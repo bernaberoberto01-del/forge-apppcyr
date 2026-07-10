@@ -12,6 +12,7 @@ import Rutinas from './pages/Rutinas'
 import CheckinPublico from './pages/CheckinPublico'
 import PortalCliente from './pages/PortalCliente'
 import RegistroCliente from './pages/RegistroCliente'
+import SesionCliente from './pages/SesionCliente'
 
 function Protected({ session, children }) {
   return session ? children : <Navigate to="/login" replace />
@@ -20,25 +21,19 @@ function Protected({ session, children }) {
 export default function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
-
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setLoading(false) })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7]">
-      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/seguimiento/:clienteId" element={<CheckinPublico />} />
         <Route path="/portal/:clienteId" element={<PortalCliente />} />
+        <Route path="/sesion/:clienteId" element={<SesionCliente />} />
         <Route path="/registro" element={<RegistroCliente />} />
         <Route path="/" element={<Protected session={session}><Layout session={session} /></Protected>}>
           <Route index element={<Navigate to="/dashboard" replace />} />

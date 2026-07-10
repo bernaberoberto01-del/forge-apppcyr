@@ -330,3 +330,4 @@ export default function PortalCliente() {
     </div>
   )
 }
+// Componente de registro de sesión para cliente online - se añade como nueva ruta
