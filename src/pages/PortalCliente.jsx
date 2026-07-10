@@ -283,13 +283,6 @@ export default function PortalCliente() {
               </div>
             )}
 
-            {checkins.filter(c => c.adherencia_entreno).length >= 2 && (
-              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-                <p className="text-sm font-bold text-[#0A0A0A] mb-2">Adherencia</p>
-                <GraficaAdherencia checkins={checkins} />
-              </div>
-            )}
-
           </>
         )}
 
