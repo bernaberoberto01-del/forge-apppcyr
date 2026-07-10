@@ -32,24 +32,59 @@ export default function Sesiones({ session }) {
   }
 
   async function cargarRutina(clienteId, diaRutina) {
-    const { data: ru } = await supabase.from('rutinas').select('*')
-      .eq('cliente_id', clienteId).eq('estado', 'publicada')
-      .order('created_at', { ascending: false }).limit(1)
+    const [{ data: ru }, { data: cu }, { data: pf }] = await Promise.all([
+      supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
+      supabase.from('cuestionarios').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }).limit(1),
+      supabase.from('progresion_fuerza').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(1),
+    ])
+
+    // Marcas del cliente para recomendar pesos
+    const marcas = pf?.[0] || {}
+    const cuest = cu?.[0] || {}
+
+    // Función para calcular peso de trabajo (~75-80% del RM)
+    const pesoTrabajo = (patron) => {
+      const p = patron?.toLowerCase() || ''
+      if (p.includes('horizontal') && p.includes('push') || p.includes('banca')) {
+        const rm = marcas.press_banca_kg || (cuest.marca_press_banca ? parseFloat(cuest.marca_press_banca) : null)
+        return rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : ''
+      }
+      if (p.includes('squat') || p.includes('sentadilla')) {
+        const rm = marcas.sentadilla_kg || (cuest.marca_sentadilla ? parseFloat(cuest.marca_sentadilla) : null)
+        return rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : ''
+      }
+      if (p.includes('deadlift') || p.includes('bisagra') || p.includes('muerto')) {
+        const rm = marcas.peso_muerto_kg || (cuest.marca_peso_muerto ? parseFloat(cuest.marca_peso_muerto) : null)
+        return rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : ''
+      }
+      if (p.includes('vertical') && p.includes('push') || p.includes('militar')) {
+        const rm = marcas.press_militar_kg || (cuest.marca_press_militar ? parseFloat(cuest.marca_press_militar) : null)
+        return rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : ''
+      }
+      return ''
+    }
 
     if (ru?.[0]) {
       setRutinaCliente(ru[0])
       const contenido = ru[0].contenido || ru[0].borrador
       const dia = contenido?.dias?.find(d => d.dia === diaRutina)
       if (dia?.ejercicios) {
-        setEjercicios(dia.ejercicios.map(ej => ({
-          ejercicio_nombre: ej.nombre,
-          patron: ej.patron,
-          orden: ej.orden,
-          notas: ej.notas || '',
-          sets: Array.from({ length: ej.series || 3 }, (_, i) => ({
-            set: i + 1, peso: '', reps: ej.reps || '8-10', completado: false
-          }))
-        })))
+        setEjercicios(dia.ejercicios.map(ej => {
+          const pesoRec = pesoTrabajo(ej.patron)
+          return {
+            ejercicio_nombre: ej.nombre,
+            patron: ej.patron,
+            orden: ej.orden,
+            notas: ej.notas || '',
+            peso_recomendado: pesoRec,
+            sets: Array.from({ length: ej.series || 3 }, (_, i) => ({
+              set: i + 1,
+              peso: pesoRec ? String(pesoRec) : '',
+              reps: ej.reps || '8-10',
+              completado: false
+            }))
+          }
+        }))
       } else {
         setEjercicios([])
       }
@@ -91,43 +126,49 @@ export default function Sesiones({ session }) {
 
   async function guardar() {
     setLoading(true)
-    const cliente = clientes.find(c => c.id === form.cliente_id)
+    try {
+      const { data: sesion, error: sesionError } = await supabase.from('sesiones').insert({
+        entrenador_id: uid,
+        cliente_id: form.cliente_id,
+        fecha: form.fecha,
+        tipo: form.tipo,
+        completada: true,
+        notas: form.sensaciones || form.notas,
+        rpe: form.rpe,
+        fatiga_post: form.fatiga_post,
+        sensaciones: form.sensaciones,
+        duracion_minutos: form.duracion_minutos,
+        dia_rutina: form.dia_rutina
+      }).select().single()
 
-    const { data: sesion } = await supabase.from('sesiones').insert({
-      entrenador_id: uid,
-      cliente_id: form.cliente_id,
-      fecha: form.fecha,
-      tipo: form.tipo,
-      completada: true,
-      notas: form.sensaciones || form.notas,
-      rpe: form.rpe,
-      fatiga_post: form.fatiga_post,
-      sensaciones: form.sensaciones,
-      duracion_minutos: form.duracion_minutos,
-      dia_rutina: form.dia_rutina
-    }).select().single()
+      if (sesionError) throw sesionError
 
-    if (sesion.data && ejercicios.filter(e => e.ejercicio_nombre).length > 0) {
-      await supabase.from('sesion_ejercicios').insert(
-        ejercicios.filter(e => e.ejercicio_nombre).map(e => ({
-          sesion_id: sesion.data.id,
-          cliente_id: form.cliente_id,
-          entrenador_id: uid,
-          ejercicio_nombre: e.ejercicio_nombre,
-          patron: e.patron,
-          orden: e.orden,
-          sets: e.sets,
-          notas: e.notas
-        }))
-      )
+      const ejsFiltrados = ejercicios.filter(e => e.ejercicio_nombre)
+      if (sesion && ejsFiltrados.length > 0) {
+        await supabase.from('sesion_ejercicios').insert(
+          ejsFiltrados.map(e => ({
+            sesion_id: sesion.id,
+            cliente_id: form.cliente_id,
+            entrenador_id: uid,
+            ejercicio_nombre: e.ejercicio_nombre,
+            patron: e.patron,
+            orden: e.orden,
+            sets: e.sets,
+            notas: e.notas
+          }))
+        )
+      }
+
+      setModal(false)
+      setPaso(1)
+      setForm(initForm)
+      setEjercicios([])
+      setRutinaCliente(null)
+      cargar() // Sin await — no bloquea el cierre del modal
+    } catch (err) {
+      console.error('Error guardando sesión:', err)
+      alert('Error al guardar: ' + err.message)
     }
-
-    setModal(false)
-    setPaso(1)
-    setForm(initForm)
-    setEjercicios([])
-    setRutinaCliente(null)
-    await cargar()
     setLoading(false)
   }
 
@@ -359,6 +400,11 @@ export default function Sesiones({ session }) {
                           <input value={ej.ejercicio_nombre} onChange={e => updateEjercicio(ejIdx, 'ejercicio_nombre', e.target.value)}
                             className="flex-1 bg-transparent text-sm font-semibold text-[#0A0A0A] focus:outline-none placeholder:text-[#6B6B6B]"
                             placeholder="Nombre del ejercicio" />
+                          {ej.peso_recomendado && (
+                            <span className="text-xs bg-[#FF5C00]/10 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                              ~{ej.peso_recomendado}kg
+                            </span>
+                          )}
                         </div>
 
                         {/* Sets */}

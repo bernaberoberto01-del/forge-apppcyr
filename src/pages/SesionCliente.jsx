@@ -19,27 +19,45 @@ export default function SesionCliente() {
 
   useEffect(() => {
     async function cargar() {
-      const { data: cl } = await supabase.from('clientes').select('*').eq('id', clienteId).single()
+      const [{ data: cl }, { data: ru }, { data: cu }, { data: pf }] = await Promise.all([
+        supabase.from('clientes').select('*').eq('id', clienteId).single(),
+        supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
+        supabase.from('cuestionarios').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }).limit(1),
+        supabase.from('progresion_fuerza').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(1),
+      ])
       if (!cl) { setLoading(false); return }
       setCliente(cl)
-      const { data: ru } = await supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1)
       if (ru?.[0]) {
         setRutina(ru[0])
-        cargarDia(ru[0], 1)
+        cargarDia(ru[0], 1, cu?.[0], pf?.[0])
       }
       setLoading(false)
     }
     cargar()
   }, [clienteId])
 
-  function cargarDia(ru, dia) {
+  function pesoTrabajo(patron, cuest, pf) {
+    const p = (patron || '').toLowerCase()
+    const rm = (key) => pf?.[key] || (cuest?.[`marca_${key.replace('_kg','')}`] ? parseFloat(cuest[`marca_${key.replace('_kg','')}`]) : null)
+    if (p.includes('push') && p.includes('horizontal') || p.includes('banca')) return rm('press_banca_kg') ? Math.round(rm('press_banca_kg') * 0.75 / 2.5) * 2.5 : ''
+    if (p.includes('squat') || p.includes('sentadilla')) return rm('sentadilla_kg') ? Math.round(rm('sentadilla_kg') * 0.75 / 2.5) * 2.5 : ''
+    if (p.includes('deadlift') || p.includes('bisagra') || p.includes('muerto')) return rm('peso_muerto_kg') ? Math.round(rm('peso_muerto_kg') * 0.75 / 2.5) * 2.5 : ''
+    if (p.includes('overhead') || p.includes('militar')) return rm('press_militar_kg') ? Math.round(rm('press_militar_kg') * 0.75 / 2.5) * 2.5 : ''
+    return ''
+  }
+
+  function cargarDia(ru, dia, cuest, pf) {
     const contenido = ru.contenido || ru.borrador
     const d = contenido?.dias?.find(x => x.dia === dia)
     if (d?.ejercicios) {
-      setEjercicios(d.ejercicios.map(ej => ({
-        ejercicio_nombre: ej.nombre, patron: ej.patron, orden: ej.orden, notas: ej.notas || '',
-        sets: Array.from({ length: ej.series || 3 }, (_, i) => ({ set: i + 1, peso: '', reps: ej.reps || '', completado: false }))
-      })))
+      setEjercicios(d.ejercicios.map(ej => {
+        const pesoRec = pesoTrabajo(ej.patron, cuest, pf)
+        return {
+          ejercicio_nombre: ej.nombre, patron: ej.patron, orden: ej.orden, notas: ej.notas || '',
+          peso_recomendado: pesoRec,
+          sets: Array.from({ length: ej.series || 3 }, (_, i) => ({ set: i + 1, peso: pesoRec ? String(pesoRec) : '', reps: ej.reps || '', completado: false }))
+        }
+      }))
     }
   }
 
@@ -56,8 +74,9 @@ export default function SesionCliente() {
       cliente_id: clienteId,
       fecha: new Date().toISOString().split('T')[0],
       tipo: 'online', completada: true,
-      rpe, fatiga_post: fatiga, sensaciones, duracion_minutos: duracion, dia_rutina: diaSeleccionado
-    }).select().single()
+      rpe, fatiga_post: fatiga, sensaciones,
+      duracion_minutos: duracion, dia_rutina: diaSeleccionado
+    }).select('id').single()
 
     if (sesion.data) {
       const ejsFiltrados = ejercicios.filter(e => e.sets.some(s => s.peso || s.reps))
@@ -151,8 +170,12 @@ export default function SesionCliente() {
           <div key={ejIdx} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
             <div className="bg-[#0A0A0A] px-4 py-3 flex items-center gap-2">
               <span className="w-6 h-6 bg-[#FF5C00] text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
-              <p className="text-white text-sm font-semibold">{ej.ejercicio_nombre}</p>
-              {ej.patron && <span className="text-white/40 text-xs ml-auto">{ej.patron}</span>}
+              <p className="text-white text-sm font-semibold flex-1">{ej.ejercicio_nombre}</p>
+              {ej.peso_recomendado && (
+                <span className="text-xs bg-[#FF5C00]/20 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                  ~{ej.peso_recomendado}kg
+                </span>
+              )}
             </div>
             <div className="p-3 space-y-2">
               <div className="grid grid-cols-12 gap-2 px-1 mb-1">
