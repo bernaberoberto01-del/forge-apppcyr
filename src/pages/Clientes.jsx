@@ -118,7 +118,11 @@ export default function Clientes({ session }) {
     if (error) { alert('Error: ' + error.message); return }
     if (cliente) {
       await supabase.from('cuestionarios').update({ cliente_id: cliente.id, procesado: true }).eq('id', c.id)
+      // Eliminar del estado local inmediatamente
+      setCuestionarios(prev => prev.filter(x => x.id !== c.id))
       await cargar()
+      // Si no quedan más, cerrar el modal
+      if (cuestionarios.length <= 1) setModalRegistros(false)
     }
   }
 
