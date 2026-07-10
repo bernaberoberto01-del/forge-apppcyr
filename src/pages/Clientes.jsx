@@ -42,7 +42,7 @@ export default function Clientes({ session }) {
   }
 
   async function convertirCuestionario(c, tipoOverride) {
-    const { data: cliente } = await supabase.from('clientes').insert({
+    const { data: cliente, error } = await supabase.from('clientes').insert({
       entrenador_id: uid, nombre: c.nombre, email: c.email, telefono: c.telefono,
       objetivo: c.objetivo, tipo: tipoOverride || c.tipo || 'presencial',
       estado: 'activo', peso_actual: c.peso_actual,
@@ -50,8 +50,10 @@ export default function Clientes({ session }) {
       notas: `Edad: ${c.edad||'—'} | Altura: ${c.altura||'—'}cm | Motivación: ${c.motivacion||'—'}`,
       precio_mensual: 0
     }).select().single()
-    if (cliente.data) {
-      await supabase.from('cuestionarios').update({ cliente_id: cliente.data.id, procesado: true }).eq('id', c.id)
+    if (error) { alert('Error al convertir: ' + error.message); return }
+    if (cliente) {
+      await supabase.from('cuestionarios').update({ cliente_id: cliente.id, procesado: true }).eq('id', c.id)
+      setModalNuevo(false)
       await cargar()
     }
   }
