@@ -20,12 +20,19 @@ function Protected({ session, children }) {
 export default function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setLoading(false) })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7]"><div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"/></div>
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7]">
+      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
   return (
     <BrowserRouter>
       <Routes>
