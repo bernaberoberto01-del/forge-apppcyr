@@ -253,14 +253,15 @@ export default function Rutinas({ session }) {
                   </button>
                 )}
                 <button onClick={async () => {
-                  if (!confirm('¿Regenerar rutina con IA? Se archivará la actual.')) return
-                  await archivar(detalle.id)
+                  if (!confirm('¿Regenerar rutina con IA? Se eliminará la actual.')) return
+                  await supabase.from('rutinas').delete().eq('id', detalle.id)
+                  setDetalle(null)
                   await generarRutina(detalle.cliente_id)
                 }} disabled={generando === detalle.cliente_id}
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40 transition-all">
                   {generando === detalle.cliente_id ? '⏳' : '🔄'}
                 </button>
-                <button onClick={() => archivar(detalle.id)}
+                <button onClick={() => { if (!confirm('¿Eliminar esta rutina?')) return; supabase.from('rutinas').delete().eq('id', detalle.id); setDetalle(null); cargar() }}
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">
                   🗑
                 </button>
