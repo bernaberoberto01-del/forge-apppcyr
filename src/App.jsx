@@ -9,8 +9,10 @@ import Pagos from './pages/Pagos'
 import Seguimiento from './pages/Seguimiento'
 import Sesiones from './pages/Sesiones'
 import Rutinas from './pages/Rutinas'
+import Cuestionarios from './pages/Cuestionarios'
 import CheckinPublico from './pages/CheckinPublico'
 import PortalCliente from './pages/PortalCliente'
+import RegistroCliente from './pages/RegistroCliente'
 
 function Protected({ session, children }) {
   return session ? children : <Navigate to="/login" replace />
@@ -19,39 +21,28 @@ function Protected({ session, children }) {
 export default function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
-
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session); setLoading(false)
-    })
+    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setLoading(false) })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s))
     return () => subscription.unsubscribe()
   }, [])
-
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7]">
-      <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin" />
-    </div>
-  )
-
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7]"><div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"/></div>
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/seguimiento/:clienteId" element={<CheckinPublico />} />
         <Route path="/portal/:clienteId" element={<PortalCliente />} />
-        <Route path="/" element={
-          <Protected session={session}>
-            <Layout session={session} />
-          </Protected>
-        }>
+        <Route path="/registro" element={<RegistroCliente />} />
+        <Route path="/" element={<Protected session={session}><Layout session={session} /></Protected>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard session={session} />} />
           <Route path="clientes" element={<Clientes session={session} />} />
+          <Route path="rutinas" element={<Rutinas session={session} />} />
+          <Route path="cuestionarios" element={<Cuestionarios session={session} />} />
           <Route path="pagos" element={<Pagos session={session} />} />
           <Route path="seguimiento" element={<Seguimiento session={session} />} />
           <Route path="sesiones" element={<Sesiones session={session} />} />
-          <Route path="rutinas" element={<Rutinas session={session} />} />
         </Route>
       </Routes>
     </BrowserRouter>

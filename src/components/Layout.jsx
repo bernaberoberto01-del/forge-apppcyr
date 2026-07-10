@@ -4,16 +4,16 @@ import { supabase } from '../lib/supabase'
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: '⊞' },
   { to: '/clientes', label: 'Clientes', icon: '👥' },
+  { to: '/cuestionarios', label: 'Registros', icon: '📋' },
   { to: '/rutinas', label: 'Rutinas', icon: '💪' },
   { to: '/pagos', label: 'Pagos', icon: '€' },
-  { to: '/seguimiento', label: 'Seguimiento', icon: '📋' },
+  { to: '/seguimiento', label: 'Seguimiento', icon: '📈' },
   { to: '/sesiones', label: 'Sesiones', icon: '🏋️' },
 ]
 
 export default function Layout({ session }) {
   const navigate = useNavigate()
   const nombre = session?.user?.email?.split('@')[0] || ''
-
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 bg-[#111] flex flex-col fixed h-full z-10 hidden md:flex">
@@ -32,8 +32,7 @@ export default function Layout({ session }) {
         <nav className="flex-1 p-3 space-y-1">
           {nav.map(item => (
             <NavLink key={item.to} to={item.to}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${isActive ? 'bg-orange-500 text-white font-medium' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}>
+              className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${isActive ? 'bg-orange-500 text-white font-medium' : 'text-gray-400 hover:bg-white/10 hover:text-white'}`}>
               <span>{item.icon}</span>{item.label}
             </NavLink>
           ))}
@@ -47,13 +46,12 @@ export default function Layout({ session }) {
         </div>
       </aside>
       <main className="flex-1 md:ml-56 min-h-screen"><Outlet /></main>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#111] border-t border-white/10 flex z-10 overflow-x-auto">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#111] border-t border-white/10 flex z-10">
         {nav.map(item => (
           <NavLink key={item.to} to={item.to}
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center py-2 text-xs min-w-0 transition-colors ${isActive ? 'text-orange-500' : 'text-gray-500'}`}>
-            <span className="text-lg">{item.icon}</span>
-            <span className="truncate text-[10px] mt-0.5">{item.label}</span>
+            className={({ isActive }) => `flex-1 flex flex-col items-center py-2 text-xs transition-colors ${isActive ? 'text-orange-500' : 'text-gray-500'}`}>
+            <span className="text-base">{item.icon}</span>
+            <span className="text-[9px] mt-0.5 truncate w-full text-center px-0.5">{item.label}</span>
           </NavLink>
         ))}
       </nav>
