@@ -106,6 +106,13 @@ export default function Clientes({ session }) {
     await cargar(); setLoading(false)
   }
 
+  async function descartarCuestionario(id) {
+    if (!confirm('¿Descartar este registro? No se creará el cliente.')) return
+    await supabase.from('cuestionarios').update({ procesado: true }).eq('id', id)
+    setCuestionarios(prev => prev.filter(x => x.id !== id))
+    if (cuestionarios.length <= 1) setModalRegistros(false)
+  }
+
   async function convertirCuestionario(c, tipoOverride) {
     const { data: cliente, error } = await supabase.from('clientes').insert({
       entrenador_id: uid, nombre: c.nombre, email: c.email, telefono: c.telefono,
@@ -118,11 +125,12 @@ export default function Clientes({ session }) {
     if (error) { alert('Error: ' + error.message); return }
     if (cliente) {
       await supabase.from('cuestionarios').update({ cliente_id: cliente.id, procesado: true }).eq('id', c.id)
-      // Eliminar del estado local inmediatamente
-      setCuestionarios(prev => prev.filter(x => x.id !== c.id))
-      await cargar()
-      // Si no quedan más, cerrar el modal
-      if (cuestionarios.length <= 1) setModalRegistros(false)
+      setCuestionarios(prev => {
+        const nuevos = prev.filter(x => x.id !== c.id)
+        if (nuevos.length === 0) setModalRegistros(false)
+        return nuevos
+      })
+      cargar()
     }
   }
 
@@ -399,10 +407,16 @@ export default function Clientes({ session }) {
                       ))}
                     </div>
                   </div>
-                  <button onClick={() => convertirCuestionario(c)}
-                    className="w-full bg-[#111] text-white text-sm font-semibold py-2.5 rounded-xl">
-                    ✅ Convertir en cliente
-                  </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => descartarCuestionario(c.id)}
+                      className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:border-red-300 hover:text-red-500 transition-all">
+                      🗑 Descartar
+                    </button>
+                    <button onClick={() => convertirCuestionario(c)}
+                      className="flex-1 bg-[#111] text-white text-sm font-semibold py-2.5 rounded-xl">
+                      ✅ Convertir
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
