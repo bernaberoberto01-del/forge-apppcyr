@@ -1,6 +1,23 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 * { box-sizing: border-box; }
-body { font-family: 'Inter', sans-serif; background: #F7F7F7; }
+body { font-family: 'Inter', sans-serif; background: #F5F5F0; color: #0A0A0A; }
+
+@layer components {
+  .card { @apply bg-white rounded-2xl border border-black/5 shadow-sm; }
+  .btn-primary { @apply bg-[#FF5C00] hover:bg-[#E05200] text-white font-semibold rounded-xl transition-all active:scale-95; }
+  .btn-secondary { @apply bg-white border border-black/10 text-[#0A0A0A] font-medium rounded-xl hover:bg-black/5 transition-all active:scale-95; }
+  .btn-ghost { @apply text-[#6B6B6B] hover:text-[#0A0A0A] hover:bg-black/5 rounded-xl transition-all; }
+  .badge { @apply text-xs font-semibold px-2.5 py-1 rounded-full; }
+  .badge-green { @apply bg-emerald-50 text-emerald-700; }
+  .badge-red { @apply bg-red-50 text-red-600; }
+  .badge-amber { @apply bg-amber-50 text-amber-700; }
+  .badge-blue { @apply bg-blue-50 text-blue-700; }
+  .badge-gray { @apply bg-black/5 text-[#6B6B6B]; }
+  .page-header { @apply mb-6; }
+  .page-title { @apply text-2xl font-bold text-[#0A0A0A]; }
+  .page-subtitle { @apply text-sm text-[#6B6B6B] mt-0.5; }
+}
