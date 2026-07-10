@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import GraficasCliente from '../components/GraficasCliente'
-import { GraficaPeso, GraficaBienestar, GraficaAdherencia } from '../components/GraficaProgreso'
 
 export default function PortalCliente() {
   const { clienteId } = useParams()
@@ -48,10 +47,10 @@ export default function PortalCliente() {
   const diasRestantes = pagoActivo?.valido_hasta ? Math.ceil((new Date(pagoActivo.valido_hasta) - new Date()) / 864e5) : null
 
   const tabs = [
-    { id: 'inicio', icon: '🏠', label: 'Inicio' },
-    { id: 'rutina', icon: '💪', label: 'Rutina' },
-    { id: 'progreso', icon: '📈', label: 'Progreso' },
-    { id: 'mensajes', icon: '✉️', label: mensajesNoLeidos > 0 ? `✉️ ${mensajesNoLeidos}` : '✉️' },
+    { id: 'inicio', label: 'Inicio' },
+    { id: 'rutina', label: 'Rutina' },
+    { id: 'progreso', label: 'Progreso' },
+    { id: 'mensajes', label: mensajesNoLeidos > 0 ? `Mensajes (${mensajesNoLeidos})` : 'Mensajes' },
   ]
 
   if (loading) return (
@@ -104,9 +103,7 @@ export default function PortalCliente() {
         <div className="max-w-lg mx-auto flex">
           {tabs.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 py-3 text-xs font-medium border-b-2 transition-all ${
-                tab === t.id ? 'border-[#FF5C00] text-[#FF5C00]' : 'border-transparent text-white/40 hover:text-white/70'
-              }`}>
+              className={`flex-1 py-3 text-xs font-medium border-b-2 transition-all ${tab === t.id ? 'border-[#FF5C00] text-[#FF5C00]' : 'border-transparent text-white/40 hover:text-white/70'}`}>
               {t.label}
             </button>
           ))}
@@ -118,21 +115,19 @@ export default function PortalCliente() {
         {/* INICIO */}
         {tab === 'inicio' && (
           <>
-            {/* Métricas rápidas */}
             <div className="grid grid-cols-3 gap-3">
               {[
                 ['Peso actual', pesoActual ? `${pesoActual}kg` : '—', '#FF5C00'],
                 ['Objetivo', cliente.peso_objetivo ? `${cliente.peso_objetivo}kg` : '—', '#6B6B6B'],
                 ['Cambio', diferencia ? `${Number(diferencia) > 0 ? '+' : ''}${diferencia}kg` : '—', Number(diferencia) < 0 ? '#10b981' : '#ef4444'],
               ].map(([l, v, c]) => (
-                <div key={l} className="bg-white rounded-2xl border border-black/5 p-3.5 text-center shadow-sm">
+                <div key={l} className="bg-white rounded-2xl border border-black/5 shadow-sm p-3.5 text-center">
                   <p className="text-xl font-bold" style={{ color: c }}>{v}</p>
                   <p className="text-xs text-[#6B6B6B] mt-1">{l}</p>
                 </div>
               ))}
             </div>
 
-            {/* Último seguimiento */}
             {ultimoCI ? (
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -147,7 +142,7 @@ export default function PortalCliente() {
                     ['🔥', 'Fatiga', `${ultimoCI.fatiga}/5`, ultimoCI.fatiga >= 4 ? 'text-red-500' : 'text-emerald-600'],
                     ['💫', 'Motivación', `${ultimoCI.motivacion}/7`, ultimoCI.motivacion >= 5 ? 'text-emerald-600' : 'text-amber-600'],
                     ['💪', 'Adherencia', `${ultimoCI.adherencia_entreno}/10`, ultimoCI.adherencia_entreno >= 7 ? 'text-emerald-600' : 'text-amber-600'],
-                  ].map(([icon, label, val, color]) => (
+                  ].filter(([,,v]) => v && v !== 'undefined/10' && v !== 'null/5').map(([icon, label, val, color]) => (
                     <div key={label} className="bg-[#F5F5F0] rounded-xl p-2.5 text-center">
                       <p className="text-base">{icon}</p>
                       <p className={`text-sm font-bold mt-1 ${color}`}>{val}</p>
@@ -164,13 +159,18 @@ export default function PortalCliente() {
               </div>
             )}
 
-            {/* CTA check-in */}
             <a href={`/seguimiento/${clienteId}`}
               className="block bg-[#FF5C00] text-white text-center font-semibold py-4 rounded-2xl text-sm active:scale-98 transition-all">
               📋 Responder seguimiento semanal
             </a>
 
-            {/* Pago */}
+            {cliente.tipo === 'online' && (
+              <a href={`/sesion/${clienteId}`}
+                className="block bg-[#111] text-white text-center font-semibold py-4 rounded-2xl text-sm active:scale-98 transition-all">
+                🏋️ Registrar sesión de hoy
+              </a>
+            )}
+
             {pagos.length > 0 && (
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
                 <p className="text-sm font-bold text-[#0A0A0A] mb-2">Estado del pago</p>
@@ -243,6 +243,7 @@ export default function PortalCliente() {
             )}
           </>
         )}
+
         {/* PROGRESO */}
         {tab === 'progreso' && (
           <>
@@ -261,28 +262,6 @@ export default function PortalCliente() {
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
               <GraficasCliente clienteId={clienteId} />
             </div>
-          </>
-        )}
-            </div>
-
-            {checkins.filter(c => c.peso).length >= 2 && (
-              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-                <p className="text-sm font-bold text-[#0A0A0A] mb-3">Evolución de peso</p>
-                <GraficaPeso checkins={checkins} pesoObjetivo={cliente.peso_objetivo} />
-              </div>
-            )}
-
-            {checkins.filter(c => c.energia).length >= 2 && (
-              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-                <p className="text-sm font-bold text-[#0A0A0A] mb-2">Bienestar semanal</p>
-                <div className="flex gap-3 mb-2">
-                  <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-blue-500 inline-block"></span>Energía</span>
-                  <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-red-500 inline-block"></span>Estrés</span>
-                </div>
-                <GraficaBienestar checkins={checkins} />
-              </div>
-            )}
-
           </>
         )}
 
@@ -313,4 +292,3 @@ export default function PortalCliente() {
     </div>
   )
 }
-// Componente de registro de sesión para cliente online - se añade como nueva ruta
