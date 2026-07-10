@@ -1,78 +1,168 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const nav = [
-  { to: '/dashboard', label: 'Dashboard', icon: '⊞' },
-  { to: '/agenda', label: 'Agenda', icon: '📅' },
-  { to: '/clientes', label: 'Clientes', icon: '👥' },
-  { to: '/rutinas', label: 'Rutinas', icon: '💪' },
-  { to: '/pagos', label: 'Pagos', icon: '€' },
-  { to: '/seguimiento', label: 'Seguimiento', icon: '📈' },
-  { to: '/sesiones', label: 'Sesiones', icon: '🏋️' },
+const TODOS_MODULOS = [
+  { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { id: 'clientes', path: '/clientes', label: 'Clientes', icon: '👥' },
+  { id: 'rutinas', path: '/rutinas', label: 'Rutinas', icon: '💪' },
+  { id: 'sesiones', path: '/sesiones', label: 'Sesiones', icon: '🏋️' },
+  { id: 'seguimiento', path: '/seguimiento', label: 'Seguimiento', icon: '📋' },
+  { id: 'pagos', path: '/pagos', label: 'Pagos', icon: '💶' },
+  { id: 'agenda', path: '/agenda', label: 'Agenda', icon: '📅' },
 ]
 
-export default function Layout({ session }) {
-  const navigate = useNavigate()
-  const nombre = session?.user?.email?.split('@')[0] || ''
-  const inicial = nombre[0]?.toUpperCase() || 'U'
+export default function Layout({ children, session }) {
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [config, setConfig] = useState(null)
+  const location = useLocation()
+  const uid = session?.user?.id
+
+  useEffect(() => {
+    async function cargarConfig() {
+      if (!uid) return
+      const { data } = await supabase.from('configuracion').select('modulos, nombre_negocio, nombre_entrenador, foto_url, color_acento').eq('entrenador_id', uid).single()
+      setConfig(data)
+    }
+    cargarConfig()
+  }, [uid])
+
+  useEffect(() => { setMobileOpen(false) }, [location.pathname])
+
+  const modulosActivos = TODOS_MODULOS.filter(m => !config?.modulos || config.modulos[m.id] !== false)
+  const nombre = config?.nombre_entrenador || session?.user?.email?.split('@')[0] || 'Entrenador'
+  const negocio = config?.nombre_negocio || 'Forge Studio OS'
+  const acento = config?.color_acento || '#FF5C00'
+
+  const NavItem = ({ item }) => (
+    <NavLink to={item.path}
+      className={({ isActive }) =>
+        `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+          ? 'text-white'
+          : 'text-white/50 hover:text-white hover:bg-white/5'}`
+      }
+      style={({ isActive }) => isActive ? { background: acento } : {}}>
+      <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
+      <span className="truncate">{item.label}</span>
+    </NavLink>
+  )
+
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="px-4 py-5 border-b border-white/8">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: acento }}>
+            <svg width="16" height="16" viewBox="0 0 28 28" fill="none">
+              <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
+              <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
+              <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
+            </svg>
+          </div>
+          <div className="min-w-0">
+            <p className="text-white text-sm font-bold truncate">{negocio}</p>
+            <p className="text-white/40 text-xs truncate">{nombre}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {modulosActivos.map(item => <NavItem key={item.id} item={item} />)}
+      </nav>
+
+      {/* Footer */}
+      <div className="px-3 py-3 border-t border-white/8 space-y-1">
+        <NavLink to="/configuracion"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive ? 'text-white' : 'text-white/40 hover:text-white hover:bg-white/5'}`
+          }
+          style={({ isActive }) => isActive ? { background: acento } : {}}>
+          <span className="text-base w-5 text-center flex-shrink-0">⚙️</span>
+          <span>Configuración</span>
+        </NavLink>
+        <button onClick={() => supabase.auth.signOut()}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-white/30 hover:text-white hover:bg-white/5 transition-all">
+          <span className="text-base w-5 text-center flex-shrink-0">→</span>
+          <span>Cerrar sesión</span>
+        </button>
+      </div>
+    </div>
+  )
 
   return (
-    <div className="flex min-h-screen bg-[#F5F5F0]">
-      <aside className="w-60 bg-[#111] flex flex-col fixed h-full z-20 hidden md:flex">
-        <div className="p-5 border-b border-white/8">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#FF5C00] rounded-xl flex items-center justify-center flex-shrink-0">
-              <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
-                <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-                <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-                <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-                <path d="M18 18L23 12" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-                <path d="M19.5 12H23V15.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div>
-              <p className="text-white font-bold text-base leading-none">Forge</p>
-              <p className="text-white/40 text-xs mt-0.5">Studio OS</p>
-            </div>
-          </div>
+    <div className="flex h-screen bg-[#F5F5F0]">
+      {/* Sidebar desktop */}
+      <aside className="hidden md:flex w-56 bg-[#111] flex-col flex-shrink-0">
+        <SidebarContent />
+      </aside>
+
+      {/* Sidebar mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-[#111] flex flex-col">
+            <SidebarContent />
+          </aside>
         </div>
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {nav.map(item => (
-            <NavLink key={item.to} to={item.to}
+      )}
+
+      {/* Main */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Topbar móvil */}
+        <header className="md:hidden bg-white border-b border-black/5 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+          <button onClick={() => setMobileOpen(true)} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-black/5">
+            <div className="space-y-1.5">
+              <div className="w-5 h-0.5 bg-[#0A0A0A]" />
+              <div className="w-5 h-0.5 bg-[#0A0A0A]" />
+              <div className="w-5 h-0.5 bg-[#0A0A0A]" />
+            </div>
+          </button>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-[#0A0A0A] truncate">{negocio}</p>
+          </div>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: acento }}>
+            <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
+              <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
+              <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
+              <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
+            </svg>
+          </div>
+        </header>
+
+        {/* Content */}
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+
+        {/* Nav móvil inferior */}
+        <nav className="md:hidden bg-white border-t border-black/5 flex items-center px-2 py-1 flex-shrink-0 safe-bottom">
+          {modulosActivos.slice(0, 5).map(item => (
+            <NavLink key={item.id} to={item.path}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${
-                  isActive ? 'bg-[#FF5C00] text-white font-semibold' : 'text-white/50 hover:bg-white/8 hover:text-white'
-                }`}>
-              <span className="text-base w-5 text-center">{item.icon}</span>
-              <span>{item.label}</span>
+                `flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`
+              }>
+              {({ isActive }) => (
+                <>
+                  <span className="text-lg">{item.icon}</span>
+                  <span className="text-[10px] font-medium text-[#0A0A0A]">{item.label.split(' ')[0]}</span>
+                  {isActive && <div className="w-1 h-1 rounded-full" style={{ background: acento }} />}
+                </>
+              )}
             </NavLink>
           ))}
-        </nav>
-        <div className="p-3 border-t border-white/8">
-          <div className="flex items-center gap-3 px-2 py-2 mb-1">
-            <div className="w-8 h-8 bg-[#FF5C00]/20 rounded-full flex items-center justify-center text-[#FF5C00] font-bold text-sm flex-shrink-0">{inicial}</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white text-xs font-medium truncate">{nombre}</p>
-              <p className="text-white/30 text-xs">Entrenador</p>
-            </div>
-          </div>
-          <button onClick={async () => { await supabase.auth.signOut(); navigate('/login') }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-xs text-white/40 hover:text-white hover:bg-white/8 rounded-xl transition-all">
-            <span>🚪</span> Cerrar sesión
-          </button>
-        </div>
-      </aside>
-      <main className="flex-1 md:ml-60 min-h-screen pb-20 md:pb-0"><Outlet /></main>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#111] border-t border-white/8 flex z-20">
-        {nav.map(item => (
-          <NavLink key={item.to} to={item.to}
-            className={({ isActive }) =>
-              `flex-1 flex flex-col items-center py-3 transition-all ${isActive ? 'text-[#FF5C00]' : 'text-white/40'}`}>
-            <span className="text-base leading-none">{item.icon}</span>
-            <span className="text-[8px] mt-1 font-medium">{item.label}</span>
+          <NavLink to="/configuracion"
+            className={({ isActive }) => `flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`}>
+            {({ isActive }) => (
+              <>
+                <span className="text-lg">⚙️</span>
+                <span className="text-[10px] font-medium text-[#0A0A0A]">Config</span>
+                {isActive && <div className="w-1 h-1 rounded-full" style={{ background: acento }} />}
+              </>
+            )}
           </NavLink>
-        ))}
-      </nav>
+        </nav>
+      </div>
     </div>
   )
 }

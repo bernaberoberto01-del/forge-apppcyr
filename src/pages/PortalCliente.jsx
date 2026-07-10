@@ -18,6 +18,7 @@ export default function PortalCliente() {
   const [pagos, setPagos] = useState([])
   const [mensajes, setMensajes] = useState([])
   const [mensajesLeidos, setMensajesLeidos] = useState(false)
+  const [configEntrenador, setConfigEntrenador] = useState(null)
 
   useEffect(() => {
     async function cargar() {
@@ -34,6 +35,11 @@ export default function PortalCliente() {
       setCheckins(ci || [])
       setPagos(pg || [])
       setMensajes(ms || [])
+      // Cargar config del entrenador
+      if (cl?.entrenador_id) {
+        const { data: cfg } = await supabase.from('configuracion').select('nombre_entrenador, foto_url, nombre_negocio').eq('entrenador_id', cl.entrenador_id).single()
+        if (cfg) setConfigEntrenador(cfg)
+      }
       setLoading(false)
     }
     cargar()
@@ -321,9 +327,12 @@ export default function PortalCliente() {
             ) : mensajes.map(m => (
               <div key={m.id} className={`bg-white rounded-2xl border shadow-sm p-4 ${!m.leido?'border-[#FF5C00]/30':'border-black/5'}`}>
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">E</div>
+                  {configEntrenador?.foto_url
+                    ? <img src={configEntrenador.foto_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+                    : <div className="w-9 h-9 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">{(configEntrenador?.nombre_entrenador||'E').charAt(0).toUpperCase()}</div>
+                  }
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-[#0A0A0A]">Tu entrenador</p>
+                    <p className="text-sm font-semibold text-[#0A0A0A]">{configEntrenador?.nombre_entrenador || 'Tu entrenador'}</p>
                     <p className="text-xs text-[#6B6B6B]">{new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
                   </div>
                   {!m.leido && <div className="w-2 h-2 bg-[#FF5C00] rounded-full flex-shrink-0" />}
