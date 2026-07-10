@@ -40,10 +40,11 @@ export default function Clientes({ session }) {
     await cargar(); setLoading(false)
   }
 
-  async function convertirCuestionario(c) {
+  async function convertirCuestionario(c, tipoOverride) {
     const { data: cliente } = await supabase.from('clientes').insert({
       entrenador_id: uid, nombre: c.nombre, email: c.email, telefono: c.telefono,
-      objetivo: c.objetivo, tipo: 'online', estado: 'activo', peso_actual: c.peso_actual,
+      objetivo: c.objetivo, tipo: tipoOverride || c.tipo || 'presencial',
+      estado: 'activo', peso_actual: c.peso_actual,
       nivel: c.nivel, dias_semana: c.dias_semana, material: c.material, lesiones: c.lesiones,
       notas: `Edad: ${c.edad||'—'} | Altura: ${c.altura||'—'}cm | Motivación: ${c.motivacion||'—'}`,
       precio_mensual: 0
@@ -192,15 +193,30 @@ export default function Clientes({ session }) {
                         <p className="text-xs text-gray-300">{new Date(c.created_at).toLocaleDateString('es-ES')}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <div className="flex-1 bg-gray-50 rounded-lg p-2 text-xs text-gray-500">
-                        <p>Nivel: {c.nivel||'—'} · {c.dias_semana||'—'} días/sem</p>
-                        <p>Material: {c.material||'—'}</p>
-                        {c.lesiones && <p>Lesiones: {c.lesiones}</p>}
+                    <div className="flex-1 bg-gray-50 rounded-lg p-2 text-xs text-gray-500 mb-2">
+                      <p>Nivel: {c.nivel||'—'} · {c.dias_semana||'—'} días/sem</p>
+                      <p>Material: {c.material||'—'}</p>
+                      {c.lesiones && <p>Lesiones: {c.lesiones}</p>}
+                    </div>
+                    <div className="mb-2">
+                      <p className="text-xs font-medium text-gray-600 mb-1.5">Modalidad</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['presencial','online'].map(t => (
+                          <button key={t} type="button"
+                            onClick={() => {
+                              const updated = [...cuestionarios]
+                              const idx = updated.findIndex(x => x.id === c.id)
+                              updated[idx] = { ...updated[idx], tipo: t }
+                              setCuestionarios(updated)
+                            }}
+                            className={`py-2 rounded-lg text-xs font-semibold transition-all ${(c.tipo||'presencial')===t ? 'bg-orange-500 text-white' : 'border border-gray-200 text-gray-500'}`}>
+                            {t === 'presencial' ? '📍 Presencial' : '🌐 Online'}
+                          </button>
+                        ))}
                       </div>
                     </div>
                     <button onClick={() => convertirCuestionario(c)}
-                      className="w-full mt-2 bg-orange-500 text-white text-xs font-medium py-2 rounded-lg">
+                      className="w-full bg-orange-500 text-white text-xs font-medium py-2 rounded-lg">
                       ✅ Convertir en cliente
                     </button>
                   </div>

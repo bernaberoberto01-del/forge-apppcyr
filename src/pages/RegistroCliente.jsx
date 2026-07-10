@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 const PASOS = ['Datos personales','Tu objetivo','Experiencia','Marcas básicas','Material y horario','Salud','Expectativas']
 
 const init = {
-  nombre:'', email:'', telefono:'', edad:'', sexo:'', peso_actual:'', altura:'',
+  nombre:'', email:'', telefono:'', edad:'', sexo:'', peso_actual:'', altura:'', tipo:'presencial',
   objetivo:'', objetivo_detalle:'', plazo:'3_meses',
   nivel:'principiante', anos_entrenando:0,
   marca_press_banca:'', marca_sentadilla:'', marca_peso_muerto:'', marca_dominadas:'', marca_flexiones:'', marca_press_militar:'',
@@ -160,6 +160,21 @@ export default function RegistroCliente() {
                 <p className="text-sm text-[#6B6B6B] mt-0.5">Esta información nos ayuda a personalizar tu plan al máximo.</p>
               </div>
               <Input label="Nombre completo" value={form.nombre} onChange={e => set('nombre', e.target.value)} required placeholder="Tu nombre y apellidos" />
+              <div>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Modalidad de entrenamiento</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ['presencial','📍 Presencial','Entrenas en persona con tu entrenador'],
+                    ['online','🌐 Online','Seguimiento y rutinas a distancia'],
+                  ].map(([v,l,d]) => (
+                    <button key={v} type="button" onClick={() => set('tipo', v)}
+                      className={`p-3.5 rounded-xl border text-left transition-all ${form.tipo===v ? 'bg-[#FF5C00] border-[#FF5C00]' : 'border-black/10 hover:border-[#FF5C00]/50'}`}>
+                      <p className={`text-sm font-semibold ${form.tipo===v ? 'text-white' : 'text-[#0A0A0A]'}`}>{l}</p>
+                      <p className={`text-xs mt-0.5 ${form.tipo===v ? 'text-white/80' : 'text-[#6B6B6B]'}`}>{d}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Input label="Email" value={form.email} onChange={e => set('email', e.target.value)} type="email" required placeholder="tu@email.com" />
               <Input label="Teléfono" value={form.telefono} onChange={e => set('telefono', e.target.value)} type="tel" placeholder="+34 600 000 000" />
               <div className="grid grid-cols-2 gap-3">
