@@ -13,6 +13,7 @@ import CheckinPublico from './pages/CheckinPublico'
 import PortalCliente from './pages/PortalCliente'
 import RegistroCliente from './pages/RegistroCliente'
 import SesionCliente from './pages/SesionCliente'
+import ProgresoCliente from './pages/ProgresoCliente'
 
 function Protected({ session, children }) {
   return session ? children : <Navigate to="/login" replace />
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="/seguimiento/:clienteId" element={<CheckinPublico />} />
         <Route path="/portal/:clienteId" element={<PortalCliente />} />
         <Route path="/sesion/:clienteId" element={<SesionCliente />} />
+        <Route path="/progreso/:clienteId" element={<ProgresoCliente />} />
         <Route path="/registro" element={<RegistroCliente />} />
         <Route path="/" element={<Protected session={session}><Layout session={session} /></Protected>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
