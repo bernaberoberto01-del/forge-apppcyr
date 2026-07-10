@@ -124,7 +124,15 @@ export default function Clientes({ session }) {
     }).select().single()
     if (error) { alert('Error: ' + error.message); return }
     if (cliente) {
-      await supabase.from('cuestionarios').update({ cliente_id: cliente.id, procesado: true }).eq('id', c.id)
+      await Promise.all([
+        supabase.from('cuestionarios').update({ cliente_id: cliente.id, procesado: true }).eq('id', c.id),
+        // Mensaje de bienvenida automático
+        supabase.from('mensajes_cliente').insert({
+          entrenador_id: uid,
+          cliente_id: cliente.id,
+          contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu rutina. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
+        })
+      ])
       setCuestionarios(prev => {
         const nuevos = prev.filter(x => x.id !== c.id)
         if (nuevos.length === 0) setModalRegistros(false)

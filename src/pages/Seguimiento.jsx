@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
+const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
+
 const ESCALAS = [
   { label: 'Energía', field: 'energia', min: 1, max: 10, suffix: '/10', color: 'blue' },
   { label: 'Sueño (horas)', field: 'sueno', min: 4, max: 10, suffix: 'h', color: 'purple' },
@@ -33,6 +36,8 @@ export default function Seguimiento({ session }) {
   const [loading, setLoading] = useState(false)
   const [filtroCliente, setFiltroCliente] = useState('todos')
   const uid = session.user.id
+  const [enviando, setEnviando] = useState(false)
+  const [toast, setToast] = useState('')
 
   useEffect(() => { cargar() }, [uid])
 
@@ -43,6 +48,26 @@ export default function Seguimiento({ session }) {
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
+  }
+
+  async function reenviarCheckin() {
+    setEnviando(true)
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/checkin-semanal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` }
+      })
+      setToast('Check-in enviado a todos los clientes activos ✓')
+    } catch { setToast('Error al enviar') }
+    setEnviando(false)
+    setTimeout(() => setToast(''), 3000)
+  }
+
+  async function copiarEnlaceCheckin(clienteId) {
+    const url = `${window.location.origin}/seguimiento/${clienteId}`
+    await navigator.clipboard.writeText(url)
+    setToast('Enlace de seguimiento copiado ✓')
+    setTimeout(() => setToast(''), 3000)
   }
 
   async function guardar() {
@@ -76,13 +101,27 @@ export default function Seguimiento({ session }) {
   const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <div className="p-4 md:p-6 pb-20 md:pb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-[#0A0A0A]">Seguimiento</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">Check-ins semanales automáticos · Detecta fatiga, estrés y abandono antes de que ocurran</p>
-        <button onClick={() => setModal(true)} className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
-          + Registrar
-        </button>
+    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
+      {toast && (
+        <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
+          <span className="text-emerald-400">✓</span> {toast}
+        </div>
+      )}
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0A0A0A]">Seguimiento</h1>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">Check-ins semanales · Detecta fatiga y abandono antes de que ocurran</p>
+        </div>
+        <div className="flex gap-2 flex-shrink-0">
+          <button onClick={reenviarCheckin} disabled={enviando}
+            className="border border-black/10 text-[#6B6B6B] text-sm font-medium px-3 py-2 rounded-xl hover:bg-[#F5F5F0] transition-all disabled:opacity-40">
+            {enviando ? '⏳' : '📨'}
+          </button>
+          <button onClick={() => setModal(true)}
+            className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95">
+            + Registrar
+          </button>
+        </div>
       </div>
 
       {/* Filtro por cliente */}

@@ -16,6 +16,8 @@ import RegistroCliente from './pages/RegistroCliente'
 import SesionCliente from './pages/SesionCliente'
 import ProgresoCliente from './pages/ProgresoCliente'
 
+import NotFound from './pages/NotFound'
+
 function Protected({ session, children }) {
   return session ? children : <Navigate to="/login" replace />
 }
@@ -48,6 +50,7 @@ export default function App() {
           <Route path="seguimiento" element={<Seguimiento session={session} />} />
           <Route path="sesiones" element={<Sesiones session={session} />} />
         </Route>
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   )

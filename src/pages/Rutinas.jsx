@@ -4,6 +4,15 @@ import { supabase } from '../lib/supabase'
 const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
 
+function Toast({ msg, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t) }, [])
+  return (
+    <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 animate-fade-in">
+      <span className="text-emerald-400">✓</span> {msg}
+    </div>
+  )
+}
+
 const PATRONES = ['empuje_horizontal','empuje_vertical','tiron_vertical','tiron_horizontal','sentadilla','bisagra','hip_extension','core','cardio','aislamiento']
 const initEj = () => ({ nombre:'', patron:'empuje_horizontal', series:3, reps:'8-10', descanso:'90s', notas:'' })
 const initDia = (n) => ({ dia:n, nombre:`Día ${String.fromCharCode(64+n)}`, patron_principal:'', ejercicios:[initEj()] })
@@ -25,6 +34,7 @@ export default function Rutinas({ session }) {
   const [manualDescripcion, setManualDescripcion] = useState('')
   const [manualDias, setManualDias] = useState([initDia(1), initDia(2), initDia(3)])
   const [guardandoManual, setGuardandoManual] = useState(false)
+  const [toast, setToast] = useState('')
   const uid = session.user.id
 
   useEffect(() => { cargar() }, [uid])
@@ -87,6 +97,7 @@ export default function Rutinas({ session }) {
       notas_entrenador: notasEdit,
     }).eq('id', rutina.id)
     setDetalle(null)
+    setToast(`Rutina publicada para ${rutina.clientes?.nombre} ✓`)
     await cargar()
   }
 
@@ -116,6 +127,7 @@ export default function Rutinas({ session }) {
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
+      {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       {/* Cabecera contextual */}
       <div className="flex items-start justify-between mb-5">
         <div>
