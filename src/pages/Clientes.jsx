@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { GraficaPeso, GraficaBienestar, GraficaFuerza, GraficaAdherencia } from '../components/GraficaProgreso'
 
 const OBJ = { perdida_grasa:'Pérdida de grasa', ganancia_muscular:'Ganancia muscular', tonificacion:'Tonificación', fuerza:'Fuerza', rendimiento:'Rendimiento', salud_general:'Salud general', cambio_rapido_30dias:'Cambio 30 días' }
 const OBJETIVOS = Object.entries(OBJ)
@@ -63,12 +64,13 @@ export default function Clientes({ session }) {
 
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen')
-    const [{ data: ci }, { data: pg }, { data: se }] = await Promise.all([
+    const [{ data: ci }, { data: pg }, { data: se }, { data: pf }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
+      supabase.from('progresion_fuerza').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
     ])
-    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[] })
+    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], progresion: pf||[] })
   }
 
   function abrirEditar(c) {
@@ -279,9 +281,9 @@ export default function Clientes({ session }) {
                 <div className="flex-1"><p className="font-semibold">{detalle.nombre}</p><p className="text-xs text-gray-500">{OBJ[detalle.objetivo]} · {detalle.tipo==='online'?'🌐 Online':'📍 Presencial'}</p></div>
                 <button onClick={() => setDetalle(null)} className="text-gray-400 text-xl">×</button>
               </div>
-              <div className="flex gap-1">
-                {['resumen','seguimientos','sesiones','pagos'].map(t=>(
-                  <button key={t} onClick={() => setDTab(t)} className={`flex-1 py-1.5 text-xs font-medium rounded-lg ${dTab===t?'bg-orange-500 text-white':'text-gray-500 hover:bg-gray-50'}`}>
+              <div className="flex gap-1 overflow-x-auto">
+                {['resumen','progreso','seguimientos','sesiones','pagos'].map(t=>(
+                  <button key={t} onClick={() => setDTab(t)} className={`flex-shrink-0 px-2 py-1.5 text-xs font-medium rounded-lg ${dTab===t?'bg-orange-500 text-white':'text-gray-500 hover:bg-gray-50'}`}>
                     {t.charAt(0).toUpperCase()+t.slice(1)}
                   </button>
                 ))}
@@ -311,6 +313,74 @@ export default function Clientes({ session }) {
                     <button onClick={()=>abrirEditar(detalle)} className="flex-1 border border-gray-200 text-sm py-2 rounded-lg">Editar</button>
                     <button onClick={()=>eliminar(detalle.id)} className="border border-red-200 text-red-500 text-sm py-2 px-3 rounded-lg">🗑</button>
                   </div>
+                </div>
+              )}
+              {dTab==='progreso'&&(
+                <div className="space-y-4">
+                  {/* Gráfica peso */}
+                  <div className="bg-[#F5F5F0] rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-bold text-[#0A0A0A]">Evolución de peso</p>
+                      {detalle.peso_objetivo && <p className="text-xs text-emerald-600">🎯 Obj: {detalle.peso_objetivo}kg</p>}
+                    </div>
+                    <GraficaPeso checkins={dData.checkins} pesoObjetivo={detalle.peso_objetivo} />
+                  </div>
+
+                  {/* Gráfica bienestar */}
+                  <div className="bg-[#F5F5F0] rounded-xl p-3">
+                    <p className="text-xs font-bold text-[#0A0A0A] mb-1">Bienestar semanal</p>
+                    <div className="flex gap-3 mb-2">
+                      <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-blue-500 inline-block"></span>Energía</span>
+                      <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-amber-500 inline-block"></span>Motivación</span>
+                      <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-red-500 inline-block"></span>Estrés</span>
+                    </div>
+                    <GraficaBienestar checkins={dData.checkins} />
+                  </div>
+
+                  {/* Gráfica adherencia */}
+                  <div className="bg-[#F5F5F0] rounded-xl p-3">
+                    <p className="text-xs font-bold text-[#0A0A0A] mb-1">Adherencia</p>
+                    <div className="flex gap-3 mb-2">
+                      <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-[#FF5C00] inline-block"></span>Entreno</span>
+                      <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-emerald-500 inline-block"></span>Nutrición</span>
+                    </div>
+                    <GraficaAdherencia checkins={dData.checkins} />
+                  </div>
+
+                  {/* Gráfica fuerza */}
+                  {dData.progresion?.length > 0 && (
+                    <div className="bg-[#F5F5F0] rounded-xl p-3">
+                      <p className="text-xs font-bold text-[#0A0A0A] mb-1">Progresión de fuerza</p>
+                      <div className="flex gap-2 mb-2 flex-wrap">
+                        {[['Banca','#FF5C00'],['Sentadilla','#3b82f6'],['Muerto','#10b981'],['Militar','#f59e0b']].map(([l,c]) => (
+                          <span key={l} className="flex items-center gap-1 text-xs text-[#6B6B6B]">
+                            <span className="w-3 h-0.5 inline-block" style={{background:c}}></span>{l}
+                          </span>
+                        ))}
+                      </div>
+                      <GraficaFuerza progresion={dData.progresion} />
+                      {/* Última marca */}
+                      <div className="mt-3 pt-3 border-t border-black/8 grid grid-cols-2 gap-2">
+                        {[
+                          ['Press banca', dData.progresion[0]?.press_banca_kg, dData.progresion[0]?.press_banca_reps],
+                          ['Sentadilla', dData.progresion[0]?.sentadilla_kg, dData.progresion[0]?.sentadilla_reps],
+                          ['Peso muerto', dData.progresion[0]?.peso_muerto_kg, dData.progresion[0]?.peso_muerto_reps],
+                          ['Press militar', dData.progresion[0]?.press_militar_kg, dData.progresion[0]?.press_militar_reps],
+                        ].filter(([,kg,r]) => kg||r).map(([l,kg,r]) => (
+                          <div key={l} className="bg-white rounded-lg p-2">
+                            <p className="text-xs text-[#6B6B6B]">{l}</p>
+                            <p className="text-sm font-bold text-[#0A0A0A]">{kg ? `${kg}kg` : '—'} {r ? `× ${r}` : ''}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Enlace progreso cliente */}
+                  <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/progreso/${detalle.id}`)}
+                    className="w-full border border-dashed border-black/15 text-[#6B6B6B] text-xs py-2.5 rounded-xl hover:border-[#FF5C00] hover:text-[#FF5C00] transition-all">
+                    📋 Copiar enlace control de progresión
+                  </button>
                 </div>
               )}
               {dTab==='seguimientos'&&(

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { GraficaPeso, GraficaBienestar, GraficaAdherencia } from '../components/GraficaProgreso'
 
 export default function PortalCliente() {
   const { clienteId } = useParams()
@@ -258,25 +259,28 @@ export default function PortalCliente() {
               ))}
             </div>
 
-            {checkins.filter(c => c.peso).length > 0 && (
+            {checkins.filter(c => c.peso).length >= 2 && (
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
                 <p className="text-sm font-bold text-[#0A0A0A] mb-3">Evolución de peso</p>
-                <div className="space-y-2.5">
-                  {checkins.filter(c => c.peso).slice(0, 8).reverse().map((ci, i, arr) => {
-                    const max = Math.max(...arr.map(x => x.peso))
-                    const min = Math.min(...arr.map(x => x.peso))
-                    const pct = max === min ? 50 : ((ci.peso - min) / (max - min)) * 100
-                    return (
-                      <div key={ci.id} className="flex items-center gap-3">
-                        <span className="text-xs text-[#6B6B6B] w-16 flex-shrink-0">{new Date(ci.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
-                        <div className="flex-1 bg-[#F5F5F0] rounded-full h-2">
-                          <div className="bg-[#FF5C00] h-2 rounded-full transition-all" style={{ width: `${Math.max(5, pct)}%` }} />
-                        </div>
-                        <span className="text-sm font-bold text-[#0A0A0A] w-14 text-right">{ci.peso}kg</span>
-                      </div>
-                    )
-                  })}
+                <GraficaPeso checkins={checkins} pesoObjetivo={cliente.peso_objetivo} />
+              </div>
+            )}
+
+            {checkins.filter(c => c.energia).length >= 2 && (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                <p className="text-sm font-bold text-[#0A0A0A] mb-2">Bienestar semanal</p>
+                <div className="flex gap-3 mb-2">
+                  <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-blue-500 inline-block"></span>Energía</span>
+                  <span className="flex items-center gap-1 text-xs text-[#6B6B6B]"><span className="w-3 h-0.5 bg-red-500 inline-block"></span>Estrés</span>
                 </div>
+                <GraficaBienestar checkins={checkins} />
+              </div>
+            )}
+
+            {checkins.filter(c => c.adherencia_entreno).length >= 2 && (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                <p className="text-sm font-bold text-[#0A0A0A] mb-2">Adherencia</p>
+                <GraficaAdherencia checkins={checkins} />
               </div>
             )}
 
