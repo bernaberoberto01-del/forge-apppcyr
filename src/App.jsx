@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase'
 import Login from './pages/Login'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
+import Agenda from './pages/Agenda'
 import Clientes from './pages/Clientes'
 import Pagos from './pages/Pagos'
 import Seguimiento from './pages/Seguimiento'
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/" element={<Protected session={session}><Layout session={session} /></Protected>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard session={session} />} />
+          <Route path="agenda" element={<Agenda session={session} />} />
           <Route path="clientes" element={<Clientes session={session} />} />
           <Route path="rutinas" element={<Rutinas session={session} />} />
           <Route path="pagos" element={<Pagos session={session} />} />
