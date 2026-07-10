@@ -252,9 +252,17 @@ export default function Rutinas({ session }) {
                     📋 Copiar enlace del portal
                   </button>
                 )}
+                <button onClick={async () => {
+                  if (!confirm('¿Regenerar rutina con IA? Se archivará la actual.')) return
+                  await archivar(detalle.id)
+                  await generarRutina(detalle.cliente_id)
+                }} disabled={generando === detalle.cliente_id}
+                  className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40 transition-all">
+                  {generando === detalle.cliente_id ? '⏳' : '🔄'}
+                </button>
                 <button onClick={() => archivar(detalle.id)}
-                  className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-4 rounded-xl hover:bg-[#F5F5F0]">
-                  Archivar
+                  className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">
+                  🗑
                 </button>
               </div>
             </div>
