@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import GraficasCliente from '../components/GraficasCliente'
 import { GraficaPeso, GraficaBienestar, GraficaAdherencia } from '../components/GraficaProgreso'
 
 export default function PortalCliente() {
@@ -242,7 +243,6 @@ export default function PortalCliente() {
             )}
           </>
         )}
-
         {/* PROGRESO */}
         {tab === 'progreso' && (
           <>
@@ -257,6 +257,12 @@ export default function PortalCliente() {
                   <p className="text-xs text-[#6B6B6B] mt-1">{l}</p>
                 </div>
               ))}
+            </div>
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+              <GraficasCliente clienteId={clienteId} />
+            </div>
+          </>
+        )}
             </div>
 
             {checkins.filter(c => c.peso).length >= 2 && (
@@ -284,26 +290,6 @@ export default function PortalCliente() {
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-              <p className="text-sm font-bold text-[#0A0A0A] mb-3">Historial de seguimientos</p>
-              {checkins.length === 0 ? (
-                <p className="text-sm text-[#6B6B6B] text-center py-2">Sin seguimientos todavía</p>
-              ) : (
-                <div className="space-y-3">
-                  {checkins.slice(0, 6).map(ci => (
-                    <div key={ci.id} className="border-b border-black/5 pb-3 last:border-0 last:pb-0">
-                      <p className="text-xs font-medium text-[#6B6B6B] mb-2">{new Date(ci.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</p>
-                      <div className="flex gap-1.5 flex-wrap">
-                        {ci.peso && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full">⚖️ {ci.peso}kg</span>}
-                        {ci.energia && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">⚡ {ci.energia}/10</span>}
-                        {ci.estres && <span className={`text-xs px-2 py-1 rounded-full ${ci.estres >= 4 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>😤 {ci.estres}/5</span>}
-                        {ci.motivacion && <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full">💫 {ci.motivacion}/7</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </>
         )}
 
