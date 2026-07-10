@@ -78,7 +78,8 @@ export default function Seguimiento({ session }) {
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-[#111]">Seguimiento</h1>
+        <h1 className="text-2xl font-bold text-[#0A0A0A]">Seguimiento</h1>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">Check-ins semanales automáticos · Detecta fatiga, estrés y abandono antes de que ocurran</p>
         <button onClick={() => setModal(true)} className="bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
           + Registrar
         </button>

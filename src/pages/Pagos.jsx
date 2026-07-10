@@ -96,7 +96,8 @@ export default function Pagos({ session }) {
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-[#111]">Pagos</h1>
+        <h1 className="text-2xl font-bold text-[#0A0A0A]">Pagos</h1>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">Registra cobros manuales o genera enlaces de pago con Stripe · Los pagos online se activan solos</p>
         <div className="flex gap-2">
           <button onClick={() => setModalStripe(true)} className="border border-[#635BFF] text-[#635BFF] text-sm font-medium px-3 py-2 rounded-lg hover:bg-[#635BFF]/5 transition-colors">
             💳 Stripe
