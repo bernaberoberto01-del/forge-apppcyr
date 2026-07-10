@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { getPesoRecomendado } from '../utils/pesos'
 
 function Toast({ msg, tipo='ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
@@ -12,59 +13,6 @@ function Toast({ msg, tipo='ok', onClose }) {
 
 
 // Pesos de referencia por nivel y patrón de movimiento
-const PESOS_BASE = {
-  principiante: {
-    empuje_horizontal: 30, empuje_vertical: 20, tiron_vertical: null, tiron_horizontal: 30,
-    sentadilla: 40, bisagra: 50, hip_extension: 30, core: null, aislamiento: 10
-  },
-  intermedio: {
-    empuje_horizontal: 60, empuje_vertical: 40, tiron_vertical: null, tiron_horizontal: 55,
-    sentadilla: 70, bisagra: 90, hip_extension: 60, core: null, aislamiento: 15
-  },
-  avanzado: {
-    empuje_horizontal: 90, empuje_vertical: 60, tiron_vertical: null, tiron_horizontal: 80,
-    sentadilla: 100, bisagra: 130, hip_extension: 90, core: null, aislamiento: 22
-  }
-}
-
-function getPesoRecomendado(patron, nivel, marcas, cuest) {
-  const p = (patron || '').toLowerCase()
-  
-  // Primero intentar con marcas reales (75% del RM)
-  const calcRM = (rm) => rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : null
-  
-  if (p.includes('horizontal') || p.includes('banca') || p.includes('pecho')) {
-    const rm = marcas?.press_banca_kg || (cuest?.marca_press_banca ? parseFloat(cuest.marca_press_banca) : null)
-    if (rm) return calcRM(rm)
-  }
-  if (p.includes('squat') || p.includes('sentadilla') || p.includes('pierna')) {
-    const rm = marcas?.sentadilla_kg || (cuest?.marca_sentadilla ? parseFloat(cuest.marca_sentadilla) : null)
-    if (rm) return calcRM(rm)
-  }
-  if (p.includes('deadlift') || p.includes('bisagra') || p.includes('muerto')) {
-    const rm = marcas?.peso_muerto_kg || (cuest?.marca_peso_muerto ? parseFloat(cuest.marca_peso_muerto) : null)
-    if (rm) return calcRM(rm)
-  }
-  if (p.includes('militar') || p.includes('overhead') || p.includes('vertical') && p.includes('push')) {
-    const rm = marcas?.press_militar_kg || (cuest?.marca_press_militar ? parseFloat(cuest.marca_press_militar) : null)
-    if (rm) return calcRM(rm)
-  }
-
-  // Sin marcas → usar tabla por nivel
-  const nv = nivel || 'principiante'
-  const base = PESOS_BASE[nv] || PESOS_BASE.principiante
-  
-  if (p.includes('horizontal') || p.includes('banca') || p.includes('pecho') || p.includes('push')) return base.empuje_horizontal
-  if (p.includes('vertical') && p.includes('push') || p.includes('militar') || p.includes('overhead')) return base.empuje_vertical
-  if (p.includes('squat') || p.includes('sentadilla')) return base.sentadilla
-  if (p.includes('deadlift') || p.includes('bisagra') || p.includes('muerto')) return base.bisagra
-  if (p.includes('hip') || p.includes('gluteo') || p.includes('glúteo')) return base.hip_extension
-  if (p.includes('pull') || p.includes('tiron') || p.includes('jalón') || p.includes('remo')) return base.tiron_horizontal
-  if (p.includes('curl') || p.includes('aislamiento') || p.includes('bicep') || p.includes('tricep')) return base.aislamiento
-  
-  return null
-}
-
 const initForm = {
   cliente_id: '', fecha: new Date().toISOString().split('T')[0],
   tipo: 'presencial', duracion_minutos: 60, notas: '',
@@ -124,7 +72,7 @@ export default function Sesiones({ session }) {
       const dia = contenido?.dias?.find(d => d.dia === diaRutina)
       if (dia?.ejercicios) {
         setEjercicios(dia.ejercicios.map(ej => {
-          const pesoRec = getPesoRecomendado(ej.patron, nivel, marcas, cuest)
+          const pesoRec = getPesoRecomendado(ej.nombre, ej.patron, nivel, marcas, cuest)
           return {
             ejercicio_nombre: ej.nombre,
             patron: ej.patron,

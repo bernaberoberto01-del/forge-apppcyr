@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getPesoRecomendado } from '../utils/pesos'
 
 export default function SesionCliente() {
   const { clienteId } = useParams()
@@ -36,22 +37,12 @@ export default function SesionCliente() {
     cargar()
   }, [clienteId])
 
-  function pesoTrabajo(patron, cuest, pf) {
-    const p = (patron || '').toLowerCase()
-    const rm = (key) => pf?.[key] || (cuest?.[`marca_${key.replace('_kg','')}`] ? parseFloat(cuest[`marca_${key.replace('_kg','')}`]) : null)
-    if (p.includes('push') && p.includes('horizontal') || p.includes('banca')) return rm('press_banca_kg') ? Math.round(rm('press_banca_kg') * 0.75 / 2.5) * 2.5 : ''
-    if (p.includes('squat') || p.includes('sentadilla')) return rm('sentadilla_kg') ? Math.round(rm('sentadilla_kg') * 0.75 / 2.5) * 2.5 : ''
-    if (p.includes('deadlift') || p.includes('bisagra') || p.includes('muerto')) return rm('peso_muerto_kg') ? Math.round(rm('peso_muerto_kg') * 0.75 / 2.5) * 2.5 : ''
-    if (p.includes('overhead') || p.includes('militar')) return rm('press_militar_kg') ? Math.round(rm('press_militar_kg') * 0.75 / 2.5) * 2.5 : ''
-    return ''
-  }
-
   function cargarDia(ru, dia, cuest, pf) {
     const contenido = ru.contenido || ru.borrador
     const d = contenido?.dias?.find(x => x.dia === dia)
     if (d?.ejercicios) {
       setEjercicios(d.ejercicios.map(ej => {
-        const pesoRec = pesoTrabajo(ej.patron, cuest, pf)
+        const pesoRec = getPesoRecomendado(ej.nombre, ej.patron, cliente?.nivel, pf, cuest)
         return {
           ejercicio_nombre: ej.nombre, patron: ej.patron, orden: ej.orden, notas: ej.notas || '',
           peso_recomendado: pesoRec,
