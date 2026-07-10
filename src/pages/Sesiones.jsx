@@ -1,6 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
+function Toast({ msg, tipo='ok', onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  return (
+    <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[100] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
+      <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
+    </div>
+  )
+}
+
+
 // Pesos de referencia por nivel y patrón de movimiento
 const PESOS_BASE = {
   principiante: {
@@ -194,9 +204,10 @@ export default function Sesiones({ session }) {
       setForm(initForm)
       setEjercicios([])
       setRutinaCliente(null)
+      setToast('Sesión guardada correctamente')
       cargar()
     } catch (err) {
-      alert('Error al guardar: ' + err.message)
+      setToast('Error al guardar: ' + err.message)
     }
     setLoading(false)
   }
@@ -222,6 +233,7 @@ export default function Sesiones({ session }) {
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
+      {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Sesiones</h1>

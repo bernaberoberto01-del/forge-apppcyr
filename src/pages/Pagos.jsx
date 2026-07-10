@@ -82,7 +82,7 @@ export default function Pagos({ session }) {
       setModalStripe(false)
       setToast('Enlace de pago copiado — mándaselo al cliente')
     } else {
-      alert('Error: ' + (data.error || 'desconocido'))
+      setToast('Error al generar enlace: ' + (data.error || 'desconocido'))
     }
   }
 

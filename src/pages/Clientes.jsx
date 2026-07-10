@@ -1,6 +1,16 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
+
+function Toast({ msg, tipo='ok', onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  return (
+    <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[100] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
+      <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
+    </div>
+  )
+}
+
 const OBJ = {
   perdida_grasa: { label: 'Pérdida de grasa', color: 'bg-orange-50 text-orange-700' },
   ganancia_muscular: { label: 'Ganancia muscular', color: 'bg-violet-50 text-violet-700' },
@@ -36,9 +46,11 @@ export default function Clientes({ session }) {
   const [dTab, setDTab] = useState('resumen')
   const [dData, setDData] = useState({})
   const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState(null)
   const uid = session.user.id
   const enlaceRegistro = `${window.location.origin}/registro?e=${uid}`
 
+  const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
@@ -122,7 +134,7 @@ export default function Clientes({ session }) {
       notas: `Edad: ${c.edad||'—'} | Altura: ${c.altura||'—'}cm | Motivación: ${c.motivacion||'—'}`,
       precio_mensual: 0
     }).select().single()
-    if (error) { alert('Error: ' + error.message); return }
+    if (error) { showToast('Error: ' + error.message, 'error'); return }
     if (cliente) {
       await Promise.all([
         supabase.from('cuestionarios').update({ cliente_id: cliente.id, procesado: true }).eq('id', c.id),
@@ -178,6 +190,7 @@ export default function Clientes({ session }) {
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-6xl mx-auto">
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -563,7 +576,7 @@ export default function Clientes({ session }) {
                   {detalle.notas && <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs font-semibold text-amber-700 mb-1">Notas</p><p className="text-sm text-amber-800">{detalle.notas}</p></div>}
                   <div className="flex gap-2 pt-1">
                     <button onClick={() => abrirEditar(detalle)} className="flex-1 border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A]">✏️ Editar</button>
-                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); alert('Enlace del portal copiado') }}
+                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); showToast('Enlace del portal copiado') }}
                       className="flex-1 bg-[#111] text-white text-sm font-medium py-2.5 rounded-xl">🔗 Portal</button>
                     <button onClick={() => eliminar(detalle.id)} className="border border-red-200 text-red-500 text-sm px-3 py-2.5 rounded-xl">🗑</button>
                   </div>
@@ -572,7 +585,7 @@ export default function Clientes({ session }) {
               {dTab==='progreso' && (
                 <div>
                   <p className="text-sm text-[#6B6B6B] text-center py-8">Las gráficas de progreso se cargan desde el portal del cliente</p>
-                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); alert('Enlace copiado') }}
+                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); showToast('Enlace copiado') }}
                     className="w-full bg-[#111] text-white text-sm font-medium py-3 rounded-xl">🔗 Copiar enlace del portal</button>
                 </div>
               )}

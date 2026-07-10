@@ -207,6 +207,10 @@ export default function Seguimiento({ session }) {
               <div className="text-right">
                 {ci.peso && <p className="text-base font-bold text-[#FF5C00]">{ci.peso}kg</p>}
                 {ci.pasos_diarios && <p className="text-xs text-[#6B6B6B]">👟 {ci.pasos_diarios.toLocaleString()}</p>}
+                <button onClick={() => copiarEnlaceCheckin(ci.cliente_id)}
+                  className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] mt-1 transition-colors">
+                  🔗 CI
+                </button>
               </div>
             </div>
             <div className="flex gap-1.5 flex-wrap">

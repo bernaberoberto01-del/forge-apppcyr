@@ -58,7 +58,7 @@ export default function Rutinas({ session }) {
     const data = await res.json()
     setGenerando(null)
     if (data.ok) { setToast('Rutina generada — revísala y publícala'); await cargar() }
-    else alert('Error: ' + (data.error || 'desconocido'))
+    else { setToast('Error: ' + (data.error || 'desconocido')); }
   }
 
   async function guardarManual() {
