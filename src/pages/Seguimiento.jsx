@@ -13,7 +13,7 @@ const ESCALAS = [
 ]
 
 const initForm = {
-  cliente_id: '', peso: '', energia: 7, sueno: 7, estres: 2, fatiga: 2,
+  cliente_id: '', fecha: new Date().toISOString().split('T')[0], peso: '', energia: 7, sueno: 7, estres: 2, fatiga: 2,
   motivacion: 5, calidad_entreno: 5, sesiones_semana: 3,
   adherencia_entreno: 7, adherencia_nutricion: 7, pasos_diarios: '', comentario: ''
 }
@@ -153,6 +153,11 @@ export default function Seguimiento({ session }) {
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Fecha</label>
+                <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-orange-500" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

@@ -340,6 +340,11 @@ export default function Sesiones({ session }) {
                       <option value="">Selecciona cliente</option>
                       {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} {c.tipo === 'online' ? '🌐' : '📍'}</option>)}
                     </select>
+                    {form.cliente_id && !rutinaCliente && (
+                      <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg mt-1.5">
+                        ⚠ Sin rutina publicada — añade ejercicios manualmente en el paso 2
+                      </p>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>

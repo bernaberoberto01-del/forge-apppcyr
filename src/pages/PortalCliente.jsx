@@ -50,7 +50,7 @@ export default function PortalCliente() {
     { id: 'inicio', label: 'Inicio' },
     { id: 'rutina', label: 'Rutina' },
     { id: 'progreso', label: 'Progreso' },
-    { id: 'mensajes', label: mensajesNoLeidos > 0 ? `Mensajes (${mensajesNoLeidos})` : 'Mensajes' },
+    { id: 'mensajes', label: mensajesNoLeidos > 0 ? `Msgs (${mensajesNoLeidos})` : 'Mensajes' },
   ]
 
   if (loading) return (

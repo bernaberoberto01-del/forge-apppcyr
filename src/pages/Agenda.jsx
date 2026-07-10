@@ -54,7 +54,7 @@ export default function Agenda({ session }) {
     const fecha = formatFecha(diasSemana[diaSeleccionado])
     await supabase.from('sesiones').insert({
       entrenador_id: uid, cliente_id: form.cliente_id,
-      fecha, tipo: form.tipo, completada: false, notas: form.notas
+      fecha, hora: form.hora, tipo: form.tipo, completada: false, notas: form.notas
     })
     setModal(false)
     setForm({ cliente_id:'', hora:'09:00', tipo:'presencial', notas:'' })
@@ -75,7 +75,9 @@ export default function Agenda({ session }) {
 
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
   const esHoy = d => formatFecha(d) === formatFecha(new Date())
-  const sesionesDia = d => sesiones.filter(s => s.fecha === formatFecha(d))
+  const sesionesDia = d => sesiones
+    .filter(s => s.fecha === formatFecha(d))
+    .sort((a,b) => (a.hora||'00:00').localeCompare(b.hora||'00:00'))
   const totalSemana = sesiones.length
   const completadas = sesiones.filter(s => s.completada).length
 
@@ -159,7 +161,7 @@ export default function Agenda({ session }) {
                     <p className={`text-sm font-semibold ${s.completada ? 'line-through text-[#6B6B6B]' : 'text-[#0A0A0A]'}`}>
                       {s.clientes?.nombre}
                     </p>
-                    <p className="text-xs text-[#6B6B6B]">{s.tipo} {s.notas && `· ${s.notas}`}</p>
+                    <p className="text-xs text-[#6B6B6B]">{s.hora || '—'} · {s.tipo}{s.notas ? ` · ${s.notas}` : ''}</p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${
@@ -247,6 +249,11 @@ export default function Agenda({ session }) {
                 <input value={form.notas} onChange={e => setForm(f=>({...f,notas:e.target.value}))}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
                   placeholder="Ej: Día de pierna, traer rodilleras..." />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Hora</label>
+                <input type="time" value={form.hora} onChange={e => setForm(f=>({...f,hora:e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
