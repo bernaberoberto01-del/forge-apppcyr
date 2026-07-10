@@ -1,6 +1,60 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
+// Pesos de referencia por nivel y patrón de movimiento
+const PESOS_BASE = {
+  principiante: {
+    empuje_horizontal: 30, empuje_vertical: 20, tiron_vertical: null, tiron_horizontal: 30,
+    sentadilla: 40, bisagra: 50, hip_extension: 30, core: null, aislamiento: 10
+  },
+  intermedio: {
+    empuje_horizontal: 60, empuje_vertical: 40, tiron_vertical: null, tiron_horizontal: 55,
+    sentadilla: 70, bisagra: 90, hip_extension: 60, core: null, aislamiento: 15
+  },
+  avanzado: {
+    empuje_horizontal: 90, empuje_vertical: 60, tiron_vertical: null, tiron_horizontal: 80,
+    sentadilla: 100, bisagra: 130, hip_extension: 90, core: null, aislamiento: 22
+  }
+}
+
+function getPesoRecomendado(patron, nivel, marcas, cuest) {
+  const p = (patron || '').toLowerCase()
+  
+  // Primero intentar con marcas reales (75% del RM)
+  const calcRM = (rm) => rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : null
+  
+  if (p.includes('horizontal') || p.includes('banca') || p.includes('pecho')) {
+    const rm = marcas?.press_banca_kg || (cuest?.marca_press_banca ? parseFloat(cuest.marca_press_banca) : null)
+    if (rm) return calcRM(rm)
+  }
+  if (p.includes('squat') || p.includes('sentadilla') || p.includes('pierna')) {
+    const rm = marcas?.sentadilla_kg || (cuest?.marca_sentadilla ? parseFloat(cuest.marca_sentadilla) : null)
+    if (rm) return calcRM(rm)
+  }
+  if (p.includes('deadlift') || p.includes('bisagra') || p.includes('muerto')) {
+    const rm = marcas?.peso_muerto_kg || (cuest?.marca_peso_muerto ? parseFloat(cuest.marca_peso_muerto) : null)
+    if (rm) return calcRM(rm)
+  }
+  if (p.includes('militar') || p.includes('overhead') || p.includes('vertical') && p.includes('push')) {
+    const rm = marcas?.press_militar_kg || (cuest?.marca_press_militar ? parseFloat(cuest.marca_press_militar) : null)
+    if (rm) return calcRM(rm)
+  }
+
+  // Sin marcas → usar tabla por nivel
+  const nv = nivel || 'principiante'
+  const base = PESOS_BASE[nv] || PESOS_BASE.principiante
+  
+  if (p.includes('horizontal') || p.includes('banca') || p.includes('pecho') || p.includes('push')) return base.empuje_horizontal
+  if (p.includes('vertical') && p.includes('push') || p.includes('militar') || p.includes('overhead')) return base.empuje_vertical
+  if (p.includes('squat') || p.includes('sentadilla')) return base.sentadilla
+  if (p.includes('deadlift') || p.includes('bisagra') || p.includes('muerto')) return base.bisagra
+  if (p.includes('hip') || p.includes('gluteo') || p.includes('glúteo')) return base.hip_extension
+  if (p.includes('pull') || p.includes('tiron') || p.includes('jalón') || p.includes('remo')) return base.tiron_horizontal
+  if (p.includes('curl') || p.includes('aislamiento') || p.includes('bicep') || p.includes('tricep')) return base.aislamiento
+  
+  return null
+}
+
 const initForm = {
   cliente_id: '', fecha: new Date().toISOString().split('T')[0],
   tipo: 'presencial', duracion_minutos: 60, notas: '',
@@ -16,7 +70,7 @@ export default function Sesiones({ session }) {
   const [form, setForm] = useState(initForm)
   const [ejercicios, setEjercicios] = useState([])
   const [rutinaCliente, setRutinaCliente] = useState(null)
-  const [paso, setPaso] = useState(1) // 1=info, 2=ejercicios, 3=valoracion
+  const [paso, setPaso] = useState(1)
   const [loading, setLoading] = useState(false)
   const uid = session.user.id
 
@@ -24,45 +78,24 @@ export default function Sesiones({ session }) {
 
   async function cargar() {
     const [{ data: se }, { data: cl }] = await Promise.all([
-      supabase.from('sesiones').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(30),
-      supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
+      supabase.from('sesiones').select('*, clientes(nombre, tipo, nivel)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(30),
+      supabase.from('clientes').select('id,nombre,tipo,nivel').eq('entrenador_id', uid).eq('estado', 'activo'),
     ])
     setSesiones(se || [])
     setClientes(cl || [])
   }
 
   async function cargarRutina(clienteId, diaRutina) {
+    const cliente = clientes.find(c => c.id === clienteId)
     const [{ data: ru }, { data: cu }, { data: pf }] = await Promise.all([
       supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
       supabase.from('cuestionarios').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }).limit(1),
       supabase.from('progresion_fuerza').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(1),
     ])
 
-    // Marcas del cliente para recomendar pesos
-    const marcas = pf?.[0] || {}
-    const cuest = cu?.[0] || {}
-
-    // Función para calcular peso de trabajo (~75-80% del RM)
-    const pesoTrabajo = (patron) => {
-      const p = patron?.toLowerCase() || ''
-      if (p.includes('horizontal') && p.includes('push') || p.includes('banca')) {
-        const rm = marcas.press_banca_kg || (cuest.marca_press_banca ? parseFloat(cuest.marca_press_banca) : null)
-        return rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : ''
-      }
-      if (p.includes('squat') || p.includes('sentadilla')) {
-        const rm = marcas.sentadilla_kg || (cuest.marca_sentadilla ? parseFloat(cuest.marca_sentadilla) : null)
-        return rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : ''
-      }
-      if (p.includes('deadlift') || p.includes('bisagra') || p.includes('muerto')) {
-        const rm = marcas.peso_muerto_kg || (cuest.marca_peso_muerto ? parseFloat(cuest.marca_peso_muerto) : null)
-        return rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : ''
-      }
-      if (p.includes('vertical') && p.includes('push') || p.includes('militar')) {
-        const rm = marcas.press_militar_kg || (cuest.marca_press_militar ? parseFloat(cuest.marca_press_militar) : null)
-        return rm ? Math.round(rm * 0.75 / 2.5) * 2.5 : ''
-      }
-      return ''
-    }
+    const nivel = cliente?.nivel || 'principiante'
+    const marcas = pf?.[0] || null
+    const cuest = cu?.[0] || null
 
     if (ru?.[0]) {
       setRutinaCliente(ru[0])
@@ -70,7 +103,7 @@ export default function Sesiones({ session }) {
       const dia = contenido?.dias?.find(d => d.dia === diaRutina)
       if (dia?.ejercicios) {
         setEjercicios(dia.ejercicios.map(ej => {
-          const pesoRec = pesoTrabajo(ej.patron)
+          const pesoRec = getPesoRecomendado(ej.patron, nivel, marcas, cuest)
           return {
             ejercicio_nombre: ej.nombre,
             patron: ej.patron,
@@ -85,18 +118,16 @@ export default function Sesiones({ session }) {
             }))
           }
         }))
-      } else {
-        setEjercicios([])
+        return
       }
-    } else {
-      setRutinaCliente(null)
-      setEjercicios([])
     }
+    setRutinaCliente(null)
+    setEjercicios([])
   }
 
   function addEjercicio() {
     setEjercicios(prev => [...prev, {
-      ejercicio_nombre: '', patron: '', orden: prev.length + 1, notas: '',
+      ejercicio_nombre: '', patron: '', orden: prev.length + 1, notas: '', peso_recomendado: null,
       sets: [{ set: 1, peso: '', reps: '', completado: false }]
     }])
   }
@@ -107,14 +138,13 @@ export default function Sesiones({ session }) {
 
   function updateSet(ejIdx, setIdx, field, val) {
     setEjercicios(prev => prev.map((e, i) => i === ejIdx ? {
-      ...e,
-      sets: e.sets.map((s, j) => j === setIdx ? { ...s, [field]: val } : s)
+      ...e, sets: e.sets.map((s, j) => j === setIdx ? { ...s, [field]: val } : s)
     } : e))
   }
 
   function addSet(ejIdx) {
     setEjercicios(prev => prev.map((e, i) => i === ejIdx ? {
-      ...e, sets: [...e.sets, { set: e.sets.length + 1, peso: '', reps: '', completado: false }]
+      ...e, sets: [...e.sets, { set: e.sets.length + 1, peso: e.peso_recomendado ? String(e.peso_recomendado) : '', reps: '', completado: false }]
     } : e))
   }
 
@@ -125,9 +155,13 @@ export default function Sesiones({ session }) {
   }
 
   async function guardar() {
+    if (!form.cliente_id) return
     setLoading(true)
     try {
-      const { data: sesion, error: sesionError } = await supabase.from('sesiones').insert({
+      const ejsFiltrados = ejercicios.filter(e => e.ejercicio_nombre)
+      
+      // Todo en una sola inserción — ejercicios como JSONB en sesiones
+      const { error } = await supabase.from('sesiones').insert({
         entrenador_id: uid,
         cliente_id: form.cliente_id,
         fecha: form.fecha,
@@ -138,35 +172,19 @@ export default function Sesiones({ session }) {
         fatiga_post: form.fatiga_post,
         sensaciones: form.sensaciones,
         duracion_minutos: form.duracion_minutos,
-        dia_rutina: form.dia_rutina
-      }).select().single()
+        dia_rutina: form.dia_rutina,
+        ejercicios: ejsFiltrados.length > 0 ? ejsFiltrados : null
+      })
 
-      if (sesionError) throw sesionError
-
-      const ejsFiltrados = ejercicios.filter(e => e.ejercicio_nombre)
-      if (sesion && ejsFiltrados.length > 0) {
-        await supabase.from('sesion_ejercicios').insert(
-          ejsFiltrados.map(e => ({
-            sesion_id: sesion.id,
-            cliente_id: form.cliente_id,
-            entrenador_id: uid,
-            ejercicio_nombre: e.ejercicio_nombre,
-            patron: e.patron,
-            orden: e.orden,
-            sets: e.sets,
-            notas: e.notas
-          }))
-        )
-      }
+      if (error) throw error
 
       setModal(false)
       setPaso(1)
       setForm(initForm)
       setEjercicios([])
       setRutinaCliente(null)
-      cargar() // Sin await — no bloquea el cierre del modal
+      cargar()
     } catch (err) {
-      console.error('Error guardando sesión:', err)
       alert('Error al guardar: ' + err.message)
     }
     setLoading(false)
@@ -174,8 +192,7 @@ export default function Sesiones({ session }) {
 
   async function abrirDetalle(s) {
     setDetalle(s)
-    const { data: ej } = await supabase.from('sesion_ejercicios').select('*').eq('sesion_id', s.id).order('orden')
-    setDetalleEjercicios(ej || [])
+    setDetalleEjercicios(s.ejercicios || [])
   }
 
   const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
@@ -194,7 +211,6 @@ export default function Sesiones({ session }) {
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Sesiones</h1>
@@ -206,7 +222,6 @@ export default function Sesiones({ session }) {
         </button>
       </div>
 
-      {/* Lista sesiones */}
       <div className="space-y-2">
         {sesiones.length === 0 ? (
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
@@ -228,14 +243,14 @@ export default function Sesiones({ session }) {
               <div className="flex items-center gap-2 flex-shrink-0">
                 {s.rpe && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">RPE {s.rpe}</span>}
                 {s.duracion_minutos && <span className="text-xs text-[#6B6B6B]">{s.duracion_minutos}min</span>}
-                <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full font-medium">✓</span>
+                <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">✓</span>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Modal detalle sesión */}
+      {/* Detalle sesión */}
       {detalle && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -247,7 +262,6 @@ export default function Sesiones({ session }) {
               <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
             </div>
             <div className="p-4 space-y-4">
-              {/* Métricas sesión */}
               <div className="grid grid-cols-3 gap-2">
                 {[
                   ['RPE', detalle.rpe ? `${detalle.rpe}/10` : '—', '#FF5C00'],
@@ -260,32 +274,25 @@ export default function Sesiones({ session }) {
                   </div>
                 ))}
               </div>
-
-              {/* Ejercicios */}
               {detalleEjercicios.length > 0 && (
                 <div>
                   <p className="text-sm font-bold text-[#0A0A0A] mb-2">Ejercicios registrados</p>
                   <div className="space-y-2">
-                    {detalleEjercicios.map(ej => (
-                      <div key={ej.id} className="border border-black/5 rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-sm font-semibold text-[#0A0A0A]">{ej.ejercicio_nombre}</p>
-                          {ej.patron && <span className="text-xs text-[#6B6B6B] bg-[#F5F5F0] px-2 py-0.5 rounded-full">{ej.patron}</span>}
-                        </div>
+                    {detalleEjercicios.map((ej, i) => (
+                      <div key={i} className="border border-black/5 rounded-xl p-3">
+                        <p className="text-sm font-semibold text-[#0A0A0A] mb-2">{ej.ejercicio_nombre}</p>
                         <div className="flex gap-2 flex-wrap">
-                          {(ej.sets || []).map((s, i) => (
-                            <div key={i} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${s.completado ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-[#6B6B6B]'}`}>
+                          {(ej.sets || []).map((s, j) => (
+                            <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${s.completado ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-[#6B6B6B]'}`}>
                               {s.peso ? `${s.peso}kg` : '—'} × {s.reps || '—'}
                             </div>
                           ))}
                         </div>
-                        {ej.notas && <p className="text-xs text-[#6B6B6B] mt-2 italic">{ej.notas}</p>}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
               {detalle.sensaciones && (
                 <div className="bg-amber-50 rounded-xl p-3">
                   <p className="text-xs font-semibold text-amber-700 mb-1">Sensaciones</p>
@@ -301,26 +308,26 @@ export default function Sesiones({ session }) {
       {modal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
-            {/* Header modal */}
             <div className="p-4 border-b border-black/5 sticky top-0 bg-white z-10">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-bold text-[#0A0A0A]">Nueva sesión</h2>
                 <button onClick={() => setModal(false)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
-              {/* Progress pasos */}
-              <div className="flex gap-2">
-                {[['1', 'Info'], ['2', 'Ejercicios'], ['3', 'Valoración']].map(([n, l], i) => (
+              <div className="flex items-center gap-1.5">
+                {[['1','Info'],['2','Ejercicios'],['3','Valoración']].map(([n,l],i) => (
                   <div key={n} className="flex items-center gap-1.5">
-                    <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${paso > i + 1 ? 'bg-emerald-500 text-white' : paso === i + 1 ? 'bg-[#FF5C00] text-white' : 'bg-black/10 text-[#6B6B6B]'}`}>{paso > i + 1 ? '✓' : n}</div>
-                    <span className={`text-xs ${paso === i + 1 ? 'font-semibold text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>{l}</span>
-                    {i < 2 && <div className="w-4 h-px bg-black/10 mx-1" />}
+                    <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${paso > i+1 ? 'bg-emerald-500 text-white' : paso === i+1 ? 'bg-[#FF5C00] text-white' : 'bg-black/10 text-[#6B6B6B]'}`}>
+                      {paso > i+1 ? '✓' : n}
+                    </div>
+                    <span className={`text-xs ${paso === i+1 ? 'font-semibold text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>{l}</span>
+                    {i < 2 && <div className="w-4 h-px bg-black/10 mx-0.5" />}
                   </div>
                 ))}
               </div>
             </div>
 
             <div className="p-4 space-y-4">
-              {/* PASO 1 — Info básica */}
+              {/* PASO 1 */}
               {paso === 1 && (
                 <>
                   <div>
@@ -334,7 +341,6 @@ export default function Sesiones({ session }) {
                       {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} {c.tipo === 'online' ? '🌐' : '📍'}</option>)}
                     </select>
                   </div>
-
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Fecha</label>
@@ -351,30 +357,28 @@ export default function Sesiones({ session }) {
                       </select>
                     </div>
                   </div>
-
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración: <span className="text-[#FF5C00]">{form.duracion_minutos} min</span></label>
                     <div className="flex gap-2 flex-wrap">
-                      {[30, 45, 60, 75, 90, 120].map(v => (
+                      {[30,45,60,75,90,120].map(v => (
                         <button key={v} type="button" onClick={() => setForm(f => ({ ...f, duracion_minutos: v }))}
-                          className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${form.duracion_minutos === v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+                          className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${form.duracion_minutos === v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                           {v}min
                         </button>
                       ))}
                     </div>
                   </div>
-
                   {rutinaCliente && (
                     <div>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Día de rutina</label>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         {(rutinaCliente.contenido?.dias || rutinaCliente.borrador?.dias || []).map(dia => (
                           <button key={dia.dia} type="button" onClick={async () => {
                             setForm(f => ({ ...f, dia_rutina: dia.dia }))
                             await cargarRutina(form.cliente_id, dia.dia)
                           }}
-                            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${form.dia_rutina === dia.dia ? 'bg-[#111] text-white' : 'border border-black/10 text-[#6B6B6B] hover:border-[#111]'}`}>
-                            {dia.nombre.split(' ').slice(0, 2).join(' ')}
+                            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${form.dia_rutina === dia.dia ? 'bg-[#111] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                            {dia.nombre.split(' ').slice(0,2).join(' ')}
                           </button>
                         ))}
                       </div>
@@ -383,15 +387,14 @@ export default function Sesiones({ session }) {
                 </>
               )}
 
-              {/* PASO 2 — Ejercicios */}
+              {/* PASO 2 */}
               {paso === 2 && (
                 <>
                   {rutinaCliente && ejercicios.length > 0 && (
                     <div className="bg-[#FF5C00]/5 border border-[#FF5C00]/20 rounded-xl p-3 text-xs text-[#FF5C00] font-medium">
-                      ✓ Ejercicios precargados desde la rutina de {form.dia_rutina === 1 ? 'Día A' : form.dia_rutina === 2 ? 'Día B' : 'Día C'}
+                      ✓ Ejercicios precargados desde la rutina · Los pesos son orientativos para tu nivel
                     </div>
                   )}
-
                   <div className="space-y-4">
                     {ejercicios.map((ej, ejIdx) => (
                       <div key={ejIdx} className="border border-black/8 rounded-2xl overflow-hidden">
@@ -401,17 +404,15 @@ export default function Sesiones({ session }) {
                             className="flex-1 bg-transparent text-sm font-semibold text-[#0A0A0A] focus:outline-none placeholder:text-[#6B6B6B]"
                             placeholder="Nombre del ejercicio" />
                           {ej.peso_recomendado && (
-                            <span className="text-xs bg-[#FF5C00]/10 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                            <span className="text-xs bg-[#FF5C00]/15 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
                               ~{ej.peso_recomendado}kg
                             </span>
                           )}
                         </div>
-
-                        {/* Sets */}
                         <div className="p-3 space-y-2">
                           <div className="grid grid-cols-12 gap-2 px-1 mb-1">
                             <p className="col-span-1 text-xs text-[#6B6B6B] font-medium">Set</p>
-                            <p className="col-span-4 text-xs text-[#6B6B6B] font-medium">Peso (kg)</p>
+                            <p className="col-span-4 text-xs text-[#6B6B6B] font-medium">Kg</p>
                             <p className="col-span-4 text-xs text-[#6B6B6B] font-medium">Reps</p>
                             <p className="col-span-2 text-xs text-[#6B6B6B] font-medium">✓</p>
                             <p className="col-span-1"></p>
@@ -420,7 +421,8 @@ export default function Sesiones({ session }) {
                             <div key={setIdx} className="grid grid-cols-12 gap-2 items-center">
                               <span className="col-span-1 text-xs font-bold text-[#6B6B6B]">{setIdx + 1}</span>
                               <input type="number" step="0.5" value={s.peso} onChange={e => updateSet(ejIdx, setIdx, 'peso', e.target.value)}
-                                placeholder="—" className="col-span-4 border border-black/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                                placeholder={ej.peso_recomendado || '—'}
+                                className="col-span-4 border border-black/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
                               <input value={s.reps} onChange={e => updateSet(ejIdx, setIdx, 'reps', e.target.value)}
                                 placeholder="—" className="col-span-4 border border-black/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
                               <button type="button" onClick={() => updateSet(ejIdx, setIdx, 'completado', !s.completado)}
@@ -433,18 +435,12 @@ export default function Sesiones({ session }) {
                           ))}
                           <button type="button" onClick={() => addSet(ejIdx)}
                             className="w-full border border-dashed border-black/15 text-[#6B6B6B] text-xs py-2 rounded-xl hover:border-[#FF5C00] hover:text-[#FF5C00] transition-all">
-                            + Añadir set
+                            + Set
                           </button>
-                          {ej.notas !== undefined && (
-                            <input value={ej.notas} onChange={e => updateEjercicio(ejIdx, 'notas', e.target.value)}
-                              className="w-full border border-black/8 rounded-xl px-3 py-2 text-xs text-[#6B6B6B] focus:outline-none focus:border-[#FF5C00] mt-1"
-                              placeholder="Nota sobre el ejercicio..." />
-                          )}
                         </div>
                       </div>
                     ))}
                   </div>
-
                   <button type="button" onClick={addEjercicio}
                     className="w-full border-2 border-dashed border-black/15 text-[#6B6B6B] text-sm font-medium py-3.5 rounded-2xl hover:border-[#FF5C00] hover:text-[#FF5C00] transition-all">
                     + Añadir ejercicio extra
@@ -452,45 +448,37 @@ export default function Sesiones({ session }) {
                 </>
               )}
 
-              {/* PASO 3 — Valoración */}
+              {/* PASO 3 */}
               {paso === 3 && (
                 <>
-                  <div className="bg-[#F5F5F0] rounded-2xl p-4 text-center mb-2">
+                  <div className="bg-[#F5F5F0] rounded-2xl p-4 text-center">
                     <p className="text-sm font-semibold text-[#0A0A0A]">¿Cómo fue la sesión?</p>
-                    <p className="text-xs text-[#6B6B6B] mt-0.5">Esta valoración ayuda a la IA a ajustar las próximas rutinas</p>
+                    <p className="text-xs text-[#6B6B6B] mt-0.5">La IA usará esta valoración para ajustar las próximas rutinas</p>
                   </div>
-
                   <div>
-                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">
-                      Esfuerzo percibido (RPE): <span className="text-[#FF5C00] font-bold">{form.rpe}/10</span>
-                    </label>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Esfuerzo (RPE): <span className="text-[#FF5C00] font-bold">{form.rpe}/10</span></label>
                     <p className="text-xs text-[#6B6B6B] mb-2">1 = Sin esfuerzo · 10 = Esfuerzo máximo</p>
                     <div className="flex gap-1.5 flex-wrap">
                       {[1,2,3,4,5,6,7,8,9,10].map(v => <Btn key={v} field="rpe" val={v} />)}
                     </div>
                   </div>
-
                   <div>
-                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">
-                      Fatiga generada: <span className="text-[#FF5C00] font-bold">{form.fatiga_post}/5</span>
-                    </label>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Fatiga generada: <span className="text-[#FF5C00] font-bold">{form.fatiga_post}/5</span></label>
                     <p className="text-xs text-[#6B6B6B] mb-2">1 = Fresco · 5 = Muy fatigado</p>
                     <div className="flex gap-1.5">
                       {[1,2,3,4,5].map(v => <Btn key={v} field="fatiga_post" val={v} red />)}
                     </div>
                   </div>
-
                   <div>
-                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Sensaciones (opcional)</label>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Sensaciones</label>
                     <textarea value={form.sensaciones} onChange={e => setForm(f => ({ ...f, sensaciones: e.target.value }))}
                       rows={3} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
-                      placeholder="¿Algo destacable de la sesión? Dolor, energía, progresión..." />
+                      placeholder="¿Algo destacable? Dolor, energía, progresión..." />
                   </div>
                 </>
               )}
             </div>
 
-            {/* Botones navegación */}
             <div className="p-4 border-t border-black/5 flex gap-2 sticky bottom-0 bg-white">
               {paso > 1 && (
                 <button onClick={() => setPaso(p => p - 1)}
@@ -500,12 +488,12 @@ export default function Sesiones({ session }) {
               )}
               {paso < 3 ? (
                 <button onClick={() => setPaso(p => p + 1)} disabled={paso === 1 && !form.cliente_id}
-                  className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40 hover:bg-[#E05200] transition-all">
+                  className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40 transition-all">
                   Siguiente →
                 </button>
               ) : (
                 <button onClick={guardar} disabled={loading}
-                  className="flex-1 bg-[#111] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40 hover:bg-black transition-all">
+                  className="flex-1 bg-[#111] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40 transition-all">
                   {loading ? 'Guardando...' : '✓ Guardar sesión'}
                 </button>
               )}
