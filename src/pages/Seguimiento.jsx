@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
 const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
@@ -36,8 +36,20 @@ export default function Seguimiento({ session }) {
   const [loading, setLoading] = useState(false)
   const [filtroCliente, setFiltroCliente] = useState('todos')
   const uid = session.user.id
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroAlerta, setFiltroAlerta] = useState('todos')
   const [enviando, setEnviando] = useState(false)
   const [toast, setToast] = useState('')
+
+  const checkinsFiltrados = useMemo(() => {
+    let r = [...checkins]
+    if (filtroCliente !== 'todos') r = r.filter(x => x.cliente_id === filtroCliente)
+    if (busqueda) { const b = busqueda.toLowerCase(); r = r.filter(x => x.clientes?.nombre?.toLowerCase().includes(b)) }
+    if (filtroAlerta === 'fatiga') r = r.filter(x => x.fatiga >= 4 || x.estres >= 4)
+    if (filtroAlerta === 'energia_baja') r = r.filter(x => x.energia <= 3)
+    if (filtroAlerta === 'baja_adherencia') r = r.filter(x => x.adherencia_entreno <= 4)
+    return r
+  }, [checkins, filtroCliente, busqueda, filtroAlerta])
 
   useEffect(() => { cargar() }, [uid])
 
@@ -97,7 +109,6 @@ export default function Seguimiento({ session }) {
     )
   }
 
-  const filtrados = filtroCliente === 'todos' ? checkins : checkins.filter(c => c.cliente_id === filtroCliente)
   const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
@@ -113,7 +124,7 @@ export default function Seguimiento({ session }) {
           <p className="text-sm text-[#6B6B6B] mt-0.5">Check-ins semanales · Detecta fatiga y abandono antes de que ocurran</p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
-          <button onClick={reenviarCheckin} disabled={enviando}
+          <button onClick={reenviarCheckin} disabled={enviando} title="Reenviar check-in a todos los clientes"
             className="border border-black/10 text-[#6B6B6B] text-sm font-medium px-3 py-2 rounded-xl hover:bg-[#F5F5F0] transition-all disabled:opacity-40">
             {enviando ? '⏳' : '📨'}
           </button>
@@ -124,29 +135,64 @@ export default function Seguimiento({ session }) {
         </div>
       </div>
 
-      {/* Filtro por cliente */}
-      {clientes.length > 1 && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-          <button onClick={() => setFiltroCliente('todos')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0 transition-colors ${filtroCliente === 'todos' ? 'bg-[#111] text-white' : 'bg-white text-[#6B6B6B] border border-black/10'}`}>
-            Todos
-          </button>
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          ['Total CI', checkins.length, '#FF5C00'],
+          ['Con fatiga alta', checkins.filter(x=>x.fatiga>=4||x.estres>=4).length, '#ef4444'],
+          ['Energía baja', checkins.filter(x=>x.energia<=3).length, '#f59e0b'],
+        ].map(([l,v,c])=>(
+          <div key={l} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-center">
+            <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
+            <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Buscador */}
+      <div className="relative mb-3">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
+        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente..."
+          className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+        {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]">×</button>}
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        <button onClick={() => setFiltroAlerta('todos')}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroAlerta==='todos'?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+          Todos ({checkins.length})
+        </button>
+        <button onClick={() => setFiltroAlerta('fatiga')}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroAlerta==='fatiga'?'bg-red-500 text-white':'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100'}`}>
+          ⚡ Fatiga alta
+        </button>
+        <button onClick={() => setFiltroAlerta('energia_baja')}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroAlerta==='energia_baja'?'bg-amber-500 text-white':'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>
+          🔋 Energía baja
+        </button>
+        <button onClick={() => setFiltroAlerta('baja_adherencia')}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroAlerta==='baja_adherencia'?'bg-violet-500 text-white':'bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100'}`}>
+          📉 Baja adherencia
+        </button>
+        {clientes.length > 1 && <>
+          <div className="w-px bg-black/10 flex-shrink-0" />
           {clientes.map(c => (
-            <button key={c.id} onClick={() => setFiltroCliente(c.id)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-medium flex-shrink-0 transition-colors ${filtroCliente === c.id ? 'bg-[#111] text-white' : 'bg-white text-[#6B6B6B] border border-black/10'}`}>
+            <button key={c.id} onClick={() => setFiltroCliente(filtroCliente===c.id?'todos':c.id)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroCliente===c.id?'bg-[#111] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
               {c.nombre.split(' ')[0]}
             </button>
           ))}
-        </div>
-      )}
+        </>}
+      </div>
 
       {/* Lista checkins */}
       <div className="space-y-2">
-        {filtrados.length === 0 ? (
+        {checkinsFiltrados.length === 0 ? (
           <div className="bg-white rounded-xl border border-black/5 p-8 text-center">
             <p className="text-[#6B6B6B] text-sm">Sin seguimientos registrados</p>
           </div>
-        ) : filtrados.map(ci => (
+        ) : checkinsFiltrados.map(ci => (
           <div key={ci.id} className="bg-white rounded-xl border border-black/5 p-3.5">
             <div className="flex items-center justify-between mb-2.5">
               <div className="flex items-center gap-2">

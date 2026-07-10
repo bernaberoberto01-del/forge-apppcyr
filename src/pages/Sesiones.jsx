@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
 // Pesos de referencia por nivel y patrón de movimiento
@@ -72,9 +72,20 @@ export default function Sesiones({ session }) {
   const [rutinaCliente, setRutinaCliente] = useState(null)
   const [paso, setPaso] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState('todos')
   const uid = session.user.id
 
   useEffect(() => { cargar() }, [uid])
+
+  const sesionesFiltradas = useMemo(() => {
+    let r = [...sesiones]
+    if (busqueda) { const b = busqueda.toLowerCase(); r = r.filter(s => s.clientes?.nombre?.toLowerCase().includes(b)) }
+    if (filtroTipo === 'presencial') r = r.filter(s => s.tipo === 'presencial')
+    if (filtroTipo === 'online') r = r.filter(s => s.tipo === 'online')
+    if (filtroTipo === 'hoy') r = r.filter(s => s.fecha === new Date().toISOString().split('T')[0])
+    return r
+  }, [sesiones, busqueda, filtroTipo])
 
   async function cargar() {
     const [{ data: se }, { data: cl }] = await Promise.all([
@@ -211,25 +222,57 @@ export default function Sesiones({ session }) {
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Sesiones</h1>
           <p className="text-sm text-[#6B6B6B] mt-0.5">Registra entrenamientos con pesos, reps y valoración</p>
         </div>
         <button onClick={() => { setForm(initForm); setEjercicios([]); setPaso(1); setModal(true) }}
-          className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95">
-          + Nueva sesión
+          className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95 flex-shrink-0">
+          + Nueva
         </button>
+      </div>
+
+      {/* Stats rápidas */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[
+          ['Hoy', sesiones.filter(s=>s.fecha===new Date().toISOString().split('T')[0]).length, '#FF5C00'],
+          ['Esta semana', sesiones.filter(s=>{ const d=new Date(s.fecha); const hoy=new Date(); const lun=new Date(hoy); lun.setDate(hoy.getDate()-(hoy.getDay()||7)+1); return d>=lun }).length, '#6366f1'],
+          ['Total', sesiones.length, '#6B6B6B'],
+        ].map(([l,v,c])=>(
+          <div key={l} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-center">
+            <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
+            <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Buscador */}
+      <div className="relative mb-3">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
+        <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente..."
+          className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+        {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]">×</button>}
+      </div>
+
+      {/* Filtros */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        {[['todos','Todas'],['hoy','Hoy'],['presencial','Presencial'],['online','Online']].map(([v,l])=>(
+          <button key={v} onClick={() => setFiltroTipo(v)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo===v?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+            {l}
+          </button>
+        ))}
       </div>
 
       <div className="space-y-2">
         {sesiones.length === 0 ? (
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
             <p className="text-4xl mb-3">🏋️</p>
-            <p className="font-semibold text-[#0A0A0A]">Sin sesiones registradas</p>
+            <p className="font-semibold text-[#0A0A0A]">Sin resultados</p>
             <p className="text-sm text-[#6B6B6B] mt-1">Empieza registrando el primer entrenamiento</p>
           </div>
-        ) : sesiones.map(s => (
+        ) : sesionesFiltradas.map(s => (
           <div key={s.id} onClick={() => abrirDetalle(s)}
             className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md transition-all">
             <div className="flex items-center gap-3">
