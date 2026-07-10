@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react'
+import { TIPOS_ENTRENAMIENTO } from '../utils/tiposEntrenamiento'
 import { supabase } from '../lib/supabase'
 
 const PASOS = ['Datos personales','Tu objetivo','Experiencia','Marcas básicas','Material y horario','Salud','Expectativas']
 
 const init = {
   nombre:'', email:'', telefono:'', edad:'', sexo:'', peso_actual:'', altura:'', tipo:'presencial',
-  objetivo:'', objetivo_detalle:'', plazo:'3_meses',
+  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'',
   nivel:'principiante', anos_entrenando:0,
   marca_press_banca:'', marca_sentadilla:'', marca_peso_muerto:'', marca_dominadas:'', marca_flexiones:'', marca_press_militar:'',
   material:'gimnasio', dias_semana:3, duracion_sesion:60, horario_preferido:'',
@@ -209,6 +210,19 @@ export default function RegistroCliente() {
                     <button key={v} type="button" onClick={() => set('objetivo', v)}
                       className={`p-3.5 rounded-xl border text-sm font-medium text-left transition-all ${form.objetivo===v ? 'bg-[#FF5C00] text-white border-[#FF5C00]' : 'border-black/10 text-[#0A0A0A] hover:border-[#FF5C00]/50'}`}>
                       {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Tipo de entrenamiento preferido</label>
+                <p className="text-xs text-[#6B6B6B] mb-3">Tu entrenador lo usará para diseñar tu programa</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {TIPOS_ENTRENAMIENTO.map(t => (
+                    <button key={t.id} type="button" onClick={() => set('tipo_entrenamiento', t.id)}
+                      className={`p-3 rounded-xl border text-left transition-all ${form.tipo_entrenamiento===t.id ? 'bg-[#FF5C00] border-[#FF5C00]' : 'border-black/10 hover:border-[#FF5C00]/50'}`}>
+                      <p className={`text-sm font-semibold ${form.tipo_entrenamiento===t.id?'text-white':'text-[#0A0A0A]'}`}>{t.icon} {t.label}</p>
+                      <p className={`text-xs mt-0.5 leading-tight ${form.tipo_entrenamiento===t.id?'text-white/80':'text-[#6B6B6B]'}`}>{t.desc}</p>
                     </button>
                   ))}
                 </div>

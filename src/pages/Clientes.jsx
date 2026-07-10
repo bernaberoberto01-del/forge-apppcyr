@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { TIPOS_ENTRENAMIENTO, TIPOS_MAP } from '../utils/tiposEntrenamiento'
 import { supabase } from '../lib/supabase'
 
 
@@ -21,7 +22,7 @@ const OBJ = {
   cambio_rapido_30dias: { label: 'Cambio 30 días', color: 'bg-red-50 text-red-700' },
 }
 const OBJETIVOS_LIST = Object.entries(OBJ)
-const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',notas:'',precio_mensual:'' }
+const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',notas:'',precio_mensual:'',tipo_entrenamiento:'' }
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const AVATAR_COLORS = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
 const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
@@ -171,7 +172,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'' })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'' })
     setEditId(c.id); setModal(true); setDetalle(null)
   }
 
@@ -327,9 +328,16 @@ export default function Clientes({ session }) {
                       </div>
                     </div>
                     <span>
+                      <div className="flex flex-col gap-1">
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${c.tipo === 'online' ? 'bg-blue-50 text-blue-700' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
                         {c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}
                       </span>
+                      {c.tipo_entrenamiento && TIPOS_MAP[c.tipo_entrenamiento] && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TIPOS_MAP[c.tipo_entrenamiento].color}`}>
+                          {TIPOS_MAP[c.tipo_entrenamiento].icon} {TIPOS_MAP[c.tipo_entrenamiento].label}
+                        </span>
+                      )}
+                    </div>
                     </span>
                     <span>
                       {obj && <span className={`text-xs px-2 py-1 rounded-full font-medium ${obj.color}`}>{obj.label}</span>}
@@ -511,6 +519,18 @@ export default function Clientes({ session }) {
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="99" />
               </div>
               <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Tipo de entrenamiento</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {TIPOS_ENTRENAMIENTO.map(t => (
+                    <button key={t.id} type="button" onClick={() => setForm({...form,tipo_entrenamiento:t.id})}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${form.tipo_entrenamiento===t.id?'bg-[#FF5C00] border-[#FF5C00]':'border-black/10 hover:border-[#FF5C00]/50'}`}>
+                      <p className={`text-xs font-semibold ${form.tipo_entrenamiento===t.id?'text-white':'text-[#0A0A0A]'}`}>{t.icon} {t.label}</p>
+                      <p className={`text-xs mt-0.5 leading-tight ${form.tipo_entrenamiento===t.id?'text-white/80':'text-[#6B6B6B]'} hidden md:block`}>{t.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Notas internas</label>
                 <textarea value={form.notas} onChange={e => setForm({...form,notas:e.target.value})} rows={2}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
@@ -571,6 +591,13 @@ export default function Clientes({ session }) {
                           <span key={i} className="text-xs bg-white px-2 py-1 rounded-full">{i} {v}{s}</span>
                         ))}
                       </div>
+                    </div>
+                  )}
+                  {detalle.tipo_entrenamiento && TIPOS_MAP[detalle.tipo_entrenamiento] && (
+                    <div className={`rounded-xl p-3 ${TIPOS_MAP[detalle.tipo_entrenamiento].color}`}>
+                      <p className="text-xs font-semibold mb-0.5">Tipo de entrenamiento</p>
+                      <p className="text-sm font-bold">{TIPOS_MAP[detalle.tipo_entrenamiento].icon} {TIPOS_MAP[detalle.tipo_entrenamiento].label}</p>
+                      <p className="text-xs mt-0.5 opacity-80">{TIPOS_MAP[detalle.tipo_entrenamiento].desc}</p>
                     </div>
                   )}
                   {detalle.notas && <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs font-semibold text-amber-700 mb-1">Notas</p><p className="text-sm text-amber-800">{detalle.notas}</p></div>}
