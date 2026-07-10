@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 const nav = [
   { to: '/dashboard', label: 'Dashboard', icon: '⊞' },
   { to: '/clientes', label: 'Clientes', icon: '👥' },
-  { to: '/cuestionarios', label: 'Registros', icon: '📋' },
   { to: '/rutinas', label: 'Rutinas', icon: '💪' },
   { to: '/pagos', label: 'Pagos', icon: '€' },
   { to: '/seguimiento', label: 'Seguimiento', icon: '📈' },
@@ -51,7 +50,7 @@ export default function Layout({ session }) {
           <NavLink key={item.to} to={item.to}
             className={({ isActive }) => `flex-1 flex flex-col items-center py-2 text-xs transition-colors ${isActive ? 'text-orange-500' : 'text-gray-500'}`}>
             <span className="text-base">{item.icon}</span>
-            <span className="text-[9px] mt-0.5 truncate w-full text-center px-0.5">{item.label}</span>
+            <span className="text-[9px] mt-0.5">{item.label}</span>
           </NavLink>
         ))}
       </nav>

@@ -9,7 +9,6 @@ import Pagos from './pages/Pagos'
 import Seguimiento from './pages/Seguimiento'
 import Sesiones from './pages/Sesiones'
 import Rutinas from './pages/Rutinas'
-import Cuestionarios from './pages/Cuestionarios'
 import CheckinPublico from './pages/CheckinPublico'
 import PortalCliente from './pages/PortalCliente'
 import RegistroCliente from './pages/RegistroCliente'
@@ -39,7 +38,6 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard session={session} />} />
           <Route path="clientes" element={<Clientes session={session} />} />
           <Route path="rutinas" element={<Rutinas session={session} />} />
-          <Route path="cuestionarios" element={<Cuestionarios session={session} />} />
           <Route path="pagos" element={<Pagos session={session} />} />
           <Route path="seguimiento" element={<Seguimiento session={session} />} />
           <Route path="sesiones" element={<Sesiones session={session} />} />
