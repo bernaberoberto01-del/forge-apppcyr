@@ -21,6 +21,7 @@ export default function PortalCliente() {
   const [configEntrenador, setConfigEntrenador] = useState(null)
   const [planNutricion, setPlanNutricion] = useState(null)
   const [diaActivoNutr, setDiaActivoNutr] = useState(0)
+  const [fotos, setFotos] = useState([])
 
   useEffect(() => {
     async function cargar() {
@@ -37,6 +38,9 @@ export default function PortalCliente() {
       setCheckins(ci || [])
       setPagos(pg || [])
       setMensajes(ms || [])
+      // Cargar fotos de progreso visibles
+      const { data: ft } = await supabase.from('fotos_progreso').select('*').eq('cliente_id', clienteId).eq('visible_cliente', true).order('fecha', { ascending: false })
+      if (ft) setFotos(ft)
       // Cargar plan nutricional
       const { data: pn } = await supabase.from('planes_nutricion').select('*').eq('cliente_id', clienteId).eq('estado','publicado').order('created_at', { ascending: false }).limit(1).single().catch(()=>({data:null}))
       setPlanNutricion(pn)
@@ -73,6 +77,7 @@ export default function PortalCliente() {
     { id: 'progreso', label: 'Progreso', icon: '📈' },
     { id: 'mensajes', label: mensajesNoLeidos > 0 ? `Msgs(${mensajesNoLeidos})` : 'Mensajes', icon: mensajesNoLeidos > 0 ? '🔴' : '✉️' },
     ...(planNutricion || cliente?.nutricion_activa ? [{ id: 'nutricion', label: 'Nutrición', icon: '🥗' }] : []),
+    ...(fotos.length > 0 ? [{ id: 'fotos', label: 'Fotos', icon: '📸' }] : []),
   ]
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
@@ -347,6 +352,40 @@ export default function PortalCliente() {
               </div>
             ))}
           </>
+        )}
+        {/* FOTOS */}
+        {tab==='fotos' && (
+          <div className="space-y-4">
+            <div className="bg-[#111] rounded-2xl p-4">
+              <p className="text-white font-bold mb-1">Tu evolución 📸</p>
+              <p className="text-white/50 text-xs">Fotos compartidas por tu entrenador</p>
+            </div>
+            {Object.entries(fotos.reduce((acc, f) => {
+              if (!acc[f.fecha]) acc[f.fecha] = []
+              acc[f.fecha].push(f)
+              return acc
+            }, {})).map(([fecha, fotosDia]) => (
+              <div key={fecha}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-[#0A0A0A]">
+                    {new Date(fecha).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+                  </p>
+                  {fotosDia[0]?.peso && <p className="text-xs font-bold text-[#FF5C00]">{fotosDia[0].peso}kg</p>}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {fotosDia.map(f => (
+                    <div key={f.id} className="relative">
+                      <img src={f.url} alt={f.tipo}
+                        className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 rounded-b-xl px-2 py-1 text-center">
+                        <span className="text-white text-xs capitalize">{f.tipo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
         {/* NUTRICIÓN */}
         {tab==='nutricion' && (

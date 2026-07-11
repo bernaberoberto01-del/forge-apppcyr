@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { TIPOS_ENTRENAMIENTO, TIPOS_MAP } from '../utils/tiposEntrenamiento'
+import GraficasCliente from '../components/GraficasCliente'
 import { supabase } from '../lib/supabase'
 
 
@@ -163,12 +164,13 @@ export default function Clientes({ session }) {
 
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen')
-    const [{ data: ci }, { data: pg }, { data: se }] = await Promise.all([
+    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
+      supabase.from('fotos_progreso').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
     ])
-    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[] })
+    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[] })
   }
 
   function abrirEditar(c) {
@@ -564,7 +566,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos']].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos']].map(([id,label]) => (
                   <button key={t} onClick={() => setDTab(t)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -672,6 +674,97 @@ export default function Clientes({ session }) {
                   </div>
                 </div>
               )})()}
+              {dTab==='progreso' && (
+                <div className="space-y-2">
+                  <GraficasCliente clienteId={detalle.id} />
+                </div>
+              )}
+              {dTab==='fotos' && (() => {
+                const fotos = dData.fotos || []
+                const inputRef = { current: null }
+                async function subirFoto(file, tipo) {
+                  if (!file) return
+                  const ext = file.name.split('.').pop()
+                  const path = `${uid}/${detalle.id}/${Date.now()}.${ext}`
+                  const { error } = await supabase.storage.from('progress-photos').upload(path, file)
+                  if (error) return
+                  const { data: { publicUrl } } = supabase.storage.from('progress-photos').getPublicUrl(path)
+                  await supabase.from('fotos_progreso').insert({
+                    entrenador_id: uid, cliente_id: detalle.id,
+                    url: publicUrl, tipo, fecha: new Date().toISOString().split('T')[0],
+                    peso: dData.checkins?.[0]?.peso || detalle.peso_actual
+                  })
+                  await abrirDetalle(detalle)
+                }
+                const tiposVista = ['frontal','lateral','espalda']
+                return (
+                  <div className="space-y-4">
+                    {/* Subir fotos */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {tiposVista.map(tipo => (
+                        <label key={tipo} className="cursor-pointer">
+                          <input type="file" accept="image/*" className="hidden"
+                            onChange={e => subirFoto(e.target.files[0], tipo)} />
+                          <div className="border-2 border-dashed border-black/15 rounded-xl p-3 text-center hover:border-[#FF5C00] transition-all">
+                            <p className="text-2xl mb-1">📷</p>
+                            <p className="text-xs font-medium text-[#0A0A0A] capitalize">{tipo}</p>
+                            <p className="text-xs text-[#6B6B6B]">+ añadir</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+
+                    {fotos.length === 0 ? (
+                      <div className="text-center py-6">
+                        <p className="text-3xl mb-2">📸</p>
+                        <p className="text-sm font-semibold text-[#0A0A0A]">Sin fotos todavía</p>
+                        <p className="text-xs text-[#6B6B6B] mt-1">Añade fotos comparativas para ver la evolución</p>
+                      </div>
+                    ) : (
+                      /* Agrupar por fecha */
+                      Object.entries(fotos.reduce((acc, f) => {
+                        if (!acc[f.fecha]) acc[f.fecha] = []
+                        acc[f.fecha].push(f)
+                        return acc
+                      }, {})).map(([fecha, fotosDia]) => (
+                        <div key={fecha}>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-[#0A0A0A]">
+                              {new Date(fecha).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+                            </p>
+                            {fotosDia[0]?.peso && <p className="text-xs text-[#FF5C00] font-bold">{fotosDia[0].peso}kg</p>}
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {fotosDia.map(f => (
+                              <div key={f.id} className="relative group">
+                                <img src={f.url} alt={f.tipo}
+                                  className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
+                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 rounded-b-xl px-2 py-1.5 flex items-center justify-between">
+                                  <span className="text-white text-xs capitalize">{f.tipo}</span>
+                                  <div className="flex gap-1">
+                                    <button onClick={async () => {
+                                      await supabase.from('fotos_progreso').update({ visible_cliente: !f.visible_cliente }).eq('id', f.id)
+                                      await abrirDetalle(detalle)
+                                    }} className={`text-xs px-1.5 py-0.5 rounded ${f.visible_cliente?'bg-emerald-500 text-white':'bg-white/20 text-white'}`}>
+                                      {f.visible_cliente ? '👁' : '🙈'}
+                                    </button>
+                                    <button onClick={async () => {
+                                      if (!confirm('¿Eliminar?')) return
+                                      await supabase.from('fotos_progreso').delete().eq('id', f.id)
+                                      await abrirDetalle(detalle)
+                                    }} className="text-white/70 hover:text-red-400 text-xs px-1">×</button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    <p className="text-xs text-[#6B6B6B] text-center">👁 = visible para el cliente en su portal</p>
+                  </div>
+                )
+              })()}
               {dTab==='seguimientos' && (
                 <div className="space-y-2">
                   {!dData.checkins?.length ? (
