@@ -22,6 +22,7 @@ import SesionCliente from './pages/SesionCliente'
 import ProgresoCliente from './pages/ProgresoCliente'
 import CheckinPublico from './pages/CheckinPublico'
 import NotFound from './pages/NotFound'
+import ErrorBoundary from './components/ErrorBoundary'
 
 function Protected({ session, children }) {
   if (!session) return <Navigate to="/login" replace />
@@ -88,5 +89,5 @@ export default function App() {
     </div>
   )
 
-  return <BrowserRouter><AppInner session={session} /></BrowserRouter>
+  return <ErrorBoundary><BrowserRouter><AppInner session={session} /></BrowserRouter></ErrorBoundary>
 }

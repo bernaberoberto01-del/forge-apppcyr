@@ -56,6 +56,7 @@ export default function Sesiones({ session }) {
   }
 
   async function cargarRutina(clienteId, diaRutina) {
+    if (!clienteId) return
     const cliente = clientes.find(c => c.id === clienteId)
     const [{ data: ru }, { data: cu }, { data: pf }] = await Promise.all([
       supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
@@ -68,6 +69,7 @@ export default function Sesiones({ session }) {
     const cuest = cu?.[0] || null
 
     if (ru?.[0]) {
+      if (!ru[0]) return
       setRutinaCliente(ru[0])
       const contenido = ru[0].contenido || ru[0].borrador
       const dia = contenido?.dias?.find(d => d.dia === diaRutina)
