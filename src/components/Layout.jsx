@@ -10,7 +10,6 @@ const TODOS_MODULOS = [
   { id: 'seguimiento', path: '/seguimiento', label: 'Seguimiento', icon: '📋' },
   { id: 'pagos', path: '/pagos', label: 'Pagos', icon: '💶' },
   { id: 'agenda', path: '/agenda', label: 'Agenda', icon: '📅' },
-  { id: 'biblioteca', path: '/biblioteca', label: 'Biblioteca', icon: '📚' },
   { id: 'nutricion', path: '/nutricion', label: 'Nutrición', icon: '🥗' },
   { id: 'mensajes', path: '/mensajes', label: 'Mensajes', icon: '💬' },
 ]
