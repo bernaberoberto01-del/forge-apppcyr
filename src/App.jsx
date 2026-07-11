@@ -86,7 +86,7 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setSession(session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setSession(session))
     return () => subscription.unsubscribe()
   }, [])
 
@@ -96,5 +96,26 @@ export default function App() {
     </div>
   )
 
-  return <ErrorBoundary><BrowserRouter><CentroProvider session={session}><AppInner session={session} /></CentroProvider></BrowserRouter></ErrorBoundary>
+  return (
+    <ErrorBoundary>
+      <BrowserRouter>
+        {/* Rutas públicas — sin sesión, sin contexto */}
+        <Routes>
+          <Route path="/portal/:clienteId" element={<PortalCliente />} />
+          <Route path="/registro" element={<RegistroCliente />} />
+          <Route path="/nutricion-cuest" element={<NutricionCuestionario />} />
+          <Route path="/seguimiento/:clienteId" element={<CheckinPublico />} />
+          <Route path="/sesion/:clienteId" element={<SesionCliente />} />
+          <Route path="/progreso/:clienteId" element={<ProgresoCliente />} />
+          <Route path="/unirse/:token" element={<UnirseACentro />} />
+          <Route path="*" element={
+            <CentroProvider session={session}>
+              <AppInner session={session} />
+            </CentroProvider>
+          } />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
+  )
 }
+
