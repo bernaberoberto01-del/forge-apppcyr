@@ -564,105 +564,191 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {['resumen','progreso','seguimientos','sesiones','pagos'].map(t => (
+                {[['resumen','Resumen'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos']].map(([id,label]) => (
                   <button key={t} onClick={() => setDTab(t)}
-                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===t ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
-                    {t.charAt(0).toUpperCase()+t.slice(1)}
+                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
+                    {label}
                   </button>
                 ))}
               </div>
             </div>
             <div className="p-4">
-              {dTab==='resumen' && (
+              {dTab==='resumen' && (() => {
+                const ci0 = dData.checkins?.[0]
+                const pesoInicial = dData.checkins?.length > 1 ? dData.checkins[dData.checkins.length-1]?.peso : detalle.peso_actual
+                const pesoActual = ci0?.peso || detalle.peso_actual
+                const diff = pesoInicial && pesoActual ? (pesoActual - pesoInicial).toFixed(1) : null
+                const adherenciaMedia = dData.checkins?.length ? Math.round(dData.checkins.slice(0,4).reduce((s,c)=>s+(c.adherencia_entreno||0),0)/Math.min(dData.checkins.length,4)) : null
+                const ses30 = dData.sesiones?.filter(s=>new Date(s.fecha)>new Date(Date.now()-30*864e5)).length||0
+                const ingresosTotal = dData.pagos?.reduce((s,p)=>s+Number(p.importe||0),0)||0
+                return (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    {[['Peso actual',detalle.peso_actual?`${detalle.peso_actual}kg`:'—'],['Peso objetivo',detalle.peso_objetivo?`${detalle.peso_objetivo}kg`:'—'],['Precio',`${detalle.precio_mensual||0}€/mes`]].map(([l,v])=>(
-                      <div key={l} className="bg-[#F5F5F0] rounded-xl p-3 text-center">
-                        <p className="text-base font-bold text-[#0A0A0A]">{v}</p>
+                  {/* Métricas clave */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-[#111] rounded-xl p-3">
+                      <p className="text-white/40 text-xs mb-1">Peso actual</p>
+                      <p className="text-white text-xl font-bold">{pesoActual ? `${pesoActual}kg` : '—'}</p>
+                      {diff !== null && <p className={`text-xs mt-0.5 font-medium ${Number(diff)<0?'text-emerald-400':'text-red-400'}`}>{Number(diff)>0?'+':''}{diff}kg desde inicio</p>}
+                    </div>
+                    <div className="bg-[#111] rounded-xl p-3">
+                      <p className="text-white/40 text-xs mb-1">Objetivo</p>
+                      <p className="text-white text-xl font-bold">{detalle.peso_objetivo ? `${detalle.peso_objetivo}kg` : '—'}</p>
+                      {detalle.peso_objetivo && pesoActual && <p className="text-xs text-white/40 mt-0.5">Quedan {Math.abs(pesoActual-detalle.peso_objetivo).toFixed(1)}kg</p>}
+                    </div>
+                    <div className="bg-[#F5F5F0] rounded-xl p-3">
+                      <p className="text-[#6B6B6B] text-xs mb-1">Sesiones /mes</p>
+                      <p className="text-[#0A0A0A] text-xl font-bold">{ses30}</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">últimos 30 días</p>
+                    </div>
+                    <div className="bg-[#F5F5F0] rounded-xl p-3">
+                      <p className="text-[#6B6B6B] text-xs mb-1">Adherencia media</p>
+                      <p className="text-xl font-bold" style={{color: adherenciaMedia>=7?'#10b981':adherenciaMedia>=4?'#f59e0b':'#ef4444'}}>{adherenciaMedia ? `${adherenciaMedia}/10` : '—'}</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">últimos 4 CIs</p>
+                    </div>
+                  </div>
+
+                  {/* Info personal */}
+                  <div className="bg-white border border-black/5 rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-bold text-[#0A0A0A]">Perfil</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                      {[
+                        ['Nivel', detalle.nivel],
+                        ['Días/sem', detalle.dias_semana ? `${detalle.dias_semana} días` : null],
+                        ['Material', detalle.material],
+                        ['Precio', `${detalle.precio_mensual||0}€/mes`],
+                        ['Total facturado', `${ingresosTotal}€`],
+                        ['Inicio', detalle.fecha_inicio ? new Date(detalle.fecha_inicio).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : null],
+                      ].filter(([,v])=>v).map(([l,v])=>(
+                        <div key={l} className="flex items-center justify-between">
+                          <p className="text-xs text-[#6B6B6B]">{l}</p>
+                          <p className="text-xs font-semibold text-[#0A0A0A] capitalize">{v}</p>
+                        </div>
+                      ))}
+                    </div>
+                    {detalle.telefono && <a href={`tel:${detalle.telefono}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-[#FF5C00] pt-1 border-t border-black/5 transition-colors">📞 {detalle.telefono}</a>}
+                    {detalle.email && <a href={`mailto:${detalle.email}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">✉️ {detalle.email}</a>}
+                  </div>
+
+                  {/* Último CI */}
+                  {ci0 && (
+                    <div className="bg-[#F5F5F0] rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-bold text-[#0A0A0A]">Último check-in</p>
+                        <p className="text-xs text-[#6B6B6B]">{new Date(ci0.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[['⚡',ci0.energia,'/10','Energía'],['😴',ci0.sueno,'h','Sueño'],['😤',ci0.estres,'/5','Estrés'],['🔥',ci0.fatiga,'/5','Fatiga'],['💫',ci0.motivacion,'/7','Motivación'],['💪',ci0.adherencia_entreno,'/10','Adherencia']].filter(([,,, ,v])=>ci0[['energia','sueno','estres','fatiga','motivacion','adherencia_entreno'][['⚡','😴','😤','🔥','💫','💪'].indexOf(_=>_)]]).filter(([,v])=>v).map(([ic,v,s,l])=>(
+                          <div key={l} className="bg-white rounded-lg p-2 text-center">
+                            <p className="text-sm">{ic}</p>
+                            <p className="text-xs font-bold text-[#0A0A0A]">{v}{s}</p>
+                            <p className="text-[10px] text-[#6B6B6B]">{l}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {ci0.comentario && <p className="text-xs text-[#6B6B6B] mt-2 italic border-t border-black/5 pt-2">"{ci0.comentario}"</p>}
+                    </div>
+                  )}
+
+                  {/* Tipo entrenamiento */}
+                  {detalle.tipo_entrenamiento && TIPOS_MAP[detalle.tipo_entrenamiento] && (
+                    <div className={`rounded-xl p-3 ${TIPOS_MAP[detalle.tipo_entrenamiento].color}`}>
+                      <p className="text-xs font-bold mb-0.5">{TIPOS_MAP[detalle.tipo_entrenamiento].icon} {TIPOS_MAP[detalle.tipo_entrenamiento].label}</p>
+                      <p className="text-xs opacity-80">{TIPOS_MAP[detalle.tipo_entrenamiento].desc}</p>
+                    </div>
+                  )}
+
+                  {/* Lesiones/notas */}
+                  {detalle.lesiones && <div className="bg-red-50 border border-red-100 rounded-xl p-3"><p className="text-xs font-semibold text-red-700 mb-1">⚠ Lesiones / limitaciones</p><p className="text-sm text-red-800">{detalle.lesiones}</p></div>}
+                  {detalle.notas && <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs font-semibold text-amber-700 mb-1">📝 Notas internas</p><p className="text-sm text-amber-800">{detalle.notas}</p></div>}
+
+                  {/* Acciones */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
+                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); showToast('Enlace del portal copiado') }}
+                      className="bg-[#111] text-white text-sm font-medium py-2.5 rounded-xl">🔗 Portal</button>
+                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${detalle.id}`); showToast('Enlace check-in copiado') }}
+                      className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Enviar CI</button>
+                    <button onClick={() => eliminar(detalle.id)} className="border border-red-100 text-red-500 text-sm font-medium py-2.5 rounded-xl hover:bg-red-50">🗑 Eliminar</button>
+                  </div>
+                </div>
+              )})()}
+              {dTab==='seguimientos' && (
+                <div className="space-y-2">
+                  {!dData.checkins?.length ? (
+                    <div className="text-center py-8">
+                      <p className="text-3xl mb-2">📋</p>
+                      <p className="text-sm text-[#6B6B6B]">Sin seguimientos registrados</p>
+                    </div>
+                  ) : dData.checkins.map(ci => (
+                    <div key={ci.id} className="border border-black/5 rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-[#0A0A0A]">{new Date(ci.fecha).toLocaleDateString('es-ES', { weekday:'short', day:'numeric', month:'short' })}</p>
+                        {ci.peso && <span className="text-xs font-bold text-[#FF5C00]">⚖️ {ci.peso}kg</span>}
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {ci.energia && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">⚡ {ci.energia}/10</span>}
+                        {ci.sueno && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full">😴 {ci.sueno}h</span>}
+                        {ci.estres && <span className={`text-xs px-2 py-1 rounded-full ${ci.estres>=4?'bg-red-50 text-red-700':'bg-emerald-50 text-emerald-700'}`}>😤 {ci.estres}/5</span>}
+                        {ci.fatiga && <span className={`text-xs px-2 py-1 rounded-full ${ci.fatiga>=4?'bg-red-50 text-red-700':'bg-gray-50 text-gray-600'}`}>🔥 {ci.fatiga}/5</span>}
+                        {ci.motivacion && <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full">💫 {ci.motivacion}/7</span>}
+                        {ci.adherencia_entreno && <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full">💪 {ci.adherencia_entreno}/10</span>}
+                      </div>
+                      {ci.comentario && <p className="text-xs text-[#6B6B6B] mt-2 italic border-t border-black/5 pt-2">"{ci.comentario}"</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {dTab==='sesiones' && (
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {[
+                      ['Este mes', dData.sesiones?.filter(s=>new Date(s.fecha)>new Date(Date.now()-30*864e5)).length||0, '#FF5C00'],
+                      ['RPE medio', dData.sesiones?.length ? (dData.sesiones.slice(0,8).reduce((s,x)=>s+(x.rpe||0),0)/Math.min(dData.sesiones.length,8)).toFixed(1) : '—', '#6366f1'],
+                      ['Total', dData.sesiones?.length||0, '#6B6B6B'],
+                    ].map(([l,v,c])=>(
+                      <div key={l} className="bg-[#F5F5F0] rounded-xl p-2.5 text-center">
+                        <p className="text-lg font-bold" style={{color:c}}>{v}</p>
                         <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
                       </div>
                     ))}
                   </div>
-                  {dData.checkins?.[0] && (
-                    <div className="bg-[#F5F5F0] rounded-xl p-3">
-                      <p className="text-xs font-semibold text-[#6B6B6B] mb-2">Último seguimiento</p>
-                      <div className="flex gap-2 flex-wrap">
-                        {[['⚡',dData.checkins[0].energia,'/10'],['😴',dData.checkins[0].sueno,'h'],['😤',dData.checkins[0].estres,'/5'],['💫',dData.checkins[0].motivacion,'/7']].filter(([,v])=>v).map(([i,v,s])=>(
-                          <span key={i} className="text-xs bg-white px-2 py-1 rounded-full">{i} {v}{s}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {detalle.tipo_entrenamiento && TIPOS_MAP[detalle.tipo_entrenamiento] && (
-                    <div className={`rounded-xl p-3 ${TIPOS_MAP[detalle.tipo_entrenamiento].color}`}>
-                      <p className="text-xs font-semibold mb-0.5">Tipo de entrenamiento</p>
-                      <p className="text-sm font-bold">{TIPOS_MAP[detalle.tipo_entrenamiento].icon} {TIPOS_MAP[detalle.tipo_entrenamiento].label}</p>
-                      <p className="text-xs mt-0.5 opacity-80">{TIPOS_MAP[detalle.tipo_entrenamiento].desc}</p>
-                    </div>
-                  )}
-                  {detalle.notas && <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs font-semibold text-amber-700 mb-1">Notas</p><p className="text-sm text-amber-800">{detalle.notas}</p></div>}
-                  <div className="flex gap-2 pt-1">
-                    <button onClick={() => abrirEditar(detalle)} className="flex-1 border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A]">✏️ Editar</button>
-                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); showToast('Enlace del portal copiado') }}
-                      className="flex-1 bg-[#111] text-white text-sm font-medium py-2.5 rounded-xl">🔗 Portal</button>
-                    <button onClick={() => eliminar(detalle.id)} className="border border-red-200 text-red-500 text-sm px-3 py-2.5 rounded-xl">🗑</button>
-                  </div>
-                </div>
-              )}
-              {dTab==='progreso' && (
-                <div>
-                  <p className="text-sm text-[#6B6B6B] text-center py-8">Las gráficas de progreso se cargan desde el portal del cliente</p>
-                  <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); showToast('Enlace copiado') }}
-                    className="w-full bg-[#111] text-white text-sm font-medium py-3 rounded-xl">🔗 Copiar enlace del portal</button>
-                </div>
-              )}
-              {dTab==='seguimientos' && (
-                <div className="space-y-2">
-                  {!dData.checkins?.length ? <p className="text-sm text-[#6B6B6B] text-center py-6">Sin seguimientos</p> :
-                    dData.checkins.map(ci => (
-                      <div key={ci.id} className="border border-black/5 rounded-xl p-3">
-                        <p className="text-xs text-[#6B6B6B] mb-2">{new Date(ci.fecha).toLocaleDateString('es-ES', { day:'numeric', month:'short', year:'numeric' })}</p>
-                        <div className="flex gap-1.5 flex-wrap">
-                          {ci.peso && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full">⚖️ {ci.peso}kg</span>}
-                          {ci.energia && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">⚡ {ci.energia}/10</span>}
-                          {ci.estres && <span className={`text-xs px-2 py-1 rounded-full ${ci.estres>=4?'bg-red-50 text-red-700':'bg-emerald-50 text-emerald-700'}`}>😤 {ci.estres}/5</span>}
-                          {ci.motivacion && <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full">💫 {ci.motivacion}/7</span>}
-                          {ci.fatiga && <span className={`text-xs px-2 py-1 rounded-full ${ci.fatiga>=4?'bg-red-50 text-red-700':'bg-gray-50 text-gray-600'}`}>🔥 {ci.fatiga}/5</span>}
+                  {!dData.sesiones?.length ? <p className="text-sm text-[#6B6B6B] text-center py-4">Sin sesiones registradas</p> :
+                    dData.sesiones.slice(0,10).map(s => (
+                      <div key={s.id} className="border border-black/5 rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-sm font-semibold text-[#0A0A0A]">{new Date(s.fecha).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</p>
+                          <div className="flex gap-1.5">
+                            {s.rpe && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full">RPE {s.rpe}</span>}
+                            {s.fatiga_post && <span className={`text-xs px-2 py-1 rounded-full ${s.fatiga_post>=4?'bg-red-50 text-red-600':'bg-emerald-50 text-emerald-700'}`}>💪 {s.fatiga_post}/5</span>}
+                          </div>
                         </div>
-                        {ci.comentario && <p className="text-xs text-[#6B6B6B] mt-2 italic">"{ci.comentario}"</p>}
-                      </div>
-                    ))}
-                </div>
-              )}
-              {dTab==='sesiones' && (
-                <div>
-                  <div className="bg-[#FF5C00]/8 rounded-xl p-3 mb-3 text-center">
-                    <p className="text-2xl font-bold text-[#FF5C00]">{dData.sesiones?.filter(s=>new Date(s.fecha)>new Date(Date.now()-30*864e5)).length||0}</p>
-                    <p className="text-xs text-[#6B6B6B]">Sesiones últimos 30 días</p>
-                  </div>
-                  {!dData.sesiones?.length ? <p className="text-sm text-[#6B6B6B] text-center py-4">Sin sesiones</p> :
-                    dData.sesiones.slice(0,8).map(s => (
-                      <div key={s.id} className="flex items-center gap-3 py-2.5 border-b border-black/5 last:border-0">
-                        <span className="text-base">🏋️</span>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-[#0A0A0A]">{s.tipo}</p>
-                          <p className="text-xs text-[#6B6B6B]">{new Date(s.fecha).toLocaleDateString('es-ES')}</p>
-                        </div>
-                        {s.rpe && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full">RPE {s.rpe}</span>}
+                        {s.ejercicios?.length > 0 && (
+                          <div className="flex gap-1 flex-wrap">
+                            {s.ejercicios.slice(0,4).map((ej,i)=>(
+                              <span key={i} className="text-xs bg-[#F5F5F0] text-[#6B6B6B] px-2 py-0.5 rounded-full">{ej.ejercicio_nombre}</span>
+                            ))}
+                            {s.ejercicios.length > 4 && <span className="text-xs text-[#6B6B6B]">+{s.ejercicios.length-4}</span>}
+                          </div>
+                        )}
+                        {s.sensaciones && <p className="text-xs text-[#6B6B6B] mt-1.5 italic">"{s.sensaciones}"</p>}
                       </div>
                     ))}
                 </div>
               )}
               {dTab==='pagos' && (
                 <div className="space-y-2">
-                  {!dData.pagos?.length ? <p className="text-sm text-[#6B6B6B] text-center py-6">Sin pagos</p> :
+                  <div className="bg-[#111] rounded-xl p-3 mb-3">
+                    <p className="text-white/40 text-xs">Total facturado</p>
+                    <p className="text-white text-2xl font-bold">{dData.pagos?.reduce((s,p)=>s+Number(p.importe||0),0)||0}€</p>
+                  </div>
+                  {!dData.pagos?.length ? <p className="text-sm text-[#6B6B6B] text-center py-4">Sin pagos registrados</p> :
                     dData.pagos.map(p => {
                       const d = p.valido_hasta ? Math.ceil((new Date(p.valido_hasta)-new Date())/864e5) : null
                       return (
                         <div key={p.id} className="border border-black/5 rounded-xl p-3 flex items-center justify-between">
                           <div>
                             <p className="text-sm font-medium text-[#0A0A0A]">{p.concepto||'Mensualidad'}</p>
-                            <p className="text-xs text-[#6B6B6B]">{new Date(p.fecha_pago).toLocaleDateString('es-ES')}</p>
+                            <p className="text-xs text-[#6B6B6B]">{new Date(p.fecha_pago).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
                           </div>
                           <div className="text-right">
                             <p className="font-bold text-[#FF5C00]">{p.importe}€</p>
