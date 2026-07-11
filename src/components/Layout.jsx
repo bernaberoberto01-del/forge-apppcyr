@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { NavLink, useLocation } from 'react-router-dom'
 
 const TODOS_MODULOS = [
@@ -9,31 +10,50 @@ const TODOS_MODULOS = [
   { id: 'seguimiento', path: '/seguimiento', label: 'Seguimiento', icon: '📋' },
   { id: 'pagos', path: '/pagos', label: 'Pagos', icon: '💶' },
   { id: 'agenda', path: '/agenda', label: 'Agenda', icon: '📅' },
+  { id: 'mensajes', path: '/mensajes', label: 'Mensajes', icon: '💬' },
 ]
 
 export default function Layout({ children, session, config }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [mensajesNL, setMensajesNL] = useState(0)
   const location = useLocation()
 
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
+
+  useEffect(() => {
+    if (!config?.modulos?.mensajes) return
+    const uid = session?.user?.id
+    if (!uid) return
+    supabase.from('mensajes_cliente').select('id', { count: 'exact' })
+      .eq('entrenador_id', uid).eq('leido', false)
+      .then(({ count }) => setMensajesNL(count || 0))
+  }, [location.pathname, config])
 
   const modulosActivos = TODOS_MODULOS.filter(m => !config?.modulos || config.modulos[m.id] !== false)
   const nombre = config?.nombre_entrenador || session?.user?.email?.split('@')[0] || 'Entrenador'
   const negocio = config?.nombre_negocio || 'Forge Studio OS'
   const acento = config?.color_acento || '#FF5C00'
 
-  const NavItem = ({ item }) => (
-    <NavLink to={item.path}
-      className={({ isActive }) =>
-        `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
-          ? 'text-white'
-          : 'text-white/50 hover:text-white hover:bg-white/5'}`
-      }
-      style={({ isActive }) => isActive ? { background: acento } : {}}>
-      <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
-      <span className="truncate">{item.label}</span>
-    </NavLink>
-  )
+  const NavItem = ({ item }) => {
+    const badge = item.id === 'mensajes' && mensajesNL > 0 ? mensajesNL : 0
+    return (
+      <NavLink to={item.path}
+        className={({ isActive }) =>
+          `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${isActive
+            ? 'text-white'
+            : 'text-white/50 hover:text-white hover:bg-white/5'}`
+        }
+        style={({ isActive }) => isActive ? { background: acento } : {}}>
+        <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
+        <span className="flex-1 truncate">{item.label}</span>
+        {badge > 0 && (
+          <span className="w-5 h-5 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+            {badge > 9 ? '9+' : badge}
+          </span>
+        )}
+      </NavLink>
+    )
+  }
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">

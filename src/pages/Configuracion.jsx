@@ -9,6 +9,7 @@ const MODULOS = [
   { id: 'seguimiento', label: 'Seguimiento', icon: '📋', desc: 'Check-ins semanales y alertas', obligatorio: false },
   { id: 'pagos', label: 'Pagos', icon: '💶', desc: 'Cobros manuales y Stripe', obligatorio: false },
   { id: 'agenda', label: 'Agenda', icon: '📅', desc: 'Calendario semanal de sesiones', obligatorio: false },
+  { id: 'mensajes', label: 'Mensajes', icon: '💬', desc: 'Comunicación directa con clientes', obligatorio: false },
 ]
 
 const COLORES = [

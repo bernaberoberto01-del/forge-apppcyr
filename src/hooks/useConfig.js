@@ -7,7 +7,7 @@ const defaultConfig = {
   bio: '',
   foto_url: '',
   color_acento: '#FF5C00',
-  modulos: { dashboard:true, clientes:true, rutinas:true, sesiones:true, seguimiento:true, pagos:true, agenda:true },
+  modulos: { dashboard:true, clientes:true, rutinas:true, sesiones:true, seguimiento:true, pagos:true, agenda:true, mensajes:true },
   cuestionario_bloques: { basico:true, objetivo:true, historial:true, disponibilidad:true, material:true, salud:true, motivacion:true }
 }
 

@@ -13,6 +13,7 @@ import Seguimiento from './pages/Seguimiento'
 import Pagos from './pages/Pagos'
 import Agenda from './pages/Agenda'
 import Configuracion from './pages/Configuracion'
+import Mensajes from './pages/Mensajes'
 import RegistroCliente from './pages/RegistroCliente'
 import PortalCliente from './pages/PortalCliente'
 import SesionCliente from './pages/SesionCliente'
@@ -54,6 +55,7 @@ function AppInner({ session }) {
         <Route path="/seguimiento" element={<Wrap><Seguimiento session={session} /></Wrap>} />
         <Route path="/pagos" element={<Wrap><Pagos session={session} /></Wrap>} />
         <Route path="/agenda" element={<Wrap><Agenda session={session} /></Wrap>} />
+        <Route path="/mensajes" element={<Wrap><Mensajes session={session} /></Wrap>} />
         <Route path="/configuracion" element={<Wrap><Configuracion session={session} onConfigChange={actualizar} /></Wrap>} />
         {/* Rutas públicas cliente */}
         <Route path="/registro" element={<RegistroCliente />} />
