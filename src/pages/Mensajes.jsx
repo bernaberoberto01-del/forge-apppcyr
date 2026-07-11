@@ -240,7 +240,7 @@ export default function Mensajes({ session }) {
           </div>
         </div>
       )}
-    </div>
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
+    </div>
   )
 }
