@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import LoginPortal from './LoginPortal'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import GraficasCliente from '../components/GraficasCliente'
@@ -9,6 +10,7 @@ export default function PortalCliente() {
   const { clienteId } = useParams()
   const [searchParams] = useSearchParams()
   const pagoStatus = searchParams.get('pago')
+  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=no sesión, objeto=sesión
   const [cliente, setCliente] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -27,6 +29,17 @@ export default function PortalCliente() {
   const [biblioteca, setBiblioteca] = useState([])
   const [videoEj, setVideoEj] = useState(null)
   const [fotos, setFotos] = useState([])
+
+  // Verificar sesión de Supabase al montar
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setClienteSession(session?.user || null)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setClienteSession(session?.user || null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     async function cargar() {
@@ -99,6 +112,23 @@ export default function PortalCliente() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
   if (notFound) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] p-4"><div className="text-center"><p className="text-4xl mb-3">🔗</p><p className="text-[#6B6B6B]">Enlace no válido</p></div></div>
+
+  // Sin sesión → mostrar login
+  if (clienteSession === null) return (
+    <LoginPortal
+      clienteId={clienteId}
+      onLogin={user => setClienteSession(user)}
+      nombreNegocio={configEntrenador?.nombre_negocio}
+      colorAccento="#FF5C00"
+    />
+  )
+
+  // Cargando sesión
+  if (clienteSession === undefined) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
+      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   // Pantalla PIN
   if (clientePin && !pinValido) return (

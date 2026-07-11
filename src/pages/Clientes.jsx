@@ -154,7 +154,7 @@ export default function Clientes({ session }) {
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
           body: JSON.stringify({ cliente_id: cliente.id })
         }).catch(() => {})
-        showToast(`✓ ${c.nombre.split(' ')[0]} convertido · Email de bienvenida enviado`)
+        showToast(`✓ ${c.nombre.split(' ')[0]} convertido · Email enviado con enlace al portal`)
       } else {
         showToast(`✓ ${c.nombre.split(' ')[0]} convertido como cliente`)
       }
