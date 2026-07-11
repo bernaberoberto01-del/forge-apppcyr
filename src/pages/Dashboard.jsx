@@ -1,162 +1,261 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
+function BarChart({ datos, max }) {
+  return (
+    <div className="flex items-end gap-1 h-20">
+      {datos.map((d, i) => {
+        const pct = max > 0 ? (d.valor / max) * 100 : 0
+        const esActual = i === datos.length - 1
+        return (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <p className="text-xs font-bold text-[#0A0A0A]" style={{ opacity: pct > 0 ? 1 : 0 }}>
+              {d.valor > 0 ? `${d.valor}€` : ''}
+            </p>
+            <div className="w-full rounded-t-lg transition-all" style={{
+              height: `${Math.max(pct, pct > 0 ? 8 : 0)}%`,
+              background: esActual ? '#FF5C00' : '#FF5C00',
+              opacity: esActual ? 1 : 0.3 + (i / datos.length) * 0.5,
+              minHeight: pct > 0 ? '4px' : '0'
+            }} />
+            <p className="text-xs text-[#6B6B6B]">{d.mes}</p>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function Dashboard({ session }) {
-  const [stats, setStats] = useState({ activos: 0, ingresos: 0, pendientes: 0, vencidos: 0 })
-  const [alertas, setAlertas] = useState([])
-  const [clientes, setClientes] = useState([])
-  const [cargando, setCargando] = useState(true)
+  const [datos, setDatos] = useState(null)
+  const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
   const uid = session.user.id
 
-  useEffect(() => {
-    async function load() {
-      const hoy = new Date()
-      const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
-      const hace7 = new Date(hoy.getTime() - 7 * 864e5).toISOString().split('T')[0]
+  useEffect(() => { cargar() }, [uid])
 
-      const [{ data: cl }, { data: pg }, { data: ci }, { data: al }] = await Promise.all([
-        supabase.from('clientes').select('*').eq('entrenador_id', uid),
-        supabase.from('pagos').select('*').eq('entrenador_id', uid),
-        supabase.from('checkins').select('cliente_id, fecha').eq('entrenador_id', uid),
-        supabase.from('alertas').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('leida', false).order('created_at', { ascending: false }).limit(8),
-      ])
+  async function cargar() {
+    const hoy = new Date()
+    const hace6m = new Date(hoy.getFullYear(), hoy.getMonth() - 5, 1).toISOString().split('T')[0]
+    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
+    const inicioSemana = (() => { const d = new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)); return d.toISOString().split('T')[0] })()
 
-      const activos = cl?.filter(c => c.estado === 'activo').length || 0
+    const [
+      { data: clientes },
+      { data: pagos },
+      { data: sesiones },
+      { data: checkins },
+      { data: alertas },
+    ] = await Promise.all([
+      supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual').eq('entrenador_id', uid),
+      supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
+      supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').eq('entrenador_id', uid).gte('fecha', inicioSemana),
+      supabase.from('checkins').select('cliente_id,fecha,adherencia_entreno,energia,fatiga').eq('entrenador_id', uid).gte('fecha', hace6m).order('fecha', { ascending: false }),
+      supabase.from('alertas').select('*').eq('entrenador_id', uid).eq('resuelta', false).order('created_at', { ascending: false }).limit(5),
+    ])
 
-      // Fix ingresos: filtrar por fecha_pago >= inicio del mes
-      const ingresos = (pg || [])
-        .filter(p => p.fecha_pago && p.fecha_pago >= inicioMes)
-        .reduce((s, p) => s + Number(p.importe || 0), 0)
+    const activos = (clientes||[]).filter(c => c.estado === 'activo')
+    const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
+    const sesioneHoy = (sesiones||[]).filter(s => s.fecha === hoy.toISOString().split('T')[0])
+    
+    // Adherencia: media de check-ins de últimas 4 semanas
+    const hace4s = new Date(Date.now()-28*864e5).toISOString().split('T')[0]
+    const ciRecientes = (checkins||[]).filter(c => c.fecha >= hace4s)
+    const adherenciaMedia = ciRecientes.length > 0
+      ? Math.round(ciRecientes.reduce((s,c) => s+(c.adherencia_entreno||0),0) / ciRecientes.length * 10)
+      : null
 
-      const hoyStr = hoy.toISOString().split('T')[0]
-      const vencidos = (pg || []).filter(p => p.valido_hasta && p.valido_hasta < hoyStr).length
+    // Ingresos últimos 6 meses
+    const ingresosPorMes = Array.from({length:6},(_,i) => {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth()-5+i, 1)
+      const mesStr = d.toISOString().slice(0,7)
+      const total = (pagos||[]).filter(p => p.fecha_pago?.startsWith(mesStr)).reduce((s,p) => s+Number(p.importe||0),0)
+      return { mes: MESES[d.getMonth()], valor: Math.round(total) }
+    })
+    const maxIngreso = Math.max(...ingresosPorMes.map(m => m.valor), 1)
 
-      // Clientes activos sin checkin en 7 días
-      const sinCI = (cl || []).filter(c => {
-        if (c.estado !== 'activo') return false
-        const ultimo = (ci || []).filter(x => x.cliente_id === c.id).sort((a,b) => b.fecha.localeCompare(a.fecha))[0]
-        return !ultimo || ultimo.fecha < hace7
-      })
+    // Alertas: pagos vencidos
+    const alertasPagos = (clientes||[]).filter(c => {
+      const ultimoPago = (pagos||[]).filter(p => p.cliente_id === c.id).sort((a,b) => b.fecha_pago?.localeCompare(a.fecha_pago))[0]
+      if (!ultimoPago?.valido_hasta) return false
+      return new Date(ultimoPago.valido_hasta) < hoy
+    })
 
-      // Alertas manuales
-      const als = []
-      ;(pg || []).filter(p => p.valido_hasta && p.valido_hasta < hoyStr).slice(0, 3).forEach(p => {
-        const c = (cl || []).find(x => x.id === p.cliente_id)
-        if (c) als.push({ tipo: 'pago', nombre: c.nombre, msg: 'Pago vencido', nav: '/pagos', icon: '⚠️', color: 'bg-red-50 text-red-700' })
-      })
-      sinCI.slice(0, 3).forEach(c => als.push({ tipo: 'ci', nombre: c.nombre, msg: 'Sin seguimiento +7 días', nav: '/seguimiento', icon: '📋', color: 'bg-amber-50 text-amber-700' }))
+    // Check-ins sin responder
+    const hace7d = new Date(Date.now()-7*864e5).toISOString().split('T')[0]
+    const clientesSinCI = activos.filter(c => !ciRecientes.some(ci => ci.cliente_id === c.id && ci.fecha >= hace7d))
 
-      // Alertas del sistema
-      ;(al || []).forEach(a => als.push({
-        id: a.id, tipo: a.tipo, nombre: a.clientes?.nombre || '', msg: a.mensaje?.slice(0, 80),
-        nav: a.tipo === 'rutina_lista' ? '/rutinas' : '/seguimiento',
-        icon: a.tipo === 'fatiga_alta' ? '⚡' : a.tipo === 'abandono' ? '👻' : a.tipo === 'rutina_lista' ? '💪' : '📊',
-        color: a.tipo === 'fatiga_alta' ? 'bg-amber-50 text-amber-700' : a.tipo === 'rutina_lista' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
-      }))
+    // Tasa retención (clientes activos / total clientes alguna vez)
+    const totalClientes = (clientes||[]).length
+    const tasaRetencion = totalClientes > 0 ? Math.round((activos.length / totalClientes) * 100) : 100
 
-      setStats({ activos, ingresos, pendientes: sinCI.length, vencidos })
-      setAlertas(als.slice(0, 6))
-      setClientes((cl || []).filter(c => c.estado === 'activo').slice(0, 6))
-      setCargando(false)
-    }
-    load()
-  }, [uid])
-
-  async function marcarLeida(id) {
-    if (id) await supabase.from('alertas').update({ leida: true }).eq('id', id)
-    setAlertas(a => a.filter(x => x.id !== id))
+    setDatos({
+      activos, ingresosMes, sesioneHoy, adherenciaMedia,
+      ingresosPorMes, maxIngreso,
+      alertasPagos, clientesSinCI,
+      alertasExtra: alertas || [],
+      tasaRetencion, totalClientes
+    })
+    setLoading(false)
   }
 
-  const h = new Date().getHours()
-  const saludo = h < 12 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches'
-  const nombre = session?.user?.email?.split('@')[0] || ''
-  const fecha = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+  const hora = new Date().getHours()
+  const saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches'
+  const nombre = session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || 'Roberto'
 
-  if (cargando) return (
-    <div className="min-h-screen flex items-center justify-center">
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
       <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
+  const d = datos
+
   return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto">
-      <div className="mb-6 pt-2">
+    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto space-y-4">
+      {/* Saludo */}
+      <div>
         <h1 className="text-2xl font-bold text-[#0A0A0A]">{saludo}, {nombre} 👋</h1>
-        <p className="text-sm text-[#6B6B6B] mt-0.5 capitalize">{fecha}</p>
+        <p className="text-sm text-[#6B6B6B] mt-0.5 capitalize">
+          {new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
+        </p>
       </div>
 
-      {/* Métricas */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      {/* Métricas principales */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Clientes activos', valor: stats.activos, color: '#FF5C00', nav: '/clientes', icon: '👥' },
-          { label: 'Ingresos del mes', valor: `${stats.ingresos.toLocaleString('es-ES')}€`, color: '#10b981', nav: '/pagos', icon: '💶' },
-          { label: 'Sin seguimiento', valor: stats.pendientes, color: '#f59e0b', nav: '/seguimiento', icon: '📋' },
-          { label: 'Pagos vencidos', valor: stats.vencidos, color: '#ef4444', nav: '/pagos', icon: '⚠️' },
-        ].map(m => (
-          <div key={m.label} onClick={() => navigate(m.nav)}
-            className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md transition-all active:scale-98">
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-xl">{m.icon}</span>
-              <div className="w-2 h-2 rounded-full mt-1" style={{ background: m.color }} />
-            </div>
-            <p className="text-2xl font-bold" style={{ color: m.color }}>{m.valor}</p>
-            <p className="text-xs text-[#6B6B6B] mt-1 leading-tight">{m.label}</p>
-          </div>
+          ['Clientes activos', d.activos.length, '#FF5C00', '/clientes'],
+          ['Ingresos mes', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos'],
+          ['Sesiones hoy', d.sesioneHoy.length, '#6366f1', '/agenda'],
+          ['Adherencia 4s', d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento'],
+        ].map(([l,v,c,ruta]) => (
+          <button key={l} onClick={() => navigate(ruta)}
+            className="bg-white rounded-xl border border-black/5 shadow-sm p-4 text-center hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
+            <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
+            <p className="text-xs text-[#6B6B6B] mt-1 leading-tight">{l}</p>
+          </button>
         ))}
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Alertas */}
-        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-[#0A0A0A]">Alertas</h2>
-            {alertas.length > 0 && <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">{alertas.length}</span>}
+      {/* Gráfica ingresos */}
+      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A]">Ingresos últimos 6 meses</p>
+            <p className="text-xs text-[#6B6B6B] mt-0.5">Total: {d.ingresosPorMes.reduce((s,m)=>s+m.valor,0)}€</p>
           </div>
-          {alertas.length === 0 ? (
-            <div className="flex items-center gap-3 py-2">
-              <div className="w-8 h-8 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 flex-shrink-0 text-sm">✓</div>
-              <p className="text-sm text-[#6B6B6B]">Todo al día, sin alertas</p>
-            </div>
-          ) : alertas.map((a, i) => (
-            <div key={a.id || i} className={`flex items-start gap-3 p-3 rounded-xl mb-2 last:mb-0 cursor-pointer transition-all ${a.color}`}
-              onClick={() => navigate(a.nav)}>
-              <span className="text-base flex-shrink-0">{a.icon}</span>
+          <button onClick={() => navigate('/pagos')} className="text-xs text-[#FF5C00] font-medium">Ver pagos →</button>
+        </div>
+        <BarChart datos={d.ingresosPorMes} max={d.maxIngreso} />
+      </div>
+
+      {/* Alertas */}
+      {(d.alertasPagos.length > 0 || d.clientesSinCI.length > 0 || d.alertasExtra.length > 0) && (
+        <div className="space-y-2">
+          <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide">⚠ Requieren atención</p>
+          {d.alertasPagos.map(c => (
+            <button key={c.id} onClick={() => navigate('/pagos')}
+              className="w-full bg-red-50 border border-red-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-red-100 transition-all">
+              <span className="text-lg flex-shrink-0">💳</span>
               <div className="flex-1 min-w-0">
-                {a.nombre && <p className="text-xs font-bold truncate">{a.nombre}</p>}
-                <p className="text-xs leading-relaxed truncate">{a.msg}</p>
+                <p className="text-sm font-semibold text-red-700 truncate">{c.nombre}</p>
+                <p className="text-xs text-red-500">Pago vencido</p>
               </div>
-              {a.id && <button onClick={e => { e.stopPropagation(); marcarLeida(a.id) }} className="text-xs opacity-60 hover:opacity-100 flex-shrink-0">✓</button>}
-            </div>
+              <span className="text-red-400 flex-shrink-0">›</span>
+            </button>
+          ))}
+          {d.clientesSinCI.slice(0,3).map(c => (
+            <button key={c.id} onClick={() => navigate('/seguimiento')}
+              className="w-full bg-amber-50 border border-amber-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-amber-100 transition-all">
+              <span className="text-lg flex-shrink-0">📋</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-700 truncate">{c.nombre}</p>
+                <p className="text-xs text-amber-500">Sin check-in esta semana</p>
+              </div>
+              <span className="text-amber-400 flex-shrink-0">›</span>
+            </button>
           ))}
         </div>
+      )}
 
-        {/* Clientes activos */}
-        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-[#0A0A0A]">Clientes activos</h2>
-            <button onClick={() => navigate('/clientes')} className="text-xs text-[#FF5C00] font-medium">Ver todos →</button>
+      {/* Stats secundarias */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
+          <p className="text-xs font-semibold text-[#6B6B6B] mb-2">Tasa de retención</p>
+          <p className="text-2xl font-bold text-[#0A0A0A]">{d.tasaRetencion}%</p>
+          <p className="text-xs text-[#6B6B6B] mt-0.5">{d.activos.length} activos de {d.totalClientes}</p>
+          <div className="mt-2 h-1.5 bg-black/5 rounded-full overflow-hidden">
+            <div className="h-full bg-[#FF5C00] rounded-full" style={{width:`${d.tasaRetencion}%`}} />
           </div>
-          {clientes.length === 0 ? (
-            <div className="py-4 text-center">
-              <p className="text-sm text-[#6B6B6B]">Sin clientes activos todavía</p>
-              <button onClick={() => navigate('/clientes')} className="mt-2 text-xs text-[#FF5C00] font-medium">+ Añadir cliente</button>
+        </div>
+        <div className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
+          <p className="text-xs font-semibold text-[#6B6B6B] mb-2">Sesiones hoy</p>
+          {d.sesioneHoy.length === 0 ? (
+            <p className="text-sm text-[#6B6B6B]">Sin sesiones programadas</p>
+          ) : (
+            <div className="space-y-1">
+              {d.sesioneHoy.slice(0,3).map(s => (
+                <div key={s.id} className="flex items-center gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.completada?'bg-emerald-500':'bg-[#FF5C00]'}`} />
+                  <p className="text-xs text-[#0A0A0A] truncate">{s.fecha}</p>
+                </div>
+              ))}
             </div>
-          ) : clientes.map(c => (
-            <div key={c.id} onClick={() => navigate('/clientes')}
-              className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-[#F5F5F0] cursor-pointer transition-all">
-              <div className="w-8 h-8 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {c.nombre.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#0A0A0A] truncate">{c.nombre}</p>
-                <p className="text-xs text-[#6B6B6B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'} · {c.objetivo?.replace(/_/g,' ')}</p>
-              </div>
-            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Accesos rápidos */}
+      <div>
+        <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide mb-3">Accesos rápidos</p>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            ['👤', 'Nuevo cliente', '/clientes'],
+            ['💪', 'Nueva rutina', '/rutinas'],
+            ['📋', 'Enviar check-in', '/seguimiento'],
+            ['💳', 'Registrar pago', '/pagos'],
+            ['📅', 'Ver agenda', '/agenda'],
+            ['💬', 'Mensajes', '/mensajes'],
+          ].map(([icon, label, ruta]) => (
+            <button key={label} onClick={() => navigate(ruta)}
+              className="bg-white rounded-xl border border-black/5 shadow-sm p-3 text-center hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
+              <p className="text-2xl mb-1">{icon}</p>
+              <p className="text-xs font-medium text-[#6B6B6B] leading-tight">{label}</p>
+            </button>
           ))}
         </div>
       </div>
+
+      {/* Clientes activos */}
+      {d.activos.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide">Clientes activos</p>
+            <button onClick={() => navigate('/clientes')} className="text-xs text-[#FF5C00] font-medium">Ver todos →</button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {d.activos.slice(0,6).map(c => {
+              const tieneCI = d.clientesSinCI ? !d.clientesSinCI.find(x=>x.id===c.id) : true
+              return (
+                <button key={c.id} onClick={() => navigate('/clientes')}
+                  className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-left flex items-center gap-3 hover:shadow-md transition-all">
+                  <div className="w-9 h-9 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-sm flex-shrink-0">
+                    {(c.nombre||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{c.nombre}</p>
+                    <p className="text-xs text-[#6B6B6B]">{c.nivel} · {c.tipo}</p>
+                  </div>
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tieneCI ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -77,6 +77,28 @@ export default function Configuracion({ session, onConfigChange }) {
     setToast({ msg: 'Foto subida correctamente' })
   }
 
+  async function guardarCheckin() {
+    await supabase.from('checkin_config').upsert({ entrenador_id: uid, campos: camposCheckin, updated_at: new Date().toISOString() }, { onConflict: 'entrenador_id' })
+    showToast('Cuestionario guardado')
+  }
+
+  function toggleCampo(id) {
+    setCamposCheckin(prev => prev.map(c => c.id === id ? { ...c, activo: !c.activo } : c))
+  }
+
+  function updateCampoLabel(id, label) {
+    setCamposCheckin(prev => prev.map(c => c.id === id ? { ...c, label } : c))
+  }
+
+  function addCampoPersonalizado() {
+    const nuevo = { id: `custom_${Date.now()}`, label: 'Nuevo campo', tipo: 'escala', min:1, max:10, activo:true, orden: camposCheckin.length+1, custom:true }
+    setCamposCheckin(prev => [...prev, nuevo])
+  }
+
+  function eliminarCampo(id) {
+    setCamposCheckin(prev => prev.filter(c => c.id !== id))
+  }
+
   async function guardar() {
     setSaving(true)
     const { error } = await supabase.from('configuracion').upsert({
