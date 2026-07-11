@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
+import EjercicioInput from '../components/EjercicioInput'
 
 const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
@@ -35,6 +36,8 @@ export default function Rutinas({ session }) {
   const [guardandoManual, setGuardandoManual] = useState(false)
   const [toast, setToast] = useState('')
   const [quickView, setQuickView] = useState(null)
+  const [plantillas, setPlantillas] = useState([])
+  const [modalPlantillas, setModalPlantillas] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('activas')
   const uid = session.user.id
@@ -42,12 +45,14 @@ export default function Rutinas({ session }) {
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
-    const [{ data: ru }, { data: cl }] = await Promise.all([
+    const [{ data: ru }, { data: cl }, { data: pl }] = await Promise.all([
       supabase.from('rutinas').select('*, clientes(nombre,tipo,objetivo)').eq('entrenador_id', uid).order('created_at', { ascending: false }),
       supabase.from('clientes').select('id,nombre,objetivo,nivel,tipo').eq('entrenador_id', uid).eq('estado','activo'),
+      supabase.from('plantillas_rutina').select('*').eq('entrenador_id', uid).order('usos', { ascending: false }),
     ])
     setRutinas(ru || [])
     setClientes(cl || [])
+    setPlantillas(pl || [])
   }
 
   async function generarRutina(clienteId) {
@@ -71,6 +76,45 @@ export default function Rutinas({ session }) {
     await supabase.from('rutinas').insert({ cliente_id: manualClienteId, entrenador_id: uid, nombre: manualNombre, objetivo: cliente?.objetivo, semanas: 4, dias_semana: borrador.dias.length, borrador, estado: 'borrador' })
     setModalManual(false); setManualClienteId(''); setManualNombre(''); setManualDescripcion(''); setManualDias([initDia(1), initDia(2), initDia(3)]); setGuardandoManual(false)
     setToast('Rutina creada como borrador')
+    await cargar()
+  }
+
+  async function guardarComoPlantilla(rutina) {
+    const nombre = prompt('Nombre de la plantilla:', rutina.borrador?.nombre || rutina.contenido?.nombre || 'Mi plantilla')
+    if (!nombre) return
+    await supabase.from('plantillas_rutina').insert({
+      entrenador_id: uid,
+      nombre,
+      objetivo: rutina.objetivo,
+      dias_semana: rutina.dias_semana,
+      descripcion: rutina.borrador?.descripcion || '',
+      contenido: rutina.borrador || rutina.contenido,
+    })
+    setToast('✓ Guardada como plantilla')
+    await cargar()
+  }
+
+  async function aplicarPlantilla(plantilla, clienteId) {
+    if (!clienteId) return
+    await supabase.from('plantillas_rutina').update({ usos: (plantilla.usos||0)+1 }).eq('id', plantilla.id)
+    await supabase.from('rutinas').insert({
+      cliente_id: clienteId,
+      entrenador_id: uid,
+      nombre: plantilla.nombre,
+      objetivo: plantilla.objetivo,
+      semanas: 4,
+      dias_semana: plantilla.dias_semana,
+      borrador: plantilla.contenido,
+      estado: 'borrador'
+    })
+    setModalPlantillas(false)
+    setToast('Plantilla aplicada — revisa y publica la rutina')
+    await cargar()
+  }
+
+  async function eliminarPlantilla(id) {
+    if (!confirm('¿Eliminar esta plantilla?')) return
+    await supabase.from('plantillas_rutina').delete().eq('id', id)
     await cargar()
   }
 
@@ -115,9 +159,17 @@ export default function Rutinas({ session }) {
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Rutinas</h1>
           <p className="text-sm text-[#6B6B6B] mt-0.5">Genera con IA o crea manualmente · Publica para que el cliente la vea en su portal</p>
         </div>
-        <button onClick={() => setModalManual(true)} className="bg-[#111] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95 flex-shrink-0">
-          ✍️ Manual
-        </button>
+        <div className="flex gap-2">
+          {plantillas.length > 0 && (
+            <button onClick={() => setModalPlantillas(true)}
+              className="border border-[#6366f1]/30 text-[#6366f1] text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-[#6366f1]/5 transition-all">
+              📋 {plantillas.length}
+            </button>
+          )}
+          <button onClick={() => setModalManual(true)} className="bg-[#111] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95">
+            ✍️ Manual
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -254,6 +306,10 @@ export default function Rutinas({ session }) {
                   <button onClick={() => { navigator.clipboard.writeText(portalUrl(detalle.cliente_id)); setToast('Enlace copiado') }}
                     className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">📋 Copiar enlace del portal</button>
                 )}
+                <button onClick={() => guardarComoPlantilla(detalle)}
+                  className="border border-[#6366f1]/30 text-[#6366f1] text-sm py-3 px-3 rounded-xl hover:bg-[#6366f1]/5">
+                  📋
+                </button>
                 <button onClick={async () => {
                   if (!confirm('¿Regenerar rutina con IA? Se eliminará la actual.')) return
                   await supabase.from('rutinas').delete().eq('id', detalle.id); setDetalle(null)
@@ -308,8 +364,13 @@ export default function Rutinas({ session }) {
                     {dia.ejercicios.map((ej, ei) => (
                       <div key={ei} className="space-y-1.5 border-b border-black/5 pb-2.5 last:border-0 last:pb-0">
                         <div className="flex gap-2">
-                          <input value={ej.nombre} onChange={e => updateEj(di,ei,'nombre',e.target.value)} placeholder="Nombre del ejercicio"
-                            className="flex-1 border border-black/10 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#FF5C00]" />
+                          <EjercicioInput
+                            value={ej.nombre}
+                            onChange={val => updateEj(di,ei,'nombre',val)}
+                            onSelect={e2 => { updateEj(di,ei,'nombre',e2.nombre); if(e2.patron) updateEj(di,ei,'patron',e2.patron) }}
+                            uid={uid}
+                            placeholder="Nombre del ejercicio"
+                            className="flex-1 text-xs" />
                           {dia.ejercicios.length > 1 && <button onClick={() => removeEj(di,ei)} className="text-[#6B6B6B] hover:text-red-500 px-2">×</button>}
                         </div>
                         <div className="grid grid-cols-3 gap-1.5">
@@ -358,6 +419,49 @@ export default function Rutinas({ session }) {
         </div>
       )}
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
+
+      {/* Modal plantillas */}
+      {modalPlantillas && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">
+            <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
+              <div>
+                <h2 className="font-bold text-[#0A0A0A]">Plantillas de rutina</h2>
+                <p className="text-xs text-[#6B6B6B]">Aplica una plantilla a cualquier cliente</p>
+              </div>
+              <button onClick={() => setModalPlantillas(false)} className="text-[#6B6B6B] text-xl">×</button>
+            </div>
+            <div className="p-4 space-y-3">
+              {plantillas.map(p => (
+                <div key={p.id} className="border border-black/8 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-[#0A0A0A]">{p.nombre}</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">{p.dias_semana} días/sem · usado {p.usos} veces</p>
+                    </div>
+                    <button onClick={() => eliminarPlantilla(p.id)} className="text-[#6B6B6B] hover:text-red-500 text-lg flex-shrink-0">×</button>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Aplicar a cliente</label>
+                    <select onChange={e => e.target.value && aplicarPlantilla(p, e.target.value)}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                      <option value="">Selecciona cliente →</option>
+                      {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    </select>
+                  </div>
+                </div>
+              ))}
+              {plantillas.length === 0 && (
+                <div className="text-center py-6">
+                  <p className="text-3xl mb-2">📋</p>
+                  <p className="text-sm font-semibold text-[#0A0A0A]">Sin plantillas todavía</p>
+                  <p className="text-xs text-[#6B6B6B] mt-1">Abre una rutina y pulsa 📋 para guardarla como plantilla</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

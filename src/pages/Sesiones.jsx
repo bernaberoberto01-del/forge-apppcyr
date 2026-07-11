@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { getPesoRecomendado } from '../utils/pesos'
+import EjercicioInput from '../components/EjercicioInput'
 
 function Toast({ msg, tipo = 'ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
@@ -416,8 +417,12 @@ export default function Sesiones({ session }) {
                       <div key={ejIdx} className="border border-black/8 rounded-2xl overflow-hidden">
                         <div className="bg-[#F5F5F0] px-4 py-3 flex items-center gap-2">
                           <span className="w-6 h-6 bg-[#FF5C00] text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
-                          <input value={ej.ejercicio_nombre} onChange={e => updateEjercicio(ejIdx, 'ejercicio_nombre', e.target.value)}
-                            className="flex-1 bg-transparent text-sm font-semibold text-[#0A0A0A] focus:outline-none placeholder:text-[#6B6B6B]"
+                          <EjercicioInput
+                            value={ej.ejercicio_nombre}
+                            onChange={val => updateEjercicio(ejIdx, 'ejercicio_nombre', val)}
+                            onSelect={ej2 => { updateEjercicio(ejIdx, 'ejercicio_nombre', ej2.nombre); updateEjercicio(ejIdx, 'patron', ej2.patron || '') }}
+                            uid={uid}
+                            className="flex-1 bg-transparent text-sm font-semibold border-0 focus:ring-0 p-0"
                             placeholder="Nombre del ejercicio" />
                           {ej.peso_recomendado && (
                             <span className="text-xs bg-[#FF5C00]/15 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
