@@ -400,23 +400,21 @@ export default function RegistroCliente() {
               ← Anterior
             </button>
           )}
+          {paso === PASOS.length - 1 && (
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" checked={form.acepta_rgpd} onChange={e => set('acepta_rgpd', e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
+              <span className="text-xs text-[#6B6B6B] leading-relaxed">
+                Acepto el tratamiento de mis datos personales y de salud conforme al <span className="text-[#FF5C00] underline">RGPD</span>. Mis datos no serán cedidos a terceros.
+              </span>
+            </label>
+          )}
           {paso < PASOS.length - 1 ? (
-            {paso === PASOS.length - 1 && (
-              <div className="mb-3">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input type="checkbox" checked={form.acepta_rgpd} onChange={e => set('acepta_rgpd', e.target.checked)}
-                    className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
-                  <span className="text-xs text-[#6B6B6B] leading-relaxed">
-                    Acepto el tratamiento de mis datos personales y de salud por parte del entrenador para la gestión de mi programa de entrenamiento, conforme al <span className="text-[#FF5C00] underline">Reglamento General de Protección de Datos (RGPD)</span>. Mis datos no serán cedidos a terceros.
-                  </span>
-                </label>
-              </div>
-            )}
-            <button onClick={siguiente} disabled={paso === PASOS.length - 1 && !form.acepta_rgpd} className="flex-1 bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-40">
+            <button onClick={siguiente} className="flex-1 bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95">
               Siguiente →
             </button>
           ) : (
-            <button onClick={enviar} disabled={loading} className="flex-1 bg-[#111] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-50">
+            <button onClick={enviar} disabled={loading || !form.acepta_rgpd} className="flex-1 bg-[#111] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-40">
               {loading ? 'Enviando...' : '✅ Enviar cuestionario'}
             </button>
           )}
