@@ -33,32 +33,28 @@ export default function PortalCliente() {
       const { data: cl, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single()
       if (error || !cl) { setNotFound(true); setLoading(false); return }
       setCliente(cl)
-      const [{ data: ru }, { data: ci }, { data: pg }, { data: ms }] = await Promise.all([
-        supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado','publicada').order('created_at', { ascending: false }).limit(1),
-        supabase.from('checkins').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(12),
-        supabase.from('pagos').select('*').eq('cliente_id', clienteId).order('fecha_pago', { ascending: false }),
-        supabase.from('mensajes_cliente').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }),
-      ])
-      setRutina(ru?.[0] || null)
-      setCheckins(ci || [])
-      setPagos(pg || [])
-      setMensajes(ms || [])
-      // Cargar biblioteca para vídeos de ejercicios
-      const { data: bib } = await supabase.from('ejercicios_biblioteca').select('nombre, sinonimos, youtube_url, consejos_tecnica').eq('entrenador_id', cl.entrenador_id)
-      if (bib) setBiblioteca(bib)
-      // Cargar PIN si está activo
       if (cl.portal_pin) setClientePin(cl.portal_pin)
-      // Cargar fotos de progreso visibles
-      const { data: ft } = await supabase.from('fotos_progreso').select('*').eq('cliente_id', clienteId).eq('visible_cliente', true).order('fecha', { ascending: false })
-      if (ft) setFotos(ft)
-      // Cargar plan nutricional
-      const { data: pn } = await supabase.from('planes_nutricion').select('*').eq('cliente_id', clienteId).eq('estado','publicado').order('created_at', { ascending: false }).limit(1).single().catch(()=>({data:null}))
+
+      // Cargar datos en paralelo — cada uno con su propio catch para no bloquear los demás
+      const [ru, ci, pg, ms, bib, ft, pn, cfg] = await Promise.all([
+        supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado','publicada').order('created_at', { ascending: false }).limit(1).then(r => r.data || []).catch(() => []),
+        supabase.from('checkins').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(12).then(r => r.data || []).catch(() => []),
+        supabase.from('pagos').select('*').eq('cliente_id', clienteId).order('fecha_pago', { ascending: false }).then(r => r.data || []).catch(() => []),
+        supabase.from('mensajes_cliente').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }).then(r => r.data || []).catch(() => []),
+        supabase.from('ejercicios_biblioteca').select('nombre, sinonimos, youtube_url, consejos_tecnica').eq('entrenador_id', cl.entrenador_id).then(r => r.data || []).catch(() => []),
+        supabase.from('fotos_progreso').select('*').eq('cliente_id', clienteId).eq('visible_cliente', true).order('fecha', { ascending: false }).then(r => r.data || []).catch(() => []),
+        supabase.from('planes_nutricion').select('*').eq('cliente_id', clienteId).eq('estado','publicado').order('created_at', { ascending: false }).limit(1).then(r => r.data?.[0] || null).catch(() => null),
+        supabase.from('configuracion').select('nombre_entrenador, foto_url, nombre_negocio').eq('entrenador_id', cl.entrenador_id).single().then(r => r.data || null).catch(() => null),
+      ])
+
+      setRutina(ru[0] || null)
+      setCheckins(ci)
+      setPagos(pg)
+      setMensajes(ms)
+      setBiblioteca(bib)
+      setFotos(ft)
       setPlanNutricion(pn)
-      // Cargar config del entrenador
-      if (cl?.entrenador_id) {
-        const { data: cfg } = await supabase.from('configuracion').select('nombre_entrenador, foto_url, nombre_negocio').eq('entrenador_id', cl.entrenador_id).single()
-        if (cfg) setConfigEntrenador(cfg)
-      }
+      if (cfg) setConfigEntrenador(cfg)
       setLoading(false)
     }
     cargar()
