@@ -234,6 +234,12 @@ export default function Rutinas({ session }) {
                   </div>
                 </div>
               ))}
+              <div className="bg-[#F5F5F0] border border-black/8 rounded-xl p-3 flex gap-2">
+                <span className="text-sm flex-shrink-0">⚖️</span>
+                <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                  <span className="font-semibold text-[#0A0A0A]">Aviso:</span> Este programa es una guía de entrenamiento personalizada. Si tienes dudas sobre tu estado de salud, consulta con un profesional médico antes de comenzar.
+                </p>
+              </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas para el cliente</label>
                 <textarea value={notasEdit} onChange={e => setNotasEdit(e.target.value)} rows={3}

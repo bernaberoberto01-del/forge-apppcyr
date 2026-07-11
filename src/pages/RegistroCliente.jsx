@@ -6,7 +6,7 @@ const PASOS = ['Datos personales','Tu objetivo','Experiencia','Marcas básicas',
 
 const init = {
   nombre:'', email:'', telefono:'', edad:'', sexo:'', peso_actual:'', altura:'', tipo:'presencial',
-  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'',
+  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'', acepta_rgpd: false,
   nivel:'principiante', anos_entrenando:0,
   marca_press_banca:'', marca_sentadilla:'', marca_peso_muerto:'', marca_dominadas:'', marca_flexiones:'', marca_press_militar:'',
   material:'gimnasio', dias_semana:3, duracion_sesion:60, horario_preferido:'',
@@ -401,7 +401,18 @@ export default function RegistroCliente() {
             </button>
           )}
           {paso < PASOS.length - 1 ? (
-            <button onClick={siguiente} className="flex-1 bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95">
+            {paso === PASOS.length - 1 && (
+              <div className="mb-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.acepta_rgpd} onChange={e => set('acepta_rgpd', e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
+                  <span className="text-xs text-[#6B6B6B] leading-relaxed">
+                    Acepto el tratamiento de mis datos personales y de salud por parte del entrenador para la gestión de mi programa de entrenamiento, conforme al <span className="text-[#FF5C00] underline">Reglamento General de Protección de Datos (RGPD)</span>. Mis datos no serán cedidos a terceros.
+                  </span>
+                </label>
+              </div>
+            )}
+            <button onClick={siguiente} disabled={paso === PASOS.length - 1 && !form.acepta_rgpd} className="flex-1 bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-40">
               Siguiente →
             </button>
           ) : (

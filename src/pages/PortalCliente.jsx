@@ -20,6 +20,7 @@ export default function PortalCliente() {
   const [mensajesLeidos, setMensajesLeidos] = useState(false)
   const [configEntrenador, setConfigEntrenador] = useState(null)
   const [planNutricion, setPlanNutricion] = useState(null)
+  const [diaActivoNutr, setDiaActivoNutr] = useState(0)
 
   useEffect(() => {
     async function cargar() {
@@ -373,18 +374,17 @@ export default function PortalCliente() {
                 {(() => {
                   const menu = planNutricion.contenido?.menu || []
                   const dias = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
-                  const [diaIdx, setDiaIdx] = window._nutriDia !== undefined ? [window._nutriDia, (i) => { window._nutriDia = i; }] : [0, ()=>{}]
                   return (
                     <div className="space-y-3">
                       <div className="flex gap-1.5 overflow-x-auto pb-1">
                         {dias.map((d,i)=>(
-                          <button key={d} onClick={()=>{ window._nutriDia=i; window.dispatchEvent(new Event('storage')) }}
-                            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 ${i===(window._nutriDia||0)?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B]'}`}>
+                          <button key={d} onClick={() => setDiaActivoNutr(i)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${i===diaActivoNutr?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B]'}`}>
                             {d}
                           </button>
                         ))}
                       </div>
-                      {(menu[window._nutriDia||0]?.comidas||[]).map((comida,i)=>(
+                      {(menu[diaActivoNutr]?.comidas||[]).map((comida,i)=>(
                         <div key={i} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
                           <div className="bg-[#0A0A0A] px-4 py-2.5 flex items-center justify-between">
                             <span className="text-white font-semibold text-sm">{comida.nombre}</span>

@@ -318,7 +318,14 @@ export default function Nutricion({ session }) {
                 )
               })()}
 
-              {/* Hidratación */}
+              {/* Disclaimer legal */}
+              <div className="bg-[#F5F5F0] border border-black/8 rounded-xl p-3 flex gap-2">
+                <span className="text-sm flex-shrink-0">⚖️</span>
+                <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                  <span className="font-semibold text-[#0A0A0A]">Aviso legal:</span> Este plan nutricional es orientativo y no constituye prescripción dietética. Para un seguimiento médico-nutricional, consulta con un dietista-nutricionista titulado.
+                </p>
+              </div>
+      {/* Hidratación */}
               {(detalle.borrador?.hidratacion || detalle.contenido?.hidratacion) && (
                 <div className="bg-[#F5F5F0] rounded-xl p-3 flex items-center gap-3">
                   <span className="text-2xl">💧</span>
