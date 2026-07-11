@@ -15,6 +15,7 @@ import Agenda from './pages/Agenda'
 import Configuracion from './pages/Configuracion'
 import Mensajes from './pages/Mensajes'
 import Nutricion from './pages/Nutricion'
+import Biblioteca from './pages/Biblioteca'
 import NutricionCuestionario from './pages/NutricionCuestionario'
 import RegistroCliente from './pages/RegistroCliente'
 import PortalCliente from './pages/PortalCliente'
@@ -58,6 +59,7 @@ function AppInner({ session }) {
         <Route path="/seguimiento" element={<Wrap><Seguimiento session={session} /></Wrap>} />
         <Route path="/pagos" element={<Wrap><Pagos session={session} /></Wrap>} />
         <Route path="/agenda" element={<Wrap><Agenda session={session} /></Wrap>} />
+        <Route path="/biblioteca" element={<Wrap><Biblioteca session={session} /></Wrap>} />
         <Route path="/nutricion" element={<Wrap><Nutricion session={session} /></Wrap>} />
         <Route path="/mensajes" element={<Wrap><Mensajes session={session} /></Wrap>} />
         <Route path="/configuracion" element={<Wrap><Configuracion session={session} onConfigChange={actualizar} /></Wrap>} />

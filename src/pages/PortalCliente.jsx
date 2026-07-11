@@ -21,6 +21,8 @@ export default function PortalCliente() {
   const [configEntrenador, setConfigEntrenador] = useState(null)
   const [planNutricion, setPlanNutricion] = useState(null)
   const [diaActivoNutr, setDiaActivoNutr] = useState(0)
+  const [biblioteca, setBiblioteca] = useState([])
+  const [videoEj, setVideoEj] = useState(null)
   const [fotos, setFotos] = useState([])
 
   useEffect(() => {
@@ -38,6 +40,9 @@ export default function PortalCliente() {
       setCheckins(ci || [])
       setPagos(pg || [])
       setMensajes(ms || [])
+      // Cargar biblioteca para vídeos de ejercicios
+      const { data: bib } = await supabase.from('ejercicios_biblioteca').select('nombre, sinonimos, youtube_url, consejos_tecnica').eq('entrenador_id', cl.entrenador_id)
+      if (bib) setBiblioteca(bib)
       // Cargar fotos de progreso visibles
       const { data: ft } = await supabase.from('fotos_progreso').select('*').eq('cliente_id', clienteId).eq('visible_cliente', true).order('fecha', { ascending: false })
       if (ft) setFotos(ft)
@@ -62,6 +67,17 @@ export default function PortalCliente() {
   }, [tab, mensajes])
 
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+
+  function buscarEnBiblioteca(nombreEj) {
+    if (!nombreEj || !biblioteca.length) return null
+    const n = nombreEj.toLowerCase()
+    return biblioteca.find(e =>
+      e.nombre.toLowerCase() === n ||
+      e.nombre.toLowerCase().includes(n) ||
+      n.includes(e.nombre.toLowerCase()) ||
+      e.sinonimos?.toLowerCase().split(',').some(s => s.trim() === n || n.includes(s.trim()))
+    )
+  }
   const pesoActual = checkins[0]?.peso || cliente?.peso_actual
   const pesoInicial = checkins.length > 1 ? checkins[checkins.length-1]?.peso : cliente?.peso_actual
   const diferencia = pesoInicial && pesoActual ? (pesoActual - pesoInicial).toFixed(1) : null
@@ -385,6 +401,27 @@ export default function PortalCliente() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {/* Modal vídeo ejercicio */}
+        {videoEj && (
+          <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4" onClick={() => setVideoEj(null)}>
+            <div className="bg-[#111] rounded-2xl w-full max-w-lg overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between p-4 border-b border-white/10">
+                <p className="text-white font-bold">{videoEj.nombre}</p>
+                <button onClick={() => setVideoEj(null)} className="text-white/50 hover:text-white text-2xl">×</button>
+              </div>
+              <div className="relative w-full" style={{paddingBottom:'56.25%'}}>
+                <iframe src={`${videoEj.youtube_url}?autoplay=1&rel=0`} className="absolute inset-0 w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+              </div>
+              {videoEj.consejos_tecnica && (
+                <div className="p-4">
+                  <p className="text-xs font-semibold text-amber-400 mb-1.5">📋 Técnica correcta</p>
+                  <p className="text-sm text-white/70 leading-relaxed">{videoEj.consejos_tecnica}</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
         {/* NUTRICIÓN */}
