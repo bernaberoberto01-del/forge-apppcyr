@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 
 const PLANTILLAS = [
@@ -25,6 +26,7 @@ export default function Mensajes({ session }) {
   const [busqueda, setBusqueda] = useState('')
   const [noLeidos, setNoLeidos] = useState({})
   const [showPlantillas, setShowPlantillas] = useState(false)
+  const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState('')
   const endRef = useRef()
   const uid = session.user.id
@@ -146,6 +148,10 @@ export default function Mensajes({ session }) {
               <p className="text-sm font-bold text-[#0A0A0A] truncate">{seleccionado.nombre}</p>
               <p className="text-xs text-[#6B6B6B]">{seleccionado.tipo === 'online' ? '🌐 Online' : '📍 Presencial'} · ve los mensajes en su portal</p>
             </div>
+            <button onClick={() => setQuickView(seleccionado.id)}
+              className="text-xs border border-black/10 text-[#6B6B6B] px-3 py-1.5 rounded-lg hover:bg-[#F5F5F0] transition-all flex-shrink-0">
+              👤 Perfil
+            </button>
             <a href={`/portal/${seleccionado.id}`} target="_blank" rel="noopener noreferrer"
               className="text-xs border border-black/10 text-[#6B6B6B] px-3 py-1.5 rounded-lg hover:bg-[#F5F5F0] transition-all flex-shrink-0">
               Portal →
@@ -235,5 +241,6 @@ export default function Mensajes({ session }) {
         </div>
       )}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }

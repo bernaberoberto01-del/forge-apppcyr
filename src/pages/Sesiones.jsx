@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import ClienteQuickView from '../components/ClienteQuickView'
 import { getPesoRecomendado } from '../utils/pesos'
 
 function Toast({ msg, tipo='ok', onClose }) {
@@ -8,6 +9,7 @@ function Toast({ msg, tipo='ok', onClose }) {
     <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[100] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
       <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }
 
@@ -240,7 +242,7 @@ export default function Sesiones({ session }) {
                 {ini(s.clientes?.nombre)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre}</p>
+                <button onClick={e=>{e.stopPropagation();setQuickView(s.cliente_id)}} className="text-sm font-semibold text-[#0A0A0A] truncate hover:text-[#FF5C00] transition-colors text-left">{s.clientes?.nombre}</button>
                 <p className="text-xs text-[#6B6B6B]">{new Date(s.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })} · {s.tipo}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -510,5 +512,6 @@ export default function Sesiones({ session }) {
         </div>
       )}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }

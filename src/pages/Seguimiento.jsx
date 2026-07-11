@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import ClienteQuickView from '../components/ClienteQuickView'
 
 const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
@@ -39,6 +40,7 @@ export default function Seguimiento({ session }) {
   const [busqueda, setBusqueda] = useState('')
   const [filtroAlerta, setFiltroAlerta] = useState('todos')
   const [detalleCI, setDetalleCI] = useState(null)
+  const [quickView, setQuickView] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const [toast, setToast] = useState('')
 
@@ -56,7 +58,7 @@ export default function Seguimiento({ session }) {
 
   async function cargar() {
     const [{ data: ci }, { data: cl }] = await Promise.all([
-      supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(50),
+      supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(100),
       supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
     ])
     setCheckins(ci || [])
@@ -216,7 +218,7 @@ export default function Seguimiento({ session }) {
                   {ini(ci.clientes?.nombre)}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-[#0A0A0A]">{ci.clientes?.nombre}</p>
+                  <button onClick={e=>{e.stopPropagation();setQuickView(ci.cliente_id)}} className="text-sm font-medium text-[#0A0A0A] hover:text-[#FF5C00] transition-colors">{ci.clientes?.nombre}</button>
                   <p className="text-xs text-[#6B6B6B]">{new Date(ci.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                 </div>
               </div>
@@ -240,7 +242,29 @@ export default function Seguimiento({ session }) {
               {ci.adherencia_entreno && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('adherencia_entreno', ci.adherencia_entreno)}`}>💪 {ci.adherencia_entreno}/10</span>}
               {ci.adherencia_nutricion && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('adherencia_nutricion', ci.adherencia_nutricion)}`}>🥗 {ci.adherencia_nutricion}/10</span>}
             </div>
-            {ci.comentario && <p className="text-xs text-[#6B6B6B] mt-2 italic border-t border-gray-50 pt-2">"{ci.comentario}"</p>}
+            {ci.comentario && <p className="text-xs text-[#6B6B6B] mt-2 italic border-t border-black/5 pt-2">"{ci.comentario}"</p>}
+            {/* Tendencia vs CI anterior del mismo cliente */}
+            {(() => {
+              const anterior = checkinsFiltrados.find(x => x.cliente_id === ci.cliente_id && x.fecha < ci.fecha)
+              if (!anterior) return null
+              const diffEnergia = ci.energia && anterior.energia ? ci.energia - anterior.energia : null
+              const diffPeso = ci.peso && anterior.peso ? (ci.peso - anterior.peso).toFixed(1) : null
+              if (!diffEnergia && !diffPeso) return null
+              return (
+                <div className="flex gap-2 mt-2 pt-2 border-t border-black/5">
+                  {diffEnergia !== null && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diffEnergia > 0 ? 'bg-emerald-50 text-emerald-700' : diffEnergia < 0 ? 'bg-red-50 text-red-600' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                      ⚡ {diffEnergia > 0 ? '+' : ''}{diffEnergia} vs anterior
+                    </span>
+                  )}
+                  {diffPeso !== null && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${Number(diffPeso) < 0 ? 'bg-emerald-50 text-emerald-700' : Number(diffPeso) > 0 ? 'bg-red-50 text-red-600' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                      ⚖️ {Number(diffPeso) > 0 ? '+' : ''}{diffPeso}kg
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         ))}
       </div>
@@ -347,6 +371,10 @@ export default function Seguimiento({ session }) {
 
               {/* Acciones */}
               <div className="flex gap-2 pt-1">
+                <button onClick={() => { setQuickView(detalleCI.cliente_id); setDetalleCI(null) }}
+                  className="flex-1 bg-[#F5F5F0] text-[#0A0A0A] text-sm font-medium py-2.5 rounded-xl hover:bg-black/10">
+                  👤 Ver cliente
+                </button>
                 <button onClick={() => { copiarEnlaceCheckin(detalleCI.cliente_id); setDetalleCI(null) }}
                   className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0]">
                   🔗 Enviar nuevo CI
@@ -427,5 +455,6 @@ export default function Seguimiento({ session }) {
         </div>
       )}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 
 const DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -32,6 +33,7 @@ function Toast({ msg, tipo='ok', onClose }) {
     <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
       <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }
 
@@ -48,6 +50,7 @@ export default function Agenda({ session }) {
   const [formExtra, setFormExtra] = useState({ fecha: new Date().toISOString().split('T')[0], concepto:'', horas:'', tipo:'desplazamiento' })
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
+  const [quickView, setQuickView] = useState(null)
   const [vistaTab, setVistaTab] = useState('semana') // semana | mes
   const uid = session.user.id
 
@@ -242,7 +245,7 @@ export default function Agenda({ session }) {
                   </button>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className={`text-sm font-semibold ${s.completada?'line-through text-[#6B6B6B]':'text-[#0A0A0A]'}`}>{s.clientes?.nombre}</p>
+                      <button onClick={e=>{e.stopPropagation();setQuickView(s.cliente_id)}} className={`text-sm font-semibold hover:text-[#FF5C00] transition-colors ${s.completada?'line-through text-[#6B6B6B]':'text-[#0A0A0A]'}`}>{s.clientes?.nombre}</button>
                       {s.completada && <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Completada</span>}
                     </div>
                     <p className="text-xs text-[#6B6B6B]">
@@ -491,5 +494,6 @@ export default function Agenda({ session }) {
         </div>
       )}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }

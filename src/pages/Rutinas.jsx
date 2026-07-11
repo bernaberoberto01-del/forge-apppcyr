@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import ClienteQuickView from '../components/ClienteQuickView'
 
 const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
@@ -15,6 +16,7 @@ function Toast({ msg, onClose }) {
     <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
       <span className="text-emerald-400">✓</span> {msg}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }
 
@@ -33,6 +35,7 @@ export default function Rutinas({ session }) {
   const [manualDias, setManualDias] = useState([initDia(1), initDia(2), initDia(3)])
   const [guardandoManual, setGuardandoManual] = useState(false)
   const [toast, setToast] = useState('')
+  const [quickView, setQuickView] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('activas')
   const uid = session.user.id
@@ -188,7 +191,7 @@ export default function Rutinas({ session }) {
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">{ini(r.clientes?.nombre)}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#0A0A0A] truncate">{r.clientes?.nombre}</p>
+                <button onClick={e=>{e.stopPropagation();setQuickView(r.cliente_id)}} className="text-sm font-semibold text-[#0A0A0A] truncate hover:text-[#FF5C00] transition-colors">{r.clientes?.nombre}</button>
                 <p className="text-xs text-[#6B6B6B] truncate">{r.borrador?.nombre || r.contenido?.nombre || 'Rutina'} · {r.dias_semana} días/sem</p>
               </div>
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${r.estado==='publicada'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
@@ -214,7 +217,7 @@ export default function Rutinas({ session }) {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
-              <div><h2 className="font-bold text-[#0A0A0A]">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2><p className="text-xs text-[#6B6B6B]">{detalle.clientes?.nombre}</p></div>
+              <div><h2 className="font-bold text-[#0A0A0A]">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2><button onClick={() => setQuickView(detalle.cliente_id)} className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">{detalle.clientes?.nombre} →</button></div>
               <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
             </div>
             <div className="p-4 space-y-3">
@@ -356,5 +359,6 @@ export default function Rutinas({ session }) {
         </div>
       )}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }

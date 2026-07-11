@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 
 const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
@@ -12,6 +13,7 @@ function Toast({ msg, tipo='ok', onClose }) {
     <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
       <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }
 
@@ -33,6 +35,7 @@ export default function Nutricion({ session }) {
   const [busqueda, setBusqueda] = useState('')
   const [filtro, setFiltro] = useState('activos')
   const [toast, setToast] = useState(null)
+  const [quickView, setQuickView] = useState(null)
   const [modalActivar, setModalActivar] = useState(null)
   const [modalCuest, setModalCuest] = useState(null)
   const [cuest, setCuest] = useState({})
@@ -216,7 +219,7 @@ export default function Nutricion({ session }) {
             <div className="flex items-center gap-3 mb-3">
               <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold text-xs flex-shrink-0">{ini(p.clientes?.nombre)}</div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#0A0A0A] truncate">{p.clientes?.nombre}</p>
+                <button onClick={e=>{e.stopPropagation();setQuickView(p.cliente_id)}} className="text-sm font-semibold text-[#0A0A0A] truncate hover:text-[#FF5C00] transition-colors">{p.clientes?.nombre}</button>
                 <p className="text-xs text-[#6B6B6B]">{p.calorias_dia}kcal · P:{p.proteinas_g}g · C:{p.carbohidratos_g}g · G:{p.grasas_g}g</p>
               </div>
               <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${p.estado==='publicado'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
@@ -534,5 +537,6 @@ export default function Nutricion({ session }) {
         </div>
       )}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }

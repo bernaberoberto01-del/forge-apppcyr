@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import ClienteQuickView from '../components/ClienteQuickView'
 
 const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
 const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
@@ -11,6 +12,7 @@ function Toast({ msg, onClose }) {
     <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
       <span className="text-emerald-400">✓</span> {msg}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }
 
@@ -25,6 +27,7 @@ export default function Pagos({ session }) {
   const [loading, setLoading] = useState(false)
   const [generando, setGenerando] = useState(false)
   const [toast, setToast] = useState('')
+  const [quickView, setQuickView] = useState(null)
   const [ingresosMes, setIngresosMes] = useState(0)
   const uid = session.user.id
 
@@ -148,7 +151,7 @@ export default function Pagos({ session }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{p.clientes?.nombre}</p>
+                    <button onClick={e=>{e.stopPropagation();setQuickView(p.cliente_id)}} className="text-sm font-semibold text-[#0A0A0A] truncate hover:text-[#FF5C00] transition-colors">{p.clientes?.nombre}</button>
                     {p.clientes?.tipo === 'online' && <span className="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full flex-shrink-0">online</span>}
                   </div>
                   <p className="text-xs text-[#6B6B6B]">{p.concepto||'Mensualidad'} · {new Date(p.fecha_pago).toLocaleDateString('es-ES')}</p>
@@ -263,5 +266,6 @@ export default function Pagos({ session }) {
         </div>
       )}
     </div>
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
   )
 }
