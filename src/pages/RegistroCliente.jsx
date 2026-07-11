@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { TIPOS_ENTRENAMIENTO } from '../utils/tiposEntrenamiento'
 import { supabase } from '../lib/supabase'
 
@@ -62,6 +62,33 @@ const Select = ({ label, value, onChange, options, required=false }) => (
 
 export default function RegistroCliente() {
   const [paso, setPaso] = useState(0)
+  const [bloques, setBloques] = useState({ basico:true, objetivo:true, historial:true, disponibilidad:true, material:true, salud:true, motivacion:true })
+
+  // Cargar bloques del entrenador desde la URL
+  useEffect(() => {
+    const uid = new URLSearchParams(window.location.search).get('e')
+    if (!uid) return
+    supabase.from('configuracion').select('cuestionario_bloques').eq('entrenador_id', uid).single()
+      .then(({ data }) => { if (data?.cuestionario_bloques) setBloques(b => ({ ...b, ...data.cuestionario_bloques })) })
+  }, [])
+
+  // Mapa de paso -> bloque
+  const PASO_BLOQUE = ['basico', 'objetivo', 'historial', 'historial', 'material', 'salud', 'motivacion']
+
+  const siguiente = () => {
+    if (!validarPaso()) return
+    let next = paso + 1
+    // Saltar pasos desactivados
+    while (next < PASOS.length - 1 && PASO_BLOQUE[next] && !bloques[PASO_BLOQUE[next]]) next++
+    setPaso(Math.min(next, PASOS.length - 1))
+  }
+
+  const anterior2 = () => {
+    setError('')
+    let prev = paso - 1
+    while (prev > 0 && PASO_BLOQUE[prev] && !bloques[PASO_BLOQUE[prev]]) prev--
+    setPaso(Math.max(prev, 0))
+  }
   const [form, setForm] = useState(init)
   const [enviado, setEnviado] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -78,8 +105,7 @@ export default function RegistroCliente() {
     setError(''); return true
   }
 
-  const siguiente = () => { if (validarPaso()) setPaso(p => Math.min(p+1, PASOS.length-1)) }
-  const anterior = () => { setError(''); setPaso(p => Math.max(p-1, 0)) }
+
 
   const enviar = async () => {
     if (!validarPaso()) return
@@ -370,7 +396,7 @@ export default function RegistroCliente() {
         {/* Botones */}
         <div className="flex gap-3 mt-4">
           {paso > 0 && (
-            <button onClick={anterior} className="flex-1 bg-white border border-black/10 text-[#0A0A0A] text-sm font-semibold py-4 rounded-2xl transition-all active:scale-95">
+            <button onClick={anterior2} className="flex-1 bg-white border border-black/10 text-[#0A0A0A] text-sm font-semibold py-4 rounded-2xl transition-all active:scale-95">
               ← Anterior
             </button>
           )}

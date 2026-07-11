@@ -3,12 +3,29 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --acento: #FF5C00;
+  --acento-hover: #E05200;
+  --acento-light: rgba(255,92,0,0.08);
+  --acento-border: rgba(255,92,0,0.2);
+}
+
 * { box-sizing: border-box; }
 body { font-family: 'Inter', sans-serif; background: #F5F5F0; color: #0A0A0A; }
 
+/* Clases dinámicas que usan la variable CSS */
+.bg-acento { background-color: var(--acento) !important; }
+.text-acento { color: var(--acento) !important; }
+.border-acento { border-color: var(--acento) !important; }
+.hover-acento:hover { background-color: var(--acento) !important; color: white !important; }
+.ring-acento { --tw-ring-color: var(--acento) !important; }
+.bg-acento-light { background-color: var(--acento-light) !important; }
+.border-acento-light { border-color: var(--acento-border) !important; }
+
 @layer components {
   .card { @apply bg-white rounded-2xl border border-black/5 shadow-sm; }
-  .btn-primary { @apply bg-[#FF5C00] hover:bg-[#E05200] text-white font-semibold rounded-xl transition-all active:scale-95; }
+  .btn-primary { background-color: var(--acento); @apply text-white font-semibold rounded-xl transition-all active:scale-95; }
+  .btn-primary:hover { background-color: var(--acento-hover); }
   .btn-secondary { @apply bg-white border border-black/10 text-[#0A0A0A] font-medium rounded-xl hover:bg-black/5 transition-all active:scale-95; }
   .btn-ghost { @apply text-[#6B6B6B] hover:text-[#0A0A0A] hover:bg-black/5 rounded-xl transition-all; }
   .badge { @apply text-xs font-semibold px-2.5 py-1 rounded-full; }
@@ -17,7 +34,4 @@ body { font-family: 'Inter', sans-serif; background: #F5F5F0; color: #0A0A0A; }
   .badge-amber { @apply bg-amber-50 text-amber-700; }
   .badge-blue { @apply bg-blue-50 text-blue-700; }
   .badge-gray { @apply bg-black/5 text-[#6B6B6B]; }
-  .page-header { @apply mb-6; }
-  .page-title { @apply text-2xl font-bold text-[#0A0A0A]; }
-  .page-subtitle { @apply text-sm text-[#6B6B6B] mt-0.5; }
 }

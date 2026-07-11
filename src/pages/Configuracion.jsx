@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const MODULOS = [
@@ -41,6 +41,8 @@ export default function Configuracion({ session, onConfigChange }) {
   const [config, setConfig] = useState(defaultConfig)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const fotoRef = useRef()
   const [toast, setToast] = useState(null)
   const [tab, setTab] = useState('perfil')
   const uid = session.user.id
@@ -58,6 +60,19 @@ export default function Configuracion({ session, onConfigChange }) {
       })
     }
     setLoading(false)
+  }
+
+  async function subirFoto(file) {
+    if (!file) return
+    setSubiendoFoto(true)
+    const ext = file.name.split('.').pop()
+    const path = `${uid}/avatar.${ext}`
+    const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+    if (error) { setToast({ msg: 'Error al subir foto', tipo: 'error' }); setSubiendoFoto(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('avatares').getPublicUrl(path)
+    setConfig(c => ({ ...c, foto_url: publicUrl + '?t=' + Date.now() }))
+    setSubiendoFoto(false)
+    setToast({ msg: 'Foto subida correctamente' })
   }
 
   async function guardar() {
@@ -132,13 +147,26 @@ export default function Configuracion({ session, onConfigChange }) {
                 <p className="text-xs text-[#6B6B6B] mt-1">Visible en el portal del cliente</p>
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">URL de tu foto de perfil</label>
-                <input value={config.foto_url} onChange={e => setConfig(c => ({ ...c, foto_url: e.target.value }))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
-                  placeholder="https://..." />
-                {config.foto_url && (
-                  <img src={config.foto_url} alt="Preview" className="w-16 h-16 rounded-full object-cover mt-2 border-2 border-black/10" onError={e => e.target.style.display='none'} />
-                )}
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Foto de perfil</label>
+                <div className="flex items-center gap-3">
+                  {config.foto_url
+                    ? <img src={config.foto_url} alt="Avatar" className="w-16 h-16 rounded-full object-cover border-2 border-black/10 flex-shrink-0" onError={e => e.target.style.display='none'} />
+                    : <div className="w-16 h-16 rounded-full bg-[#F5F5F0] border-2 border-dashed border-black/20 flex items-center justify-center text-2xl flex-shrink-0">👤</div>
+                  }
+                  <div className="flex-1">
+                    <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={e => subirFoto(e.target.files[0])} />
+                    <button onClick={() => fotoRef.current?.click()} disabled={subiendoFoto}
+                      className="w-full border border-black/10 text-[#0A0A0A] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40 transition-all">
+                      {subiendoFoto ? '⏳ Subiendo...' : '📷 Subir foto'}
+                    </button>
+                    {config.foto_url && (
+                      <button onClick={() => setConfig(c => ({ ...c, foto_url: '' }))}
+                        className="w-full text-xs text-red-500 hover:text-red-600 mt-1.5 py-1">
+                        Eliminar foto
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -244,7 +272,7 @@ export default function Configuracion({ session, onConfigChange }) {
             <p className="text-xs text-[#6B6B6B] mb-4">El color principal de botones, badges y elementos activos</p>
             <div className="grid grid-cols-4 gap-2">
               {COLORES.map(c => (
-                <button key={c.id} onClick={() => setConfig(cfg => ({ ...cfg, color_acento: c.id }))}
+                <button key={c.id} onClick={() => { setConfig(cfg => ({ ...cfg, color_acento: c.id })); document.documentElement.style.setProperty('--acento', c.id) }}
                   className={`h-12 rounded-xl transition-all relative ${config.color_acento === c.id ? 'ring-2 ring-offset-2 ring-black scale-105' : 'hover:scale-102'}`}
                   style={{ background: c.id }}>
                   {config.color_acento === c.id && (

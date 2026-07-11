@@ -1,59 +1,86 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
-import Login from './pages/Login'
+import { ConfigContext, useConfigLoader } from './hooks/useConfig'
+
 import Layout from './components/Layout'
+import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import Agenda from './pages/Agenda'
 import Clientes from './pages/Clientes'
-import Pagos from './pages/Pagos'
-import Seguimiento from './pages/Seguimiento'
-import Sesiones from './pages/Sesiones'
 import Rutinas from './pages/Rutinas'
-import CheckinPublico from './pages/CheckinPublico'
-import PortalCliente from './pages/PortalCliente'
+import Sesiones from './pages/Sesiones'
+import Seguimiento from './pages/Seguimiento'
+import Pagos from './pages/Pagos'
+import Agenda from './pages/Agenda'
+import Configuracion from './pages/Configuracion'
 import RegistroCliente from './pages/RegistroCliente'
+import PortalCliente from './pages/PortalCliente'
 import SesionCliente from './pages/SesionCliente'
 import ProgresoCliente from './pages/ProgresoCliente'
-
+import CheckinPublico from './pages/CheckinPublico'
 import NotFound from './pages/NotFound'
-import Configuracion from './pages/Configuracion'
 
 function Protected({ session, children }) {
-  return session ? children : <Navigate to="/login" replace />
+  if (!session) return <Navigate to="/login" replace />
+  return children
 }
 
-export default function App() {
-  const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); setLoading(false) })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSession(s))
-    return () => subscription.unsubscribe()
-  }, [])
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+function AppInner({ session }) {
+  const { config, loading, actualizar } = useConfigLoader(session?.user?.id)
+
+  if (loading && session) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
+      <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--acento)', borderTopColor: 'transparent' }} />
+    </div>
+  )
+
+  const Wrap = ({ children }) => (
+    <Protected session={session}>
+      <Layout session={session} config={config}>
+        {children}
+      </Layout>
+    </Protected>
+  )
+
   return (
-    <BrowserRouter>
+    <ConfigContext.Provider value={config}>
       <Routes>
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login />} />
-        <Route path="/seguimiento/:clienteId" element={<CheckinPublico />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard" element={<Wrap><Dashboard session={session} /></Wrap>} />
+        <Route path="/clientes" element={<Wrap><Clientes session={session} /></Wrap>} />
+        <Route path="/rutinas" element={<Wrap><Rutinas session={session} /></Wrap>} />
+        <Route path="/sesiones" element={<Wrap><Sesiones session={session} /></Wrap>} />
+        <Route path="/seguimiento" element={<Wrap><Seguimiento session={session} /></Wrap>} />
+        <Route path="/pagos" element={<Wrap><Pagos session={session} /></Wrap>} />
+        <Route path="/agenda" element={<Wrap><Agenda session={session} /></Wrap>} />
+        <Route path="/configuracion" element={<Wrap><Configuracion session={session} onConfigChange={actualizar} /></Wrap>} />
+        {/* Rutas públicas cliente */}
+        <Route path="/registro" element={<RegistroCliente />} />
         <Route path="/portal/:clienteId" element={<PortalCliente />} />
         <Route path="/sesion/:clienteId" element={<SesionCliente />} />
         <Route path="/progreso/:clienteId" element={<ProgresoCliente />} />
-        <Route path="/registro" element={<RegistroCliente />} />
-        <Route path="/" element={<Protected session={session}><Layout session={session} /></Protected>}>
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard session={session} />} />
-          <Route path="agenda" element={<Agenda session={session} />} />
-          <Route path="clientes" element={<Clientes session={session} />} />
-          <Route path="rutinas" element={<Rutinas session={session} />} />
-          <Route path="pagos" element={<Pagos session={session} />} />
-          <Route path="seguimiento" element={<Seguimiento session={session} />} />
-          <Route path="sesiones" element={<Sesiones session={session} />} />
-        </Route>
-          <Route path="/configuracion" element={<Protected session={session}><Layout session={session}><Configuracion session={session} /></Layout></Protected>} />
+        <Route path="/seguimiento/:clienteId" element={<CheckinPublico />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </BrowserRouter>
+    </ConfigContext.Provider>
   )
+}
+
+export default function App() {
+  const [session, setSession] = useState(undefined)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setSession(session))
+    return () => subscription.unsubscribe()
+  }, [])
+
+  if (session === undefined) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
+      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  return <BrowserRouter><AppInner session={session} /></BrowserRouter>
 }

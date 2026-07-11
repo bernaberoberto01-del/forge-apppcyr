@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
 
 const TODOS_MODULOS = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -12,20 +11,9 @@ const TODOS_MODULOS = [
   { id: 'agenda', path: '/agenda', label: 'Agenda', icon: '📅' },
 ]
 
-export default function Layout({ children, session }) {
+export default function Layout({ children, session, config }) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [config, setConfig] = useState(null)
   const location = useLocation()
-  const uid = session?.user?.id
-
-  useEffect(() => {
-    async function cargarConfig() {
-      if (!uid) return
-      const { data } = await supabase.from('configuracion').select('modulos, nombre_negocio, nombre_entrenador, foto_url, color_acento').eq('entrenador_id', uid).single()
-      setConfig(data)
-    }
-    cargarConfig()
-  }, [uid])
 
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
