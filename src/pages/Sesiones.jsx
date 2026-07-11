@@ -3,22 +3,22 @@ import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { getPesoRecomendado } from '../utils/pesos'
 
-function Toast({ msg, tipo='ok', onClose }) {
+function Toast({ msg, tipo = 'ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
   return (
-    <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[100] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
-      <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
+    <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo === 'error' ? 'bg-red-600' : 'bg-[#111]'}`}>
+      <span>{tipo === 'error' ? '⚠' : '✓'}</span> {msg}
     </div>
   )
 }
 
-
-// Pesos de referencia por nivel y patrón de movimiento
 const initForm = {
   cliente_id: '', fecha: new Date().toISOString().split('T')[0],
   tipo: 'presencial', duracion_minutos: 60, notas: '',
   rpe: 7, fatiga_post: 2, sensaciones: '', dia_rutina: 1
 }
+
+const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
 export default function Sesiones({ session }) {
   const [sesiones, setSesiones] = useState([])
@@ -31,8 +31,10 @@ export default function Sesiones({ session }) {
   const [rutinaCliente, setRutinaCliente] = useState(null)
   const [paso, setPaso] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [toast, setToast] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('todos')
+  const [quickView, setQuickView] = useState(null)
   const uid = session.user.id
 
   useEffect(() => { cargar() }, [uid])
@@ -48,7 +50,7 @@ export default function Sesiones({ session }) {
 
   async function cargar() {
     const [{ data: se }, { data: cl }] = await Promise.all([
-      supabase.from('sesiones').select('*, clientes(nombre, tipo, nivel)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(30),
+      supabase.from('sesiones').select('*, clientes(nombre, tipo, nivel)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(50),
       supabase.from('clientes').select('id,nombre,tipo,nivel').eq('entrenador_id', uid).eq('estado', 'activo'),
     ])
     setSesiones(se || [])
@@ -57,19 +59,18 @@ export default function Sesiones({ session }) {
 
   async function cargarRutina(clienteId, diaRutina) {
     if (!clienteId) return
+    setRutinaCliente(null)
+    setEjercicios([])
     const cliente = clientes.find(c => c.id === clienteId)
     const [{ data: ru }, { data: cu }, { data: pf }] = await Promise.all([
       supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
       supabase.from('cuestionarios').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }).limit(1),
       supabase.from('progresion_fuerza').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(1),
     ])
-
     const nivel = cliente?.nivel || 'principiante'
     const marcas = pf?.[0] || null
     const cuest = cu?.[0] || null
-
     if (ru?.[0]) {
-      if (!ru[0]) return
       setRutinaCliente(ru[0])
       const contenido = ru[0].contenido || ru[0].borrador
       const dia = contenido?.dias?.find(d => d.dia === diaRutina)
@@ -90,11 +91,8 @@ export default function Sesiones({ session }) {
             }))
           }
         }))
-        return
       }
     }
-    setRutinaCliente(null)
-    setEjercicios([])
   }
 
   function addEjercicio() {
@@ -131,8 +129,6 @@ export default function Sesiones({ session }) {
     setLoading(true)
     try {
       const ejsFiltrados = ejercicios.filter(e => e.ejercicio_nombre)
-      
-      // Todo en una sola inserción — ejercicios como JSONB en sesiones
       const { error } = await supabase.from('sesiones').insert({
         entrenador_id: uid,
         cliente_id: form.cliente_id,
@@ -147,28 +143,24 @@ export default function Sesiones({ session }) {
         dia_rutina: form.dia_rutina,
         ejercicios: ejsFiltrados.length > 0 ? ejsFiltrados : null
       })
-
       if (error) throw error
-
       setModal(false)
       setPaso(1)
       setForm(initForm)
       setEjercicios([])
       setRutinaCliente(null)
-      setToast('Sesión guardada correctamente')
+      setToast({ msg: 'Sesión guardada correctamente' })
       cargar()
     } catch (err) {
-      setToast('Error al guardar: ' + err.message)
+      setToast({ msg: 'Error al guardar: ' + err.message, tipo: 'error' })
     }
     setLoading(false)
   }
 
-  async function abrirDetalle(s) {
+  function abrirDetalle(s) {
     setDetalle(s)
     setDetalleEjercicios(s.ejercicios || [])
   }
-
-  const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   const Btn = ({ field, val, red }) => {
     const active = form[field] === val
@@ -182,9 +174,14 @@ export default function Sesiones({ session }) {
     )
   }
 
+  const hoy = new Date().toISOString().split('T')[0]
+  const lun = new Date(); lun.setDate(lun.getDate() - (lun.getDay() || 7) + 1)
+  const lunStr = lun.toISOString().split('T')[0]
+
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
-      {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
+
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Sesiones</h1>
@@ -196,15 +193,15 @@ export default function Sesiones({ session }) {
         </button>
       </div>
 
-      {/* Stats rápidas */}
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          ['Hoy', sesiones.filter(s=>s.fecha===new Date().toISOString().split('T')[0]).length, '#FF5C00'],
-          ['Esta semana', sesiones.filter(s=>{ const d=new Date(s.fecha); const hoy=new Date(); const lun=new Date(hoy); lun.setDate(hoy.getDate()-(hoy.getDay()||7)+1); return d>=lun }).length, '#6366f1'],
+          ['Hoy', sesiones.filter(s => s.fecha === hoy).length, '#FF5C00'],
+          ['Esta semana', sesiones.filter(s => s.fecha >= lunStr).length, '#6366f1'],
           ['Total', sesiones.length, '#6B6B6B'],
-        ].map(([l,v,c])=>(
+        ].map(([l, v, c]) => (
           <div key={l} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-center">
-            <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
+            <p className="text-2xl font-bold" style={{ color: c }}>{v}</p>
             <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
           </div>
         ))}
@@ -220,31 +217,37 @@ export default function Sesiones({ session }) {
 
       {/* Filtros */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-        {[['todos','Todas'],['hoy','Hoy'],['presencial','Presencial'],['online','Online']].map(([v,l])=>(
+        {[['todos', 'Todas'], ['hoy', 'Hoy'], ['presencial', 'Presencial'], ['online', 'Online']].map(([v, l]) => (
           <button key={v} onClick={() => setFiltroTipo(v)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo===v?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo === v ? 'bg-[#FF5C00] text-white' : 'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
             {l}
           </button>
         ))}
       </div>
 
+      {/* Lista */}
       <div className="space-y-2">
-        {sesiones.length === 0 ? (
+        {sesionesFiltradas.length === 0 ? (
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
             <p className="text-4xl mb-3">🏋️</p>
-            <p className="font-semibold text-[#0A0A0A]">Sin resultados</p>
-            <p className="text-sm text-[#6B6B6B] mt-1">Empieza registrando el primer entrenamiento</p>
+            <p className="font-semibold text-[#0A0A0A]">{busqueda ? 'Sin resultados' : 'Sin sesiones registradas'}</p>
+            <p className="text-sm text-[#6B6B6B] mt-1">{busqueda ? `No hay sesiones que coincidan` : 'Registra el primer entrenamiento'}</p>
           </div>
         ) : sesionesFiltradas.map(s => (
           <div key={s.id} onClick={() => abrirDetalle(s)}
-            className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md transition-all">
+            className="bg-white rounded-xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-sm flex-shrink-0">
                 {ini(s.clientes?.nombre)}
               </div>
               <div className="flex-1 min-w-0">
-                <button onClick={e=>{e.stopPropagation();setQuickView(s.cliente_id)}} className="text-sm font-semibold text-[#0A0A0A] truncate hover:text-[#FF5C00] transition-colors text-left">{s.clientes?.nombre}</button>
-                <p className="text-xs text-[#6B6B6B]">{new Date(s.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })} · {s.tipo}</p>
+                <button onClick={e => { e.stopPropagation(); setQuickView(s.cliente_id) }}
+                  className="text-sm font-semibold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors truncate block text-left">
+                  {s.clientes?.nombre}
+                </button>
+                <p className="text-xs text-[#6B6B6B]">
+                  {new Date(s.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })} · {s.hora || '—'} · {s.tipo}
+                </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {s.rpe && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">RPE {s.rpe}</span>}
@@ -256,13 +259,15 @@ export default function Sesiones({ session }) {
         ))}
       </div>
 
-      {/* Detalle sesión */}
+      {/* Modal detalle */}
       {detalle && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
               <div>
-                <h2 className="font-bold text-[#0A0A0A]">{detalle.clientes?.nombre}</h2>
+                <button onClick={() => setQuickView(detalle.cliente_id)} className="font-bold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors">
+                  {detalle.clientes?.nombre}
+                </button>
                 <p className="text-xs text-[#6B6B6B]">{new Date(detalle.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
               </div>
               <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
@@ -289,7 +294,7 @@ export default function Sesiones({ session }) {
                         <p className="text-sm font-semibold text-[#0A0A0A] mb-2">{ej.ejercicio_nombre}</p>
                         <div className="flex gap-2 flex-wrap">
                           {(ej.sets || []).map((s, j) => (
-                            <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${s.completado ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-[#6B6B6B]'}`}>
+                            <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${s.completado ? 'bg-emerald-50 text-emerald-700' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
                               {s.peso ? `${s.peso}kg` : '—'} × {s.reps || '—'}
                             </div>
                           ))}
@@ -317,15 +322,15 @@ export default function Sesiones({ session }) {
             <div className="p-4 border-b border-black/5 sticky top-0 bg-white z-10">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-bold text-[#0A0A0A]">Nueva sesión</h2>
-                <button onClick={() => setModal(false)} className="text-[#6B6B6B] text-xl">×</button>
+                <button onClick={() => { setModal(false); setPaso(1); setForm(initForm); setEjercicios([]) }} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex items-center gap-1.5">
-                {[['1','Info'],['2','Ejercicios'],['3','Valoración']].map(([n,l],i) => (
+                {[['1', 'Info'], ['2', 'Ejercicios'], ['3', 'Valoración']].map(([n, l], i) => (
                   <div key={n} className="flex items-center gap-1.5">
-                    <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${paso > i+1 ? 'bg-emerald-500 text-white' : paso === i+1 ? 'bg-[#FF5C00] text-white' : 'bg-black/10 text-[#6B6B6B]'}`}>
-                      {paso > i+1 ? '✓' : n}
+                    <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${paso > i + 1 ? 'bg-emerald-500 text-white' : paso === i + 1 ? 'bg-[#FF5C00] text-white' : 'bg-black/10 text-[#6B6B6B]'}`}>
+                      {paso > i + 1 ? '✓' : n}
                     </div>
-                    <span className={`text-xs ${paso === i+1 ? 'font-semibold text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>{l}</span>
+                    <span className={`text-xs ${paso === i + 1 ? 'font-semibold text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>{l}</span>
                     {i < 2 && <div className="w-4 h-px bg-black/10 mx-0.5" />}
                   </div>
                 ))}
@@ -340,8 +345,8 @@ export default function Sesiones({ session }) {
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
                     <select value={form.cliente_id} onChange={async e => {
                       const val = e.target.value
-                      setForm(f => ({ ...f, cliente_id: val }))
-                      if (val) await cargarRutina(val, form.dia_rutina)
+                      setForm(f => ({ ...f, cliente_id: val, dia_rutina: 1 }))
+                      if (val) await cargarRutina(val, 1)
                     }} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
                       <option value="">Selecciona cliente</option>
                       {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} {c.tipo === 'online' ? '🌐' : '📍'}</option>)}
@@ -371,7 +376,7 @@ export default function Sesiones({ session }) {
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración: <span className="text-[#FF5C00]">{form.duracion_minutos} min</span></label>
                     <div className="flex gap-2 flex-wrap">
-                      {[30,45,60,75,90,120].map(v => (
+                      {[30, 45, 60, 75, 90, 120].map(v => (
                         <button key={v} type="button" onClick={() => setForm(f => ({ ...f, duracion_minutos: v }))}
                           className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${form.duracion_minutos === v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                           {v}min
@@ -389,7 +394,7 @@ export default function Sesiones({ session }) {
                             await cargarRutina(form.cliente_id, dia.dia)
                           }}
                             className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${form.dia_rutina === dia.dia ? 'bg-[#111] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
-                            {dia.nombre.split(' ').slice(0,2).join(' ')}
+                            {dia.nombre.split(' ').slice(0, 2).join(' ')}
                           </button>
                         ))}
                       </div>
@@ -403,7 +408,7 @@ export default function Sesiones({ session }) {
                 <>
                   {rutinaCliente && ejercicios.length > 0 && (
                     <div className="bg-[#FF5C00]/5 border border-[#FF5C00]/20 rounded-xl p-3 text-xs text-[#FF5C00] font-medium">
-                      ✓ Ejercicios precargados desde la rutina · Los pesos son orientativos para tu nivel
+                      ✓ Ejercicios precargados desde la rutina · Pesos orientativos por nivel
                     </div>
                   )}
                   <div className="space-y-4">
@@ -422,11 +427,9 @@ export default function Sesiones({ session }) {
                         </div>
                         <div className="p-3 space-y-2">
                           <div className="grid grid-cols-12 gap-2 px-1 mb-1">
-                            <p className="col-span-1 text-xs text-[#6B6B6B] font-medium">Set</p>
-                            <p className="col-span-4 text-xs text-[#6B6B6B] font-medium">Kg</p>
-                            <p className="col-span-4 text-xs text-[#6B6B6B] font-medium">Reps</p>
-                            <p className="col-span-2 text-xs text-[#6B6B6B] font-medium">✓</p>
-                            <p className="col-span-1"></p>
+                            {['Set', 'Kg', 'Reps', '✓', ''].map((h, i) => (
+                              <p key={i} className={`text-xs text-[#6B6B6B] font-medium ${i === 0 ? 'col-span-1' : i === 1 ? 'col-span-4' : i === 2 ? 'col-span-4' : i === 3 ? 'col-span-2' : 'col-span-1'}`}>{h}</p>
+                            ))}
                           </div>
                           {ej.sets.map((s, setIdx) => (
                             <div key={setIdx} className="grid grid-cols-12 gap-2 items-center">
@@ -454,7 +457,7 @@ export default function Sesiones({ session }) {
                   </div>
                   <button type="button" onClick={addEjercicio}
                     className="w-full border-2 border-dashed border-black/15 text-[#6B6B6B] text-sm font-medium py-3.5 rounded-2xl hover:border-[#FF5C00] hover:text-[#FF5C00] transition-all">
-                    + Añadir ejercicio extra
+                    + Añadir ejercicio
                   </button>
                 </>
               )}
@@ -468,16 +471,14 @@ export default function Sesiones({ session }) {
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Esfuerzo (RPE): <span className="text-[#FF5C00] font-bold">{form.rpe}/10</span></label>
-                    <p className="text-xs text-[#6B6B6B] mb-2">1 = Sin esfuerzo · 10 = Esfuerzo máximo</p>
                     <div className="flex gap-1.5 flex-wrap">
-                      {[1,2,3,4,5,6,7,8,9,10].map(v => <Btn key={v} field="rpe" val={v} />)}
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => <Btn key={v} field="rpe" val={v} />)}
                     </div>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Fatiga generada: <span className="text-[#FF5C00] font-bold">{form.fatiga_post}/5</span></label>
-                    <p className="text-xs text-[#6B6B6B] mb-2">1 = Fresco · 5 = Muy fatigado</p>
                     <div className="flex gap-1.5">
-                      {[1,2,3,4,5].map(v => <Btn key={v} field="fatiga_post" val={v} red />)}
+                      {[1, 2, 3, 4, 5].map(v => <Btn key={v} field="fatiga_post" val={v} red />)}
                     </div>
                   </div>
                   <div>
@@ -512,6 +513,7 @@ export default function Sesiones({ session }) {
           </div>
         </div>
       )}
+
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
     </div>
   )
