@@ -19,6 +19,7 @@ export default function PortalCliente() {
   const [mensajes, setMensajes] = useState([])
   const [mensajesLeidos, setMensajesLeidos] = useState(false)
   const [configEntrenador, setConfigEntrenador] = useState(null)
+  const [planNutricion, setPlanNutricion] = useState(null)
 
   useEffect(() => {
     async function cargar() {
@@ -35,6 +36,9 @@ export default function PortalCliente() {
       setCheckins(ci || [])
       setPagos(pg || [])
       setMensajes(ms || [])
+      // Cargar plan nutricional
+      const { data: pn } = await supabase.from('planes_nutricion').select('*').eq('cliente_id', clienteId).eq('estado','publicado').order('created_at', { ascending: false }).limit(1).single().catch(()=>({data:null}))
+      setPlanNutricion(pn)
       // Cargar config del entrenador
       if (cl?.entrenador_id) {
         const { data: cfg } = await supabase.from('configuracion').select('nombre_entrenador, foto_url, nombre_negocio').eq('entrenador_id', cl.entrenador_id).single()
@@ -67,6 +71,7 @@ export default function PortalCliente() {
     { id: 'rutina', label: 'Rutina', icon: '💪' },
     { id: 'progreso', label: 'Progreso', icon: '📈' },
     { id: 'mensajes', label: mensajesNoLeidos > 0 ? `Msgs(${mensajesNoLeidos})` : 'Mensajes', icon: mensajesNoLeidos > 0 ? '🔴' : '✉️' },
+    ...(planNutricion || cliente?.nutricion_activa ? [{ id: 'nutricion', label: 'Nutrición', icon: '🥗' }] : []),
   ]
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
@@ -340,6 +345,73 @@ export default function PortalCliente() {
                 <p className="text-sm text-[#0A0A0A] leading-relaxed">{m.contenido}</p>
               </div>
             ))}
+          </>
+        )}
+        {/* NUTRICIÓN */}
+        {tab==='nutricion' && (
+          <>
+            {!planNutricion ? (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
+                <p className="text-5xl mb-4">🥗</p>
+                <p className="font-bold text-[#0A0A0A] text-lg">Plan nutricional en preparación</p>
+                <p className="text-sm text-[#6B6B6B] mt-2">Tu entrenador está personalizando tu plan. Recibirás un mensaje cuando esté listo.</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-[#111] rounded-2xl p-5">
+                  <h2 className="text-white font-bold">{planNutricion.nombre}</h2>
+                  <div className="grid grid-cols-4 gap-2 mt-3">
+                    {[['kcal',planNutricion.calorias_dia,'#FF5C00'],['Prot.',`${planNutricion.proteinas_g}g`,'#6366f1'],['Carbs',`${planNutricion.carbohidratos_g}g`,'#f59e0b'],['Grasa',`${planNutricion.grasas_g}g`,'#10b981']].map(([l,v,col])=>(
+                      <div key={l} className="bg-white/8 rounded-xl p-2.5 text-center">
+                        <p className="text-sm font-bold" style={{color:col}}>{v}</p>
+                        <p className="text-white/40 text-xs mt-0.5">{l}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Menú semanal */}
+                {(() => {
+                  const menu = planNutricion.contenido?.menu || []
+                  const dias = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+                  const [diaIdx, setDiaIdx] = window._nutriDia !== undefined ? [window._nutriDia, (i) => { window._nutriDia = i; }] : [0, ()=>{}]
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex gap-1.5 overflow-x-auto pb-1">
+                        {dias.map((d,i)=>(
+                          <button key={d} onClick={()=>{ window._nutriDia=i; window.dispatchEvent(new Event('storage')) }}
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 ${i===(window._nutriDia||0)?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B]'}`}>
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                      {(menu[window._nutriDia||0]?.comidas||[]).map((comida,i)=>(
+                        <div key={i} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+                          <div className="bg-[#0A0A0A] px-4 py-2.5 flex items-center justify-between">
+                            <span className="text-white font-semibold text-sm">{comida.nombre}</span>
+                            <span className="text-white/50 text-xs">{comida.hora} · {comida.calorias}kcal</span>
+                          </div>
+                          <div className="p-3 space-y-1">
+                            {(comida.alimentos||[]).map((al,j)=>(
+                              <div key={j} className="flex justify-between text-sm">
+                                <span className="text-[#0A0A0A]">{al.nombre}</span>
+                                <span className="text-[#6B6B6B] text-xs font-medium">{al.cantidad}</span>
+                              </div>
+                            ))}
+                            {comida.prep && <p className="text-xs text-[#6B6B6B] border-t border-black/5 pt-2 mt-1">🍳 {comida.prep}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+                {planNutricion.notas_entrenador && (
+                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+                    <p className="text-xs font-semibold text-amber-700 mb-1.5">📝 Nota de tu entrenador</p>
+                    <p className="text-sm text-amber-800 leading-relaxed">{planNutricion.notas_entrenador}</p>
+                  </div>
+                )}
+              </>
+            )}
           </>
         )}
       </div>
