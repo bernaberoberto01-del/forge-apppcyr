@@ -38,6 +38,7 @@ export default function Seguimiento({ session }) {
   const uid = session.user.id
   const [busqueda, setBusqueda] = useState('')
   const [filtroAlerta, setFiltroAlerta] = useState('todos')
+  const [detalleCI, setDetalleCI] = useState(null)
   const [enviando, setEnviando] = useState(false)
   const [toast, setToast] = useState('')
 
@@ -109,6 +110,21 @@ export default function Seguimiento({ session }) {
     )
   }
 
+
+  // Etiquetas descriptivas por escala y valor
+  const getEtiqueta = (campo, valor) => {
+    const escalas = {
+      energia: { 1:'Agotado', 2:'Muy baja', 3:'Baja', 4:'Por debajo de lo normal', 5:'Normal', 6:'Bien', 7:'Bastante bien', 8:'Alta', 9:'Muy alta', 10:'Excelente' },
+      sueno: { 1:'1h', 2:'2h', 3:'3h', 4:'4h', 5:'5h', 6:'6h', 7:'7h', 8:'8h', 9:'9h', 10:'10h+' },
+      estres: { 1:'Sin estrés', 2:'Leve', 3:'Moderado', 4:'Alto', 5:'Muy alto' },
+      fatiga: { 1:'Sin fatiga', 2:'Leve', 3:'Moderada', 4:'Alta', 5:'Muy alta' },
+      motivacion: { 1:'Sin motivación', 2:'Muy baja', 3:'Baja', 4:'Normal', 5:'Bien', 6:'Alta', 7:'Máxima' },
+      calidad_entreno: { 1:'Muy mala', 2:'Mala', 3:'Regular', 4:'Normal', 5:'Buena', 6:'Muy buena', 7:'Excelente' },
+      adherencia_entreno: { 1:'0%', 2:'20%', 3:'30%', 4:'40%', 5:'50%', 6:'60%', 7:'70%', 8:'80%', 9:'90%', 10:'100%' },
+      adherencia_nutricion: { 1:'0%', 2:'20%', 3:'30%', 4:'40%', 5:'50%', 6:'60%', 7:'70%', 8:'80%', 9:'90%', 10:'100%' },
+    }
+    return escalas[campo]?.[valor] || `${valor}`
+  }
   const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
@@ -193,7 +209,7 @@ export default function Seguimiento({ session }) {
             <p className="text-[#6B6B6B] text-sm">Sin seguimientos registrados</p>
           </div>
         ) : checkinsFiltrados.map(ci => (
-          <div key={ci.id} className="bg-white rounded-xl border border-black/5 p-3.5">
+          <div key={ci.id} onClick={() => setDetalleCI(ci)} className="bg-white rounded-xl border border-black/5 p-3.5 cursor-pointer hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
             <div className="flex items-center justify-between mb-2.5">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">
@@ -228,6 +244,122 @@ export default function Seguimiento({ session }) {
           </div>
         ))}
       </div>
+
+      {/* Modal detalle check-in */}
+      {detalleCI && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="p-4 border-b border-black/5 sticky top-0 bg-white flex items-center justify-between">
+              <div>
+                <p className="font-bold text-[#0A0A0A]">{detalleCI.clientes?.nombre}</p>
+                <p className="text-xs text-[#6B6B6B]">
+                  {new Date(detalleCI.fecha).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+                </p>
+              </div>
+              <button onClick={() => setDetalleCI(null)} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Peso y pasos destacados */}
+              {(detalleCI.peso || detalleCI.pasos_diarios) && (
+                <div className="grid grid-cols-2 gap-2">
+                  {detalleCI.peso && (
+                    <div className="bg-[#FF5C00]/8 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-[#FF5C00]">{detalleCI.peso}kg</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">Peso corporal</p>
+                    </div>
+                  )}
+                  {detalleCI.pasos_diarios && (
+                    <div className="bg-[#F5F5F0] rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-[#0A0A0A]">{Number(detalleCI.pasos_diarios).toLocaleString()}</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">Pasos diarios</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Escalas detalladas */}
+              <div className="space-y-2">
+                {[
+                  { campo:'energia', label:'Energía', icon:'⚡', max:10, desc:'Nivel de energía general durante la semana' },
+                  { campo:'sueno', label:'Sueño', icon:'😴', max:10, desc:'Horas de sueño promedio por noche' },
+                  { campo:'estres', label:'Estrés', icon:'😤', max:5, desc:'Nivel de estrés percibido', invertido:true },
+                  { campo:'fatiga', label:'Fatiga', icon:'🔥', max:5, desc:'Fatiga acumulada del entrenamiento', invertido:true },
+                  { campo:'motivacion', label:'Motivación', icon:'💫', max:7, desc:'Motivación para entrenar' },
+                  { campo:'calidad_entreno', label:'Calidad entreno', icon:'🏋️', max:7, desc:'Calidad percibida de los entrenamientos' },
+                  { campo:'sesiones_semana', label:'Sesiones realizadas', icon:'📅', max:7, desc:'Número de sesiones completadas esta semana', noBar:true },
+                  { campo:'adherencia_entreno', label:'Adherencia entreno', icon:'💪', max:10, desc:'Cumplimiento del plan de entrenamiento' },
+                  { campo:'adherencia_nutricion', label:'Adherencia nutrición', icon:'🥗', max:10, desc:'Cumplimiento del plan nutricional' },
+                ].map(({ campo, label, icon, max, desc, invertido, noBar }) => {
+                  const val = detalleCI[campo]
+                  if (!val && val !== 0) return null
+                  const pct = (val / max) * 100
+                  const etiqueta = getEtiqueta(campo, val)
+                  const esAlerta = invertido ? val >= 4 : val <= 3
+                  const esBien = invertido ? val <= 2 : val >= Math.ceil(max * 0.7)
+                  const colorBar = esAlerta ? '#ef4444' : esBien ? '#10b981' : '#FF5C00'
+                  return (
+                    <div key={campo} className="bg-[#F5F5F0] rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base">{icon}</span>
+                          <div>
+                            <p className="text-xs font-semibold text-[#0A0A0A]">{label}</p>
+                            <p className="text-xs text-[#6B6B6B]">{desc}</p>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm font-bold" style={{color: colorBar}}>{val}/{max}</p>
+                          <p className="text-xs text-[#6B6B6B]">{etiqueta}</p>
+                        </div>
+                      </div>
+                      {!noBar && (
+                        <div className="h-1.5 bg-black/8 rounded-full overflow-hidden mt-2">
+                          <div className="h-full rounded-full transition-all" style={{width:`${pct}%`, background: colorBar}} />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Comentario del cliente */}
+              {detalleCI.comentario && (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+                  <p className="text-xs font-semibold text-amber-700 mb-2">💬 Comentario del cliente</p>
+                  <p className="text-sm text-amber-800 leading-relaxed">"{detalleCI.comentario}"</p>
+                </div>
+              )}
+
+              {/* Alerta de atención si hay valores preocupantes */}
+              {(detalleCI.fatiga >= 4 || detalleCI.estres >= 4 || detalleCI.energia <= 3 || detalleCI.motivacion <= 2) && (
+                <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-red-700 mb-1.5">⚠ Puntos de atención</p>
+                  <div className="space-y-1">
+                    {detalleCI.fatiga >= 4 && <p className="text-xs text-red-600">• Fatiga alta ({detalleCI.fatiga}/5) — considera reducir la carga esta semana</p>}
+                    {detalleCI.estres >= 4 && <p className="text-xs text-red-600">• Estrés elevado ({detalleCI.estres}/5) — puede afectar la recuperación</p>}
+                    {detalleCI.energia <= 3 && <p className="text-xs text-red-600">• Energía baja ({detalleCI.energia}/10) — revisar descanso y nutrición</p>}
+                    {detalleCI.motivacion <= 2 && <p className="text-xs text-red-600">• Motivación muy baja ({detalleCI.motivacion}/7) — contactar al cliente</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => { copiarEnlaceCheckin(detalleCI.cliente_id); setDetalleCI(null) }}
+                  className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0]">
+                  🔗 Enviar nuevo CI
+                </button>
+                <button onClick={() => setDetalleCI(null)}
+                  className="flex-1 bg-[#111] text-white text-sm font-semibold py-2.5 rounded-xl">
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal registrar */}
       {modal && (
