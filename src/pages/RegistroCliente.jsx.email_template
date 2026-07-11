@@ -1,0 +1,42 @@
+EMAIL DE BIENVENIDA — PLANTILLA HTML
+
+Asunto: Ya tienes tu acceso, {nombre} 🔥
+
+---
+
+Hola {nombre},
+
+Bienvenido/a al equipo. Me alegra tenerte aquí.
+
+A partir de ahora tienes todo tu progreso en un sitio: rutinas, seguimiento, evolución y comunicación directa conmigo. Todo en tu portal personal.
+
+Tu enlace es este:
+→ {portal_url}
+
+Guárdalo porque lo vas a usar cada semana.
+
+---
+
+PARA TENERLO COMO APP EN TU MÓVIL:
+
+En iPhone (Safari):
+1. Abre el enlace en Safari
+2. Pulsa el botón de compartir (cuadrado con flecha arriba)
+3. Baja y selecciona "Añadir a pantalla de inicio"
+4. Dale el nombre que quieras y listo
+
+En Android (Chrome):
+1. Abre el enlace en Chrome
+2. Pulsa los tres puntos arriba a la derecha
+3. Selecciona "Añadir a pantalla de inicio"
+4. Confirma y ya lo tienes como una app
+
+Una vez instalado lo abres desde tu pantalla de inicio como cualquier otra app, sin navegador.
+
+---
+
+Si tienes cualquier duda, escríbeme directamente.
+
+Nos vemos pronto,
+{nombre_entrenador}
+

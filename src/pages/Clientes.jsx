@@ -140,13 +140,24 @@ export default function Clientes({ session }) {
     if (cliente) {
       await Promise.all([
         supabase.from('cuestionarios').update({ cliente_id: cliente.id, procesado: true }).eq('id', c.id),
-        // Mensaje de bienvenida automático
+        // Mensaje de bienvenida en el portal
         supabase.from('mensajes_cliente').insert({
           entrenador_id: uid,
           cliente_id: cliente.id,
           contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu rutina. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
         })
       ])
+      // Email de bienvenida con enlace al portal
+      if (cliente.email) {
+        fetch(`https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/bienvenida-cliente`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
+          body: JSON.stringify({ cliente_id: cliente.id })
+        }).catch(() => {})
+        showToast(`✓ ${c.nombre.split(' ')[0]} convertido · Email de bienvenida enviado`)
+      } else {
+        showToast(`✓ ${c.nombre.split(' ')[0]} convertido como cliente`)
+      }
       setCuestionarios(prev => {
         const nuevos = prev.filter(x => x.id !== c.id)
         if (nuevos.length === 0) setModalRegistros(false)
@@ -683,6 +694,19 @@ export default function Clientes({ session }) {
                     <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); showToast('Enlace del portal copiado') }}
                       className="bg-[#111] text-white text-sm font-medium py-2.5 rounded-xl">🔗 Portal</button>
+                    {detalle.email && (
+                      <button onClick={async () => {
+                        const res = await fetch(`https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/bienvenida-cliente`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
+                          body: JSON.stringify({ cliente_id: detalle.id })
+                        })
+                        if (res.ok) showToast('Email de bienvenida enviado')
+                        else showToast('Error al enviar email', 'error')
+                      }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">
+                        📧 Bienvenida
+                      </button>
+                    )}
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${detalle.id}`); showToast('Enlace check-in copiado') }}
                       className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Enviar CI</button>
                     <button onClick={() => eliminar(detalle.id)} className="border border-red-100 text-red-500 text-sm font-medium py-2.5 rounded-xl hover:bg-red-50">🗑 Eliminar</button>
