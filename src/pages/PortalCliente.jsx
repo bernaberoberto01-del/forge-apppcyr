@@ -13,9 +13,6 @@ export default function PortalCliente() {
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('inicio')
-  const [pinDesbloqueado, setPinDesbloqueado] = useState(false)
-  const [pinIntento, setPinIntento] = useState('')
-  const [pinError, setPinError] = useState(false)
   const [rutina, setRutina] = useState(null)
   const [checkins, setCheckins] = useState([])
   const [pagos, setPagos] = useState([])
@@ -107,12 +104,51 @@ export default function PortalCliente() {
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
   if (notFound) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] p-4"><div className="text-center"><p className="text-4xl mb-3">🔗</p><p className="text-[#6B6B6B]">Enlace no válido</p></div></div>
 
+  // Pantalla PIN
+  if (clientePin && !pinValido) return (
+    <div className="min-h-screen bg-[#111] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-xs p-6 text-center">
+        <div className="w-14 h-14 bg-[#FF5C00]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl">🔒</span>
+        </div>
+        <h2 className="font-bold text-[#0A0A0A] mb-1">Portal privado</h2>
+        <p className="text-xs text-[#6B6B6B] mb-5">Introduce tu PIN de acceso</p>
+        <div className="flex gap-2 justify-center mb-4">
+          {[0,1,2,3].map(i => (
+            <div key={i} className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center text-lg font-bold transition-all ${pinError?'border-red-300 bg-red-50':pinIntroducido.length > i ? 'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10'}`}>
+              {pinIntroducido.length > i ? '●' : ''}
+            </div>
+          ))}
+        </div>
+        {pinError && <p className="text-xs text-red-500 mb-3">PIN incorrecto, inténtalo de nuevo</p>}
+        <div className="grid grid-cols-3 gap-2">
+          {[1,2,3,4,5,6,7,8,9,'',0,'←'].map((n,i) => (
+            <button key={i} onClick={() => {
+              if (n === '←') { setPinIntroducido(p => p.slice(0,-1)); setPinError(false) }
+              else if (n !== '' && pinIntroducido.length < 4) {
+                const nuevo = pinIntroducido + n
+                setPinIntroducido(nuevo)
+                if (nuevo.length === 4) {
+                  if (nuevo === clientePin) { setPinValido(true) }
+                  else { setPinError(true); setTimeout(() => setPinIntroducido(''), 500) }
+                }
+              }
+            }}
+              className={`h-12 rounded-xl text-base font-semibold transition-all active:scale-95 ${n===''?'invisible':n==='←'?'bg-[#F5F5F0] text-[#6B6B6B]':'bg-[#F5F5F0] text-[#0A0A0A] hover:bg-black/10'}`}>
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-[#F5F5F0]">
       {/* Header */}
       <div className="bg-[#111] px-4 pt-12 pb-5">
         <div className="max-w-lg mx-auto">
-          {pagoStatus === 'ok' && (
+          {diasRestantes !== null && diasRestantes > 0 && (
             <div className="bg-emerald-500 text-white text-sm font-medium px-4 py-2.5 rounded-xl mb-4 flex items-center gap-2">
               <span>✓</span> Pago completado — acceso activado
             </div>

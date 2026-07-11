@@ -262,8 +262,8 @@ export default function Sesiones({ session }) {
 
       {/* Modal detalle */}
       {detalle && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setDetalle(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
               <div>
                 <button onClick={() => setQuickView(detalle.cliente_id)} className="font-bold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors">

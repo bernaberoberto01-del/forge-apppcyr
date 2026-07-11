@@ -472,7 +472,7 @@ export default function Clientes({ session }) {
 
       {/* Modal nuevo/editar */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5">
             <h2 className="font-bold text-[#0A0A0A] mb-4">{editId ? 'Editar cliente' : 'Nuevo cliente'}</h2>
             <div className="space-y-3">
@@ -568,8 +568,8 @@ export default function Clientes({ session }) {
 
       {/* Detalle cliente */}
       {detalle && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setDetalle(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-5 border-b border-black/5">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold flex-shrink-0"

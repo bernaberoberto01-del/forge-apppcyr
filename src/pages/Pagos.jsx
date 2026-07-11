@@ -391,7 +391,7 @@ export default function Pagos({ session }) {
 
       {/* Modal registrar pago */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md p-5">
             <h2 className="font-bold text-[#0A0A0A] mb-4">Registrar pago</h2>
             <div className="space-y-3">
@@ -434,7 +434,7 @@ export default function Pagos({ session }) {
 
       {/* Modal plan de cobro */}
       {modalPlan && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalPlan(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md p-5">
             <h2 className="font-bold text-[#0A0A0A] mb-1">{editandoPlan ? 'Editar plan' : 'Nuevo plan de cobro'}</h2>
             <p className="text-xs text-[#6B6B6B] mb-4">El sistema te avisará cuándo cobrar y actualizará la próxima fecha automáticamente</p>

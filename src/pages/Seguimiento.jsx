@@ -288,8 +288,8 @@ export default function Seguimiento({ session }) {
 
       {/* Modal detalle check-in */}
       {detalleCI && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setDetalleCI(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="p-4 border-b border-black/5 sticky top-0 bg-white flex items-center justify-between">
               <div>

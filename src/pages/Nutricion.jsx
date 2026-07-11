@@ -243,8 +243,8 @@ export default function Nutricion({ session }) {
 
       {/* Modal detalle plan */}
       {detalle && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setDetalle(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 sticky top-0 bg-white z-10 flex items-center justify-between">
               <div>
                 <h2 className="font-bold text-[#0A0A0A]">{detalle.clientes?.nombre}</h2>
@@ -370,8 +370,8 @@ export default function Nutricion({ session }) {
 
       {/* Modal cuestionario nutricional */}
       {modalCuest && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalCuest(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 sticky top-0 bg-white z-10 flex items-center justify-between">
               <div>
                 <h2 className="font-bold text-[#0A0A0A]">Cuestionario nutricional</h2>

@@ -528,8 +528,8 @@ export default function Rutinas({ session }) {
 
       {/* Modal detalle rutina */}
       {detalle && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setDetalle(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
               <div>
                 <h2 className="font-bold text-[#0A0A0A]">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2>
@@ -614,8 +614,8 @@ export default function Rutinas({ session }) {
 
       {/* Modal rutina manual */}
       {modalManual && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalManual(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 sticky top-0 bg-white z-10 flex items-center justify-between">
               <h2 className="font-bold text-[#0A0A0A]">Crear rutina manual</h2>
               <button onClick={() => setModalManual(false)} className="text-[#6B6B6B] text-xl">×</button>
@@ -722,8 +722,8 @@ export default function Rutinas({ session }) {
 
       {/* Modal plantillas */}
       {modalPlantillas && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalPlantillas(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
               <h2 className="font-bold text-[#0A0A0A]">Plantillas de rutina</h2>
               <button onClick={() => setModalPlantillas(false)} className="text-[#6B6B6B] text-xl">×</button>
@@ -749,8 +749,8 @@ export default function Rutinas({ session }) {
 
       {/* Modal mensaje */}
       {msgModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-5">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setMsgModal(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-3">Enviar mensaje</h2>
             <textarea value={msgTexto} onChange={e => setMsgTexto(e.target.value)} rows={4}
               className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none mb-3" placeholder="Escribe tu mensaje..." />

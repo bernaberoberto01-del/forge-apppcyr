@@ -524,7 +524,7 @@ export default function Agenda({ session }) {
 
       {/* Modal nueva sesión */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md p-5">
             <h2 className="font-bold text-[#0A0A0A] mb-4">
               Nueva sesión — {diaClick ? new Date(diaClick+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'}) : ''}
@@ -581,7 +581,7 @@ export default function Agenda({ session }) {
 
       {/* Modal sesión recurrente */}
       {modalRecurrente && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalRecurrente(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto">
             <h2 className="font-bold text-[#0A0A0A] mb-1">Nueva sesión recurrente</h2>
             <p className="text-xs text-[#6B6B6B] mb-4">Se repite automáticamente cada semana los días que selecciones</p>
@@ -664,8 +664,8 @@ export default function Agenda({ session }) {
 
       {/* Modal gestión recurrentes */}
       {modalGestionRec && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalGestionRec(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
               <div>
                 <h2 className="font-bold text-[#0A0A0A]">Sesiones recurrentes</h2>
@@ -714,7 +714,7 @@ export default function Agenda({ session }) {
 
       {/* Modal horas extra */}
       {modalExtra && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalExtra(false)}>
           <div className="bg-white rounded-2xl w-full max-w-md p-5">
             <h2 className="font-bold text-[#0A0A0A] mb-1">Registrar horas extra</h2>
             <p className="text-xs text-[#6B6B6B] mb-4">Desplazamientos, reuniones, preparación de programas...</p>
@@ -763,8 +763,8 @@ export default function Agenda({ session }) {
 
       {/* Modal resumen horas */}
       {modalResumen && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalResumen(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-[#0A0A0A]">Resumen de horas</h2>
               <button onClick={() => setModalResumen(false)} className="text-[#6B6B6B] text-xl">×</button>
