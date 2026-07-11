@@ -13,6 +13,9 @@ export default function PortalCliente() {
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('inicio')
+  const [pinDesbloqueado, setPinDesbloqueado] = useState(false)
+  const [pinIntento, setPinIntento] = useState('')
+  const [pinError, setPinError] = useState(false)
   const [rutina, setRutina] = useState(null)
   const [checkins, setCheckins] = useState([])
   const [pagos, setPagos] = useState([])
@@ -21,6 +24,10 @@ export default function PortalCliente() {
   const [configEntrenador, setConfigEntrenador] = useState(null)
   const [planNutricion, setPlanNutricion] = useState(null)
   const [diaActivoNutr, setDiaActivoNutr] = useState(0)
+  const [pinIntroducido, setPinIntroducido] = useState('')
+  const [pinValido, setPinValido] = useState(false)
+  const [pinError, setPinError] = useState(false)
+  const [clientePin, setClientePin] = useState(null)
   const [biblioteca, setBiblioteca] = useState([])
   const [videoEj, setVideoEj] = useState(null)
   const [fotos, setFotos] = useState([])
@@ -43,6 +50,8 @@ export default function PortalCliente() {
       // Cargar biblioteca para vídeos de ejercicios
       const { data: bib } = await supabase.from('ejercicios_biblioteca').select('nombre, sinonimos, youtube_url, consejos_tecnica').eq('entrenador_id', cl.entrenador_id)
       if (bib) setBiblioteca(bib)
+      // Cargar PIN si está activo
+      if (cl.portal_pin) setClientePin(cl.portal_pin)
       // Cargar fotos de progreso visibles
       const { data: ft } = await supabase.from('fotos_progreso').select('*').eq('cliente_id', clienteId).eq('visible_cliente', true).order('fecha', { ascending: false })
       if (ft) setFotos(ft)

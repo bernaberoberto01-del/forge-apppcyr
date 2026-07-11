@@ -40,6 +40,69 @@ export default function Pagos({ session }) {
   const [loading, setLoading] = useState(false)
   const uid = session.user.id
 
+  function generarRecibo(pago) {
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, sans-serif; color: #0A0A0A; padding: 40px; max-width: 600px; margin: 0 auto; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #FF5C00; }
+  .logo { font-size: 24px; font-weight: 800; color: #FF5C00; }
+  .recibo-num { font-size: 13px; color: #6B6B6B; text-align: right; }
+  .recibo-num strong { display: block; font-size: 16px; color: #0A0A0A; }
+  .section { margin-bottom: 24px; }
+  .label { font-size: 11px; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .value { font-size: 15px; font-weight: 500; }
+  .amount-box { background: #F5F5F0; border-radius: 12px; padding: 24px; text-align: center; margin: 32px 0; }
+  .amount { font-size: 48px; font-weight: 800; color: #FF5C00; }
+  .amount-label { font-size: 13px; color: #6B6B6B; margin-top: 4px; }
+  .footer { font-size: 11px; color: #6B6B6B; text-align: center; padding-top: 20px; border-top: 1px solid #eee; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">Forge Studio</div>
+    <div class="recibo-num">
+      <span>Recibo</span>
+      <strong>#${pago.id?.slice(-6).toUpperCase()}</strong>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="section">
+      <div class="label">Cliente</div>
+      <div class="value">${pago.clientes?.nombre || '—'}</div>
+    </div>
+    <div class="section">
+      <div class="label">Fecha de pago</div>
+      <div class="value">${new Date(pago.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</div>
+    </div>
+    <div class="section">
+      <div class="label">Concepto</div>
+      <div class="value">${pago.concepto || 'Entrenamiento personal'}</div>
+    </div>
+    <div class="section">
+      <div class="label">Periodo</div>
+      <div class="value">${pago.periodo || new Date(pago.fecha_pago+'T12:00').toLocaleDateString('es-ES',{month:'long',year:'numeric'})}</div>
+    </div>
+  </div>
+  <div class="amount-box">
+    <div class="amount">${Number(pago.importe).toFixed(2)}€</div>
+    <div class="amount-label">Importe total pagado</div>
+  </div>
+  <div class="footer">
+    Recibo generado el ${new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})} · Forge Studio OS
+  </div>
+</body>
+</html>`
+    const win = window.open('', '_blank')
+    win.document.write(html)
+    win.document.close()
+    setTimeout(() => win.print(), 500)
+  }
+
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
@@ -292,6 +355,7 @@ export default function Pagos({ session }) {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <p className="text-sm font-bold text-emerald-600">+{Number(p.importe).toFixed(0)}€</p>
+                  <button onClick={() => generarRecibo(p)} className="text-[#6B6B6B] hover:text-[#FF5C00] text-sm transition-colors">🧾</button>
                   <button onClick={() => eliminarPago(p.id)} className="text-[#6B6B6B] hover:text-red-500 text-lg">×</button>
                 </div>
               </div>

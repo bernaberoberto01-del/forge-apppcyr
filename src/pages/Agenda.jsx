@@ -39,13 +39,69 @@ function Toast({ msg, tipo='ok', onClose }) {
   )
 }
 
+
+function VistaMensual({ mesVista, setMesVista, sesiones, hoy, abrirModalEnDia, setSesionDetalle, miembros, clienteColor }) {
+  const primerDia = new Date(mesVista.getFullYear(), mesVista.getMonth(), 1)
+  const ultimoDia = new Date(mesVista.getFullYear(), mesVista.getMonth()+1, 0)
+  const diasMes = ultimoDia.getDate()
+  const offsetInicio = (primerDia.getDay() + 6) % 7
+
+  return (
+    <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={() => setMesVista(d => new Date(d.getFullYear(), d.getMonth()-1, 1))}
+          className="w-8 h-8 flex items-center justify-center border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">‹</button>
+        <p className="text-sm font-bold text-[#0A0A0A] capitalize">
+          {mesVista.toLocaleDateString('es-ES',{month:'long',year:'numeric'})}
+        </p>
+        <button onClick={() => setMesVista(d => new Date(d.getFullYear(), d.getMonth()+1, 1))}
+          className="w-8 h-8 flex items-center justify-center border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">›</button>
+      </div>
+      <div className="grid grid-cols-7 gap-px bg-black/5 rounded-xl overflow-hidden">
+        {['L','M','X','J','V','S','D'].map(d => (
+          <div key={d} className="bg-white py-2 text-center text-xs font-semibold text-[#6B6B6B]">{d}</div>
+        ))}
+        {Array.from({length: offsetInicio}, (_,i) => (
+          <div key={`e${i}`} className="bg-white min-h-[72px]" />
+        ))}
+        {Array.from({length: diasMes}, (_,i) => {
+          const dia = i+1
+          const fechaDia = `${mesVista.getFullYear()}-${String(mesVista.getMonth()+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`
+          const sessDia = sesiones.filter(s => s.fecha === fechaDia)
+          const esHoyDia = fechaDia === hoy
+          return (
+            <div key={dia} onClick={() => abrirModalEnDia(new Date(fechaDia+'T12:00'), '09:00')}
+              className={`bg-white min-h-[72px] p-1.5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoyDia?'bg-[#FF5C00]/5':''}`}>
+              <p className={`text-xs font-bold mb-1 w-5 h-5 flex items-center justify-center rounded-full ${esHoyDia?'bg-[#FF5C00] text-white':'text-[#0A0A0A]'}`}>{dia}</p>
+              <div className="space-y-0.5">
+                {sessDia.slice(0,3).map((s,si) => {
+                  const miem = miembros?.find(m => m.user_id === s.entrenador_id)
+                  const col = miem?.color || clienteColor(s.cliente_id)
+                  return (
+                    <div key={si} onClick={e => { e.stopPropagation(); setSesionDetalle(s) }}
+                      className="text-[10px] px-1 py-0.5 rounded truncate leading-tight"
+                      style={{ background: s._esVirtual ? 'transparent' : col, color: s._esVirtual ? col : 'white', border: s._esVirtual ? `1px dashed ${col}` : 'none' }}>
+                      {s.hora?.slice(0,5)} {s.clientes?.nombre?.split(' ')[0]}
+                    </div>
+                  )
+                })}
+                {sessDia.length > 3 && <p className="text-[10px] text-[#6B6B6B]">+{sessDia.length-3}</p>}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function Agenda({ session }) {
   const [semanaBase, setSemanaBase] = useState(() => getLunes(new Date()))
   const [sesiones, setSesiones] = useState([])
   const [recurrentes, setRecurrentes] = useState([])
   const [clientes, setClientes] = useState([])
   const [horasExtra, setHorasExtra] = useState([])
-  const [vista, setVista] = useState('timeline') // timeline | semana
+  const [vista, setVista] = useState('timeline') // timeline | mes
   const [modal, setModal] = useState(false)
   const [modalRecurrente, setModalRecurrente] = useState(false)
   const [modalExtra, setModalExtra] = useState(false)
@@ -61,6 +117,7 @@ export default function Agenda({ session }) {
   const [formExtra, setFormExtra] = useState({ fecha: new Date().toISOString().split('T')[0], concepto:'', horas:'1', tipo:'desplazamiento' })
   const [loading, setLoading] = useState(false)
   const [filtroEntrenador, setFiltroEntrenador] = useState('todos')
+  const [mesVista, setMesVista] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const { centro, miembros, esAdmin } = useCentro() || {}
   const timelineRef = useRef()
   const uid = session.user.id
@@ -246,6 +303,14 @@ export default function Agenda({ session }) {
           </p>
           <p className="text-xs text-[#6B6B6B]">{sesionesSemana.length} sesiones · {sesCompletadasSemana.length} completadas</p>
         </div>
+        <div className="flex gap-1 bg-black/5 p-1 rounded-lg flex-shrink-0">
+          {[['timeline','📅'],['mes','🗓']].map(([v,l])=>(
+            <button key={v} onClick={() => setVista(v)}
+              className={`px-2 py-1 rounded text-xs font-medium transition-all ${vista===v?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
         {centro && miembros?.length > 1 && (
           <select value={filtroEntrenador} onChange={e => setFiltroEntrenador(e.target.value)}
             className="text-xs border border-black/10 rounded-lg px-2 py-1.5 bg-white text-[#6B6B6B] focus:outline-none focus:border-[#FF5C00]">
@@ -255,6 +320,14 @@ export default function Agenda({ session }) {
         )}
         <button onClick={() => setSemanaBase(getLunes(new Date()))}
           className="px-2 py-1 text-xs border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">Hoy</button>
+        <div className="flex gap-1 bg-black/5 p-0.5 rounded-lg">
+          {[['timeline','⏱'],['mes','📅']].map(([v,ic]) => (
+            <button key={v} onClick={() => setVista(v)}
+              className={`px-2 py-1 text-xs rounded-md transition-all ${vista===v?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
+              {ic}
+            </button>
+          ))}
+        </div>
         <button onClick={() => setSemanaBase(d => { const n=new Date(d); n.setDate(n.getDate()+7); return n })}
           className="w-8 h-8 flex items-center justify-center border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">›</button>
       </div>
@@ -289,8 +362,18 @@ export default function Agenda({ session }) {
         </div>
       </div>
 
+      {/* VISTA MENSUAL */}
+      {vista === 'mes' && (
+        <VistaMensual
+          mesVista={mesVista} setMesVista={setMesVista}
+          sesiones={sesionesConRecurrentes} hoy={hoy}
+          abrirModalEnDia={abrirModalEnDia} setSesionDetalle={setSesionDetalle}
+          miembros={miembros} clienteColor={clienteColor}
+        />
+      )}
+
       {/* TIMELINE */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className={`flex-1 overflow-hidden flex flex-col ${vista === 'mes' ? 'hidden' : ''}`}>
         {/* Cabecera días */}
         <div className="bg-white border-b border-black/5 flex flex-shrink-0">
           <div className="w-12 flex-shrink-0" /> {/* espacio horas */}
