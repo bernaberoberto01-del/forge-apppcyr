@@ -162,6 +162,21 @@ export default function Clientes({ session }) {
     await cargar(); setDetalle(null)
   }
 
+  async function subirFoto(file, tipo) {
+    if (!file || !detalle) return
+    const ext = file.name.split('.').pop()
+    const path = `${uid}/${detalle.id}/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('progress-photos').upload(path, file)
+    if (error) return
+    const { data: { publicUrl } } = supabase.storage.from('progress-photos').getPublicUrl(path)
+    await supabase.from('fotos_progreso').insert({
+      entrenador_id: uid, cliente_id: detalle.id,
+      url: publicUrl, tipo, fecha: new Date().toISOString().split('T')[0],
+      peso: dData.checkins?.[0]?.peso || detalle.peso_actual
+    })
+    await abrirDetalle(detalle)
+  }
+
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen')
     const [{ data: ci }, { data: pg }, { data: se }, { data: ft }] = await Promise.all([
@@ -681,21 +696,6 @@ export default function Clientes({ session }) {
               )}
               {dTab==='fotos' && (() => {
                 const fotos = dData.fotos || []
-                const inputRef = { current: null }
-                async function subirFoto(file, tipo) {
-                  if (!file) return
-                  const ext = file.name.split('.').pop()
-                  const path = `${uid}/${detalle.id}/${Date.now()}.${ext}`
-                  const { error } = await supabase.storage.from('progress-photos').upload(path, file)
-                  if (error) return
-                  const { data: { publicUrl } } = supabase.storage.from('progress-photos').getPublicUrl(path)
-                  await supabase.from('fotos_progreso').insert({
-                    entrenador_id: uid, cliente_id: detalle.id,
-                    url: publicUrl, tipo, fecha: new Date().toISOString().split('T')[0],
-                    peso: dData.checkins?.[0]?.peso || detalle.peso_actual
-                  })
-                  await abrirDetalle(detalle)
-                }
                 const tiposVista = ['frontal','lateral','espalda']
                 return (
                   <div className="space-y-4">

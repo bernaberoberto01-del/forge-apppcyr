@@ -11,7 +11,6 @@ const TODOS_MODULOS = [
   { id: 'pagos', path: '/pagos', label: 'Pagos', icon: '💶' },
   { id: 'agenda', path: '/agenda', label: 'Agenda', icon: '📅' },
   { id: 'nutricion', path: '/nutricion', label: 'Nutrición', icon: '🥗' },
-  { id: 'centro', path: '/centro', label: 'Centro', icon: '🏋️' },
   { id: 'mensajes', path: '/mensajes', label: 'Mensajes', icon: '💬' },
 ]
 

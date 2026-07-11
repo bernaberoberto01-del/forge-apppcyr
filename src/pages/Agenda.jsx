@@ -332,34 +332,18 @@ export default function Agenda({ session }) {
           className="w-8 h-8 flex items-center justify-center border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">›</button>
       </div>
 
-      {/* Stats horas + acciones */}
-      <div className="bg-white border-b border-black/5 px-4 py-2 flex items-center gap-3 flex-shrink-0 overflow-x-auto">
-        <div className="flex gap-3 flex-shrink-0">
-          {[
-            [formatH(horasAutoSemana), 'sesiones sem.', '#FF5C00'],
-            [`${extraSemana}h`, 'extras sem.', '#6366f1'],
-            [`${(horasAutoMes/60 + extraMes).toFixed(1)}h`, 'total mes', '#10b981'],
-          ].map(([v,l,c])=>(
-            <div key={l} className="text-center">
-              <p className="text-sm font-bold" style={{color:c}}>{v}</p>
-              <p className="text-xs text-[#6B6B6B]">{l}</p>
-            </div>
-          ))}
-        </div>
-        <div className="ml-auto flex gap-1.5 flex-shrink-0">
-          <button onClick={() => setModalResumen(true)}
-            className="border border-black/10 text-xs font-medium px-2.5 py-1.5 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">⏱</button>
+      {/* Acciones */}
+      <div className="bg-white border-b border-black/5 px-4 py-2 flex items-center gap-2 flex-shrink-0 justify-between">
+        <div className="flex gap-1.5">
           <button onClick={() => setModalGestionRec(true)}
             className="border border-[#6366f1]/30 text-[#6366f1] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-[#6366f1]/5">
-            🔄 {recurrentes.length}
+            🔄 Recurrentes {recurrentes.length > 0 ? `(${recurrentes.length})` : ''}
           </button>
-          <button onClick={() => setModalExtra(true)}
-            className="border border-black/10 text-xs font-medium px-2.5 py-1.5 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">+ Extra</button>
           <button onClick={() => setModalRecurrente(true)}
-            className="border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-[#FF5C00]/5">↻ Recurrente</button>
-          <button onClick={() => { setDiaClick(hoy); setModal(true) }}
-            className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg">+ Sesión</button>
+            className="border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-[#FF5C00]/5">↻ Nueva regla</button>
         </div>
+        <button onClick={() => { setDiaClick(hoy); setModal(true) }}
+          className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg">+ Sesión</button>
       </div>
 
       {/* VISTA MENSUAL */}

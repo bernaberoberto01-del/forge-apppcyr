@@ -2,6 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 
+const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
+
 function Toast({ msg, tipo='ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
   return (
@@ -38,6 +41,7 @@ export default function Pagos({ session }) {
   const [form, setForm] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: new Date().toISOString().split('T')[0], periodo:'' })
   const [formPlan, setFormPlan] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', frecuencia:'mensual', dia_cobro:1 })
   const [loading, setLoading] = useState(false)
+  const [generandoStripe, setGenerandoStripe] = useState(null)
   const uid = session.user.id
 
   function generarRecibo(pago) {
@@ -186,6 +190,23 @@ export default function Pagos({ session }) {
     await cargar()
   }
 
+  async function generarEnlaceStripe(clienteId, importe, concepto) {
+    setGenerandoStripe(clienteId)
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/crear-checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+        body: JSON.stringify({ cliente_id: clienteId, importe: Number(importe), concepto })
+      })
+      const data = await res.json()
+      if (data.url) {
+        await navigator.clipboard.writeText(data.url)
+        setToast('Enlace Stripe copiado')
+      } else setToast('Error al generar enlace Stripe')
+    } catch { setToast('Error al generar enlace') }
+    setGenerandoStripe(null)
+  }
+
   const ingresosMes = useMemo(() => {
     const mes = new Date().toISOString().slice(0,7)
     return pagos.filter(p => p.fecha_pago?.startsWith(mes)).reduce((s,p) => s+Number(p.importe||0), 0)
@@ -317,10 +338,14 @@ export default function Pagos({ session }) {
                   </p>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={() => marcarCobrado(p)} className="flex-1 bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg">✓ Marcar cobrado</button>
+                  <button onClick={() => marcarCobrado(p)} className="flex-1 bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg">✓ Cobrado</button>
+                  <button onClick={() => generarEnlaceStripe(p.cliente_id, p.importe, p.concepto)} disabled={generandoStripe===p.cliente_id}
+                    className="border border-[#6B6B6B]/20 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40">
+                    {generandoStripe===p.cliente_id?'⏳':'💳'}
+                  </button>
                   <button onClick={() => { setEditandoPlan(p); setFormPlan({ cliente_id:p.cliente_id, importe:String(p.importe), concepto:p.concepto, frecuencia:p.frecuencia, dia_cobro:p.dia_cobro }); setModalPlan(true) }}
-                    className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-lg hover:bg-[#F5F5F0]">✏️</button>
-                  <button onClick={() => eliminarPlan(p.id)} className="border border-red-100 text-red-400 text-xs py-2 px-3 rounded-lg hover:bg-red-50">×</button>
+                    className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0]">✏️</button>
+                  <button onClick={() => eliminarPlan(p.id)} className="border border-red-100 text-red-400 text-xs py-2 px-2.5 rounded-lg hover:bg-red-50">×</button>
                 </div>
               </div>
             )
