@@ -26,7 +26,6 @@ export default function PortalCliente() {
   const [diaActivoNutr, setDiaActivoNutr] = useState(0)
   const [pinIntroducido, setPinIntroducido] = useState('')
   const [pinValido, setPinValido] = useState(false)
-  const [pinError, setPinError] = useState(false)
   const [clientePin, setClientePin] = useState(null)
   const [biblioteca, setBiblioteca] = useState([])
   const [videoEj, setVideoEj] = useState(null)
