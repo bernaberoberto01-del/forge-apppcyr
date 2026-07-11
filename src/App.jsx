@@ -24,6 +24,9 @@ import ProgresoCliente from './pages/ProgresoCliente'
 import CheckinPublico from './pages/CheckinPublico'
 import NotFound from './pages/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
+import AdminCentro from './pages/AdminCentro'
+import UnirseACentro from './pages/UnirseACentro'
+import { CentroProvider } from './hooks/useCentro.jsx'
 
 function Protected({ session, children }) {
   if (!session) return <Navigate to="/login" replace />
@@ -59,11 +62,13 @@ function AppInner({ session }) {
         <Route path="/seguimiento" element={<Wrap><Seguimiento session={session} /></Wrap>} />
         <Route path="/pagos" element={<Wrap><Pagos session={session} /></Wrap>} />
         <Route path="/agenda" element={<Wrap><Agenda session={session} /></Wrap>} />
+        <Route path="/centro" element={<Wrap><AdminCentro session={session} /></Wrap>} />
         <Route path="/biblioteca" element={<Wrap><Biblioteca session={session} /></Wrap>} />
         <Route path="/nutricion" element={<Wrap><Nutricion session={session} /></Wrap>} />
         <Route path="/mensajes" element={<Wrap><Mensajes session={session} /></Wrap>} />
         <Route path="/configuracion" element={<Wrap><Configuracion session={session} onConfigChange={actualizar} /></Wrap>} />
         {/* Rutas públicas cliente */}
+        <Route path="/unirse/:token" element={<UnirseACentro />} />
         <Route path="/nutricion-cuest" element={<NutricionCuestionario />} />
         <Route path="/registro" element={<RegistroCliente />} />
         <Route path="/portal/:clienteId" element={<PortalCliente />} />
@@ -91,5 +96,5 @@ export default function App() {
     </div>
   )
 
-  return <ErrorBoundary><BrowserRouter><AppInner session={session} /></BrowserRouter></ErrorBoundary>
+  return <ErrorBoundary><BrowserRouter><CentroProvider session={session}><AppInner session={session} /></CentroProvider></BrowserRouter></ErrorBoundary>
 }

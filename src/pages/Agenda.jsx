@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
+import { useCentro } from '../hooks/useCentro.jsx'
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -59,6 +60,8 @@ export default function Agenda({ session }) {
   const [formRec, setFormRec] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin:'', notas:'' })
   const [formExtra, setFormExtra] = useState({ fecha: new Date().toISOString().split('T')[0], concepto:'', horas:'1', tipo:'desplazamiento' })
   const [loading, setLoading] = useState(false)
+  const [filtroEntrenador, setFiltroEntrenador] = useState('todos')
+  const { centro, miembros, esAdmin } = useCentro() || {}
   const timelineRef = useRef()
   const uid = session.user.id
 
@@ -81,7 +84,9 @@ export default function Agenda({ session }) {
   async function cargar() {
     const hace60 = new Date(Date.now() - 60*864e5).toISOString().split('T')[0]
     const [{ data: se }, { data: cl }, { data: he }, { data: rc }] = await Promise.all([
-      supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha').order('hora'),
+      centro
+        ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).gte('fecha', hace60).order('fecha').order('hora')
+        : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha').order('hora'),
       supabase.from('clientes').select('id,nombre,tipo,horas_semana').eq('entrenador_id', uid).eq('estado','activo'),
       supabase.from('horas_extra').select('*').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha', { ascending: false }),
       supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activa', true),
@@ -241,6 +246,13 @@ export default function Agenda({ session }) {
           </p>
           <p className="text-xs text-[#6B6B6B]">{sesionesSemana.length} sesiones · {sesCompletadasSemana.length} completadas</p>
         </div>
+        {centro && miembros?.length > 1 && (
+          <select value={filtroEntrenador} onChange={e => setFiltroEntrenador(e.target.value)}
+            className="text-xs border border-black/10 rounded-lg px-2 py-1.5 bg-white text-[#6B6B6B] focus:outline-none focus:border-[#FF5C00]">
+            <option value="todos">Todos</option>
+            {miembros.map(m => <option key={m.id} value={m.user_id}>{m.nombre||m.email?.split('@')[0]}</option>)}
+          </select>
+        )}
         <button onClick={() => setSemanaBase(getLunes(new Date()))}
           className="px-2 py-1 text-xs border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">Hoy</button>
         <button onClick={() => setSemanaBase(d => { const n=new Date(d); n.setDate(n.getDate()+7); return n })}
@@ -343,7 +355,8 @@ export default function Agenda({ session }) {
                     const top = (horaMin / 60 - HORA_INICIO) * PIXELS_POR_HORA
                     const durMin = s.duracion_minutos || 60
                     const height = Math.max((durMin / 60) * PIXELS_POR_HORA - 4, 24)
-                    const color = clienteColor(s.cliente_id)
+                    const entrenadorMiembro = miembros?.find(m => m.user_id === s.entrenador_id)
+                    const color = entrenadorMiembro ? (entrenadorMiembro.color || clienteColor(s.cliente_id)) : clienteColor(s.cliente_id)
                     const esVirtual = s._esVirtual
 
                     return (
