@@ -582,7 +582,7 @@ export default function Clientes({ session }) {
               </div>
               <div className="flex gap-1 overflow-x-auto">
                 {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos']].map(([id,label]) => (
-                  <button key={t} onClick={() => setDTab(t)}
+                  <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
                   </button>

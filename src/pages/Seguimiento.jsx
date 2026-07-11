@@ -37,10 +37,14 @@ export default function Seguimiento({ session }) {
   const [loading, setLoading] = useState(false)
   const [filtroCliente, setFiltroCliente] = useState('todos')
   const uid = session.user.id
+  const [tabPrincipal, setTabPrincipal] = useState('checkins') // checkins | sesiones
   const [busqueda, setBusqueda] = useState('')
   const [filtroAlerta, setFiltroAlerta] = useState('todos')
   const [detalleCI, setDetalleCI] = useState(null)
   const [quickView, setQuickView] = useState(null)
+  const [sesiones, setSesiones] = useState([])
+  const [detalleSesion, setDetalleSesion] = useState(null)
+  const [busquedaSes, setBusquedaSes] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [toast, setToast] = useState('')
 
@@ -167,6 +171,19 @@ export default function Seguimiento({ session }) {
         ))}
       </div>
 
+      {/* Tabs principales */}
+      <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-4">
+        <button onClick={() => setTabPrincipal('checkins')}
+          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${tabPrincipal==='checkins'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
+          📋 Check-ins ({checkins.length})
+        </button>
+        <button onClick={() => setTabPrincipal('sesiones')}
+          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${tabPrincipal==='sesiones'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
+          🏋️ Sesiones ({sesiones.length})
+        </button>
+      </div>
+
+      {tabPrincipal === 'checkins' && <>
       {/* Buscador */}
       <div className="relative mb-3">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
@@ -384,6 +401,119 @@ export default function Seguimiento({ session }) {
                   Cerrar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      </> }
+
+      {/* TAB SESIONES */}
+      {tabPrincipal === 'sesiones' && (
+        <div>
+          <div className="relative mb-3">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
+            <input value={busquedaSes} onChange={e => setBusquedaSes(e.target.value)}
+              placeholder="Buscar por cliente..."
+              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+          </div>
+          <div className="space-y-2">
+            {sesiones
+              .filter(s => !busquedaSes || s.clientes?.nombre?.toLowerCase().includes(busquedaSes.toLowerCase()))
+              .map(s => {
+                const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+                return (
+                  <div key={s.id} onClick={() => setDetalleSesion(s)}
+                    className="bg-white rounded-xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-sm flex-shrink-0">
+                        {ini(s.clientes?.nombre)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <button onClick={e => { e.stopPropagation(); setQuickView(s.cliente_id) }}
+                          className="text-sm font-semibold text-[#0A0A0A] hover:text-[#FF5C00] truncate block text-left">
+                          {s.clientes?.nombre}
+                        </button>
+                        <p className="text-xs text-[#6B6B6B]">
+                          {new Date(s.fecha).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}
+                          {s.hora ? ` · ${s.hora}` : ''} · {s.tipo}
+                          {s.duracion_minutos ? ` · ${s.duracion_minutos}min` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {s.rpe && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">RPE {s.rpe}</span>}
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.completada?'bg-emerald-50 text-emerald-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                          {s.completada ? '✓' : 'Pendiente'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            {sesiones.length === 0 && (
+              <div className="bg-white rounded-2xl border border-black/5 p-8 text-center">
+                <p className="text-3xl mb-2">🏋️</p>
+                <p className="text-sm font-semibold text-[#0A0A0A]">Sin sesiones registradas</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal detalle sesión */}
+      {detalleSesion && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
+              <div>
+                <button onClick={() => { setQuickView(detalleSesion.cliente_id); setDetalleSesion(null) }}
+                  className="font-bold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors">
+                  {detalleSesion.clientes?.nombre}
+                </button>
+                <p className="text-xs text-[#6B6B6B]">
+                  {new Date(detalleSesion.fecha).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
+                </p>
+              </div>
+              <button onClick={() => setDetalleSesion(null)} className="text-[#6B6B6B] text-xl">×</button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  ['RPE', detalleSesion.rpe ? `${detalleSesion.rpe}/10` : '—', '#FF5C00'],
+                  ['Fatiga', detalleSesion.fatiga_post ? `${detalleSesion.fatiga_post}/5` : '—', detalleSesion.fatiga_post >= 4 ? '#ef4444' : '#10b981'],
+                  ['Duración', detalleSesion.duracion_minutos ? `${detalleSesion.duracion_minutos}min` : '—', '#6B6B6B'],
+                ].map(([l,v,col]) => (
+                  <div key={l} className="bg-[#F5F5F0] rounded-xl p-3 text-center">
+                    <p className="text-lg font-bold" style={{color:col}}>{v}</p>
+                    <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
+                  </div>
+                ))}
+              </div>
+              {(detalleSesion.ejercicios||[]).length > 0 && (
+                <div>
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">Ejercicios</p>
+                  <div className="space-y-2">
+                    {detalleSesion.ejercicios.map((ej, i) => (
+                      <div key={i} className="border border-black/5 rounded-xl p-3">
+                        <p className="text-sm font-semibold text-[#0A0A0A] mb-2">{ej.ejercicio_nombre}</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {(ej.sets||[]).map((s,j) => (
+                            <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${s.completado?'bg-emerald-50 text-emerald-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                              {s.peso?`${s.peso}kg`:'—'} × {s.reps||'—'}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {detalleSesion.sensaciones && (
+                <div className="bg-amber-50 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-amber-700 mb-1">Sensaciones</p>
+                  <p className="text-sm text-amber-800">{detalleSesion.sensaciones}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

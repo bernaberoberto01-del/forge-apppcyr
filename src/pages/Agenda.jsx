@@ -303,14 +303,7 @@ export default function Agenda({ session }) {
           </p>
           <p className="text-xs text-[#6B6B6B]">{sesionesSemana.length} sesiones · {sesCompletadasSemana.length} completadas</p>
         </div>
-        <div className="flex gap-1 bg-black/5 p-1 rounded-lg flex-shrink-0">
-          {[['timeline','📅'],['mes','🗓']].map(([v,l])=>(
-            <button key={v} onClick={() => setVista(v)}
-              className={`px-2 py-1 rounded text-xs font-medium transition-all ${vista===v?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
-              {l}
-            </button>
-          ))}
-        </div>
+
         {centro && miembros?.length > 1 && (
           <select value={filtroEntrenador} onChange={e => setFiltroEntrenador(e.target.value)}
             className="text-xs border border-black/10 rounded-lg px-2 py-1.5 bg-white text-[#6B6B6B] focus:outline-none focus:border-[#FF5C00]">
