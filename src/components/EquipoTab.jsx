@@ -177,7 +177,24 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
                   <p className="text-xs text-[#6B6B6B]">{st.clientes||0} clientes · {st.sesiones||0} sesiones/mes</p>
                 </div>
                 {esAdmin && !esYo && (
-                  <button onClick={()=>eliminarMiembro(m.id)} className="text-[#6B6B6B] hover:text-red-500 text-xl">×</button>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    <button onClick={async () => {
+                      // Buscar invitación activa o crear una nueva
+                      const { data: invExist } = await supabase
+                        .from('invitaciones_centro').select('token')
+                        .eq('centro_id', centro.id).eq('email', m.email).eq('usado', false).limit(1).maybeSingle()
+                      const token = invExist?.token || (await supabase.from('invitaciones_centro').insert({
+                        centro_id: centro.id, email: m.email, rol: m.rol
+                      }).select('token').single().then(r => r.data?.token))
+                      if (token) {
+                        await navigator.clipboard.writeText(`${window.location.origin}/unirse/${token}`)
+                        showToast('Enlace de acceso copiado')
+                      }
+                    }} className="text-[#6B6B6B] hover:text-[#FF5C00] text-sm border border-black/10 rounded-lg px-2.5 py-1.5 transition-colors" title="Copiar enlace">
+                      🔗
+                    </button>
+                    <button onClick={()=>eliminarMiembro(m.id)} className="text-[#6B6B6B] hover:text-red-500 text-xl">×</button>
+                  </div>
                 )}
               </div>
 
