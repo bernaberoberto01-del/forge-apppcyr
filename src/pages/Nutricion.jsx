@@ -405,6 +405,20 @@ export default function Nutricion({ session }) {
                 </div>
               )}
 
+              {(detalle.borrador?.recomendaciones || detalle.contenido?.recomendaciones)?.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-wide mb-2">Recomendaciones y hábitos</p>
+                  <div className="space-y-2">
+                    {(detalle.borrador?.recomendaciones || detalle.contenido?.recomendaciones).map((rec, i) => (
+                      <div key={i} className="flex items-start gap-2.5 bg-[#F5F5F0] rounded-xl p-3">
+                        <span className="text-sm flex-shrink-0">{['💧','🕐','💪','😴','⚡'][i] || '→'}</span>
+                        <p className="text-xs text-[#444] leading-relaxed">{rec}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Notas entrenador */}
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas para el cliente</label>
