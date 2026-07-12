@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useCentro } from '../hooks/useCentro.jsx'
 import ClienteQuickView from '../components/ClienteQuickView'
 import EjercicioInput from '../components/EjercicioInput'
 
@@ -78,6 +79,7 @@ export default function Rutinas({ session }) {
   const [toast, setToast] = useState('')
   const [quickView, setQuickView] = useState(null)
   const [plantillas, setPlantillas] = useState([])
+  const [plantillasCentro, setPlantillasCentro] = useState([])
   const [modalPlantillas, setModalPlantillas] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('activas')
@@ -90,6 +92,7 @@ export default function Rutinas({ session }) {
   const [modalNuevoEj, setModalNuevoEj] = useState(false)
   const [formEj, setFormEj] = useState({ nombre:'', sinonimos:'', grupo_muscular:'Pecho', grupo_secundario:'', patron:'empuje_horizontal', nivel:'principiante', modalidad:'fuerza', consejos_tecnica:'', youtube_url:'' })
   const uid = session.user.id
+  const { centro } = useCentro() || {}
 
   useEffect(() => { cargar() }, [uid])
 

@@ -20,6 +20,7 @@ import Mensajes from './pages/Mensajes'
 import Nutricion from './pages/Nutricion'
 import Biblioteca from './pages/Biblioteca'
 import AdminCentro from './pages/AdminCentro'
+import ImportarDatos from './pages/ImportarDatos'
 import NotFound from './pages/NotFound'
 
 // Páginas públicas (sin sesión)
@@ -58,6 +59,7 @@ function AppPrivada({ session }) {
             <Route path="/mensajes" element={<Mensajes session={session} />} />
             <Route path="/biblioteca" element={<Biblioteca session={session} />} />
             <Route path="/centro" element={<AdminCentro session={session} />} />
+            <Route path="/importar" element={<ImportarDatos session={session} />} />
             <Route path="/configuracion" element={<Configuracion session={session} onConfigChange={actualizar} />} />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFound />} />
