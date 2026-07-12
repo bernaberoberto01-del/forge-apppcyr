@@ -31,6 +31,7 @@ import CheckinPublico from './pages/CheckinPublico'
 import SesionCliente from './pages/SesionCliente'
 import ProgresoCliente from './pages/ProgresoCliente'
 import UnirseACentro from './pages/UnirseACentro'
+import SetupDemo from './pages/SetupDemo'
 
 // Rutas privadas con layout
 function AppPrivada({ session }) {
@@ -100,6 +101,7 @@ export default function App() {
           <Route path="/unirse/:token" element={<UnirseACentro />} />
 
           {/* ── LOGIN ── */}
+          <Route path="/setup-demo" element={<SetupDemo />} />
           <Route path="/login" element={
             session ? <Navigate to="/dashboard" replace /> : <Login />
           } />
