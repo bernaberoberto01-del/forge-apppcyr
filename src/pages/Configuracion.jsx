@@ -48,6 +48,7 @@ export default function Configuracion({ session, onConfigChange }) {
   const [subiendoFoto, setSubiendoFoto] = useState(false)
   const fotoRef = useRef()
   const [toast, setToast] = useState(null)
+  const showToast = (msg, tipo = 'ok') => setToast({ msg, tipo })
   const [tab, setTab] = useState('perfil')
   const uid = session.user.id
   const centroCtx = useCentro()
