@@ -110,9 +110,10 @@ export default function PortalCliente() {
     { id: 'inicio', label: 'Inicio', icon: '🏠' },
     { id: 'rutina', label: 'Rutina', icon: '💪' },
     { id: 'progreso', label: 'Progreso', icon: '📈' },
-    { id: 'mensajes', label: mensajesNoLeidos > 0 ? `Msgs(${mensajesNoLeidos})` : 'Mensajes', icon: mensajesNoLeidos > 0 ? '🔴' : '✉️' },
+    { id: 'mensajes', label: 'Mensajes', icon: '✉️', badge: mensajesNoLeidos > 0 ? mensajesNoLeidos : 0 },
     ...(planNutricion || cliente?.nutricion_activa ? [{ id: 'nutricion', label: 'Nutrición', icon: '🥗' }] : []),
     ...(fotos.length > 0 ? [{ id: 'fotos', label: 'Fotos', icon: '📸' }] : []),
+    ...(pagos.length > 0 ? [{ id: 'pagos_cliente', label: 'Pagos', icon: '💳' }] : []),
   ]
 
   async function cancelarSesion(sesionId) {
@@ -441,10 +442,56 @@ export default function PortalCliente() {
         {/* PROGRESO */}
         {tab==='progreso' && (
           <>
+            {/* Resumen de progreso visual */}
+            {checkins.length >= 2 && (() => {
+              const ultimo = checkins[0]
+              const primero = checkins[checkins.length - 1]
+              const diffPeso = ultimo.peso && primero.peso ? (ultimo.peso - primero.peso) : null
+              const diffSemanas = Math.ceil((new Date(ultimo.fecha) - new Date(primero.fecha)) / (7*864e5))
+              const bajando = diffPeso !== null && diffPeso < 0
+              const subiendo = diffPeso !== null && diffPeso > 0
+              return (
+                <div className="bg-[#111] rounded-2xl p-5">
+                  <p className="text-white/60 text-xs mb-3">Tu progreso — últimas {diffSemanas} semanas</p>
+                  {diffPeso !== null && (
+                    <div className="flex items-end gap-3 mb-4">
+                      <div>
+                        <p className="text-4xl font-bold" style={{color: bajando ? '#10b981' : subiendo ? '#6366f1' : '#fff'}}>
+                          {bajando ? '' : '+'}{diffPeso.toFixed(1)}kg
+                        </p>
+                        <p className="text-white/50 text-xs mt-1">
+                          {primero.peso}kg → {ultimo.peso}kg
+                        </p>
+                      </div>
+                      <div className="flex-1 flex items-end gap-0.5 h-12 pb-1">
+                        {checkins.slice().reverse().filter(ci=>ci.peso).map((ci,i,arr) => {
+                          const min = Math.min(...arr.map(c=>c.peso))
+                          const max = Math.max(...arr.map(c=>c.peso))
+                          const h = max===min ? 50 : ((ci.peso-min)/(max-min))*80+20
+                          return <div key={ci.id} className="flex-1 rounded-sm opacity-60" style={{height:`${h}%`,background:'#FF5C00'}}/>
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      ['⚡', 'Energía media', checkins.filter(c=>c.energia).reduce((s,c)=>s+c.energia,0)/checkins.filter(c=>c.energia).length, '/10'],
+                      ['💪', 'Adherencia media', checkins.filter(c=>c.adherencia_entreno).reduce((s,c)=>s+c.adherencia_entreno,0)/checkins.filter(c=>c.adherencia_entreno).length, '/10'],
+                      ['📅', 'Check-ins totales', checkins.length, ''],
+                    ].map(([icon,label,val,suf]) => (
+                      <div key={label} className="bg-white/5 rounded-xl p-2.5 text-center">
+                        <p className="text-base">{icon}</p>
+                        <p className="text-white text-sm font-bold mt-0.5">{typeof val === 'number' ? val.toFixed(1) : val}{suf}</p>
+                        <p className="text-white/40 text-xs mt-0.5 leading-tight">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
               <GraficasCliente clienteId={clienteId} />
             </div>
-            {/* Historial check-ins */}
             {checkins.length > 0 && (
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
                 <p className="text-sm font-bold text-[#0A0A0A] mb-3">Historial de seguimientos</p>
@@ -526,6 +573,61 @@ export default function PortalCliente() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Tab pagos del cliente */}
+        {tab==='pagos_cliente' && (
+          <div className="space-y-3">
+            <div className="bg-[#111] rounded-2xl p-4">
+              <p className="text-white font-bold mb-1">Tus pagos 💳</p>
+              <p className="text-white/50 text-xs">Historial de pagos registrados</p>
+            </div>
+            {/* Estado de suscripción */}
+            {(() => {
+              const ultimo = pagos[0]
+              if (!ultimo) return null
+              const vence = new Date(ultimo.valido_hasta || ultimo.fecha_pago)
+              vence.setMonth(vence.getMonth() + 1)
+              const diasRestantes = Math.ceil((vence - new Date()) / 864e5)
+              return (
+                <div className={`rounded-2xl p-4 ${diasRestantes > 7 ? 'bg-emerald-50 border border-emerald-100' : 'bg-red-50 border border-red-100'}`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{diasRestantes > 7 ? '✅' : '⚠️'}</span>
+                    <div>
+                      <p className={`text-sm font-bold ${diasRestantes > 7 ? 'text-emerald-800' : 'text-red-800'}`}>
+                        {diasRestantes > 7 ? 'Suscripción al día' : diasRestantes > 0 ? `Vence en ${diasRestantes} días` : 'Pago vencido'}
+                      </p>
+                      <p className={`text-xs ${diasRestantes > 7 ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {ultimo.concepto} · {Number(ultimo.importe).toFixed(0)}€/mes
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
+            {/* Historial */}
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+              {pagos.map((p, i) => (
+                <div key={p.id} className={`flex items-center gap-3 px-4 py-3 ${i > 0 ? 'border-t border-black/5' : ''}`}>
+                  <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-emerald-600 text-sm">✓</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[#0A0A0A] truncate">{p.concepto || 'Entrenamiento'}</p>
+                    <p className="text-xs text-[#6B6B6B]">
+                      {new Date(p.fecha_pago + 'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-600 flex-shrink-0">+{Number(p.importe).toFixed(0)}€</p>
+                </div>
+              ))}
+              {pagos.length === 0 && (
+                <div className="p-6 text-center">
+                  <p className="text-sm text-[#6B6B6B]">Sin pagos registrados todavía</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
         {/* Modal vídeo ejercicio */}

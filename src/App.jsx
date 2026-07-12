@@ -11,7 +11,6 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
 import Rutinas from './pages/Rutinas'
-import Sesiones from './pages/Sesiones'
 import Seguimiento from './pages/Seguimiento'
 import Pagos from './pages/Pagos'
 import Agenda from './pages/Agenda'
@@ -52,7 +51,6 @@ function AppPrivada({ session }) {
             <Route path="/dashboard" element={<Dashboard session={session} />} />
             <Route path="/clientes" element={<Clientes session={session} />} />
             <Route path="/rutinas" element={<Rutinas session={session} />} />
-            <Route path="/sesiones" element={<Sesiones session={session} />} />
             <Route path="/seguimiento" element={<Seguimiento session={session} />} />
             <Route path="/pagos" element={<Pagos session={session} />} />
             <Route path="/agenda" element={<Agenda session={session} />} />

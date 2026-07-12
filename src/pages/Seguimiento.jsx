@@ -74,7 +74,7 @@ export default function Seguimiento({ session }) {
   async function reenviarCheckin() {
     setEnviando(true)
     try {
-      await fetch(`${SUPABASE_URL}/functions/v1/checkin-semanal`, {
+      await fetch(`${SUPABASE_URL}/functions/v1/check-in-semanal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` }
       })

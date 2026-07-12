@@ -32,6 +32,7 @@ function BarChart({ datos, max }) {
 export default function Dashboard({ session }) {
   const [datos, setDatos] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [sesionesHoy, setSesionesHoy] = useState([])
   const navigate = useNavigate()
   const uid = session.user.id
 
@@ -59,6 +60,10 @@ export default function Dashboard({ session }) {
 
     const activos = (clientes||[]).filter(c => c.estado === 'activo')
     const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
+    // Sesiones de hoy con datos de cliente
+    const { data: sesHoy } = await supabase.from('sesiones').select('*, clientes(nombre,tipo)')
+      .eq('entrenador_id', uid).eq('fecha', hoy).eq('cancelada', false).order('hora')
+    setSesionesHoy(sesHoy || [])
     const sesioneHoy = (sesiones||[]).filter(s => s.fecha === hoy.toISOString().split('T')[0])
     
     // Adherencia: media de check-ins de últimas 4 semanas
@@ -139,6 +144,36 @@ export default function Dashboard({ session }) {
           </button>
         ))}
       </div>
+
+      {/* Sesiones de hoy */}
+      {sesionesHoy.length > 0 && (
+        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-bold text-[#0A0A0A]">Hoy — {sesionesHoy.length} sesiones</p>
+            <button onClick={() => navigate('/agenda')} className="text-xs text-[#FF5C00] font-medium">Ver agenda →</button>
+          </div>
+          <div className="space-y-2">
+            {sesionesHoy.map(s => {
+              const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+              return (
+                <div key={s.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${s.completada ? 'bg-emerald-50 border border-emerald-100' : 'bg-[#F5F5F0]'}`}>
+                  <div className="w-8 h-8 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">
+                    {ini(s.clientes?.nombre)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre}</p>
+                    <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos||60}min · {s.tipo}</p>
+                  </div>
+                  {s.completada
+                    ? <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium flex-shrink-0">✓ Hecha</span>
+                    : <span className="text-xs bg-white border border-black/10 text-[#6B6B6B] px-2 py-1 rounded-full flex-shrink-0">{s.hora}</span>
+                  }
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Gráfica ingresos */}
       <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">

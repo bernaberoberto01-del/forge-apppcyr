@@ -6,7 +6,7 @@ const TODOS_MODULOS = [
   { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'clientes', path: '/clientes', label: 'Clientes', icon: '👥' },
   { id: 'rutinas', path: '/rutinas', label: 'Rutinas', icon: '💪' },
-  { id: 'seguimiento', path: '/seguimiento', label: 'Seguimiento', icon: '📊' },
+  { id: 'seguimiento', path: '/seguimiento', label: 'Seguimiento', icon: '📋' },
   { id: 'pagos', path: '/pagos', label: 'Pagos', icon: '💶' },
   { id: 'agenda', path: '/agenda', label: 'Agenda', icon: '📅' },
   { id: 'nutricion', path: '/nutricion', label: 'Nutrición', icon: '🥗' },
