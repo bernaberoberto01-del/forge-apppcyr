@@ -20,6 +20,7 @@ import Nutricion from './pages/Nutricion'
 import Biblioteca from './pages/Biblioteca'
 import AdminCentro from './pages/AdminCentro'
 import ImportarDatos from './pages/ImportarDatos'
+import PortalEntrenador from './pages/PortalEntrenador'
 import NotFound from './pages/NotFound'
 
 // Páginas públicas (sin sesión)
@@ -42,6 +43,12 @@ function AppPrivada({ session }) {
         style={{ borderColor: 'var(--acento)', borderTopColor: 'transparent' }} />
     </div>
   )
+
+  // Si es entrenador de centro (tiene config de otro) → portal entrenador
+  // Solo va al portal si NO tiene config propia (no es owner/admin)
+  if (!config?.nombre_negocio && window.location.pathname === '/') {
+    return <Navigate to="/portal-entrenador" replace />
+  }
 
   return (
     <ConfigContext.Provider value={config}>
@@ -67,6 +74,12 @@ function AppPrivada({ session }) {
       </CentroProvider>
     </ConfigContext.Provider>
   )
+}
+
+// Ruta portal entrenador — redirige a app completa si es admin/owner
+function PortalEntrenadorRoute({ session }) {
+  if (!session) return <Navigate to="/login" replace />
+  return <PortalEntrenador session={session} />
 }
 
 export default function App() {
@@ -96,6 +109,7 @@ export default function App() {
           <Route path="/seguimiento/:clienteId" element={<CheckinPublico />} />
           <Route path="/sesion/:clienteId" element={<SesionCliente />} />
           <Route path="/progreso/:clienteId" element={<ProgresoCliente />} />
+          <Route path="/portal-entrenador" element={<PortalEntrenadorRoute session={session} />} />
           <Route path="/unirse/:token" element={<UnirseACentro />} />
 
           {/* ── LOGIN ── */}

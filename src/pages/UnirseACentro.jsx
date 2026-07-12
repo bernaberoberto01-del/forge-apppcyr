@@ -49,7 +49,7 @@ export default function UnirseACentro() {
     await supabase.from('invitaciones_centro').update({ usado: true }).eq('id', inv.id)
 
     setEstado('exito')
-    setTimeout(() => window.location.href = '/', 2000)
+    setTimeout(() => window.location.href = '/portal-entrenador', 2000)
     setLoading(false)
   }
 
