@@ -241,15 +241,14 @@ export default function Clientes({ session }) {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: 'Activos', value: stats.activos, color: '#FF5C00', filtro: 'activos' },
-          { label: 'Ingresos mes', value: `${stats.ingresos}€`, color: '#10b981', filtro: null },
           { label: 'Sin seguimiento', value: stats.sinCI, color: '#f59e0b', filtro: 'sinCI' },
           { label: 'Pago vencido', value: stats.vencidos, color: '#ef4444', filtro: 'vencidos' },
         ].map(s => (
           <div key={s.label} onClick={() => s.filtro && (setFiltroTipo(filtroTipo === s.filtro ? 'todos' : s.filtro), setPagina(1))}
-            className={`bg-white rounded-2xl border border-black/5 shadow-sm p-4 ${s.filtro ? 'cursor-pointer hover:shadow-md' : ''} transition-all`}>
+            className={`bg-white rounded-2xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md transition-all`}>
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
             <p className="text-xs text-[#6B6B6B] mt-1">{s.label}</p>
           </div>
