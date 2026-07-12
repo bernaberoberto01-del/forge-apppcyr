@@ -61,12 +61,14 @@ export default function Seguimiento({ session }) {
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
-    const [{ data: ci }, { data: cl }] = await Promise.all([
-      supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(100),
+    const [{ data: ci }, { data: cl }, { data: se }] = await Promise.all([
+      supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(200),
       supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
+      supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(300),
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
+    setSesiones(se || [])
   }
 
   async function reenviarCheckin() {

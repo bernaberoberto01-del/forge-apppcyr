@@ -15,22 +15,24 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
   useEffect(() => { if (centro && miembros?.length) cargarStats() }, [centro, miembros])
 
   async function cargarStats() {
+    if (!centro?.id) return
     const hace30 = new Date(Date.now()-30*864e5).toISOString().split('T')[0]
     const inicioSemana = (() => { const d=new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)); return d.toISOString().split('T')[0] })()
-    const [{ data: sesMes }, { data: sesSem }, { data: clientesData }, { data: extrasData }] = await Promise.all([
-      supabase.from('sesiones').select('entrenador_id,completada,duracion_minutos').eq('centro_id', centro.id).gte('fecha', hace30),
-      supabase.from('sesiones').select('entrenador_id,completada,duracion_minutos').eq('centro_id', centro.id).gte('fecha', inicioSemana),
-      supabase.from('clientes').select('entrenador_id,estado').eq('centro_id', centro.id),
-      supabase.from('horas_extra').select('entrenador_id,horas,fecha').gte('fecha', hace30),
+    
+    const [sesMesR, sesSemR, clientesR, extrasR] = await Promise.all([
+      supabase.from('sesiones').select('entrenador_id,completada,duracion_minutos').eq('centro_id', centro.id).gte('fecha', hace30).then(r=>r.data||[]).catch(()=>[]),
+      supabase.from('sesiones').select('entrenador_id,completada,duracion_minutos').eq('centro_id', centro.id).gte('fecha', inicioSemana).then(r=>r.data||[]).catch(()=>[]),
+      supabase.from('clientes').select('entrenador_id,estado').eq('centro_id', centro.id).then(r=>r.data||[]).catch(()=>[]),
+      supabase.from('horas_extra').select('entrenador_id,horas,fecha').eq('centro_id', centro.id).gte('fecha', hace30).then(r=>r.data||[]).catch(()=>[]),
     ])
     const stats = {}
     ;(miembros||[]).forEach(m => {
-      const mesC = (sesMes||[]).filter(s=>s.entrenador_id===m.user_id&&s.completada)
-      const semC = (sesSem||[]).filter(s=>s.entrenador_id===m.user_id&&s.completada)
+      const mesC = sesMesR.filter(s=>s.entrenador_id===m.user_id&&s.completada)
+      const semC = sesSemR.filter(s=>s.entrenador_id===m.user_id&&s.completada)
       const horasMes = mesC.reduce((s,x)=>s+(x.duracion_minutos||60),0)/60
       const horasSem = semC.reduce((s,x)=>s+(x.duracion_minutos||60),0)/60
-      const extrasMes = (extrasData||[]).filter(h=>h.entrenador_id===m.user_id).reduce((s,x)=>s+Number(x.horas),0)
-      const clientes = (clientesData||[]).filter(c=>c.entrenador_id===m.user_id&&c.estado==='activo').length
+      const extrasMes = extrasR.filter(h=>h.entrenador_id===m.user_id).reduce((s,x)=>s+Number(x.horas),0)
+      const clientes = clientesR.filter(c=>c.entrenador_id===m.user_id&&c.estado==='activo').length
       stats[m.user_id] = { horasMes: Math.round(horasMes*10)/10, horasSem: Math.round(horasSem*10)/10, extrasMes, clientes, sesiones: mesC.length }
     })
     setStatsEntrenadores(stats)
