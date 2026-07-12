@@ -72,7 +72,7 @@ export default function Nutricion({ session }) {
       })
       const data = await res.json()
       if (data.ok) { setToast({ msg: '✓ Plan nutricional generado — revísalo y publícalo' }); await cargar() }
-      else setToast({ msg: data.error || 'Error al generar', tipo: 'error' })
+      else setToast({ msg: (data.error || 'Error') + (data.detail ? ': ' + data.detail : '') + (data.preview ? ' | ' + data.preview : ''), tipo: 'error' })
     } catch (e) { setToast({ msg: e.message, tipo: 'error' }) }
     setGenerando(null)
   }
