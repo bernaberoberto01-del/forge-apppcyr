@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import EquipoTab from '../components/EquipoTab'
+import { useCentro } from '../hooks/useCentro.jsx'
 
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊', desc: 'Métricas, alertas y resumen general', obligatorio: true },
@@ -48,6 +50,7 @@ export default function Configuracion({ session, onConfigChange }) {
   const [toast, setToast] = useState(null)
   const [tab, setTab] = useState('perfil')
   const uid = session.user.id
+  const { centro, miembros, esAdmin, recargar: recargarCentro } = useCentro() || {}
 
   useEffect(() => { cargar() }, [uid])
 
@@ -136,7 +139,7 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-5">
-        {[['perfil', '👤 Perfil'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia']].map(([id, label]) => (
+        {[['perfil', '👤 Perfil'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['equipo', '🏋️ Equipo']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${tab === id ? 'bg-white shadow-sm text-[#0A0A0A]' : 'text-[#6B6B6B] hover:text-[#0A0A0A]'}`}>
             {label}
@@ -330,6 +333,18 @@ export default function Configuracion({ session, onConfigChange }) {
             <p className="text-xs text-[#6B6B6B]">⚠ El cambio de color se aplica globalmente después de guardar y recargar la página. La implementación completa de temas dinámicos estará en la próxima versión.</p>
           </div>
         </div>
+      )}
+
+      {tab === 'equipo' && (
+        <EquipoTab
+          centro={centro}
+          miembros={miembros}
+          esAdmin={esAdmin}
+          recargar={recargarCentro}
+          session={session}
+          uid={uid}
+          showToast={showToast}
+        />
       )}
     </div>
   )

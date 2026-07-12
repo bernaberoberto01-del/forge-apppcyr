@@ -110,6 +110,8 @@ export default function Agenda({ session }) {
   const [diaClick, setDiaClick] = useState(null)
   const [horaClick, setHoraClick] = useState('09:00')
   const [sesionDetalle, setSesionDetalle] = useState(null)
+  const [editando, setEditando] = useState(false)
+  const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState(null)
   const [form, setForm] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'' })
@@ -219,6 +221,22 @@ export default function Agenda({ session }) {
     else setToast({ msg: 'Sesión recurrente creada' })
     setModalRecurrente(false)
     setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin:'', notas:'' })
+    await cargar()
+    setLoading(false)
+  }
+
+  async function guardarEdicion() {
+    if (!sesionDetalle?.id) return
+    setLoading(true)
+    await supabase.from('sesiones').update({
+      hora: formEdit.hora,
+      duracion_minutos: Number(formEdit.duracion_minutos),
+      tipo: formEdit.tipo,
+      notas: formEdit.notas
+    }).eq('id', sesionDetalle.id)
+    setEditando(false)
+    setSesionDetalle(null)
+    setToast({ msg: 'Sesión actualizada' })
     await cargar()
     setLoading(false)
   }
@@ -472,7 +490,7 @@ export default function Agenda({ session }) {
                   {new Date(sesionDetalle.fecha).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
                 </p>
               </div>
-              <button onClick={() => setSesionDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
+              <button onClick={() => { setSesionDetalle(null); setEditando(false) }} className="text-[#6B6B6B] text-xl">×</button>
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-4">
