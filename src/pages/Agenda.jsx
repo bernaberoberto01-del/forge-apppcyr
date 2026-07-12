@@ -427,44 +427,74 @@ export default function Agenda({ session }) {
                     </div>
                   )}
 
-                  {/* Sesiones posicionadas */}
-                  {sesionesDia.map((s, idx) => {
-                    const horaMin = horaAMin(s.hora || '09:00')
-                    const top = (horaMin / 60 - HORA_INICIO) * PIXELS_POR_HORA
-                    const durMin = s.duracion_minutos || 60
-                    const height = Math.max((durMin / 60) * PIXELS_POR_HORA - 4, 24)
-                    const entrenadorMiembro = miembros?.find(m => m.user_id === s.entrenador_id)
-                    const color = entrenadorMiembro ? (entrenadorMiembro.color || clienteColor(s.cliente_id)) : clienteColor(s.cliente_id)
-                    const esVirtual = s._esVirtual
+                  {/* Sesiones posicionadas — con detección de solapamiento */}
+                  {(() => {
+                    // Calcular columnas para evitar solapamiento
+                    const sesOrdenadas = [...sesionesDia].sort((a,b) => horaAMin(a.hora||'09:00') - horaAMin(b.hora||'09:00'))
+                    const columnas = [] // array de arrays de sesiones
+                    
+                    for (const s of sesOrdenadas) {
+                      const ini = horaAMin(s.hora || '09:00')
+                      const fin = ini + (s.duracion_minutos || 60)
+                      // Buscar la primera columna donde no hay solapamiento
+                      let colocada = false
+                      for (const col of columnas) {
+                        const ultima = col[col.length - 1]
+                        const uIni = horaAMin(ultima.hora || '09:00')
+                        const uFin = uIni + (ultima.duracion_minutos || 60)
+                        if (ini >= uFin) { col.push(s); colocada = true; break }
+                      }
+                      if (!colocada) columnas.push([s])
+                    }
+                    
+                    const numCols = columnas.length || 1
+                    // Mapear sesión → (colIdx, totalCols)
+                    const sesMap = new Map()
+                    columnas.forEach((col, ci) => col.forEach(s => sesMap.set(s.id || s._key, { ci, numCols })))
 
-                    return (
-                      <div key={s.id || idx}
-                        onClick={e => { e.stopPropagation(); setSesionDetalle(s) }}
-                        className={`absolute left-1 right-1 rounded-lg px-2 py-1 cursor-pointer z-10 transition-all hover:brightness-95 ${s.completada ? 'opacity-60' : ''} ${esVirtual ? 'border-dashed border-2' : ''}`}
-                        style={{
-                          top: top + 2,
-                          height,
-                          background: esVirtual ? 'white' : color,
-                          borderColor: color,
-                          overflow: 'hidden'
-                        }}>
-                        <p className={`text-xs font-bold truncate leading-tight ${esVirtual ? '' : 'text-white'}`}
-                          style={esVirtual ? { color } : {}}>
-                          {s.clientes?.nombre?.split(' ')[0]}
-                        </p>
-                        {height > 30 && (
-                          <p className={`text-xs truncate ${esVirtual ? 'text-[#6B6B6B]' : 'text-white/80'}`}>
-                            {s.hora} · {durMin}min
+                    return sesionesDia.map((s, idx) => {
+                      const horaMin = horaAMin(s.hora || '09:00')
+                      const top = (horaMin / 60 - HORA_INICIO) * PIXELS_POR_HORA
+                      const durMin = s.duracion_minutos || 60
+                      const height = Math.max((durMin / 60) * PIXELS_POR_HORA - 4, 24)
+                      const entrenadorMiembro = miembros?.find(m => m.user_id === s.entrenador_id)
+                      const color = entrenadorMiembro ? (entrenadorMiembro.color || clienteColor(s.cliente_id)) : clienteColor(s.cliente_id)
+                      const esVirtual = s._esVirtual
+                      const { ci = 0, numCols: nc = 1 } = sesMap.get(s.id || s._key) || {}
+                      const ancho = 100 / nc
+                      const left = ancho * ci
+
+                      return (
+                        <div key={s.id || idx}
+                          onClick={e => { e.stopPropagation(); setSesionDetalle(s) }}
+                          className={`absolute rounded-lg px-1.5 py-1 cursor-pointer z-10 transition-all hover:brightness-95 ${s.completada ? 'opacity-60' : ''} ${esVirtual ? 'border-dashed border-2' : ''}`}
+                          style={{
+                            top: top + 2,
+                            height,
+                            left: `calc(${left}% + 2px)`,
+                            width: `calc(${ancho}% - 4px)`,
+                            background: esVirtual ? 'white' : color,
+                            borderColor: color,
+                            overflow: 'hidden'
+                          }}>
+                          <p className={`text-xs font-bold truncate leading-tight ${esVirtual ? '' : 'text-white'}`}
+                            style={esVirtual ? { color } : {}}>
+                            {s.clientes?.nombre?.split(' ')[0]}
                           </p>
-                        )}
-                        {s.completada && (
-                          <div className="absolute top-1 right-1 w-3 h-3 bg-emerald-500 rounded-full flex items-center justify-center">
-                            <span className="text-white text-[8px]">✓</span>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                          {height > 30 && (
+                            <p className={`text-xs truncate ${esVirtual ? 'text-[#6B6B6B]' : 'text-white/80'}`}>
+                              {s.hora} · {durMin}min
+                            </p>
+                          )}
+                          {s.completada && (
+                            <div className="absolute top-1 right-1 w-3 h-3 bg-emerald-500 rounded-full flex items-center justify-center">
+                              <span className="text-white text-[8px]">✓</span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
               )
             })}
