@@ -443,6 +443,10 @@ export default function Nutricion({ session }) {
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-4 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
                   {generando===detalle.cliente_id ? <span className='flex items-center gap-1.5'><span className='w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin'/> Generando...</span> : '🔄 Regenerar'}
                 </button>
+                <button onClick={() => abrirCuestionario({ id: detalle.cliente_id, nombre: detalle.clientes?.nombre, peso_actual: detalle.clientes?.peso_actual, objetivo: detalle.objetivo })}
+                  className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]" title="Editar cuestionario">
+                  📋
+                </button>
               </div>
             </div>
           </div>
