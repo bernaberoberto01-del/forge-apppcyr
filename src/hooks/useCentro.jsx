@@ -17,32 +17,31 @@ export function CentroProvider({ session, children }) {
 
   async function cargar() {
     setLoading(true)
-    // Ver si pertenezco a algún centro
-    const { data: memData } = await supabase
-      .from('miembros_centro')
-      .select('*, centros(*)')
-      .eq('user_id', uid)
-      .eq('activo', true)
-      .limit(1)
-      .single()
-      .catch(() => ({ data: null }))
-
-    if (memData) {
-      setCentro(memData.centros)
-      setMiembro(memData)
-      // Cargar todos los miembros del centro
-      const { data: todos } = await supabase
+    try {
+      const { data: memData } = await supabase
         .from('miembros_centro')
-        .select('*')
-        .eq('centro_id', memData.centro_id)
+        .select('*, centros(*)')
+        .eq('user_id', uid)
         .eq('activo', true)
-        .order('rol')
-      setMiembros(todos || [])
-    } else {
+        .limit(1)
+        .single()
+
+      if (memData) {
+        setCentro(memData.centros)
+        setMiembro(memData)
+        const { data: todos } = await supabase
+          .from('miembros_centro')
+          .select('*')
+          .eq('centro_id', memData.centro_id)
+          .eq('activo', true)
+          .order('rol')
+        setMiembros(todos || [])
+      } else {
+        setCentro(null); setMiembro(null); setMiembros([])
+      }
+    } catch (_) {
       // Sin centro — modo personal
-      setCentro(null)
-      setMiembro(null)
-      setMiembros([])
+      setCentro(null); setMiembro(null); setMiembros([])
     }
     setLoading(false)
   }
