@@ -439,31 +439,45 @@ export default function Agenda({ session }) {
                     </div>
                   )}
 
-                  {/* Sesiones posicionadas — con detección de solapamiento */}
+                  {/* Sesiones — algoritmo Apple Calendar */}
                   {(() => {
-                    // Calcular columnas — máximo 2 para que sean legibles
-                    const sesOrdenadas = [...sesionesDia].sort((a,b) => horaAMin(a.hora||'09:00') - horaAMin(b.hora||'09:00'))
-                    const columnas = []
-                    
+                    // Algoritmo: agrupar sesiones que se solapan, distribuir ancho dentro del grupo
+                    const sesOrdenadas = [...sesionesDia].map(s => ({
+                      ...s,
+                      _ini: horaAMin(s.hora || '09:00'),
+                      _fin: horaAMin(s.hora || '09:00') + (s.duracion_minutos || 60)
+                    })).sort((a,b) => a._ini - b._ini)
+
+                    // Agrupar por solapamiento
+                    const grupos = [] // cada grupo es un array de sesiones que se solapan entre sí
                     for (const s of sesOrdenadas) {
-                      const ini = horaAMin(s.hora || '09:00')
-                      const fin = ini + (s.duracion_minutos || 60)
-                      let colocada = false
-                      for (const col of columnas.slice(0, 2)) { // max 2 columnas
-                        const ultima = col[col.length - 1]
-                        const uIni = horaAMin(ultima.hora || '09:00')
-                        const uFin = uIni + (ultima.duracion_minutos || 60)
-                        if (ini >= uFin) { col.push(s); colocada = true; break }
+                      let añadida = false
+                      for (const g of grupos) {
+                        // Se solapa con alguna del grupo?
+                        if (g.some(gs => s._ini < gs._fin && s._fin > gs._ini)) {
+                          g.push(s); añadida = true; break
+                        }
                       }
-                      if (!colocada) {
-                        if (columnas.length < 2) columnas.push([s])
-                        else columnas[columnas.length - 1].push(s) // poner en última col si hay 3+
+                      if (!añadida) grupos.push([s])
+                    }
+
+                    // Para cada grupo, asignar columna greedy
+                    const sesMap = new Map()
+                    for (const grupo of grupos) {
+                      const cols = [] // cols[i] = fin de la última sesión en esa columna
+                      for (const s of grupo) {
+                        let col = cols.findIndex(fin => s._ini >= fin)
+                        if (col === -1) { col = cols.length; cols.push(0) }
+                        cols[col] = s._fin
+                        sesMap.set(s.id || s._key || s._ini + '_' + s.cliente_id, { col, totalCols: 0 })
+                      }
+                      // Actualizar totalCols para todo el grupo
+                      const total = cols.length
+                      for (const s of grupo) {
+                        const entry = sesMap.get(s.id || s._key || s._ini + '_' + s.cliente_id)
+                        if (entry) entry.totalCols = total
                       }
                     }
-                    
-                    const numCols = Math.min(columnas.length, 2) || 1
-                    const sesMap = new Map()
-                    columnas.forEach((col, ci) => col.forEach(s => sesMap.set(s.id || s._key, { ci, numCols })))
 
                     return sesionesDia.map((s, idx) => {
                       const horaMin = horaAMin(s.hora || '09:00')
@@ -473,9 +487,10 @@ export default function Agenda({ session }) {
                       const entrenadorMiembro = miembros?.find(m => m.user_id === s.entrenador_id)
                       const color = entrenadorMiembro ? (entrenadorMiembro.color || clienteColor(s.cliente_id)) : clienteColor(s.cliente_id)
                       const esVirtual = s._esVirtual
-                      const { ci = 0, numCols: nc = 1 } = sesMap.get(s.id || s._key) || {}
+                      const _key = s.id || s._key || (horaAMin(s.hora||'09:00') + '_' + s.cliente_id)
+                      const { col = 0, totalCols: nc = 1 } = sesMap.get(_key) || {}
                       const ancho = 100 / nc
-                      const left = ancho * ci
+                      const left = ancho * col
 
                       const entNombre = entrenadorMiembro?.nombre || entrenadorMiembro?.email?.split('@')[0] || ''
                       const entIni = entNombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
@@ -498,7 +513,7 @@ export default function Agenda({ session }) {
                             style={{ background: esVirtual ? 'white' : `${color}18`, border: `1.5px solid ${color}`, borderLeft: `3px solid ${color}` }} />
                           <div className="relative px-1.5 py-1 h-full flex flex-col justify-between">
                             <div className="flex items-start gap-1 min-w-0">
-                              {nc > 1 && height > 28 && (
+                              {nc > 1 && height > 36 && (
                                 <div className="w-4 h-4 rounded flex items-center justify-center text-white flex-shrink-0 mt-0.5"
                                   style={{ background: color, fontSize: '8px', fontWeight: 700 }}>
                                   {entIni || '?'}

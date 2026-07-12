@@ -42,13 +42,29 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
   async function crearCentro() {
     if (!formCentro.nombre) return
     setLoading(true)
-    const { data: nuevo } = await supabase.from('centros').insert({ nombre: formCentro.nombre, color_acento: formCentro.color_acento, owner_id: uid }).select().single()
-    if (nuevo) {
-      await supabase.from('miembros_centro').insert({ centro_id: nuevo.id, user_id: uid, rol: 'admin', nombre: session?.user?.user_metadata?.nombre || session?.user?.email?.split('@')[0], email: session?.user?.email, color: '#FF5C00' })
-      showToast(`Centro "${formCentro.nombre}" creado`)
-      setModalCrear(false)
-      recargar?.()
+    const { data: nuevo, error } = await supabase.from('centros')
+      .insert({ nombre: formCentro.nombre, color_acento: formCentro.color_acento, owner_id: uid })
+      .select().single()
+    
+    if (error || !nuevo) {
+      showToast('Error al crear centro: ' + (error?.message || 'inténtalo de nuevo'), 'error')
+      setLoading(false)
+      return
     }
+
+    const { error: e2 } = await supabase.from('miembros_centro').insert({
+      centro_id: nuevo.id, user_id: uid, rol: 'admin',
+      nombre: session?.user?.user_metadata?.nombre || session?.user?.email?.split('@')[0] || 'Admin',
+      email: session?.user?.email || '', color: '#FF5C00', activo: true
+    })
+    
+    if (e2) {
+      showToast('Centro creado pero error añadiendo miembro: ' + e2.message, 'error')
+    } else {
+      showToast(`Centro "${formCentro.nombre}" creado`)
+    }
+    setModalCrear(false)
+    recargar?.()
     setLoading(false)
   }
 
