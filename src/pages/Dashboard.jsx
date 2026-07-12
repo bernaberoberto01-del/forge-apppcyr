@@ -54,7 +54,7 @@ export default function Dashboard({ session }) {
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
       supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').eq('entrenador_id', uid).gte('fecha', inicioSemana),
       supabase.from('checkins').select('cliente_id,fecha,adherencia_entreno,energia,fatiga').eq('entrenador_id', uid).gte('fecha', hace6m).order('fecha', { ascending: false }),
-      supabase.from('alertas').select('*').eq('entrenador_id', uid).eq('resuelta', false).order('created_at', { ascending: false }).limit(5),
+      supabase.from('alertas').select('*').eq('entrenador_id', uid).eq('leida', false).order('created_at', { ascending: false }).limit(5),
     ])
 
     const activos = (clientes||[]).filter(c => c.estado === 'activo')

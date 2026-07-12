@@ -514,6 +514,34 @@ export default function PortalCliente() {
                     <p className="text-sm text-amber-800 leading-relaxed">{planNutricion.notas_entrenador}</p>
                   </div>
                 )}
+
+                {/* Hidratación */}
+                {(planNutricion.contenido?.hidratacion || planNutricion.borrador?.hidratacion) && (
+                  <div className="bg-blue-50 rounded-2xl p-4 flex items-center gap-3">
+                    <span className="text-2xl">💧</span>
+                    <div>
+                      <p className="text-sm font-bold text-blue-900">
+                        {planNutricion.contenido?.hidratacion || planNutricion.borrador?.hidratacion}L de agua al día
+                      </p>
+                      <p className="text-xs text-blue-600">Hidratación recomendada</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recomendaciones */}
+                {(planNutricion.contenido?.recomendaciones || planNutricion.borrador?.recomendaciones)?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-wide mb-2">Recomendaciones</p>
+                    <div className="space-y-2">
+                      {(planNutricion.contenido?.recomendaciones || planNutricion.borrador?.recomendaciones).map((rec, i) => (
+                        <div key={i} className="flex items-start gap-2.5 bg-[#F5F5F0] rounded-xl p-3">
+                          <span className="text-sm flex-shrink-0">{['💧','🕐','💪','😴','⚡'][i] || '→'}</span>
+                          <p className="text-xs text-[#444] leading-relaxed">{rec}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </>
