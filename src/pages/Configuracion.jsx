@@ -50,7 +50,12 @@ export default function Configuracion({ session, onConfigChange }) {
   const [toast, setToast] = useState(null)
   const [tab, setTab] = useState('perfil')
   const uid = session.user.id
-  const { centro, miembros, esAdmin, recargar: recargarCentro } = useCentro() || {}
+  const centroCtx = useCentro()
+  const centro = centroCtx?.centro
+  const miembros = centroCtx?.miembros || []
+  const esAdmin = centroCtx?.esAdmin
+  const recargarCentro = centroCtx?.recargar
+  const centroLoading = centroCtx?.loading
 
   useEffect(() => { cargar() }, [uid])
 
@@ -336,15 +341,17 @@ export default function Configuracion({ session, onConfigChange }) {
       )}
 
       {tab === 'equipo' && (
-        <EquipoTab
-          centro={centro}
-          miembros={miembros}
-          esAdmin={esAdmin}
-          recargar={recargarCentro}
-          session={session}
-          uid={uid}
-          showToast={showToast}
-        />
+        centroLoading
+          ? <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+          : <EquipoTab
+              centro={centro}
+              miembros={miembros}
+              esAdmin={esAdmin}
+              recargar={recargarCentro}
+              session={session}
+              uid={uid}
+              showToast={showToast}
+            />
       )}
     </div>
   )

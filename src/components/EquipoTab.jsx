@@ -5,6 +5,7 @@ const COLORES = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 
 export default function EquipoTab({ centro, miembros, esAdmin, recargar, session, uid, showToast }) {
+  if (!uid) return null
   const [statsEntrenadores, setStatsEntrenadores] = useState({})
   const [modalInvitar, setModalInvitar] = useState(false)
   const [modalCrear, setModalCrear] = useState(false)
@@ -43,7 +44,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
     setLoading(true)
     const { data: nuevo } = await supabase.from('centros').insert({ nombre: formCentro.nombre, color_acento: formCentro.color_acento, owner_id: uid }).select().single()
     if (nuevo) {
-      await supabase.from('miembros_centro').insert({ centro_id: nuevo.id, user_id: uid, rol: 'admin', nombre: session.user.user_metadata?.nombre || session.user.email?.split('@')[0], email: session.user.email, color: '#FF5C00' })
+      await supabase.from('miembros_centro').insert({ centro_id: nuevo.id, user_id: uid, rol: 'admin', nombre: session?.user?.user_metadata?.nombre || session?.user?.email?.split('@')[0], email: session?.user?.email, color: '#FF5C00' })
       showToast(`Centro "${formCentro.nombre}" creado`)
       setModalCrear(false)
       recargar?.()
