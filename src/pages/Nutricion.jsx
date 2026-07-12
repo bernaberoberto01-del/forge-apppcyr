@@ -71,7 +71,7 @@ export default function Nutricion({ session }) {
         body: JSON.stringify({ cliente_id: clienteId })
       })
       const data = await res.json()
-      if (data.ok) { setToast({ msg: 'Plan generado — revísalo y publícalo' }); await cargar() }
+      if (data.ok) { setToast({ msg: '✓ Plan nutricional generado — revísalo y publícalo' }); await cargar() }
       else setToast({ msg: data.error || 'Error al generar', tipo: 'error' })
     } catch (e) { setToast({ msg: e.message, tipo: 'error' }) }
     setGenerando(null)
@@ -158,7 +158,7 @@ export default function Nutricion({ session }) {
                     )}
                     <button onClick={() => generarPlan(c.id)} disabled={generando === c.id}
                       className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
-                      {generando === c.id ? '⏳' : '✨ IA'}
+                      {generando === c.id ? <span className='flex items-center gap-1.5'><span className='w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin'/> Generando...</span> : '✨ Generar con IA'}
                     </button>
                   </div>
                 </div>
@@ -360,7 +360,7 @@ export default function Nutricion({ session }) {
                 )}
                 <button onClick={() => generarPlan(detalle.cliente_id)} disabled={generando===detalle.cliente_id}
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-4 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
-                  {generando===detalle.cliente_id?'⏳':'🔄 Regenerar'}
+                  {generando===detalle.cliente_id ? <span className='flex items-center gap-1.5'><span className='w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin'/> Generando...</span> : '🔄 Regenerar'}
                 </button>
               </div>
             </div>

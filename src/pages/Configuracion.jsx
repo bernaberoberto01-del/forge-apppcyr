@@ -139,7 +139,7 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-5">
-        {[['perfil', '👤 Perfil'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['equipo', '🏋️ Equipo']].map(([id, label]) => (
+        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${tab === id ? 'bg-white shadow-sm text-[#0A0A0A]' : 'text-[#6B6B6B] hover:text-[#0A0A0A]'}`}>
             {label}
