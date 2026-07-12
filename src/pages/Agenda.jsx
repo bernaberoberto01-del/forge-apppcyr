@@ -441,26 +441,27 @@ export default function Agenda({ session }) {
 
                   {/* Sesiones posicionadas — con detección de solapamiento */}
                   {(() => {
-                    // Calcular columnas para evitar solapamiento
+                    // Calcular columnas — máximo 2 para que sean legibles
                     const sesOrdenadas = [...sesionesDia].sort((a,b) => horaAMin(a.hora||'09:00') - horaAMin(b.hora||'09:00'))
-                    const columnas = [] // array de arrays de sesiones
+                    const columnas = []
                     
                     for (const s of sesOrdenadas) {
                       const ini = horaAMin(s.hora || '09:00')
                       const fin = ini + (s.duracion_minutos || 60)
-                      // Buscar la primera columna donde no hay solapamiento
                       let colocada = false
-                      for (const col of columnas) {
+                      for (const col of columnas.slice(0, 2)) { // max 2 columnas
                         const ultima = col[col.length - 1]
                         const uIni = horaAMin(ultima.hora || '09:00')
                         const uFin = uIni + (ultima.duracion_minutos || 60)
                         if (ini >= uFin) { col.push(s); colocada = true; break }
                       }
-                      if (!colocada) columnas.push([s])
+                      if (!colocada) {
+                        if (columnas.length < 2) columnas.push([s])
+                        else columnas[columnas.length - 1].push(s) // poner en última col si hay 3+
+                      }
                     }
                     
-                    const numCols = columnas.length || 1
-                    // Mapear sesión → (colIdx, totalCols)
+                    const numCols = Math.min(columnas.length, 2) || 1
                     const sesMap = new Map()
                     columnas.forEach((col, ci) => col.forEach(s => sesMap.set(s.id || s._key, { ci, numCols })))
 

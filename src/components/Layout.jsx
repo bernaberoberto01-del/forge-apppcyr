@@ -16,6 +16,7 @@ const TODOS_MODULOS = [
 export default function Layout({ children, session, config }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mensajesNL, setMensajesNL] = useState(0)
+  const [alertasNL, setAlertasNL] = useState(0)
   const location = useLocation()
 
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
@@ -27,6 +28,9 @@ export default function Layout({ children, session, config }) {
     supabase.from('mensajes_cliente').select('id', { count: 'exact' })
       .eq('entrenador_id', uid).eq('leido', false)
       .then(({ count }) => setMensajesNL(count || 0))
+    supabase.from('alertas').select('id', { count: 'exact' })
+      .eq('entrenador_id', uid).eq('leida', false)
+      .then(({ count }) => setAlertasNL(count || 0))
   }, [location.pathname, config])
 
   const modulosActivos = TODOS_MODULOS.filter(m => !config?.modulos || config.modulos[m.id] !== false)
@@ -35,7 +39,7 @@ export default function Layout({ children, session, config }) {
   const acento = config?.color_acento || '#FF5C00'
 
   const NavItem = ({ item }) => {
-    const badge = item.id === 'mensajes' && mensajesNL > 0 ? mensajesNL : 0
+    const badge = item.id === 'mensajes' && mensajesNL > 0 ? mensajesNL : item.id === 'dashboard' && alertasNL > 0 ? alertasNL : 0
     return (
       <NavLink to={item.path}
         className={({ isActive }) =>
