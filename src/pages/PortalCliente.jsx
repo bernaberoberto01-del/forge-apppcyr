@@ -23,6 +23,9 @@ export default function PortalCliente() {
   const [configEntrenador, setConfigEntrenador] = useState(null)
   const [planNutricion, setPlanNutricion] = useState(null)
   const [diaActivoNutr, setDiaActivoNutr] = useState(0)
+  const [cancelando, setCancelando] = useState(null) // id de sesión que se está cancelando
+  const [motivoCancel, setMotivoCancel] = useState('')
+  const [sesionesPortal, setSesionesPortal] = useState([])
   const [biblioteca, setBiblioteca] = useState([])
   const [videoEj, setVideoEj] = useState(null)
   const [fotos, setFotos] = useState([])
@@ -188,6 +191,63 @@ export default function PortalCliente() {
         {/* INICIO */}
         {tab==='inicio' && (
           <>
+            {/* Próximas sesiones */}
+            {sesionesPortal.length > 0 && (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                <p className="text-sm font-bold text-[#0A0A0A] mb-3">Próximas sesiones</p>
+                <div className="space-y-2">
+                  {sesionesPortal.slice(0,4).map(s => {
+                    const fecha = new Date(s.fecha + 'T12:00')
+                    const esHoy = s.fecha === new Date().toISOString().split('T')[0]
+                    const esMañana = s.fecha === new Date(Date.now()+864e5).toISOString().split('T')[0]
+                    const labelFecha = esHoy ? 'Hoy' : esMañana ? 'Mañana' : fecha.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
+                    return (
+                      <div key={s.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${esHoy?'border-[#FF5C00]/30 bg-[#FF5C00]/5':'border-black/5 bg-[#F5F5F0]'}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold ${esHoy?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{labelFecha}</p>
+                          <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos||60}min · {s.tipo}</p>
+                        </div>
+                        <button onClick={() => setCancelando(s)}
+                          className="text-xs text-[#6B6B6B] border border-black/10 px-2.5 py-1.5 rounded-lg hover:border-red-300 hover:text-red-500 transition-all flex-shrink-0">
+                          Cancelar
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Modal confirmación cancelación */}
+            {cancelando && (
+              <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center p-4" onClick={() => { setCancelando(null); setMotivoCancel('') }}>
+                <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+                  <h3 className="font-bold text-[#0A0A0A] mb-1">¿Cancelar esta sesión?</h3>
+                  <p className="text-sm text-[#6B6B6B] mb-4">
+                    {new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})} a las {cancelando.hora}
+                  </p>
+                  <div className="mb-4">
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Motivo (opcional)</label>
+                    <textarea value={motivoCancel} onChange={e => setMotivoCancel(e.target.value)} rows={2}
+                      placeholder="Viaje, trabajo, enfermedad..."
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
+                  </div>
+                  <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5 mb-4">
+                    ⚠ Se notificará a tu entrenador automáticamente
+                  </p>
+                  <div className="flex gap-2">
+                    <button onClick={() => { setCancelando(null); setMotivoCancel('') }}
+                      className="flex-1 border border-black/10 text-sm py-2.5 rounded-xl text-[#6B6B6B]">
+                      Volver
+                    </button>
+                    <button onClick={() => cancelarSesion(cancelando.id)}
+                      className="flex-1 bg-red-500 text-white text-sm font-semibold py-2.5 rounded-xl">
+                      Confirmar cancelación
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {/* Último check-in */}
             {ultimoCI ? (
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">

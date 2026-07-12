@@ -178,6 +178,18 @@ export default function Dashboard({ session }) {
               <span className="text-amber-400 flex-shrink-0">›</span>
             </button>
           ))}
+          {d.alertasExtra.filter(a => a.tipo === 'cancelacion_sesion').map(a => (
+            <button key={a.id} onClick={() => navigate('/agenda')}
+              className="w-full bg-orange-50 border border-orange-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-orange-100 transition-all">
+              <span className="text-lg flex-shrink-0">❌</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-orange-700 truncate">Sesión cancelada por cliente</p>
+                <p className="text-xs text-orange-500 truncate">{a.mensaje}</p>
+              </div>
+              <button onClick={async e => { e.stopPropagation(); await supabase.from('alertas').update({ leida: true }).eq('id', a.id); cargar() }}
+                className="text-orange-300 hover:text-orange-600 text-lg flex-shrink-0">×</button>
+            </button>
+          ))}
         </div>
       )}
 
