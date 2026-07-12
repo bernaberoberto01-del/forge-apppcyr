@@ -109,15 +109,19 @@ export default function Nutricion({ session }) {
 
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 
+  const OBJETIVO_LABEL = { perdida_grasa:'Pérdida de grasa', ganancia_muscular:'Ganancia muscular', tonificacion:'Tonificación', fuerza:'Fuerza', rendimiento:'Rendimiento', salud_general:'Salud general', cambio_rapido_30dias:'Cambio 30 días' }
+  const OBJETIVO_COLOR = { perdida_grasa:'#f59e0b', ganancia_muscular:'#6366f1', tonificacion:'#10b981', fuerza:'#ef4444', rendimiento:'#0ea5e9', salud_general:'#10b981', cambio_rapido_30dias:'#FF5C00' }
+
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
+      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
 
       {/* Cabecera */}
-      <div className="flex items-start justify-between mb-5">
+      <div className="flex items-start justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Nutrición</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">Planes personalizados con IA · Activa por cliente según tu oferta</p>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">Planes IA personalizados por cliente</p>
         </div>
       </div>
 
@@ -125,11 +129,11 @@ export default function Nutricion({ session }) {
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           ['Con nutrición', clientesConNutricion.length, '#FF5C00'],
-          ['Sin plan', clientesSinPlan.length, '#f59e0b'],
+          ['Pendientes', clientesSinPlan.length, '#f59e0b'],
           ['Publicados', planes.filter(p=>p.estado==='publicado').length, '#10b981'],
-        ].map(([l,v,c])=>(
+        ].map(([l,v,col])=>(
           <div key={l} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-center">
-            <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
+            <p className="text-2xl font-bold" style={{color:col}}>{v}</p>
             <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
           </div>
         ))}
@@ -206,39 +210,102 @@ export default function Nutricion({ session }) {
       )}
 
       {/* Lista planes */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {planFiltrado.length === 0 && planesActivos.length === 0 ? (
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
             <p className="text-4xl mb-3">🥗</p>
             <p className="font-semibold text-[#0A0A0A]">Sin planes nutricionales</p>
             <p className="text-sm text-[#6B6B6B] mt-1">Activa nutrición para un cliente y genera su plan con IA</p>
           </div>
-        ) : planFiltrado.map(p => (
-          <div key={p.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold text-xs flex-shrink-0">{ini(p.clientes?.nombre)}</div>
-              <div className="flex-1 min-w-0">
-                <button onClick={e=>{e.stopPropagation();setQuickView(p.cliente_id)}} className="text-sm font-semibold text-[#0A0A0A] truncate hover:text-[#FF5C00] transition-colors">{p.clientes?.nombre}</button>
-                <p className="text-xs text-[#6B6B6B]">{p.calorias_dia}kcal · P:{p.proteinas_g}g · C:{p.carbohidratos_g}g · G:{p.grasas_g}g</p>
+        ) : planFiltrado.map(p => {
+          const obj = p.objetivo || 'perdida_grasa'
+          const objColor = OBJETIVO_COLOR[obj] || '#FF5C00'
+          const objLabel = OBJETIVO_LABEL[obj] || obj
+          const menu = p.borrador?.menu || p.contenido?.menu || []
+          const hoy = new Date().toLocaleDateString('es-ES',{weekday:'long'}).replace(/^\w/,c=>c.toUpperCase())
+          const diaHoy = menu.find(d => d.dia === hoy) || menu[0]
+          return (
+          <div key={p.id} onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setDiaActivo(0) }}
+            className="bg-white rounded-2xl border border-black/5 shadow-sm hover:shadow-md hover:border-[#FF5C00]/20 transition-all cursor-pointer">
+            {/* Header con objetivo */}
+            <div className="px-4 pt-4 pb-3 border-b border-black/5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                    style={{background: objColor}}>
+                    {ini(p.clientes?.nombre)}
+                  </div>
+                  <div>
+                    <button onClick={e=>{e.stopPropagation();setQuickView(p.cliente_id)}}
+                      className="text-sm font-bold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors block text-left">
+                      {p.clientes?.nombre}
+                    </button>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      style={{background:`${objColor}15`, color:objColor}}>
+                      {objLabel}
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${p.estado==='publicado'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
+                  {p.estado==='publicado'?'✓ Publicado':'Borrador'}
+                </span>
               </div>
-              <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${p.estado==='publicado'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
-                {p.estado==='publicado'?'✓ Publicado':'Borrador'}
-              </span>
+
+              {/* Macros prominentes */}
+              <div className="grid grid-cols-4 gap-2 mt-3">
+                {[
+                  [p.calorias_dia, 'kcal', '#FF5C00'],
+                  [p.proteinas_g + 'g', 'Proteína', '#6366f1'],
+                  [p.carbohidratos_g + 'g', 'Carbos', '#f59e0b'],
+                  [p.grasas_g + 'g', 'Grasas', '#10b981'],
+                ].map(([v,l,col])=>(
+                  <div key={l} className="bg-[#F5F5F0] rounded-xl p-2 text-center">
+                    <p className="text-sm font-bold" style={{color:col}}>{v}</p>
+                    <p className="text-xs text-[#6B6B6B]">{l}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setDiaActivo(0) }}
-                className="flex-1 border border-black/10 text-[#0A0A0A] text-xs font-medium py-2 rounded-lg hover:bg-[#F5F5F0]">Ver plan</button>
+
+            {/* Preview del día actual */}
+            {diaHoy && (
+              <div className="px-4 py-2.5">
+                <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">
+                  {diaHoy.dia || 'Hoy'} — {diaHoy.comidas?.length || 0} comidas
+                </p>
+                <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                  {(diaHoy.comidas || []).slice(0,4).map((com,i) => (
+                    <div key={i} className="bg-[#F5F5F0] rounded-lg px-2.5 py-1.5 flex-shrink-0">
+                      <p className="text-xs font-medium text-[#0A0A0A] whitespace-nowrap">{com.nombre}</p>
+                      <p className="text-xs text-[#6B6B6B]">{com.hora}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Acciones */}
+            <div className="px-4 pb-3 flex gap-2" onClick={e=>e.stopPropagation()}>
               {p.estado==='publicado' && (
-                <button onClick={() => { navigator.clipboard.writeText(portalUrl(p.cliente_id)); setToast({ msg: 'Enlace copiado' }) }}
-                  className="flex-1 border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-medium py-2 rounded-lg hover:bg-[#FF5C00]/5">📋 Portal</button>
+                <button onClick={() => { navigator.clipboard.writeText(portalUrl(p.cliente_id)); setToast({ msg: 'Enlace del portal copiado' }) }}
+                  className="flex-1 border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-semibold py-2 rounded-xl hover:bg-[#FF5C00]/5">
+                  📋 Copiar enlace portal
+                </button>
+              )}
+              {p.estado==='borrador' && (
+                <button onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setDiaActivo(0) }}
+                  className="flex-1 bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl">
+                  Revisar y publicar →
+                </button>
               )}
               <button onClick={() => generarPlan(p.cliente_id)} disabled={generando===p.cliente_id}
-                className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40">
-                {generando===p.cliente_id?'⏳':'🔄'}
+                className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
+                {generando===p.cliente_id ? <span className="w-4 h-4 border-2 border-[#6B6B6B] border-t-transparent rounded-full animate-spin block"/> : '🔄'}
               </button>
             </div>
           </div>
-        ))}
+        )})}
+
       </div>
 
       {/* Modal detalle plan */}
