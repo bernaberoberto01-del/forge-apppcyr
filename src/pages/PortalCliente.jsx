@@ -67,6 +67,12 @@ export default function PortalCliente() {
       setFotos(ft)
       setPlanNutricion(pn)
       if (cfg) setConfigEntrenador(cfg)
+      // Sesiones futuras del cliente
+      const hoy = new Date().toISOString().split('T')[0]
+      const { data: sesFut } = await supabase.from('sesiones').select('*')
+        .eq('cliente_id', clienteId).gte('fecha', hoy)
+        .eq('cancelada', false).order('fecha').order('hora').limit(8)
+      setSesionesPortal(sesFut || [])
       setLoading(false)
     }
     cargar()

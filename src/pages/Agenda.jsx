@@ -6,7 +6,7 @@ import { useCentro } from '../hooks/useCentro.jsx'
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
 const HORA_INICIO = 6
-const PIXELS_POR_HORA = 80
+const PIXELS_POR_HORA = 96
 const TIPOS_EXTRA = [
   { id: 'desplazamiento', label: 'Desplazamiento', icon: '🚗' },
   { id: 'reunion', label: 'Reunión', icon: '🤝' },
@@ -323,11 +323,23 @@ export default function Agenda({ session }) {
         </div>
 
         {centro && miembros?.length > 1 && (
-          <select value={filtroEntrenador} onChange={e => setFiltroEntrenador(e.target.value)}
-            className="text-xs border border-black/10 rounded-lg px-2 py-1.5 bg-white text-[#6B6B6B] focus:outline-none focus:border-[#FF5C00]">
-            <option value="todos">Todos</option>
-            {miembros.map(m => <option key={m.id} value={m.user_id}>{m.nombre||m.email?.split('@')[0]}</option>)}
-          </select>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Leyenda colores entrenadores */}
+            {miembros.map(m => (
+              <button key={m.id}
+                onClick={() => setFiltroEntrenador(filtroEntrenador === m.user_id ? 'todos' : m.user_id)}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all border ${filtroEntrenador === m.user_id ? 'border-current shadow-sm' : 'border-transparent bg-black/5 opacity-70 hover:opacity-100'}`}
+                style={{ color: m.color || '#FF5C00', background: filtroEntrenador === m.user_id ? `${m.color || '#FF5C00'}15` : '' }}>
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: m.color || '#FF5C00' }} />
+                {(m.nombre || m.email?.split('@')[0])?.split(' ')[0]}
+              </button>
+            ))}
+            {filtroEntrenador !== 'todos' && (
+              <button onClick={() => setFiltroEntrenador('todos')} className="text-xs text-[#6B6B6B] px-2 py-1 rounded-lg bg-black/5 hover:bg-black/10">
+                Ver todos
+              </button>
+            )}
+          </div>
         )}
         <button onClick={() => setSemanaBase(getLunes(new Date()))}
           className="px-2 py-1 text-xs border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">Hoy</button>
@@ -464,33 +476,50 @@ export default function Agenda({ session }) {
                       const ancho = 100 / nc
                       const left = ancho * ci
 
+                      const entNombre = entrenadorMiembro?.nombre || entrenadorMiembro?.email?.split('@')[0] || ''
+                      const entIni = entNombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+                      const nombreCliente = s.clientes?.nombre?.split(' ')[0] || '—'
+                      
                       return (
                         <div key={s.id || idx}
                           onClick={e => { e.stopPropagation(); setSesionDetalle(s) }}
-                          className={`absolute rounded-lg px-1.5 py-1 cursor-pointer z-10 transition-all hover:brightness-95 ${s.completada ? 'opacity-60' : ''} ${esVirtual ? 'border-dashed border-2' : ''}`}
+                          className={`absolute cursor-pointer z-10 transition-all hover:shadow-md hover:scale-[1.01] ${s.completada ? 'opacity-55' : ''}`}
                           style={{
                             top: top + 2,
                             height,
                             left: `calc(${left}% + 2px)`,
                             width: `calc(${ancho}% - 4px)`,
-                            background: esVirtual ? 'white' : color,
-                            borderColor: color,
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            borderRadius: '8px',
                           }}>
-                          <p className={`text-xs font-bold truncate leading-tight ${esVirtual ? '' : 'text-white'}`}
-                            style={esVirtual ? { color } : {}}>
-                            {s.clientes?.nombre?.split(' ')[0]}
-                          </p>
-                          {height > 30 && (
-                            <p className={`text-xs truncate ${esVirtual ? 'text-[#6B6B6B]' : 'text-white/80'}`}>
-                              {s.hora} · {durMin}min
-                            </p>
-                          )}
-                          {s.completada && (
-                            <div className="absolute top-1 right-1 w-3 h-3 bg-emerald-500 rounded-full flex items-center justify-center">
-                              <span className="text-white text-[8px]">✓</span>
+                          {/* Fondo con borde izquierdo de color */}
+                          <div className="absolute inset-0 rounded-lg"
+                            style={{ background: esVirtual ? 'white' : `${color}18`, border: `1.5px solid ${color}`, borderLeft: `3px solid ${color}` }} />
+                          <div className="relative px-1.5 py-1 h-full flex flex-col justify-between">
+                            <div className="flex items-start gap-1 min-w-0">
+                              {nc > 1 && height > 28 && (
+                                <div className="w-4 h-4 rounded flex items-center justify-center text-white flex-shrink-0 mt-0.5"
+                                  style={{ background: color, fontSize: '8px', fontWeight: 700 }}>
+                                  {entIni || '?'}
+                                </div>
+                              )}
+                              <p className="text-xs font-bold truncate leading-tight" style={{ color }}>
+                                {nombreCliente}
+                              </p>
                             </div>
-                          )}
+                            {height > 32 && (
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs truncate" style={{ color: `${color}99` }}>
+                                  {s.hora}
+                                </p>
+                                {s.completada && (
+                                  <div className="w-3 h-3 bg-emerald-500 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <span className="text-white" style={{ fontSize: '7px' }}>✓</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )
                     })
