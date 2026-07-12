@@ -6,7 +6,7 @@ import { useCentro } from '../hooks/useCentro.jsx'
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
 const HORA_INICIO = 6
-const PIXELS_POR_HORA = 96
+const PIXELS_POR_HORA = 108
 const TIPOS_EXTRA = [
   { id: 'desplazamiento', label: 'Desplazamiento', icon: '🚗' },
   { id: 'reunion', label: 'Reunión', icon: '🤝' },
@@ -468,7 +468,7 @@ export default function Agenda({ session }) {
                       const horaMin = horaAMin(s.hora || '09:00')
                       const top = (horaMin / 60 - HORA_INICIO) * PIXELS_POR_HORA
                       const durMin = s.duracion_minutos || 60
-                      const height = Math.max((durMin / 60) * PIXELS_POR_HORA - 4, 24)
+                      const height = Math.max((durMin / 60) * PIXELS_POR_HORA - 4, 36)
                       const entrenadorMiembro = miembros?.find(m => m.user_id === s.entrenador_id)
                       const color = entrenadorMiembro ? (entrenadorMiembro.color || clienteColor(s.cliente_id)) : clienteColor(s.cliente_id)
                       const esVirtual = s._esVirtual

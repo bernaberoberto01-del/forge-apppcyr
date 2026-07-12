@@ -115,6 +115,37 @@ export default function PortalCliente() {
     ...(fotos.length > 0 ? [{ id: 'fotos', label: 'Fotos', icon: '📸' }] : []),
   ]
 
+  async function cancelarSesion(sesionId) {
+    const { error } = await supabase.from('sesiones').update({
+      cancelada: true,
+      cancelada_por: 'cliente',
+      motivo_cancelacion: motivoCancel || 'Sin motivo indicado',
+      cancelada_at: new Date().toISOString(),
+      completada: false
+    }).eq('id', sesionId)
+
+    if (!error) {
+      await Promise.all([
+        supabase.from('alertas').insert({
+          entrenador_id: cliente.entrenador_id,
+          cliente_id: clienteId,
+          tipo: 'cancelacion_sesion',
+          mensaje: `${cliente.nombre} ha cancelado la sesión del ${new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} a las ${cancelando.hora}${motivoCancel ? '. Motivo: ' + motivoCancel : ''}`
+        }),
+        supabase.from('mensajes_cliente').insert({
+          entrenador_id: cliente.entrenador_id,
+          cliente_id: clienteId,
+          contenido: `He tenido que cancelar mi sesión del ${new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} a las ${cancelando.hora}.${motivoCancel ? ' Motivo: ' + motivoCancel : ''}`,
+          tipo: 'cliente',
+          leido: false
+        })
+      ])
+      setSesionesPortal(prev => prev.filter(s => s.id !== sesionId))
+    }
+    setCancelando(null)
+    setMotivoCancel('')
+  }
+
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
   if (notFound) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] p-4"><div className="text-center"><p className="text-4xl mb-3">🔗</p><p className="text-[#6B6B6B]">Enlace no válido</p></div></div>
 

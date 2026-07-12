@@ -18,17 +18,19 @@ export function CentroProvider({ session, children }) {
   async function cargar() {
     setLoading(true)
     try {
+      // Primero buscar si soy miembro de algún centro
       const { data: memData } = await supabase
         .from('miembros_centro')
         .select('*, centros(*)')
         .eq('user_id', uid)
         .eq('activo', true)
         .limit(1)
-        .single()
+        .maybeSingle()
 
-      if (memData) {
+      if (memData?.centros) {
         setCentro(memData.centros)
         setMiembro(memData)
+        // Cargar todos los miembros — owner puede verlos todos por RLS
         const { data: todos } = await supabase
           .from('miembros_centro')
           .select('*')
@@ -37,10 +39,35 @@ export function CentroProvider({ session, children }) {
           .order('rol')
         setMiembros(todos || [])
       } else {
-        setCentro(null); setMiembro(null); setMiembros([])
+        // Ver si soy owner de algún centro aunque no tenga registro de miembro
+        const { data: centroOwner } = await supabase
+          .from('centros')
+          .select('*')
+          .eq('owner_id', uid)
+          .limit(1)
+          .maybeSingle()
+
+        if (centroOwner) {
+          setCentro(centroOwner)
+          const { data: todos } = await supabase
+            .from('miembros_centro')
+            .select('*')
+            .eq('centro_id', centroOwner.id)
+            .eq('activo', true)
+            .order('rol')
+          setMiembros(todos || [])
+          // Crear mi registro de miembro si no existe
+          if (!(todos || []).find(m => m.user_id === uid)) {
+            await supabase.from('miembros_centro').insert({
+              centro_id: centroOwner.id, user_id: uid, rol: 'admin',
+              nombre: 'Admin', email: '', color: '#FF5C00', activo: true
+            })
+          }
+        } else {
+          setCentro(null); setMiembro(null); setMiembros([])
+        }
       }
-    } catch (_) {
-      // Sin centro — modo personal
+    } catch (e) {
       setCentro(null); setMiembro(null); setMiembros([])
     }
     setLoading(false)
