@@ -38,10 +38,10 @@ export default function Mensajes({ session }) {
   async function cargarClientes() {
     const [{ data: cl }, { data: ms }] = await Promise.all([
       supabase.from('clientes').select('id,nombre,tipo,estado').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
-      supabase.from('mensajes_cliente').select('cliente_id,leido,created_at').eq('entrenador_id', uid).eq('leido',false)
+      supabase.from('mensajes_cliente').select('cliente_id,leido_entrenador,tipo,created_at')
+        .eq('entrenador_id', uid).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema')
     ])
     setClientes(cl || [])
-    // Contar no leídos por cliente
     const nl = {}
     ;(ms || []).forEach(m => { nl[m.cliente_id] = (nl[m.cliente_id] || 0) + 1 })
     setNoLeidos(nl)
@@ -51,7 +51,12 @@ export default function Mensajes({ session }) {
     const { data } = await supabase.from('mensajes_cliente')
       .select('*').eq('cliente_id', clienteId).order('created_at', { ascending: true })
     setMensajes(data || [])
-    // Marcar como leídos (desde el lado del entrenador)
+    // Marcar como leídos por el entrenador en la BD
+    await supabase.from('mensajes_cliente')
+      .update({ leido_entrenador: true })
+      .eq('cliente_id', clienteId)
+      .eq('entrenador_id', uid)
+      .neq('tipo', 'entrenador')
     setNoLeidos(prev => { const n = {...prev}; delete n[clienteId]; return n })
   }
 

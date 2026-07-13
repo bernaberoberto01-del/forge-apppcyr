@@ -26,7 +26,7 @@ export default function Layout({ children, session, config }) {
     const uid = session?.user?.id
     if (!uid) return
     supabase.from('mensajes_cliente').select('id', { count: 'exact' })
-      .eq('entrenador_id', uid).eq('leido', false)
+      .eq('entrenador_id', uid).eq('leido_entrenador', false).neq('tipo', 'entrenador').neq('tipo', 'sistema')
       .then(({ count }) => setMensajesNL(count || 0))
     supabase.from('alertas').select('id', { count: 'exact' })
       .eq('entrenador_id', uid).eq('leida', false)
