@@ -175,17 +175,9 @@ export default function Clientes({ session }) {
           contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu rutina. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
         })
       ])
-      // Email de bienvenida — doble vía: Edge Function + n8n webhook (Gmail backup)
+      // Email de bienvenida via n8n → Gmail
       if (cliente.email) {
-        const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
-        // 1. Edge Function (Resend)
-        fetch(`https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/bienvenida-cliente`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON}` },
-          body: JSON.stringify({ cliente_id: cliente.id })
-        }).catch(() => {})
-        // 2. n8n webhook (Gmail backup automático)
-        fetch(`https://rbernabe.app.n8n.cloud/webhook/forge-nuevo-cliente`, {
+        fetch('https://rbernabe.app.n8n.cloud/webhook/forge-nuevo-cliente', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cliente_id: cliente.id, nombre: cliente.nombre, email: cliente.email })
@@ -731,13 +723,18 @@ export default function Clientes({ session }) {
                       className="bg-[#111] text-white text-sm font-medium py-2.5 rounded-xl">🔗 Portal</button>
                     {detalle.email && (
                       <button onClick={async () => {
-                        const res = await fetch(`https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/bienvenida-cliente`, {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
-                          body: JSON.stringify({ cliente_id: detalle.id })
-                        })
-                        if (res.ok) showToast('Email de bienvenida enviado')
-                        else showToast('Error al enviar email', 'error')
+                        try {
+                          // Llamar al webhook de n8n que envía por Gmail
+                          const res = await fetch('https://rbernabe.app.n8n.cloud/webhook/forge-nuevo-cliente', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ cliente_id: detalle.id, nombre: detalle.nombre, email: detalle.email })
+                          })
+                          if (res.ok) showToast('✓ Email de bienvenida enviado a ' + detalle.email)
+                          else showToast('Error al enviar email', 'error')
+                        } catch(e) {
+                          showToast('Error de conexión', 'error')
+                        }
                       }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">
                         📧 Bienvenida
                       </button>
