@@ -67,6 +67,10 @@ export default function Rutinas({ session }) {
   const [biblioteca, setBiblioteca] = useState([])
   const [generando, setGenerando] = useState(null)
   const [detalle, setDetalle] = useState(null)
+  const [modoEdicion, setModoEdicion] = useState(false)
+  const [rutinaBorrador, setRutinaBorrador] = useState(null)
+  const [contextoIA, setContextoIA] = useState('')
+  const [mostrarContextoIA, setMostrarContextoIA] = useState(false)
   const [notasEdit, setNotasEdit] = useState('')
   const [msgModal, setMsgModal] = useState(null)
   const [msgTexto, setMsgTexto] = useState('')
@@ -110,16 +114,16 @@ export default function Rutinas({ session }) {
   }
 
   // ===== RUTINAS =====
-  async function generarRutina(clienteId) {
+  async function generarRutina(clienteId, contextoExtra = '') {
     setGenerando(clienteId)
     const res = await fetch(`${SUPABASE_URL}/functions/v1/generar-rutina`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
-      body: JSON.stringify({ cliente_id: clienteId })
+      body: JSON.stringify({ cliente_id: clienteId, contexto_extra: contextoExtra })
     })
     const data = await res.json()
     setGenerando(null)
-    if (data.ok) { setToast('Rutina generada — revísala y publícala'); await cargar() }
+    if (data.ok) { setToast('✓ Rutina generada — revísala y publícala'); await cargar() }
     else setToast('Error: ' + (data.error || 'desconocido'))
   }
 
@@ -423,7 +427,7 @@ export default function Rutinas({ session }) {
                   </span>
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <button onClick={() => { setDetalle(r); setNotasEdit(r.notas_entrenador||'') }}
+                  <button onClick={() => { setDetalle(r); setNotasEdit(r.notas_entrenador||''); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }}
                     className="flex-1 border border-black/10 text-[#0A0A0A] text-xs font-medium py-2 rounded-lg hover:bg-[#F5F5F0]">Ver rutina</button>
                   {r.estado==='publicada' && (
                     <button onClick={() => { navigator.clipboard.writeText(portalUrl(r.cliente_id)); setToast('Enlace copiado') }}
@@ -538,27 +542,91 @@ export default function Rutinas({ session }) {
                 <h2 className="font-bold text-[#0A0A0A]">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2>
                 <button onClick={() => setQuickView(detalle.cliente_id)} className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">{detalle.clientes?.nombre} →</button>
               </div>
-              <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
+              <button onClick={() => { setDetalle(null); setModoEdicion(false); setRutinaBorrador(null) }} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
             </div>
             <div className="p-4 space-y-3">
-              {(detalle.borrador?.dias||detalle.contenido?.dias||[]).map(dia => (
+              {/* Barra modo edición */}
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-[#6B6B6B]">{modoEdicion ? '✏️ Editando — toca cualquier campo' : 'Solo lectura'}</p>
+                <button onClick={() => {
+                  if (!modoEdicion) {
+                    setRutinaBorrador(JSON.parse(JSON.stringify(detalle.borrador || detalle.contenido)))
+                    setModoEdicion(true)
+                  } else {
+                    setModoEdicion(false); setRutinaBorrador(null)
+                  }
+                }} className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${modoEdicion ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-[#FF5C00]/10 text-[#FF5C00]'}`}>
+                  {modoEdicion ? '✗ Cancelar edición' : '✏️ Editar rutina'}
+                </button>
+              </div>
+
+              {(modoEdicion ? rutinaBorrador?.dias : (detalle.borrador?.dias||detalle.contenido?.dias||[])).map((dia, diaIdx) => (
                 <div key={dia.dia} className="border border-black/8 rounded-xl overflow-hidden">
                   <div className="bg-[#0A0A0A] px-4 py-2.5 flex items-center justify-between">
-                    <p className="text-white text-sm font-semibold">{dia.nombre}</p>
+                    {modoEdicion ? (
+                      <input value={dia.nombre} onChange={e => {
+                        const d = {...rutinaBorrador}
+                        d.dias[diaIdx].nombre = e.target.value
+                        setRutinaBorrador(d)
+                      }} className="bg-transparent text-white text-sm font-semibold border-b border-white/20 focus:outline-none focus:border-[#FF5C00] flex-1 mr-2" />
+                    ) : (
+                      <p className="text-white text-sm font-semibold">{dia.nombre}</p>
+                    )}
                     {dia.patron_principal && <p className="text-white/40 text-xs">{dia.patron_principal}</p>}
                   </div>
                   <div className="divide-y divide-black/5">
-                    {dia.ejercicios?.map((ej,i) => {
+                    {dia.ejercicios?.map((ej, ejIdx) => {
                       const ejBib = biblioteca.find(b => b.nombre.toLowerCase() === ej.nombre?.toLowerCase() || b.sinonimos?.toLowerCase().split(',').some(s => s.trim() === ej.nombre?.toLowerCase()))
-                      return (
-                        <div key={i} className="px-4 py-3 flex items-start gap-3">
+                      return modoEdicion ? (
+                        <div key={ejIdx} className="px-3 py-3 space-y-2 bg-amber-50/30">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-[#6B6B6B] w-4 text-center flex-shrink-0">{ejIdx+1}</span>
+                            <input value={ej.nombre} onChange={e => {
+                              const d = {...rutinaBorrador}
+                              d.dias[diaIdx].ejercicios[ejIdx].nombre = e.target.value
+                              setRutinaBorrador(d)
+                            }} className="flex-1 text-sm font-medium border border-black/10 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#FF5C00] bg-white" placeholder="Nombre del ejercicio" />
+                            <button onClick={() => {
+                              const d = {...rutinaBorrador}
+                              d.dias[diaIdx].ejercicios.splice(ejIdx, 1)
+                              setRutinaBorrador(d)
+                            }} className="text-red-400 hover:text-red-600 text-lg flex-shrink-0 w-7 text-center">×</button>
+                          </div>
+                          <div className="flex gap-2 pl-6">
+                            <div className="flex-1">
+                              <label className="text-xs text-[#6B6B6B]">Series × Reps</label>
+                              <div className="flex gap-1 mt-0.5">
+                                <input value={ej.series} onChange={e => {
+                                  const d = {...rutinaBorrador}; d.dias[diaIdx].ejercicios[ejIdx].series = e.target.value; setRutinaBorrador(d)
+                                }} className="w-14 text-sm font-bold text-[#FF5C00] border border-black/10 rounded-lg px-2 py-1 focus:outline-none focus:border-[#FF5C00] text-center bg-white" placeholder="4" />
+                                <span className="text-[#6B6B6B] self-center">×</span>
+                                <input value={ej.reps} onChange={e => {
+                                  const d = {...rutinaBorrador}; d.dias[diaIdx].ejercicios[ejIdx].reps = e.target.value; setRutinaBorrador(d)
+                                }} className="flex-1 text-sm border border-black/10 rounded-lg px-2 py-1 focus:outline-none focus:border-[#FF5C00] bg-white" placeholder="12-15" />
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <label className="text-xs text-[#6B6B6B]">Descanso</label>
+                              <input value={ej.descanso} onChange={e => {
+                                const d = {...rutinaBorrador}; d.dias[diaIdx].ejercicios[ejIdx].descanso = e.target.value; setRutinaBorrador(d)
+                              }} className="w-full text-sm border border-black/10 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-[#FF5C00] bg-white" placeholder="60s" />
+                            </div>
+                          </div>
+                          <div className="pl-6">
+                            <input value={ej.notas||''} onChange={e => {
+                              const d = {...rutinaBorrador}; d.dias[diaIdx].ejercicios[ejIdx].notas = e.target.value; setRutinaBorrador(d)
+                            }} className="w-full text-xs border border-black/10 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#FF5C00] text-[#6B6B6B] bg-white" placeholder="Notas técnicas (opcional)" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div key={ejIdx} className="px-4 py-3 flex items-start gap-3">
                           {ejBib?.youtube_url ? (
                             <button onClick={() => setVideoActivo(ejBib)}
                               className="w-8 h-8 bg-[#111] hover:bg-[#FF5C00] rounded-lg flex items-center justify-center flex-shrink-0 transition-colors mt-0.5">
                               <span className="text-white text-xs">▶</span>
                             </button>
                           ) : (
-                            <div className="w-6 h-6 bg-[#FF5C00]/10 text-[#FF5C00] rounded-lg text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{ej.orden||i+1}</div>
+                            <div className="w-6 h-6 bg-[#FF5C00]/10 text-[#FF5C00] rounded-lg text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{ej.orden||ejIdx+1}</div>
                           )}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-[#0A0A0A]">{ej.nombre}</p>
@@ -575,9 +643,58 @@ export default function Rutinas({ session }) {
                         </div>
                       )
                     })}
+                    {modoEdicion && (
+                      <button onClick={() => {
+                        const d = {...rutinaBorrador}
+                        d.dias[diaIdx].ejercicios.push({ nombre: '', series: 3, reps: '10-12', descanso: '60s', notas: '' })
+                        setRutinaBorrador(d)
+                      }} className="w-full text-center text-xs text-[#FF5C00] py-2.5 hover:bg-[#FF5C00]/5 transition-colors">
+                        + Añadir ejercicio
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
+
+              {/* Botón guardar cambios (modo edición) */}
+              {modoEdicion && (
+                <button onClick={async () => {
+                  const contenido = { ...(detalle.borrador || detalle.contenido), dias: rutinaBorrador.dias }
+                  await supabase.from('rutinas').update({ borrador: contenido, contenido }).eq('id', detalle.id)
+                  setDetalle(d => ({ ...d, borrador: contenido, contenido }))
+                  setModoEdicion(false); setRutinaBorrador(null)
+                  setToast('✓ Rutina guardada')
+                }} className="w-full bg-emerald-500 text-white text-sm font-bold py-3 rounded-xl">
+                  ✓ Guardar cambios
+                </button>
+              )}
+
+              {/* Campo contexto adicional para IA */}
+              {!modoEdicion && (
+                <div>
+                  <button onClick={() => setMostrarContextoIA(!mostrarContextoIA)}
+                    className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors flex items-center gap-1">
+                    🤖 {mostrarContextoIA ? 'Ocultar' : 'Regenerar con más contexto'}
+                  </button>
+                  {mostrarContextoIA && (
+                    <div className="mt-2 space-y-2">
+                      <textarea value={contextoIA} onChange={e => setContextoIA(e.target.value)} rows={3}
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                        placeholder="Ej: Sustituir sentadilla por prensa porque tiene dolor de rodilla. Añadir más trabajo de espalda. Quitar ejercicios de impacto." />
+                      <button onClick={async () => {
+                        if (!confirm('¿Regenerar con este contexto adicional?')) return
+                        await supabase.from('rutinas').delete().eq('id', detalle.id)
+                        setDetalle(null); setMostrarContextoIA(false)
+                        await generarRutina(detalle.cliente_id, contextoIA)
+                        setContextoIA('')
+                      }} disabled={generando===detalle.cliente_id}
+                        className="w-full bg-[#6366f1] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                        🔄 Regenerar con este contexto
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Disclaimer legal */}
               <div className="bg-[#F5F5F0] border border-black/8 rounded-xl p-3 flex gap-2">
