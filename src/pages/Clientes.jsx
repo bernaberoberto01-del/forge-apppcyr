@@ -128,13 +128,41 @@ export default function Clientes({ session }) {
   }
 
   async function convertirCuestionario(c, tipoOverride) {
+    // Normalizar material al valor válido más cercano
+    const normMaterial = (m) => {
+      if (!m) return 'sin_material'
+      if (m === 'gimnasio') return 'gimnasio'
+      if (m === 'material_basico' || m === 'basico') return 'material_basico'
+      return 'sin_material'
+    }
+    // Normalizar objetivo
+    const objetos = ['perdida_grasa','ganancia_muscular','tonificacion','fuerza','rendimiento','salud_general','cambio_rapido_30dias']
+    const normObj = objetos.includes(c.objetivo) ? c.objetivo : 'salud_general'
+
     const { data: cliente, error } = await supabase.from('clientes').insert({
-      entrenador_id: uid, nombre: c.nombre, email: c.email, telefono: c.telefono,
-      objetivo: c.objetivo, tipo: tipoOverride || c.tipo || 'presencial',
-      estado: 'activo', peso_actual: c.peso_actual, nivel: c.nivel,
-      dias_semana: c.dias_semana, material: c.material, lesiones: c.lesiones,
-      notas: `Edad: ${c.edad||'—'} | Altura: ${c.altura||'—'}cm | Motivación: ${c.motivacion||'—'}`,
-      precio_mensual: 0
+      entrenador_id: uid,
+      nombre: c.nombre,
+      email: c.email,
+      telefono: c.telefono || null,
+      objetivo: normObj,
+      tipo: tipoOverride || (c.tipo === 'online' ? 'online' : 'presencial'),
+      estado: 'activo',
+      peso_actual: c.peso_actual || null,
+      peso_objetivo: null,
+      nivel: ['principiante','intermedio','avanzado'].includes(c.nivel) ? c.nivel : 'principiante',
+      dias_semana: c.dias_semana || 3,
+      material: normMaterial(c.material),
+      lesiones: c.lesiones || null,
+      notas: [
+        c.edad ? `Edad: ${c.edad}` : null,
+        c.altura ? `Altura: ${c.altura}cm` : null,
+        c.motivacion ? `Motivación: ${c.motivacion}` : null,
+        c.como_nos_conocio ? `Conocido por: ${c.como_nos_conocio}` : null,
+      ].filter(Boolean).join(' · ') || null,
+      precio_mensual: null,
+      tipo_entrenamiento: c.tipo_entrenamiento || normObj,
+      nutricion_activa: false,
+      horas_semana: c.dias_semana || 3,
     }).select().single()
     if (error) { showToast('Error: ' + error.message, 'error'); return }
     if (cliente) {
