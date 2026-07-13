@@ -32,6 +32,7 @@ import SesionCliente from './pages/SesionCliente'
 import ProgresoCliente from './pages/ProgresoCliente'
 import UnirseACentro from './pages/UnirseACentro'
 import SetupDemo from './pages/SetupDemo'
+import HealthCheck from './pages/HealthCheck'
 
 // Rutas privadas con layout
 function AppPrivada({ session }) {
@@ -114,6 +115,7 @@ export default function App() {
 
           {/* ── LOGIN ── */}
           <Route path="/setup-demo" element={<SetupDemo />} />
+          <Route path="/health" element={<HealthCheck session={session} />} />
           <Route path="/login" element={
             session ? <Navigate to="/dashboard" replace /> : <Login />
           } />
