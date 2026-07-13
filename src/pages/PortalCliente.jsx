@@ -41,6 +41,17 @@ export default function PortalCliente() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Al hacer login, vincular auth_user_id con el cliente si no está vinculado
+  useEffect(() => {
+    if (!clienteSession || !clienteId || !cliente) return
+    if (!cliente.auth_user_id) {
+      supabase.from('clientes')
+        .update({ auth_user_id: clienteSession.id })
+        .eq('id', clienteId)
+        .then(() => {})
+    }
+  }, [clienteSession, clienteId, cliente])
+
   useEffect(() => {
     async function cargar() {
       const { data: cl, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single()

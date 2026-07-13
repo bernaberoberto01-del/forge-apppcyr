@@ -10,23 +10,58 @@ export default function LoginPortal({ clienteId, onLogin, nombreNegocio, colorAc
   const [error, setError] = useState('')
   const acento = colorAccento || '#FF5C00'
 
+  async function handleRegistrar(e) {
+    e.preventDefault()
+    setLoading(true); setError('')
+    
+    const { data, error } = await supabase.auth.signUp({
+      email, password,
+      options: { 
+        data: { nombre: nombre || email.split('@')[0] },
+        emailRedirectTo: undefined
+      }
+    })
+    
+    if (error) { 
+      // Si ya existe la cuenta, intentar login directo
+      if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+        setError('Este email ya tiene cuenta. Usa "Entrar" con tu contraseña.')
+      } else {
+        setError(error.message)
+      }
+      setLoading(false); return 
+    }
+    
+    const userId = data.user?.id
+    if (userId) {
+      // Vincular auth_user_id con el cliente
+      await supabase.from('clientes').update({ auth_user_id: userId }).eq('id', clienteId)
+      
+      // Si el email necesita confirmación, hacer login igualmente
+      if (data.session) {
+        onLogin(data.user)
+      } else {
+        // Intentar login directo (puede funcionar si email confirmation está desactivado)
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password })
+        if (!loginError && loginData.user) {
+          onLogin(loginData.user)
+        } else {
+          setError('Cuenta creada. Si no puedes entrar, comprueba tu email para confirmar la cuenta.')
+        }
+      }
+    }
+    setLoading(false)
+  }
+
   async function handleEntrar(e) {
     e.preventDefault()
     setLoading(true); setError('')
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError('Email o contraseña incorrectos'); setLoading(false); return }
-    onLogin(data.user)
-    setLoading(false)
-  }
-
-  async function handleRegistrar(e) {
-    e.preventDefault()
-    setLoading(true); setError('')
-    const { data, error } = await supabase.auth.signUp({
-      email, password,
-      options: { data: { nombre: nombre || email.split('@')[0] } }
-    })
-    if (error) { setError(error.message); setLoading(false); return }
+    if (error) { 
+      setError('Email o contraseña incorrectos')
+      setLoading(false); return 
+    }
+    // Vincular si no estaba vinculado
     if (data.user) {
       await supabase.from('clientes').update({ auth_user_id: data.user.id }).eq('id', clienteId)
       onLogin(data.user)
