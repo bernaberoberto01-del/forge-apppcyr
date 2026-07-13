@@ -175,16 +175,16 @@ export default function Clientes({ session }) {
           contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu rutina. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
         })
       ])
-      // Email de bienvenida via n8n → Gmail
+      // Email de bienvenida via Edge Function (Gmail SMTP)
       if (cliente.email) {
-        fetch('https://rbernabe.app.n8n.cloud/webhook/forge-nuevo-cliente', {
+        fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/bienvenida-cliente', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cliente_id: cliente.id, nombre: cliente.nombre, email: cliente.email })
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
+          body: JSON.stringify({ cliente_id: cliente.id })
         }).catch(() => {})
-        showToast(`✓ ${c.nombre.split(' ')[0]} convertido · Email enviado con enlace al portal`)
+        showToast(`✓ ${c.nombre.split(' ')[0]} convertido · Email enviado`)
       } else {
-        showToast(`✓ ${c.nombre.split(' ')[0]} convertido como cliente`)
+        showToast(`✓ ${c.nombre.split(' ')[0]} convertido`)
       }
       setCuestionarios(prev => {
         const nuevos = prev.filter(x => x.id !== c.id)
@@ -724,14 +724,14 @@ export default function Clientes({ session }) {
                     {detalle.email && (
                       <button onClick={async () => {
                         try {
-                          // Llamar al webhook de n8n que envía por Gmail
-                          const res = await fetch('https://rbernabe.app.n8n.cloud/webhook/forge-nuevo-cliente', {
+                          const res = await fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/bienvenida-cliente', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ cliente_id: detalle.id, nombre: detalle.nombre, email: detalle.email })
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
+                            body: JSON.stringify({ cliente_id: detalle.id })
                           })
-                          if (res.ok) showToast('✓ Email de bienvenida enviado a ' + detalle.email)
-                          else showToast('Error al enviar email', 'error')
+                          const data = await res.json()
+                          if (data.ok) showToast('✓ Email de bienvenida enviado a ' + detalle.email)
+                          else showToast('Error: ' + (data.error || 'inténtalo de nuevo'), 'error')
                         } catch(e) {
                           showToast('Error de conexión', 'error')
                         }
