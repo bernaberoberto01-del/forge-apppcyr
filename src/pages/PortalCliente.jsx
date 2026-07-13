@@ -117,30 +117,26 @@ export default function PortalCliente() {
   ]
 
   async function cancelarSesion(sesionId) {
-    const { error } = await supabase.from('sesiones').update({
-      cancelada: true,
-      cancelada_por: 'cliente',
-      motivo_cancelacion: motivoCancel || 'Sin motivo indicado',
-      cancelada_at: new Date().toISOString(),
-      completada: false
-    }).eq('id', sesionId)
-
-    if (!error) {
-      await Promise.all([
-        supabase.from('alertas').insert({
+    const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
+    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/portal-accion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+      body: JSON.stringify({
+        accion: 'cancelar_sesion',
+        datos: {
+          sesion_id: sesionId,
           entrenador_id: cliente.entrenador_id,
           cliente_id: clienteId,
-          tipo: 'cancelacion_sesion',
-          mensaje: `${cliente.nombre} ha cancelado la sesión del ${new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} a las ${cancelando.hora}${motivoCancel ? '. Motivo: ' + motivoCancel : ''}`
-        }),
-        supabase.from('mensajes_cliente').insert({
-          entrenador_id: cliente.entrenador_id,
-          cliente_id: clienteId,
-          contenido: `He tenido que cancelar mi sesión del ${new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })} a las ${cancelando.hora}.${motivoCancel ? ' Motivo: ' + motivoCancel : ''}`,
-          tipo: 'cliente',
-          leido: false
-        })
-      ])
+          cliente_nombre: cliente.nombre,
+          fecha: cancelando.fecha,
+          hora: cancelando.hora,
+          motivo: motivoCancel || ''
+        }
+      })
+    })
+    const data = await res.json()
+    if (data.ok) {
       setSesionesPortal(prev => prev.filter(s => s.id !== sesionId))
     }
     setCancelando(null)
