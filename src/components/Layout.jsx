@@ -22,16 +22,23 @@ export default function Layout({ children, session, config }) {
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
   useEffect(() => {
-    if (!config?.modulos?.mensajes) return
     const uid = session?.user?.id
     if (!uid) return
-    supabase.from('mensajes_cliente').select('id', { count: 'exact' })
-      .eq('entrenador_id', uid).eq('leido_entrenador', false).neq('tipo', 'entrenador').neq('tipo', 'sistema')
-      .then(({ count }) => setMensajesNL(count || 0))
-    supabase.from('alertas').select('id', { count: 'exact' })
-      .eq('entrenador_id', uid).eq('leida', false)
-      .then(({ count }) => setAlertasNL(count || 0))
-  }, [location.pathname, config])
+    function actualizarBadges() {
+      if (config?.modulos?.mensajes !== false) {
+        supabase.from('mensajes_cliente').select('id', { count: 'exact' })
+          .eq('entrenador_id', uid).eq('leido_entrenador', false).neq('tipo', 'entrenador').neq('tipo', 'sistema')
+          .then(({ count }) => setMensajesNL(count || 0))
+      }
+      supabase.from('alertas').select('id', { count: 'exact' })
+        .eq('entrenador_id', uid).eq('leida', false)
+        .then(({ count }) => setAlertasNL(count || 0))
+    }
+    actualizarBadges()
+    // Escuchar evento cuando el Dashboard marca alertas como leídas
+    window.addEventListener('alertas-leidas', actualizarBadges)
+    return () => window.removeEventListener('alertas-leidas', actualizarBadges)
+  }, [location.pathname, config, session])
 
   const modulosActivos = TODOS_MODULOS.filter(m => !config?.modulos || config.modulos[m.id] !== false)
   const nombre = config?.nombre_entrenador || session?.user?.email?.split('@')[0] || 'Entrenador'
