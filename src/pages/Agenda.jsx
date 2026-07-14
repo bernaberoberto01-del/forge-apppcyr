@@ -144,8 +144,8 @@ export default function Agenda({ session }) {
     const hace60 = new Date(Date.now() - 60*864e5).toISOString().split('T')[0]
     const [{ data: se }, { data: cl }, { data: he }, { data: rc }] = await Promise.all([
       centro
-        ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).gte('fecha', hace60).order('fecha').order('hora')
-        : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha').order('hora'),
+        ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
+        : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
       supabase.from('clientes').select('id,nombre,tipo,horas_semana').eq('entrenador_id', uid).eq('estado','activo'),
       supabase.from('horas_extra').select('*').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha', { ascending: false }),
       supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activa', true),
