@@ -44,9 +44,10 @@ function AppPrivada({ session }) {
     </div>
   )
 
-  // Si es entrenador de centro (tiene config de otro) → portal entrenador
-  // Solo va al portal si NO tiene config propia (no es owner/admin)
-  if (!config?.nombre_negocio && window.location.pathname === '/') {
+  // Si no tiene config propia (no es owner/admin, o la cuenta ni siquiera es de
+  // un entrenador) → portal entrenador. Se comprueba en TODAS las rutas privadas,
+  // no solo en "/", para que no baste con teclear /dashboard directamente.
+  if (!config?.nombre_negocio) {
     return <Navigate to="/portal-entrenador" replace />
   }
 

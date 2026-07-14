@@ -36,7 +36,10 @@ function aplicarColor(acento) {
 }
 
 export function useConfigLoader(uid) {
-  const [config, setConfig] = useState(defaultConfig)
+  // null = todavía no sabemos si esta cuenta tiene configuración propia de
+  // entrenador. No usar defaultConfig aquí: tiene un nombre_negocio de relleno
+  // que haría parecer "es entrenador" a cualquier cuenta sin fila real.
+  const [config, setConfig] = useState(null)
   const [loading, setLoading] = useState(true)
 
   async function cargar() {
@@ -51,6 +54,8 @@ export function useConfigLoader(uid) {
       }
       setConfig(merged)
       aplicarColor(merged.color_acento)
+    } else {
+      setConfig(null)
     }
     setLoading(false)
   }
