@@ -346,7 +346,7 @@ export default function PortalCliente() {
 
             {/* Botones de registro rápido */}
             <div className="grid grid-cols-2 gap-3">
-              <a href={`https://forge-studio-os.vercel.app/checkin/${clienteId}`} target="_blank" rel="noreferrer"
+              <a href={`https://forge-studio-os.vercel.app/seguimiento/${clienteId}`} target="_blank" rel="noreferrer"
                 className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
                 <span className="text-2xl">📋</span>
                 <p className="text-sm font-bold text-[#0A0A0A]">Check-in semanal</p>
