@@ -463,6 +463,8 @@ export default function PortalCliente() {
               const diffSemanas = Math.ceil((new Date(ultimo.fecha) - new Date(primero.fecha)) / (7*864e5))
               const bajando = diffPeso !== null && diffPeso < 0
               const subiendo = diffPeso !== null && diffPeso > 0
+              const energiaMedia = checkins.filter(c=>c.energia).reduce((s,c)=>s+c.energia,0) / (checkins.filter(c=>c.energia).length || 1)
+              const adherenciaMedia = checkins.filter(c=>c.adherencia_entreno).reduce((s,c)=>s+c.adherencia_entreno,0) / (checkins.filter(c=>c.adherencia_entreno).length || 1)
               return (
                 <div className="bg-[#111] rounded-2xl p-5">
                   <p className="text-white/60 text-xs mb-3">Tu progreso — últimas {diffSemanas} semanas</p>
@@ -472,14 +474,12 @@ export default function PortalCliente() {
                         <p className="text-4xl font-bold" style={{color: bajando ? '#10b981' : subiendo ? '#6366f1' : '#fff'}}>
                           {bajando ? '' : '+'}{diffPeso.toFixed(1)}kg
                         </p>
-                        <p className="text-white/50 text-xs mt-1">
-                          {primero.peso}kg → {ultimo.peso}kg
-                        </p>
+                        <p className="text-white/50 text-xs mt-1">{primero.peso}kg → {ultimo.peso}kg</p>
                       </div>
                       <div className="flex-1 flex items-end gap-0.5 h-12 pb-1">
                         {checkins.slice().reverse().filter(ci=>ci.peso).map((ci,i,arr) => {
-                          const min = Math.min(...arr.map(c=>c.peso))
-                          const max = Math.max(...arr.map(c=>c.peso))
+                          const min = Math.min(...arr.map(x=>x.peso))
+                          const max = Math.max(...arr.map(x=>x.peso))
                           const h = max===min ? 50 : ((ci.peso-min)/(max-min))*80+20
                           return <div key={ci.id} className="flex-1 rounded-sm opacity-60" style={{height:`${h}%`,background:'#FF5C00'}}/>
                         })}
@@ -488,9 +488,9 @@ export default function PortalCliente() {
                   )}
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      ['⚡', 'Energía media', checkins.filter(c=>c.energia).reduce((s,c)=>s+c.energia,0)/checkins.filter(c=>c.energia).length, '/10'],
-                      ['💪', 'Adherencia media', checkins.filter(c=>c.adherencia_entreno).reduce((s,c)=>s+c.adherencia_entreno,0)/checkins.filter(c=>c.adherencia_entreno).length, '/10'],
-                      ['📅', 'Check-ins totales', checkins.length, ''],
+                      ['⚡','Energía media', energiaMedia, '/10'],
+                      ['💪','Adherencia media', adherenciaMedia, '/10'],
+                      ['📅','Check-ins totales', checkins.length, ''],
                     ].map(([icon,label,val,suf]) => (
                       <div key={label} className="bg-white/5 rounded-xl p-2.5 text-center">
                         <p className="text-base">{icon}</p>
@@ -594,10 +594,71 @@ export default function PortalCliente() {
               </div>
               <p className="text-xs text-[#6B6B6B] text-center mt-1.5">Enter para enviar · Shift+Enter para nueva línea</p>
             </div>
+            {/* Fotos de progreso dentro del tab Progreso */}
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+              <div className="px-4 pt-4 pb-3 border-b border-black/5">
+                <p className="text-sm font-bold text-[#0A0A0A] mb-3">📸 Fotos de progreso</p>
+                {/* Subir foto */}
+                <div className="bg-[#F5F5F0] rounded-xl p-3 space-y-2">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {['frontal','lateral','espalda'].map(t => (
+                      <button key={t} onClick={() => setTipoFoto(t)}
+                        className={`py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${tipoFoto===t ? 'text-white shadow-sm' : 'bg-white text-[#6B6B6B]'}`}
+                        style={tipoFoto===t ? {background: configEntrenador?.color_acento||'#FF5C00'} : {}}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="number" value={pesoFoto} onChange={e => setPesoFoto(e.target.value)}
+                    placeholder="Peso del día (kg) — opcional"
+                    className="w-full bg-white border border-black/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  {errorFoto && <p className="text-red-500 text-xs">{errorFoto}</p>}
+                  <label className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold cursor-pointer transition-all active:scale-95 ${subiendoFoto?'opacity-50':''}`}
+                    style={{background: configEntrenador?.color_acento||'#FF5C00'}}>
+                    {subiendoFoto
+                      ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Subiendo...</>
+                      : <>📷 Subir foto {tipoFoto}</>}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={subirFoto} disabled={subiendoFoto} />
+                  </label>
+                </div>
+              </div>
+              {/* Galería */}
+              {fotos.length === 0 ? (
+                <div className="p-8 text-center">
+                  <p className="text-3xl mb-2">📷</p>
+                  <p className="text-sm text-[#6B6B6B]">Sube tu primera foto de progreso</p>
+                </div>
+              ) : (
+                <div className="p-4 space-y-4">
+                  {Object.entries(fotos.reduce((acc, f) => {
+                    if (!acc[f.fecha]) acc[f.fecha] = []
+                    acc[f.fecha].push(f)
+                    return acc
+                  }, {})).map(([fecha, fotosDia]) => (
+                    <div key={fecha}>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-[#0A0A0A]">
+                          {new Date(fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long'})}
+                        </p>
+                        {fotosDia[0]?.peso && <p className="text-xs font-bold text-[#FF5C00]">{fotosDia[0].peso}kg</p>}
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {fotosDia.map(f => (
+                          <div key={f.id} className="relative">
+                            <img src={f.url} alt={f.tipo} className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
+                            <div className="absolute bottom-0 left-0 right-0 bg-black/50 rounded-b-xl px-2 py-1 text-center">
+                              <span className="text-white text-xs capitalize">{f.tipo}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
-        {/* FOTOS */}
-        {tab==='fotos' && (
           <div className="space-y-4">
             <div className="bg-[#111] rounded-2xl p-4">
               <p className="text-white font-bold mb-3">📸 Subir foto de progreso</p>
@@ -654,23 +715,6 @@ export default function PortalCliente() {
               <div key={fecha}>
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-[#0A0A0A]">{new Date(fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</p>
-                  {fotosDia[0]?.peso && <p className="text-xs font-bold text-[#FF5C00]">{fotosDia[0].peso}kg</p>}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {fotosDia.map(f => (
-                    <div key={f.id} className="relative">
-                      <img src={f.url} alt={f.tipo} className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 rounded-b-xl px-2 py-1 text-center">
-                        <span className="text-white text-xs capitalize">{f.tipo}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Tab pagos del cliente */}
         {tab==='pagos_cliente' && (
           <div className="space-y-3">
