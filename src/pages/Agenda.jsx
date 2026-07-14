@@ -618,7 +618,7 @@ export default function Agenda({ session }) {
       {/* Modal nueva sesión */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-5">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-4">
               Nueva sesión — {diaClick ? new Date(diaClick+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'}) : ''}
             </h2>
