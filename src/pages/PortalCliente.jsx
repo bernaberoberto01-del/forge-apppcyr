@@ -35,6 +35,9 @@ export default function PortalCliente() {
   const [biblioteca, setBiblioteca] = useState([])
   const [videoEj, setVideoEj] = useState(null)
   const [fotos, setFotos] = useState([])
+  const [subTabProgreso, setSubTabProgreso] = useState('peso')
+  const [medidas, setMedidas] = useState({})
+  const [historialMedidas, setHistorialMedidas] = useState([])
 
   // Verificar sesión de Supabase al montar
   useEffect(() => {
@@ -118,7 +121,7 @@ export default function PortalCliente() {
   const pesoInicial = checkins.length > 1 ? checkins[checkins.length-1]?.peso : cliente?.peso_actual
   const diferencia = pesoInicial && pesoActual ? (pesoActual - pesoInicial).toFixed(1) : null
   const ultimoCI = checkins[0]
-  const mensajesNoLeidos = mensajes.filter(m => !m.leido).length
+  const mensajesNoLeidos = mensajes.filter(m => !m.leido && m.tipo === 'entrenador').length
   const pagoActivo = pagos[0]
   const diasRestantes = pagoActivo?.valido_hasta ? Math.ceil((new Date(pagoActivo.valido_hasta) - new Date()) / 864e5) : null
   const sesionesEstasSemana = 0 // placeholder
