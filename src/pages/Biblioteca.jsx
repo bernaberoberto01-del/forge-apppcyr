@@ -12,7 +12,7 @@ const MODALIDADES_LABEL = {
 function VideoModal({ ejercicio, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#111] rounded-2xl w-full max-w-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#111] rounded-2xl w-full max-w-2xl overflow-hidden" onClick={e = onClick={e = onClick={e => e.stopPropagation()}> e.stopPropagation()}> e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div>
             <h2 className="text-white font-bold">{ejercicio.nombre}</h2>

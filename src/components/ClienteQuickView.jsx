@@ -42,7 +42,7 @@ export default function ClienteQuickView({ clienteId, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={e = onClick={e => e.stopPropagation()}> e.stopPropagation()}>
         {loading ? (
           <div className="flex items-center justify-center h-40">
             <div className="w-6 h-6 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>

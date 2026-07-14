@@ -675,7 +675,7 @@ export default function Agenda({ session }) {
       {/* Modal sesión recurrente */}
       {modalRecurrente && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalRecurrente(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-1">Nueva sesión recurrente</h2>
             <p className="text-xs text-[#6B6B6B] mb-4">Se repite automáticamente cada semana los días que selecciones</p>
             <div className="space-y-3">
