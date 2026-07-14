@@ -26,6 +26,12 @@ export default function PortalCliente() {
   const [cancelando, setCancelando] = useState(null) // id de sesión que se está cancelando
   const [motivoCancel, setMotivoCancel] = useState('')
   const [sesionesPortal, setSesionesPortal] = useState([])
+  const [textoMsg, setTextoMsg] = useState('')
+  const [enviandoMsg, setEnviandoMsg] = useState(false)
+  const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const [tipoFoto, setTipoFoto] = useState('frontal')
+  const [pesoFoto, setPesoFoto] = useState('')
+  const [errorFoto, setErrorFoto] = useState('')
   const [biblioteca, setBiblioteca] = useState([])
   const [videoEj, setVideoEj] = useState(null)
   const [fotos, setFotos] = useState([])
@@ -123,7 +129,7 @@ export default function PortalCliente() {
     { id: 'progreso', label: 'Progreso', icon: '📈' },
     { id: 'mensajes', label: 'Mensajes', icon: '✉️', badge: mensajesNoLeidos > 0 ? mensajesNoLeidos : 0 },
     ...(planNutricion || cliente?.nutricion_activa ? [{ id: 'nutricion', label: 'Nutrición', icon: '🥗' }] : []),
-    ...(fotos.length > 0 ? [{ id: 'fotos', label: 'Fotos', icon: '📸' }] : []),
+    { id: 'fotos', label: 'Fotos', icon: '📸' },
     ...(pagos.length > 0 ? [{ id: 'pagos_cliente', label: 'Pagos', icon: '💳' }] : []),
   ]
 
@@ -522,166 +528,148 @@ export default function PortalCliente() {
         )}
 
         {/* MENSAJES */}
-        {tab==='mensajes' && (() => {
-          const [textoMsg, setTextoMsg] = useState('')
-          const [enviandoMsg, setEnviandoMsg] = useState(false)
-
-          async function enviarMensaje() {
-            if (!textoMsg.trim()) return
-            setEnviandoMsg(true)
-            await fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/portal-accion', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
-              body: JSON.stringify({ accion: 'enviar_mensaje', datos: { entrenador_id: cliente.entrenador_id, cliente_id: clienteId, contenido: textoMsg.trim() } })
-            })
-            setTextoMsg('')
-            // Recargar mensajes
-            const { data } = await supabase.from('mensajes_cliente').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false })
-            setMensajes(data || [])
-            setEnviandoMsg(false)
-          }
-
-          return (
-            <>
-              {/* Chat */}
-              <div className="space-y-3 mb-4">
-                {mensajes.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
-                    <p className="text-4xl mb-3">✉️</p>
-                    <p className="text-sm font-semibold text-[#0A0A0A]">Sin mensajes todavía</p>
-                    <p className="text-xs text-[#6B6B6B] mt-1">Escribe a tu entrenador aquí abajo</p>
-                  </div>
-                ) : [...mensajes].reverse().map(m => (
-                  <div key={m.id} className={`flex ${m.tipo === 'cliente' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${m.tipo === 'cliente' ? 'bg-[#FF5C00] text-white rounded-br-sm' : 'bg-white border border-black/5 shadow-sm text-[#0A0A0A] rounded-bl-sm'}`}>
-                      {m.tipo !== 'cliente' && (
-                        <p className="text-xs font-semibold mb-1 opacity-60">{configEntrenador?.nombre_entrenador || 'Tu entrenador'}</p>
-                      )}
-                      <p className="text-sm leading-relaxed">{m.contenido}</p>
-                      <p className={`text-xs mt-1.5 ${m.tipo === 'cliente' ? 'text-white/60' : 'text-[#6B6B6B]'}`}>
-                        {new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Input enviar */}
-              <div className="sticky bottom-4 bg-[#F5F5F0] pt-2">
-                <div className="flex gap-2 bg-white border border-black/10 rounded-2xl p-2 shadow-sm">
-                  <textarea value={textoMsg} onChange={e => setTextoMsg(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviarMensaje() }}}
-                    placeholder="Escribe a tu entrenador..."
-                    rows={2}
-                    className="flex-1 text-sm text-[#0A0A0A] placeholder:text-[#6B6B6B] resize-none focus:outline-none px-2 py-1" />
-                  <button onClick={enviarMensaje} disabled={!textoMsg.trim() || enviandoMsg}
-                    className="w-10 h-10 bg-[#FF5C00] rounded-xl flex items-center justify-center text-white flex-shrink-0 self-end disabled:opacity-40 transition-all active:scale-95">
-                    {enviandoMsg ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <span className="text-base">↑</span>}
-                  </button>
-                </div>
-                <p className="text-xs text-[#6B6B6B] text-center mt-1.5">Enter para enviar · Shift+Enter para nueva línea</p>
-              </div>
-            </>
-          )
-        })()}
-        {/* FOTOS */}
-        {tab==='fotos' && (() => {
-          const [subiendoFoto, setSubiendoFoto] = useState(false)
-          const [tipoFoto, setTipoFoto] = useState('frontal')
-          const [pesoFoto, setPesoFoto] = useState('')
-          const [errorFoto, setErrorFoto] = useState('')
-
-          async function subirFoto(e) {
-            const file = e.target.files?.[0]
-            if (!file) return
-            if (file.size > 10 * 1024 * 1024) { setErrorFoto('La foto no puede superar 10MB'); return }
-            setSubiendoFoto(true); setErrorFoto('')
-            try {
-              const ext = file.name.split('.').pop()
-              const path = `${clienteId}/${Date.now()}_${tipoFoto}.${ext}`
-              const { error: uploadError } = await supabase.storage.from('progress-photos').upload(path, file, { upsert: false })
-              if (uploadError) throw new Error(uploadError.message)
-              const { data: { publicUrl } } = supabase.storage.from('progress-photos').getPublicUrl(path)
-              const { error: dbError } = await supabase.from('fotos_progreso').insert({
-                entrenador_id: cliente.entrenador_id, cliente_id: clienteId,
-                url: publicUrl, fecha: new Date().toISOString().split('T')[0],
-                tipo: tipoFoto, peso: pesoFoto ? Number(pesoFoto) : null,
-                visible_cliente: true
-              })
-              if (dbError) throw new Error(dbError.message)
-              // Recargar fotos
-              const { data } = await supabase.from('fotos_progreso').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false })
-              setFotos(data || [])
-              setPesoFoto('')
-            } catch(err) {
-              setErrorFoto(err.message)
-            }
-            setSubiendoFoto(false)
-          }
-
-          return (
-            <div className="space-y-4">
-              {/* Subir nueva foto */}
-              <div className="bg-[#111] rounded-2xl p-4">
-                <p className="text-white font-bold mb-3">📸 Subir foto de progreso</p>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  {['frontal','lateral','espalda'].map(t => (
-                    <button key={t} onClick={() => setTipoFoto(t)}
-                      className={`py-2 rounded-xl text-xs font-semibold capitalize transition-all ${tipoFoto===t ? 'text-white' : 'bg-white/10 text-white/50'}`}
-                      style={tipoFoto===t ? { background: configEntrenador?.color_acento || '#FF5C00' } : {}}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                <input type="number" value={pesoFoto} onChange={e => setPesoFoto(e.target.value)}
-                  placeholder="Peso actual (kg) — opcional"
-                  className="w-full bg-white/10 text-white placeholder:text-white/30 text-sm rounded-xl px-3 py-2.5 mb-3 focus:outline-none focus:bg-white/15" />
-                {errorFoto && <p className="text-red-400 text-xs mb-2">{errorFoto}</p>}
-                <label className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold cursor-pointer transition-all active:scale-95 ${subiendoFoto ? 'opacity-50' : ''}`}
-                  style={{ background: configEntrenador?.color_acento || '#FF5C00' }}>
-                  {subiendoFoto
-                    ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Subiendo...</>
-                    : <><span>📷</span> Seleccionar foto</>
-                  }
-                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={subirFoto} disabled={subiendoFoto} />
-                </label>
-                <p className="text-white/30 text-xs text-center mt-2">Toca para abrir la cámara o galería · Máx 10MB</p>
-              </div>
-
-              {/* Fotos existentes */}
-              {fotos.length === 0 ? (
+        {tab==='mensajes' && (
+          <>
+            {/* Chat */}
+            <div className="space-y-3 mb-4">
+              {mensajes.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
-                  <p className="text-4xl mb-3">📸</p>
-                  <p className="text-sm font-semibold text-[#0A0A0A]">Sin fotos todavía</p>
-                  <p className="text-xs text-[#6B6B6B] mt-1">Sube tu primera foto de progreso</p>
+                  <p className="text-4xl mb-3">✉️</p>
+                  <p className="text-sm font-semibold text-[#0A0A0A]">Sin mensajes todavía</p>
+                  <p className="text-xs text-[#6B6B6B] mt-1">Escribe a tu entrenador aquí abajo</p>
                 </div>
-              ) : Object.entries(fotos.reduce((acc, f) => {
-                if (!acc[f.fecha]) acc[f.fecha] = []
-                acc[f.fecha].push(f)
-                return acc
-              }, {})).map(([fecha, fotosDia]) => (
-                <div key={fecha}>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-[#0A0A0A]">
-                      {new Date(fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+              ) : [...mensajes].reverse().map(m => (
+                <div key={m.id} className={`flex ${m.tipo === 'cliente' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${m.tipo === 'cliente' ? 'bg-[#FF5C00] text-white rounded-br-sm' : 'bg-white border border-black/5 shadow-sm text-[#0A0A0A] rounded-bl-sm'}`}>
+                    {m.tipo !== 'cliente' && (
+                      <p className="text-xs font-semibold mb-1 opacity-60">{configEntrenador?.nombre_entrenador || 'Tu entrenador'}</p>
+                    )}
+                    <p className="text-sm leading-relaxed">{m.contenido}</p>
+                    <p className={`text-xs mt-1.5 ${m.tipo === 'cliente' ? 'text-white/60' : 'text-[#6B6B6B]'}`}>
+                      {new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
                     </p>
-                    {fotosDia[0]?.peso && <p className="text-xs font-bold text-[#FF5C00]">{fotosDia[0].peso}kg</p>}
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {fotosDia.map(f => (
-                      <div key={f.id} className="relative">
-                        <img src={f.url} alt={f.tipo} className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 rounded-b-xl px-2 py-1 text-center">
-                          <span className="text-white text-xs capitalize">{f.tipo}</span>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
               ))}
             </div>
-          )
-        })()}
+            {/* Input */}
+            <div className="sticky bottom-4 bg-[#F5F5F0] pt-2">
+              <div className="flex gap-2 bg-white border border-black/10 rounded-2xl p-2 shadow-sm">
+                <textarea value={textoMsg} onChange={e => setTextoMsg(e.target.value)}
+                  onKeyDown={async e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (!textoMsg.trim() || enviandoMsg) return
+                      setEnviandoMsg(true)
+                      await fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/portal-accion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
+                        body: JSON.stringify({ accion: 'enviar_mensaje', datos: { entrenador_id: cliente.entrenador_id, cliente_id: clienteId, contenido: textoMsg.trim() } })
+                      })
+                      setTextoMsg('')
+                      const { data } = await supabase.from('mensajes_cliente').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false })
+                      setMensajes(data || [])
+                      setEnviandoMsg(false)
+                    }
+                  }}
+                  placeholder="Escribe a tu entrenador..." rows={2}
+                  className="flex-1 text-sm text-[#0A0A0A] placeholder:text-[#6B6B6B] resize-none focus:outline-none px-2 py-1" />
+                <button onClick={async () => {
+                  if (!textoMsg.trim() || enviandoMsg) return
+                  setEnviandoMsg(true)
+                  await fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/portal-accion', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
+                    body: JSON.stringify({ accion: 'enviar_mensaje', datos: { entrenador_id: cliente.entrenador_id, cliente_id: clienteId, contenido: textoMsg.trim() } })
+                  })
+                  setTextoMsg('')
+                  const { data } = await supabase.from('mensajes_cliente').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false })
+                  setMensajes(data || [])
+                  setEnviandoMsg(false)
+                }} disabled={!textoMsg.trim() || enviandoMsg}
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0 self-end disabled:opacity-40 active:scale-95"
+                  style={{background: configEntrenador?.color_acento || '#FF5C00'}}>
+                  {enviandoMsg ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : '↑'}
+                </button>
+              </div>
+              <p className="text-xs text-[#6B6B6B] text-center mt-1.5">Enter para enviar · Shift+Enter para nueva línea</p>
+            </div>
+          </>
+        )}
+        {/* FOTOS */}
+        {tab==='fotos' && (
+          <div className="space-y-4">
+            <div className="bg-[#111] rounded-2xl p-4">
+              <p className="text-white font-bold mb-3">📸 Subir foto de progreso</p>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {['frontal','lateral','espalda'].map(t => (
+                  <button key={t} onClick={() => setTipoFoto(t)}
+                    className={`py-2 rounded-xl text-xs font-semibold capitalize transition-all ${tipoFoto===t ? 'text-white' : 'bg-white/10 text-white/50'}`}
+                    style={tipoFoto===t ? { background: configEntrenador?.color_acento || '#FF5C00' } : {}}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <input type="number" value={pesoFoto} onChange={e => setPesoFoto(e.target.value)}
+                placeholder="Peso actual (kg) — opcional"
+                className="w-full bg-white/10 text-white placeholder:text-white/30 text-sm rounded-xl px-3 py-2.5 mb-3 focus:outline-none" />
+              {errorFoto && <p className="text-red-400 text-xs mb-2">{errorFoto}</p>}
+              <label className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold cursor-pointer active:scale-95 ${subiendoFoto ? 'opacity-50' : ''}`}
+                style={{ background: configEntrenador?.color_acento || '#FF5C00' }}>
+                {subiendoFoto ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Subiendo...</> : <><span>📷</span> Seleccionar foto</>}
+                <input type="file" accept="image/*" capture="environment" className="hidden" disabled={subiendoFoto}
+                  onChange={async e => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    if (file.size > 10*1024*1024) { setErrorFoto('La foto no puede superar 10MB'); return }
+                    setSubiendoFoto(true); setErrorFoto('')
+                    try {
+                      const ext = file.name.split('.').pop()
+                      const path = `${clienteId}/${Date.now()}_${tipoFoto}.${ext}`
+                      const { error: upErr } = await supabase.storage.from('progress-photos').upload(path, file)
+                      if (upErr) throw new Error(upErr.message)
+                      const { data: { publicUrl } } = supabase.storage.from('progress-photos').getPublicUrl(path)
+                      const { error: dbErr } = await supabase.from('fotos_progreso').insert({
+                        entrenador_id: cliente.entrenador_id, cliente_id: clienteId,
+                        url: publicUrl, fecha: new Date().toISOString().split('T')[0],
+                        tipo: tipoFoto, peso: pesoFoto ? Number(pesoFoto) : null, visible_cliente: true
+                      })
+                      if (dbErr) throw new Error(dbErr.message)
+                      const { data } = await supabase.from('fotos_progreso').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false })
+                      setFotos(data || [])
+                      setPesoFoto('')
+                    } catch(err) { setErrorFoto(err.message) }
+                    setSubiendoFoto(false)
+                  }} />
+              </label>
+              <p className="text-white/30 text-xs text-center mt-2">Abre la cámara o galería · Máx 10MB</p>
+            </div>
+            {fotos.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
+                <p className="text-4xl mb-3">📸</p>
+                <p className="text-sm font-semibold text-[#0A0A0A]">Sin fotos todavía</p>
+                <p className="text-xs text-[#6B6B6B] mt-1">Sube tu primera foto de progreso</p>
+              </div>
+            ) : Object.entries(fotos.reduce((acc,f) => { if(!acc[f.fecha])acc[f.fecha]=[]; acc[f.fecha].push(f); return acc }, {})).map(([fecha, fotosDia]) => (
+              <div key={fecha}>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-[#0A0A0A]">{new Date(fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</p>
+                  {fotosDia[0]?.peso && <p className="text-xs font-bold text-[#FF5C00]">{fotosDia[0].peso}kg</p>}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {fotosDia.map(f => (
+                    <div key={f.id} className="relative">
+                      <img src={f.url} alt={f.tipo} className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 rounded-b-xl px-2 py-1 text-center">
+                        <span className="text-white text-xs capitalize">{f.tipo}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Tab pagos del cliente */}
         {tab==='pagos_cliente' && (
