@@ -42,18 +42,28 @@ export default function PortalCliente() {
   // Verificar sesión de Supabase al montar
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      // Si hay sesión pero el email no coincide con el cliente, ignorarla
+      // (evita que la sesión del entrenador se use en el portal)
+      if (session?.user && cliente && session.user.email !== cliente.email) {
+        setClienteSession(null)
+        return
+      }
       setClienteSession(session?.user || null)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session?.user && cliente && session.user.email !== cliente.email) {
+        setClienteSession(null)
+        return
+      }
       setClienteSession(session?.user || null)
     })
     return () => subscription.unsubscribe()
-  }, [])
+  }, [cliente])
 
-  // Al hacer login, vincular auth_user_id con el cliente si no está vinculado
+  // Al hacer login, vincular auth_user_id solo si el email coincide con el cliente
   useEffect(() => {
     if (!clienteSession || !clienteId || !cliente) return
-    if (!cliente.auth_user_id) {
+    if (!cliente.auth_user_id && clienteSession.email === cliente.email) {
       supabase.from('clientes')
         .update({ auth_user_id: clienteSession.id })
         .eq('id', clienteId)
