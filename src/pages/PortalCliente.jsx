@@ -344,6 +344,22 @@ export default function PortalCliente() {
               ))}
             </div>
 
+            {/* Botones de registro rápido */}
+            <div className="grid grid-cols-2 gap-3">
+              <a href={`https://forge-studio-os.vercel.app/checkin/${clienteId}`} target="_blank" rel="noreferrer"
+                className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
+                <span className="text-2xl">📋</span>
+                <p className="text-sm font-bold text-[#0A0A0A]">Check-in semanal</p>
+                <p className="text-xs text-[#6B6B6B] text-center">Registra cómo te encuentras esta semana</p>
+              </a>
+              <a href={`https://forge-studio-os.vercel.app/sesion/${clienteId}`} target="_blank" rel="noreferrer"
+                className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
+                <span className="text-2xl">🏋️</span>
+                <p className="text-sm font-bold text-[#0A0A0A]">Registrar sesión</p>
+                <p className="text-xs text-[#6B6B6B] text-center">Apunta el entreno de hoy</p>
+              </a>
+            </div>
+
             {/* Último check-in */}
             {checkins[0] && (
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
@@ -456,6 +472,14 @@ export default function PortalCliente() {
                     </div>
                   )
                 })()}
+
+                {/* Gráficas de evolución */}
+                <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-3">Evolución y gráficas</p>
+                  <GraficasCliente clienteId={clienteId} />
+                </div>
+
+                {/* Historial check-ins */}
                 {checkins.slice(0,6).map(ci => (
                   <div key={ci.id} className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
                     <p className="text-xs font-medium text-[#6B6B6B] mb-2">{new Date(ci.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'long'})}</p>
