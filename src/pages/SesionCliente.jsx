@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { getPesoRecomendado } from '../utils/pesos'
 
 export default function SesionCliente() {
   const { clienteId } = useParams()
@@ -20,35 +19,29 @@ export default function SesionCliente() {
 
   useEffect(() => {
     async function cargar() {
-      const [{ data: cl }, { data: ru }, { data: cu }, { data: pf }] = await Promise.all([
+      const [{ data: cl }, { data: ru }] = await Promise.all([
         supabase.from('clientes').select('*').eq('id', clienteId).single(),
         supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
-        supabase.from('cuestionarios').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }).limit(1),
-        supabase.from('progresion_fuerza').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(1),
       ])
       if (!cl) { setLoading(false); return }
       setCliente(cl)
       if (ru?.[0]) {
         setRutina(ru[0])
-        cargarDia(ru[0], 1, cu?.[0], pf?.[0])
+        cargarDia(ru[0], 1)
       }
       setLoading(false)
     }
     cargar()
   }, [clienteId])
 
-  function cargarDia(ru, dia, cuest, pf) {
+  function cargarDia(ru, dia) {
     const contenido = ru.contenido || ru.borrador
-    const d = contenido?.dias?.find(x => x.dia === dia)
+    const d = contenido?.dias?.find(x => x.dia === dia) || contenido?.dias?.[dia - 1]
     if (d?.ejercicios) {
-      setEjercicios(d.ejercicios.map(ej => {
-        const pesoRec = getPesoRecomendado(ej.nombre, ej.patron, cliente?.nivel, pf, cuest)
-        return {
-          ejercicio_nombre: ej.nombre, patron: ej.patron, orden: ej.orden, notas: ej.notas || '',
-          peso_recomendado: pesoRec,
-          sets: Array.from({ length: ej.series || 3 }, (_, i) => ({ set: i + 1, peso: pesoRec ? String(pesoRec) : '', reps: ej.reps || '', completado: false }))
-        }
-      }))
+      setEjercicios(d.ejercicios.map(ej => ({
+        ejercicio_nombre: ej.nombre, patron: ej.patron, orden: ej.orden, notas: ej.notas || '',
+        sets: Array.from({ length: ej.series || 3 }, (_, i) => ({ set: i + 1, peso: '', reps: ej.reps || '', completado: false }))
+      })))
     }
   }
 
@@ -60,7 +53,7 @@ export default function SesionCliente() {
 
   async function guardar() {
     setGuardando(true)
-    const { data: sesion } = await supabase.from('sesiones').insert({
+    const { data: sesionData, error: sesionError } = await supabase.from('sesiones').insert({
       entrenador_id: cliente.entrenador_id,
       cliente_id: clienteId,
       fecha: new Date().toISOString().split('T')[0],
@@ -69,12 +62,12 @@ export default function SesionCliente() {
       duracion_minutos: duracion, dia_rutina: diaSeleccionado
     }).select('id').single()
 
-    if (sesion.data) {
-      const ejsFiltrados = ejercicios.filter(e => e.sets.some(s => s.peso || s.reps))
+    if (!sesionError && sesionData?.id) {
+      const ejsFiltrados = ejercicios.filter(e => e.sets.some(s => s.peso || s.completado))
       if (ejsFiltrados.length > 0) {
         await supabase.from('sesion_ejercicios').insert(
           ejsFiltrados.map(e => ({
-            sesion_id: sesion.data.id, cliente_id: clienteId,
+            sesion_id: sesionData.id, cliente_id: clienteId,
             entrenador_id: cliente.entrenador_id,
             ejercicio_nombre: e.ejercicio_nombre, patron: e.patron, orden: e.orden,
             sets: e.sets, notas: e.notas
@@ -107,7 +100,14 @@ export default function SesionCliente() {
         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5 text-4xl">💪</div>
         <h2 className="text-2xl font-bold text-[#0A0A0A] mb-2">¡Sesión registrada!</h2>
         <p className="text-[#6B6B6B] text-sm">Tu entrenador ya puede ver tu entrenamiento de hoy.</p>
-        <a href={`/portal/${clienteId}`} className="block mt-6 bg-[#111] text-white font-semibold py-3.5 rounded-2xl text-sm">Ver mi portal →</a>
+        <a href={`https://forge-studio-os.vercel.app/portal/${clienteId}`}
+          className="block mt-6 bg-[#FF5C00] text-white font-semibold py-3.5 rounded-2xl text-sm text-center">
+          Ver mi portal →
+        </a>
+        <button onClick={() => { setEnviado(false); setPaso(1) }}
+          className="block w-full mt-2 text-center text-xs text-[#6B6B6B] py-2">
+          Registrar otra sesión
+        </button>
       </div>
     </div>
   )
