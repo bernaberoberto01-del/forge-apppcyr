@@ -274,10 +274,10 @@ export default function PortalCliente() {
         {/* ===== INICIO ===== */}
         {tab === 'inicio' && (
           <>
-            {/* Próximas sesiones */}
-            {sesionesPortal.length > 0 && (
+            {/* PRESENCIAL: próximas sesiones agendadas con opción de cancelar */}
+            {cliente?.tipo === 'presencial' && sesionesPortal.length > 0 && (
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-                <p className="text-sm font-bold text-[#0A0A0A] mb-3">Próximas sesiones</p>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-3">📅 Próximas sesiones</p>
                 <div className="space-y-2">
                   {sesionesPortal.slice(0,4).map(s => {
                     const esHoy = s.fecha === new Date().toISOString().split('T')[0]
@@ -300,7 +300,16 @@ export default function PortalCliente() {
               </div>
             )}
 
-            {/* Modal cancelación */}
+            {/* PRESENCIAL sin sesiones agendadas */}
+            {cliente?.tipo === 'presencial' && sesionesPortal.length === 0 && (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 text-center">
+                <p className="text-3xl mb-2">📅</p>
+                <p className="text-sm font-semibold text-[#0A0A0A]">Sin sesiones próximas</p>
+                <p className="text-xs text-[#6B6B6B] mt-1">Tu entrenador agendará tus próximas sesiones</p>
+              </div>
+            )}
+
+            {/* Modal cancelación — solo presencial */}
             {cancelando && (
               <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center p-4" onClick={() => { setCancelando(null); setMotivoCancel('') }}>
                 <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
@@ -344,21 +353,35 @@ export default function PortalCliente() {
               ))}
             </div>
 
-            {/* Botones de registro rápido */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* ONLINE: botones de registro de actividad propia */}
+            {cliente?.tipo === 'online' && (
+              <div className="grid grid-cols-2 gap-3">
+                <a href={`https://forge-studio-os.vercel.app/seguimiento/${clienteId}`} target="_blank" rel="noreferrer"
+                  className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
+                  <span className="text-2xl">📋</span>
+                  <p className="text-sm font-bold text-[#0A0A0A]">Check-in semanal</p>
+                  <p className="text-xs text-[#6B6B6B] text-center">Cómo te encuentras esta semana</p>
+                </a>
+                <a href={`https://forge-studio-os.vercel.app/sesion/${clienteId}`} target="_blank" rel="noreferrer"
+                  className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
+                  <span className="text-2xl">🏋️</span>
+                  <p className="text-sm font-bold text-[#0A0A0A]">Registrar entreno</p>
+                  <p className="text-xs text-[#6B6B6B] text-center">Apunta el entreno de hoy</p>
+                </a>
+              </div>
+            )}
+
+            {/* PRESENCIAL: botón check-in semanal */}
+            {cliente?.tipo === 'presencial' && (
               <a href={`https://forge-studio-os.vercel.app/seguimiento/${clienteId}`} target="_blank" rel="noreferrer"
-                className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
+                className="flex items-center gap-3 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
                 <span className="text-2xl">📋</span>
-                <p className="text-sm font-bold text-[#0A0A0A]">Check-in semanal</p>
-                <p className="text-xs text-[#6B6B6B] text-center">Registra cómo te encuentras esta semana</p>
+                <div>
+                  <p className="text-sm font-bold text-[#0A0A0A]">Check-in semanal</p>
+                  <p className="text-xs text-[#6B6B6B]">Cómo te encuentras esta semana</p>
+                </div>
               </a>
-              <a href={`https://forge-studio-os.vercel.app/sesion/${clienteId}`} target="_blank" rel="noreferrer"
-                className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
-                <span className="text-2xl">🏋️</span>
-                <p className="text-sm font-bold text-[#0A0A0A]">Registrar sesión</p>
-                <p className="text-xs text-[#6B6B6B] text-center">Apunta el entreno de hoy</p>
-              </a>
-            </div>
+            )}
 
             {/* Último check-in */}
             {checkins[0] && (
@@ -491,6 +514,11 @@ export default function PortalCliente() {
                     </div>
                   </div>
                 ))}
+
+                {/* Historial de entrenamientos registrados — solo clientes online */}
+                {cliente?.tipo === 'online' && (
+                  <SesionesRegistradas clienteId={clienteId} color={color} />
+                )}
               </>
             )}
 
@@ -750,6 +778,82 @@ export default function PortalCliente() {
           </>
         )}
 
+      </div>
+    </div>
+  )
+}
+
+function SesionesRegistradas({ clienteId, color }) {
+  const [sesiones, setSesiones] = useState([])
+  const [detalle, setDetalle] = useState(null)
+
+  useEffect(() => {
+    supabase.from('sesiones').select('*')
+      .eq('cliente_id', clienteId).eq('tipo', 'online').eq('completada', true)
+      .order('fecha', { ascending: false }).limit(10)
+      .then(({ data }) => setSesiones(data || []))
+  }, [clienteId])
+
+  if (sesiones.length === 0) return null
+
+  return (
+    <div>
+      <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-wide mb-2">Entrenamientos registrados</p>
+      <div className="space-y-2">
+        {sesiones.map(s => (
+          <div key={s.id}>
+            <button onClick={async () => {
+              if (detalle?.id === s.id) { setDetalle(null); return }
+              const { data: ejes } = await supabase.from('sesion_ejercicios').select('*').eq('sesion_id', s.id).order('orden')
+              setDetalle({ ...s, ejercicios: ejes || [] })
+            }} className="w-full bg-white rounded-2xl border border-black/5 shadow-sm px-4 py-3 flex items-center gap-3 text-left hover:shadow-md transition-all">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0"
+                style={{ background: color }}>
+                💪
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-[#0A0A0A]">
+                  {new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
+                </p>
+                <p className="text-xs text-[#6B6B6B]">{s.duracion_minutos||60}min · RPE {s.rpe||'—'}/10</p>
+              </div>
+              <span className="text-[#6B6B6B] text-xs">{detalle?.id===s.id?'▲':'▼'}</span>
+            </button>
+            {detalle?.id === s.id && (
+              <div className="bg-white border border-black/5 border-t-0 rounded-b-2xl px-4 pb-4 space-y-3 -mt-1">
+                {/* Stats */}
+                <div className="flex gap-2 pt-3 flex-wrap">
+                  {s.rpe && <span className="text-xs bg-orange-50 text-orange-700 px-2.5 py-1.5 rounded-full font-medium">RPE {s.rpe}/10</span>}
+                  {s.fatiga_post && <span className="text-xs bg-red-50 text-red-700 px-2.5 py-1.5 rounded-full font-medium">Fatiga {s.fatiga_post}/5</span>}
+                  {s.duracion_minutos && <span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1.5 rounded-full font-medium">⏱ {s.duracion_minutos}min</span>}
+                </div>
+                {/* Ejercicios */}
+                {detalle.ejercicios?.length > 0 && (
+                  <div className="space-y-2">
+                    {detalle.ejercicios.map((ej, i) => (
+                      <div key={i} className="border border-black/5 rounded-xl p-3">
+                        <p className="text-sm font-semibold text-[#0A0A0A] mb-2">{ej.ejercicio_nombre}</p>
+                        <div className="flex gap-1.5 flex-wrap">
+                          {(ej.sets||[]).filter(s=>s.peso||s.completado).map((s,j) => (
+                            <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${s.completado?'bg-emerald-50 text-emerald-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                              {s.peso?`${s.peso}kg`:'—'} × {s.reps||'—'}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {s.sensaciones && (
+                  <div className="bg-amber-50 rounded-xl p-3">
+                    <p className="text-xs font-semibold text-amber-700 mb-1">Sensaciones</p>
+                    <p className="text-sm text-amber-800">{s.sensaciones}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )
