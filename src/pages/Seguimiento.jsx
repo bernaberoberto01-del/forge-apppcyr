@@ -425,7 +425,11 @@ export default function Seguimiento({ session }) {
               .map(s => {
                 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                 return (
-                  <div key={s.id} onClick={() => setDetalleSesion(s)}
+                  <div key={s.id} onClick={async () => {
+                      const { data: ejes } = await supabase.from('sesion_ejercicios')
+                        .select('*').eq('sesion_id', s.id).order('orden')
+                      setDetalleSesion({ ...s, ejercicios: ejes || [] })
+                    }}
                     className="bg-white rounded-xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-sm flex-shrink-0">
