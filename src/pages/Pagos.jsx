@@ -2,9 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 
-const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
-
 function Toast({ msg, tipo='ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
   return (
@@ -193,12 +190,10 @@ export default function Pagos({ session }) {
   async function generarEnlaceStripe(clienteId, importe, concepto) {
     setGenerandoStripe(clienteId)
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/crear-checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
-        body: JSON.stringify({ cliente_id: clienteId, importe: Number(importe), concepto })
+      const { data, error } = await supabase.functions.invoke('crear-checkout', {
+        body: { cliente_id: clienteId, importe: Number(importe), concepto }
       })
-      const data = await res.json()
+      if (error) throw error
       if (data.url) {
         await navigator.clipboard.writeText(data.url)
         setToast('Enlace Stripe copiado')
@@ -392,7 +387,7 @@ export default function Pagos({ session }) {
       {/* Modal registrar pago */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-5">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-4">Registrar pago</h2>
             <div className="space-y-3">
               <div>
@@ -435,7 +430,7 @@ export default function Pagos({ session }) {
       {/* Modal plan de cobro */}
       {modalPlan && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalPlan(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-5">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-1">{editandoPlan ? 'Editar plan' : 'Nuevo plan de cobro'}</h2>
             <p className="text-xs text-[#6B6B6B] mb-4">El sistema te avisará cuándo cobrar y actualizará la próxima fecha automáticamente</p>
             <div className="space-y-3">

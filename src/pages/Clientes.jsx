@@ -177,11 +177,7 @@ export default function Clientes({ session }) {
       ])
       // Email de bienvenida via Edge Function (Gmail SMTP)
       if (cliente.email) {
-        fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/bienvenida-cliente', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
-          body: JSON.stringify({ cliente_id: cliente.id })
-        }).catch(() => {})
+        supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: cliente.id } }).catch(() => {})
         showToast(`✓ ${c.nombre.split(' ')[0]} convertido · Email enviado`)
       } else {
         showToast(`✓ ${c.nombre.split(' ')[0]} convertido`)
@@ -455,7 +451,7 @@ export default function Clientes({ session }) {
       {/* Modal registros pendientes */}
       {modalRegistros && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-[#0A0A0A]">Registros pendientes</h2>
               <button onClick={() => setModalRegistros(false)} className="text-[#6B6B6B] text-xl">×</button>
@@ -511,7 +507,7 @@ export default function Clientes({ session }) {
       {/* Modal nuevo/editar */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-4">{editId ? 'Editar cliente' : 'Nuevo cliente'}</h2>
             <div className="space-y-3">
               {[['nombre','Nombre completo *','text'],['email','Email','email'],['telefono','Teléfono','tel']].map(([k,l,t]) => (
@@ -724,12 +720,8 @@ export default function Clientes({ session }) {
                     {detalle.email && (
                       <button onClick={async () => {
                         try {
-                          const res = await fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/bienvenida-cliente', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ` },
-                            body: JSON.stringify({ cliente_id: detalle.id })
-                          })
-                          const data = await res.json()
+                          const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
+                          if (error) throw error
                           if (data.ok) showToast('✓ Email de bienvenida enviado a ' + detalle.email)
                           else showToast('Error: ' + (data.error || 'inténtalo de nuevo'), 'error')
                         } catch(e) {

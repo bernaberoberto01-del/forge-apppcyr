@@ -55,6 +55,23 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { headers: CORS })
     }
 
+    if (accion === 'enviar_mensaje') {
+      const { contenido } = datos || {}
+      if (!contenido || !contenido.trim()) return new Response(JSON.stringify({ error: 'contenido requerido' }), { status: 400, headers: CORS })
+
+      // Derivar cliente/entrenador del usuario autenticado (no confiar en el payload)
+      const { data: cli, error: cErr } = await sb.from('clientes')
+        .select('id, entrenador_id').eq('auth_user_id', user.id).limit(1).maybeSingle()
+      if (cErr || !cli) return new Response(JSON.stringify({ error: 'Cliente no vinculado' }), { status: 403, headers: CORS })
+
+      const { error: mErr } = await sb.from('mensajes_cliente').insert({
+        entrenador_id: cli.entrenador_id, cliente_id: cli.id,
+        contenido: contenido.trim(), tipo: 'cliente', leido: false
+      })
+      if (mErr) throw new Error('Error enviando: ' + mErr.message)
+      return new Response(JSON.stringify({ ok: true }), { headers: CORS })
+    }
+
     return new Response(JSON.stringify({ error: 'Accion no reconocida' }), { status: 400, headers: CORS })
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: CORS })

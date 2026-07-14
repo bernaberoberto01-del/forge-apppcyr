@@ -144,8 +144,8 @@ export default function Agenda({ session }) {
     const hace60 = new Date(Date.now() - 60*864e5).toISOString().split('T')[0]
     const [{ data: se }, { data: cl }, { data: he }, { data: rc }] = await Promise.all([
       centro
-        ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).gte('fecha', hace60).order('fecha').order('hora')
-        : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha').order('hora'),
+        ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
+        : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
       supabase.from('clientes').select('id,nombre,tipo,horas_semana').eq('entrenador_id', uid).eq('estado','activo'),
       supabase.from('horas_extra').select('*').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha', { ascending: false }),
       supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activa', true),
@@ -618,7 +618,7 @@ export default function Agenda({ session }) {
       {/* Modal nueva sesión */}
       {modal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-5">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-4">
               Nueva sesión — {diaClick ? new Date(diaClick+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'}) : ''}
             </h2>
@@ -675,7 +675,7 @@ export default function Agenda({ session }) {
       {/* Modal sesión recurrente */}
       {modalRecurrente && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalRecurrente(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-1">Nueva sesión recurrente</h2>
             <p className="text-xs text-[#6B6B6B] mb-4">Se repite automáticamente cada semana los días que selecciones</p>
             <div className="space-y-3">
