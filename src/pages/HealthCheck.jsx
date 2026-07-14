@@ -1,14 +1,18 @@
 import { useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
-const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
+// Cliente totalmente aparte y sin sesión, solo para probar que el acceso anónimo está bloqueado.
+// (No reutiliza `supabase` para no arriesgarse a tocar la sesión real del entrenador.)
+const anonClient = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
 
-const fn = (name, body = {}) => fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
-  body: JSON.stringify(body)
-}).then(r => r.json()).catch(e => ({ error: e.message }))
+// Las Edge Functions ahora exigen la sesión real del entrenador (no la clave anónima),
+// por eso usamos supabase.functions.invoke: adjunta el JWT del usuario logueado.
+const fn = async (name, body = {}) => {
+  const { data, error } = await supabase.functions.invoke(name, { body })
+  if (error) return { error: error.message }
+  return data
+}
 
 const CHECKS = [
   {
@@ -89,16 +93,14 @@ const CHECKS = [
   },
   {
     id: 'rls_portal',
-    label: 'RLS portal cliente — lectura anónima',
-    desc: 'El portal puede leer datos sin sesión del entrenador',
+    label: 'RLS — bloquea lectura anónima',
+    desc: 'Nadie sin sesión puede leer datos de clientes (seguridad)',
     run: async (uid) => {
       const { data: cl } = await supabase.from('clientes').select('id,nombre').eq('entrenador_id', uid).limit(1).single()
       if (!cl) throw new Error('Sin clientes')
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/clientes?id=eq.${cl.id}&select=id,nombre`, {
-        headers: { 'apikey': ANON_KEY, 'Authorization': `Bearer ${ANON_KEY}` }
-      }).then(r => r.json())
-      if (!Array.isArray(res) || res.length === 0) throw new Error('RLS bloquea lectura anónima')
-      return `Portal puede leer: ${res[0].nombre}`
+      const { data: res } = await anonClient.from('clientes').select('id,nombre').eq('id', cl.id)
+      if (Array.isArray(res) && res.length > 0) throw new Error('¡FALLO DE SEGURIDAD! Un usuario anónimo puede leer datos de clientes')
+      return 'Correcto — lectura anónima bloqueada'
     }
   },
   {

@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { getPesoRecomendado } from '../utils/pesos'
+import LoginPortal from './LoginPortal'
 
 export default function SesionCliente() {
   const { clienteId } = useParams()
+  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=sin sesión, objeto=sesión
   const [cliente, setCliente] = useState(null)
   const [rutina, setRutina] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -19,7 +21,16 @@ export default function SesionCliente() {
   const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setClienteSession(session?.user || null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setClienteSession(session?.user || null))
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (clienteSession === undefined) return
+    if (!clienteSession) { setLoading(false); return }
     async function cargar() {
+      setLoading(true)
       const [{ data: cl }, { data: ru }, { data: cu }, { data: pf }] = await Promise.all([
         supabase.from('clientes').select('*').eq('id', clienteId).single(),
         supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
@@ -35,7 +46,7 @@ export default function SesionCliente() {
       setLoading(false)
     }
     cargar()
-  }, [clienteId])
+  }, [clienteId, clienteSession])
 
   function cargarDia(ru, dia, cuest, pf) {
     const contenido = ru.contenido || ru.borrador
@@ -99,6 +110,8 @@ export default function SesionCliente() {
     )
   }
 
+  if (clienteSession === undefined) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
+  if (clienteSession === null) return <LoginPortal clienteId={clienteId} onLogin={u => setClienteSession(u)} colorAccento="#FF5C00" />
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
   if (!cliente) return <div className="min-h-screen flex items-center justify-center"><p className="text-[#6B6B6B]">Enlace no válido</p></div>
   if (enviado) return (

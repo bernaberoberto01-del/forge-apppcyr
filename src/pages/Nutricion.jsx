@@ -2,9 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 
-const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
-
 const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
 
 function Toast({ msg, tipo='ok', onClose }) {
@@ -65,14 +62,12 @@ export default function Nutricion({ session }) {
   async function generarPlan(clienteId) {
     setGenerando(clienteId)
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/generar-nutricion`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
-        body: JSON.stringify({ cliente_id: clienteId })
+      const { data, error } = await supabase.functions.invoke('generar-nutricion', {
+        body: { cliente_id: clienteId }
       })
-      const data = await res.json()
-      if (data.ok) { setToast({ msg: '✓ Plan nutricional generado — revísalo y publícalo' }); await cargar() }
-      else setToast({ msg: (data.error || 'Error') + (data.detail ? ': ' + data.detail : '') + (data.preview ? ' | ' + data.preview : ''), tipo: 'error' })
+      if (error) throw error
+      if (data?.ok) { setToast({ msg: '✓ Plan nutricional generado — revísalo y publícalo' }); await cargar() }
+      else setToast({ msg: (data?.error || 'Error') + (data?.detail ? ': ' + data.detail : '') + (data?.preview ? ' | ' + data.preview : ''), tipo: 'error' })
     } catch (e) { setToast({ msg: e.message, tipo: 'error' }) }
     setGenerando(null)
   }

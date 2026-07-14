@@ -41,19 +41,14 @@ export default function PortalCliente() {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Al hacer login, vincular auth_user_id con el cliente si no está vinculado
   useEffect(() => {
-    if (!clienteSession || !clienteId || !cliente) return
-    if (!cliente.auth_user_id) {
-      supabase.from('clientes')
-        .update({ auth_user_id: clienteSession.id })
-        .eq('id', clienteId)
-        .then(() => {})
-    }
-  }, [clienteSession, clienteId, cliente])
-
-  useEffect(() => {
+    // Sin sesión aún: no cargar datos (RLS los bloquearía). Esperar al login.
+    if (clienteSession === undefined) return
+    if (!clienteSession) { setLoading(false); return }
     async function cargar() {
+      setLoading(true)
+      setNotFound(false)
+      setCliente(null)
       const { data: cl, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single()
       if (error || !cl) { setNotFound(true); setLoading(false); return }
       setCliente(cl)
@@ -87,7 +82,7 @@ export default function PortalCliente() {
       setLoading(false)
     }
     cargar()
-  }, [clienteId])
+  }, [clienteId, clienteSession])
 
   useEffect(() => {
     if (tab === 'mensajes' && mensajes.length && !mensajesLeidos) {
@@ -128,26 +123,13 @@ export default function PortalCliente() {
   ]
 
   async function cancelarSesion(sesionId) {
-    const SUPABASE_URL = 'https://qdpqpbkppkhzcxpfypvf.supabase.co'
-    const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkcHFwYmtwcGtoemN4cGZ5cHZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5Mzg2NDMsImV4cCI6MjA5MjUxNDY0M30.ZW7jmH1oUefjbD1yRqJJMtSb52o5CeZPrH6Sz-B68jQ'
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/portal-accion`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
-      body: JSON.stringify({
+    const { data } = await supabase.functions.invoke('portal-accion', {
+      body: {
         accion: 'cancelar_sesion',
-        datos: {
-          sesion_id: sesionId,
-          entrenador_id: cliente.entrenador_id,
-          cliente_id: clienteId,
-          cliente_nombre: cliente.nombre,
-          fecha: cancelando.fecha,
-          hora: cancelando.hora,
-          motivo: motivoCancel || ''
-        }
-      })
+        datos: { sesion_id: sesionId, motivo: motivoCancel || '' }
+      }
     })
-    const data = await res.json()
-    if (data.ok) {
+    if (data?.ok) {
       setSesionesPortal(prev => prev.filter(s => s.id !== sesionId))
     }
     setCancelando(null)
@@ -174,6 +156,12 @@ export default function PortalCliente() {
     </div>
   )
 
+  // Guard defensivo: nunca renderizar el portal sin datos de cliente cargados
+  if (!cliente) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
+      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-[#F5F5F0]">

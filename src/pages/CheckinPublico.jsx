@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import LoginPortal from './LoginPortal'
 
 const ESCALAS = [
   { label: 'Energía esta semana', field: 'energia', min: 1, max: 10, suffix: '/10', desc: ['1 = Agotado','10 = Al 100%'] },
@@ -15,6 +16,7 @@ const ESCALAS = [
 
 export default function CheckinPublico() {
   const { clienteId } = useParams()
+  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=sin sesión, objeto=sesión
   const [cliente, setCliente] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [enviado, setEnviado] = useState(false)
@@ -28,13 +30,22 @@ export default function CheckinPublico() {
   })
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => setClienteSession(session?.user || null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setClienteSession(session?.user || null))
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (clienteSession === undefined) return
+    if (!clienteSession) { setLoading(false); return }
+    setLoading(true)
     supabase.from('clientes').select('id,nombre,entrenador_id').eq('id', clienteId).single()
       .then(({ data, error }) => {
         if (error || !data) setNotFound(true)
         else setCliente(data)
         setLoading(false)
       })
-  }, [clienteId])
+  }, [clienteId, clienteSession])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -69,6 +80,8 @@ export default function CheckinPublico() {
     )
   }
 
+  if (clienteSession === undefined) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
+  if (clienteSession === null) return <LoginPortal clienteId={clienteId} onLogin={u => setClienteSession(u)} colorAccento="#FF5C00" />
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
   if (notFound) return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><p className="text-3xl mb-2">🔗</p><p className="text-[#6B6B6B]">Enlace no válido</p></div></div>
   if (enviado) return (

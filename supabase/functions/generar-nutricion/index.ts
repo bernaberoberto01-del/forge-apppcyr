@@ -24,6 +24,13 @@ const AYUNO = [{nombre:'Rotura del ayuno',hora:'12:00',pct:0.30},{nombre:'Comida
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
+    // ── Autenticación: exigir JWT de usuario válido ──
+    const token = (req.headers.get('Authorization') || '').replace('Bearer ', '')
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401, headers: CORS })
+    }
+
     const body = await req.json().catch(() => null)
     const { cliente_id } = body || {}
     if (!cliente_id) return new Response(JSON.stringify({ error: 'cliente_id requerido' }), { status: 400, headers: CORS })
@@ -33,6 +40,11 @@ Deno.serve(async (req) => {
     const { data: cliente, error: clienteErr } = await supabase
       .from('clientes').select('*').eq('id', cliente_id).single()
     if (clienteErr || !cliente) return new Response(JSON.stringify({ error: 'Cliente no encontrado' }), { status: 404, headers: CORS })
+
+    // Autorización: el entrenador que llama debe ser dueño del cliente
+    if (cliente.entrenador_id !== user.id) {
+      return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
+    }
 
     let q: any = {}
     try {
