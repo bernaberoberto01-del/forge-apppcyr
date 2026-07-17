@@ -96,8 +96,13 @@ function AreaPrivada({ session }) {
       const uid = session.user.id
       let { data: cli } = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
       if (!cli) {
-        // Primer acceso de un cliente: vincular su cuenta a la ficha por email (seguro)
-        await supabase.functions.invoke('vincular-cliente', { body: {} }).catch(() => {})
+        // Primer acceso: intentar vincular por email
+        const res = await supabase.functions.invoke('vincular-cliente', { body: {} }).catch(() => ({ data: null }))
+        // Si es entrenador no vincular — ir al dashboard directamente
+        if (res?.data?.error === 'es_entrenador' || res?.error?.message?.includes('es_entrenador')) {
+          if (vivo) setEsCliente(false)
+          return
+        }
         const r = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
         cli = r.data
       }
