@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import LoginPortal from './LoginPortal'
 
 const ESCALAS = [
   { label: 'Energía esta semana', field: 'energia', min: 1, max: 10, suffix: '/10', desc: ['1 = Agotado','10 = Al 100%'] },
@@ -15,8 +13,8 @@ const ESCALAS = [
 ]
 
 export default function CheckinPublico() {
-  const { clienteId } = useParams()
-  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=sin sesión, objeto=sesión
+  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=sin sesión, objeto=usuario
+  const [clienteId, setClienteId] = useState(null) // derivado de la sesión
   const [cliente, setCliente] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [enviado, setEnviado] = useState(false)
@@ -39,13 +37,13 @@ export default function CheckinPublico() {
     if (clienteSession === undefined) return
     if (!clienteSession) { setLoading(false); return }
     setLoading(true)
-    supabase.from('clientes').select('id,nombre,entrenador_id').eq('id', clienteId).single()
+    supabase.from('clientes').select('id,nombre,entrenador_id').eq('auth_user_id', clienteSession.id).maybeSingle()
       .then(({ data, error }) => {
         if (error || !data) setNotFound(true)
-        else setCliente(data)
+        else { setCliente(data); setClienteId(data.id) }
         setLoading(false)
       })
-  }, [clienteId, clienteSession])
+  }, [clienteSession])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -80,10 +78,8 @@ export default function CheckinPublico() {
     )
   }
 
-  if (clienteSession === undefined) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
-  if (clienteSession === null) return <LoginPortal clienteId={clienteId} onLogin={u => setClienteSession(u)} colorAccento="#FF5C00" />
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
-  if (notFound) return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><p className="text-3xl mb-2">🔗</p><p className="text-[#6B6B6B]">Enlace no válido</p></div></div>
+  if (clienteSession === undefined || loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
+  if (notFound) return <div className="min-h-screen flex items-center justify-center"><div className="text-center"><p className="text-3xl mb-2">🔗</p><p className="text-[#6B6B6B]">No hemos podido cargar tus datos.</p></div></div>
   if (enviado) return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#F7F7F7]">
       <div className="text-center max-w-sm">

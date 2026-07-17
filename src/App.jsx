@@ -84,6 +84,48 @@ function PortalEntrenadorRoute({ session }) {
   return <PortalEntrenador session={session} />
 }
 
+// Detecta el rol de la cuenta autenticada y enruta:
+//   cliente (tiene ficha vinculada) → portal del cliente
+//   resto (entrenador) → app del entrenador de siempre
+function AreaPrivada({ session }) {
+  const [esCliente, setEsCliente] = useState(undefined) // undefined=comprobando
+
+  useEffect(() => {
+    let vivo = true
+    async function detectar() {
+      const uid = session.user.id
+      let { data: cli } = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
+      if (!cli) {
+        // Primer acceso de un cliente: vincular su cuenta a la ficha por email (seguro)
+        await supabase.functions.invoke('vincular-cliente', { body: {} }).catch(() => {})
+        const r = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
+        cli = r.data
+      }
+      if (vivo) setEsCliente(!!cli)
+    }
+    detectar()
+    return () => { vivo = false }
+  }, [session])
+
+  if (esCliente === undefined) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
+      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  // Cliente: portal + sus flujos (registrar entreno, check-in), todo por sesión
+  if (esCliente) return (
+    <Routes>
+      <Route path="/sesion" element={<SesionCliente />} />
+      <Route path="/seguimiento" element={<CheckinPublico />} />
+      <Route path="/*" element={<PortalCliente />} />
+    </Routes>
+  )
+
+  // Entrenador
+  return <AppPrivada session={session} />
+}
+
 export default function App() {
   const [session, setSession] = useState(undefined)
 
@@ -104,12 +146,16 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter>
         <Routes>
-          {/* ── RUTAS PÚBLICAS ── sin sesión, sin layout, sin contexto */}
-          <Route path="/portal/:clienteId" element={<PortalCliente />} />
+          {/* ── Enlaces ANTIGUOS con ID de cliente en la URL ──
+              Ya no se usan: el cliente entra, inicia sesión y el sistema sabe
+              quién es. Se redirigen para no romper enlaces guardados. */}
+          <Route path="/portal/:clienteId" element={<Navigate to="/" replace />} />
+          <Route path="/sesion/:clienteId" element={<Navigate to="/sesion" replace />} />
+          <Route path="/seguimiento/:clienteId" element={<Navigate to="/seguimiento" replace />} />
+
+          {/* ── OTRAS RUTAS PÚBLICAS ── */}
           <Route path="/registro" element={<RegistroCliente />} />
           <Route path="/nutricion-cuest" element={<NutricionCuestionario />} />
-          <Route path="/seguimiento/:clienteId" element={<CheckinPublico />} />
-          <Route path="/sesion/:clienteId" element={<SesionCliente />} />
           <Route path="/progreso/:clienteId" element={<ProgresoCliente />} />
           <Route path="/portal-entrenador" element={<PortalEntrenadorRoute session={session} />} />
           <Route path="/unirse/:token" element={<UnirseACentro />} />
@@ -118,13 +164,13 @@ export default function App() {
           <Route path="/health" element={<HealthCheck session={session} />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/login" element={
-            session ? <Navigate to="/dashboard" replace /> : <Login />
+            session ? <Navigate to="/" replace /> : <Login />
           } />
 
-          {/* ── RUTAS PRIVADAS ── requieren sesión */}
+          {/* ── ÁREA PRIVADA ── requiere sesión; el rol decide qué se ve */}
           <Route path="/*" element={
             session
-              ? <AppPrivada session={session} />
+              ? <AreaPrivada session={session} />
               : <Navigate to="/login" replace />
           } />
         </Routes>

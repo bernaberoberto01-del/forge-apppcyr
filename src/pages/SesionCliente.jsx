@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import LoginPortal from './LoginPortal'
 
 export default function SesionCliente() {
-  const { clienteId } = useParams()
-  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=sin sesión, objeto=sesión
+  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=sin sesión, objeto=usuario
+  const [clienteId, setClienteId] = useState(null) // derivado de la sesión
   const [cliente, setCliente] = useState(null)
   const [rutina, setRutina] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -30,12 +28,11 @@ export default function SesionCliente() {
     if (!clienteSession) { setLoading(false); return }
     async function cargar() {
       setLoading(true)
-      const [{ data: cl }, { data: ru }] = await Promise.all([
-        supabase.from('clientes').select('*').eq('id', clienteId).single(),
-        supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
-      ])
+      const { data: cl } = await supabase.from('clientes').select('*').eq('auth_user_id', clienteSession.id).maybeSingle()
       if (!cl) { setLoading(false); return }
       setCliente(cl)
+      setClienteId(cl.id)
+      const { data: ru } = await supabase.from('rutinas').select('*').eq('cliente_id', cl.id).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1)
       if (ru?.[0]) {
         setRutina(ru[0])
         cargarDia(ru[0], 1)
@@ -43,7 +40,7 @@ export default function SesionCliente() {
       setLoading(false)
     }
     cargar()
-  }, [clienteId, clienteSession])
+  }, [clienteSession])
 
   function cargarDia(ru, dia) {
     const contenido = ru.contenido || ru.borrador
@@ -103,17 +100,15 @@ export default function SesionCliente() {
     )
   }
 
-  if (clienteSession === undefined) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
-  if (clienteSession === null) return <LoginPortal clienteId={clienteId} onLogin={u => setClienteSession(u)} colorAccento="#FF5C00" />
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
-  if (!cliente) return <div className="min-h-screen flex items-center justify-center"><p className="text-[#6B6B6B]">Enlace no válido</p></div>
+  if (clienteSession === undefined || loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
+  if (!cliente) return <div className="min-h-screen flex items-center justify-center"><p className="text-[#6B6B6B]">No hemos podido cargar tus datos.</p></div>
   if (enviado) return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#F5F5F0]">
       <div className="text-center max-w-sm">
         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5 text-4xl">💪</div>
         <h2 className="text-2xl font-bold text-[#0A0A0A] mb-2">¡Sesión registrada!</h2>
         <p className="text-[#6B6B6B] text-sm">Tu entrenador ya puede ver tu entrenamiento de hoy.</p>
-        <a href={`https://forge-studio-os.vercel.app/portal/${clienteId}`}
+        <a href="/"
           className="block mt-6 bg-[#FF5C00] text-white font-semibold py-3.5 rounded-2xl text-sm text-center">
           Ver mi portal →
         </a>

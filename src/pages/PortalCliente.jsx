@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react'
-import LoginPortal from './LoginPortal'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import GraficasCliente from '../components/GraficasCliente'
 
 const OBJ = { perdida_grasa:'Pérdida de grasa', ganancia_muscular:'Ganancia muscular', tonificacion:'Tonificación', fuerza:'Fuerza', rendimiento:'Rendimiento', cambio_rapido_30dias:'Cambio 30 días' }
 
 export default function PortalCliente() {
-  const { clienteId } = useParams()
   const [searchParams] = useSearchParams()
   const pagoStatus = searchParams.get('pago')
-  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=no sesión, objeto=sesión
+  const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=no sesión, objeto=usuario
+  const [clienteId, setClienteId] = useState(null) // se deriva de la sesión (no de la URL)
   const [cliente, setCliente] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -41,49 +40,34 @@ export default function PortalCliente() {
 
   // Verificar sesión de Supabase al montar
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      // Si hay sesión pero el email no coincide con el cliente, ignorarla
-      // (evita que la sesión del entrenador se use en el portal)
-      if (session?.user && cliente && session.user.email !== cliente.email) {
-        setClienteSession(null)
-        return
-      }
-      setClienteSession(session?.user || null)
-    })
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
-      if (session?.user && cliente && session.user.email !== cliente.email) {
-        setClienteSession(null)
-        return
-      }
-      setClienteSession(session?.user || null)
-    })
+    supabase.auth.getSession().then(({ data: { session } }) => setClienteSession(session?.user || null))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => setClienteSession(session?.user || null))
     return () => subscription.unsubscribe()
-  }, [cliente])
-
-  // La vinculación cuenta↔cliente la hace de forma segura la Edge Function
-  // vincular-cliente (llamada desde LoginPortal). No se toca auth_user_id aquí.
+  }, [])
 
   useEffect(() => {
-    // Sin sesión aún: no cargar datos (el RLS los bloquea). Esperar al login.
     if (clienteSession === undefined) return
     if (!clienteSession) { setLoading(false); return }
     async function cargar() {
       setLoading(true)
       setNotFound(false)
       setCliente(null)
-      const { data: cl, error } = await supabase.from('clientes').select('*').eq('id', clienteId).single()
+      // El cliente se identifica por SU sesión (auth_user_id), no por la URL.
+      const { data: cl, error } = await supabase.from('clientes').select('*').eq('auth_user_id', clienteSession.id).maybeSingle()
       if (error || !cl) { setNotFound(true); setLoading(false); return }
+      const cid = cl.id
       setCliente(cl)
+      setClienteId(cid)
 
       // Cargar datos en paralelo — cada uno con su propio catch para no bloquear los demás
       const [ru, ci, pg, ms, bib, ft, pn, cfg] = await Promise.all([
-        supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado','publicada').order('created_at', { ascending: false }).limit(1).then(r => r.data || []).catch(() => []),
-        supabase.from('checkins').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(12).then(r => r.data || []).catch(() => []),
-        supabase.from('pagos').select('*').eq('cliente_id', clienteId).order('fecha_pago', { ascending: false }).then(r => r.data || []).catch(() => []),
-        supabase.from('mensajes_cliente').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }).then(r => r.data || []).catch(() => []),
+        supabase.from('rutinas').select('*').eq('cliente_id', cid).eq('estado','publicada').order('created_at', { ascending: false }).limit(1).then(r => r.data || []).catch(() => []),
+        supabase.from('checkins').select('*').eq('cliente_id', cid).order('fecha', { ascending: false }).limit(12).then(r => r.data || []).catch(() => []),
+        supabase.from('pagos').select('*').eq('cliente_id', cid).order('fecha_pago', { ascending: false }).then(r => r.data || []).catch(() => []),
+        supabase.from('mensajes_cliente').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).then(r => r.data || []).catch(() => []),
         supabase.from('ejercicios_biblioteca').select('nombre, sinonimos, youtube_url, consejos_tecnica').eq('entrenador_id', cl.entrenador_id).then(r => r.data || []).catch(() => []),
-        supabase.from('fotos_progreso').select('*').eq('cliente_id', clienteId).eq('visible_cliente', true).order('fecha', { ascending: false }).then(r => r.data || []).catch(() => []),
-        supabase.from('planes_nutricion').select('*').eq('cliente_id', clienteId).eq('estado','publicado').order('created_at', { ascending: false }).limit(1).then(r => r.data?.[0] || null).catch(() => null),
+        supabase.from('fotos_progreso').select('*').eq('cliente_id', cid).eq('visible_cliente', true).order('fecha', { ascending: false }).then(r => r.data || []).catch(() => []),
+        supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).eq('estado','publicado').order('created_at', { ascending: false }).limit(1).then(r => r.data?.[0] || null).catch(() => null),
         supabase.from('configuracion').select('nombre_entrenador, foto_url, nombre_negocio').eq('entrenador_id', cl.entrenador_id).single().then(r => r.data || null).catch(() => null),
       ])
 
@@ -98,13 +82,13 @@ export default function PortalCliente() {
       // Sesiones futuras del cliente
       const hoy = new Date().toISOString().split('T')[0]
       const { data: sesFut } = await supabase.from('sesiones').select('*')
-        .eq('cliente_id', clienteId).gte('fecha', hoy)
+        .eq('cliente_id', cid).gte('fecha', hoy)
         .eq('cancelada', false).order('fecha').order('hora').limit(8)
       setSesionesPortal(sesFut || [])
       setLoading(false)
     }
     cargar()
-  }, [clienteId, clienteSession])
+  }, [clienteSession])
 
   useEffect(() => {
     if (tab === 'mensajes' && mensajes.length && !mensajesLeidos) {
@@ -134,16 +118,6 @@ export default function PortalCliente() {
   const diasRestantes = pagoActivo?.valido_hasta ? Math.ceil((new Date(pagoActivo.valido_hasta) - new Date()) / 864e5) : null
   const sesionesEstasSemana = 0 // placeholder
 
-  const tabs = [
-    { id: 'inicio', label: 'Inicio', icon: '🏠' },
-    { id: 'rutina', label: 'Rutina', icon: '💪' },
-    { id: 'progreso', label: 'Progreso', icon: '📈' },
-    { id: 'mensajes', label: 'Mensajes', icon: '✉️', badge: mensajesNoLeidos > 0 ? mensajesNoLeidos : 0 },
-    ...(planNutricion || cliente?.nutricion_activa ? [{ id: 'nutricion', label: 'Nutrición', icon: '🥗' }] : []),
-    { id: 'fotos', label: 'Fotos', icon: '📸' },
-    ...(pagos.length > 0 ? [{ id: 'pagos_cliente', label: 'Pagos', icon: '💳' }] : []),
-  ]
-
   async function cancelarSesion(sesionId) {
     const { data } = await supabase.functions.invoke('portal-accion', {
       body: { accion: 'cancelar_sesion', datos: { sesion_id: sesionId, motivo: motivoCancel || '' } }
@@ -155,23 +129,22 @@ export default function PortalCliente() {
     setMotivoCancel('')
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
-  if (notFound) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] p-4"><div className="text-center"><p className="text-4xl mb-3">🔗</p><p className="text-[#6B6B6B]">Enlace no válido</p></div></div>
-
-  // Sin sesión → mostrar login
-  if (clienteSession === null) return (
-    <LoginPortal
-      clienteId={clienteId}
-      onLogin={user => setClienteSession(user)}
-      nombreNegocio={configEntrenador?.nombre_negocio}
-      colorAccento="#FF5C00"
-    />
-  )
-
-  // Cargando sesión
-  if (clienteSession === undefined) return (
+  // Cargando sesión / datos
+  if (clienteSession === undefined || loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
       <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  // Cuenta autenticada pero sin ficha de cliente asociada
+  if (notFound || !clienteSession) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0] p-4">
+      <div className="text-center max-w-sm">
+        <p className="text-4xl mb-3">🔗</p>
+        <p className="text-[#0A0A0A] font-semibold mb-1">Tu cuenta aún no está asociada</p>
+        <p className="text-[#6B6B6B] text-sm mb-5">Usa el mismo email que tu entrenador tiene registrado, o contáctale para que te dé de alta.</p>
+        <button onClick={() => supabase.auth.signOut()} className="text-[#FF5C00] text-sm font-semibold">Cerrar sesión</button>
+      </div>
     </div>
   )
 
@@ -244,9 +217,15 @@ export default function PortalCliente() {
             <p className="text-white/40 text-xs">{configEntrenador?.nombre_negocio || 'Tu entrenador'}</p>
             <p className="text-white font-bold text-lg">{cliente?.nombre?.split(' ')[0]}</p>
           </div>
-          <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
-            style={{ background: color }}>
-            {(cliente?.nombre||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+          <div className="flex items-center gap-2">
+            <button onClick={() => supabase.auth.signOut()} title="Cerrar sesión"
+              className="text-white/40 hover:text-white/80 text-xs font-medium transition-colors">
+              Salir
+            </button>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm"
+              style={{ background: color }}>
+              {(cliente?.nombre||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+            </div>
           </div>
         </div>
         {/* Tabs */}
@@ -349,13 +328,13 @@ export default function PortalCliente() {
             {/* ONLINE: botones de registro de actividad propia */}
             {cliente?.tipo === 'online' && (
               <div className="grid grid-cols-2 gap-3">
-                <a href={`https://forge-studio-os.vercel.app/seguimiento/${clienteId}`} target="_blank" rel="noreferrer"
+                <a href="/seguimiento"
                   className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
                   <span className="text-2xl">📋</span>
                   <p className="text-sm font-bold text-[#0A0A0A]">Check-in semanal</p>
                   <p className="text-xs text-[#6B6B6B] text-center">Cómo te encuentras esta semana</p>
                 </a>
-                <a href={`https://forge-studio-os.vercel.app/sesion/${clienteId}`} target="_blank" rel="noreferrer"
+                <a href="/sesion"
                   className="flex flex-col items-center justify-center gap-2 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
                   <span className="text-2xl">🏋️</span>
                   <p className="text-sm font-bold text-[#0A0A0A]">Registrar entreno</p>
@@ -366,7 +345,7 @@ export default function PortalCliente() {
 
             {/* PRESENCIAL: botón check-in semanal */}
             {cliente?.tipo === 'presencial' && (
-              <a href={`https://forge-studio-os.vercel.app/seguimiento/${clienteId}`} target="_blank" rel="noreferrer"
+              <a href="/seguimiento"
                 className="flex items-center gap-3 bg-white rounded-2xl border border-black/5 shadow-sm p-4 hover:shadow-md transition-all active:scale-95">
                 <span className="text-2xl">📋</span>
                 <div>
