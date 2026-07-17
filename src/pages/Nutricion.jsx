@@ -99,7 +99,6 @@ export default function Nutricion({ session }) {
     return r
   }, [planesActivos, busqueda, filtro])
 
-  const portalUrl = id => `${window.location.origin}/portal/${id}`
   const cuestUrl = (entrenadorId, clienteId) => `${window.location.origin}/nutricion-cuest?e=${entrenadorId}&c=${clienteId}`
 
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
@@ -281,12 +280,6 @@ export default function Nutricion({ session }) {
 
             {/* Acciones */}
             <div className="px-4 pb-3 flex gap-2" onClick={e=>e.stopPropagation()}>
-              {p.estado==='publicado' && (
-                <button onClick={() => { navigator.clipboard.writeText(portalUrl(p.cliente_id)); setToast({ msg: 'Enlace del portal copiado' }) }}
-                  className="flex-1 border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-semibold py-2 rounded-xl hover:bg-[#FF5C00]/5">
-                  📋 Copiar enlace portal
-                </button>
-              )}
               {p.estado==='borrador' && (
                 <button onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setDiaActivo(0) }}
                   className="flex-1 bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl">
@@ -424,14 +417,9 @@ export default function Nutricion({ session }) {
 
               {/* Acciones */}
               <div className="flex gap-2">
-                {detalle.estado==='borrador' ? (
+                {detalle.estado==='borrador' && (
                   <button onClick={() => publicar(detalle)} className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">
                     ✅ Publicar para el cliente
-                  </button>
-                ) : (
-                  <button onClick={() => { navigator.clipboard.writeText(portalUrl(detalle.cliente_id)); setToast({ msg: 'Enlace copiado' }) }}
-                    className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">
-                    📋 Copiar enlace portal
                   </button>
                 )}
                 <button onClick={() => generarPlan(detalle.cliente_id)} disabled={generando===detalle.cliente_id}

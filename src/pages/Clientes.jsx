@@ -715,8 +715,6 @@ export default function Clientes({ session }) {
                   {/* Acciones */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
-                    <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${detalle.id}`); showToast('Enlace del portal copiado') }}
-                      className="bg-[#111] text-white text-sm font-medium py-2.5 rounded-xl">🔗 Portal</button>
                     {detalle.email && (
                       <button onClick={async () => {
                         try {

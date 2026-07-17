@@ -169,7 +169,6 @@ export default function Rutinas({ session }) {
   const removeDia = (di) => setManualDias(prev => prev.filter((_,i)=>i!==di))
 
   const clientesSinRutina = clientes.filter(c => !rutinas.find(r => r.cliente_id === c.id && r.estado !== 'archivada'))
-  const portalUrl = id => `${window.location.origin}/portal/${id}`
 
   const rutinasFiltradas = useMemo(() => {
     let r = rutinas.filter(x => x.estado !== 'archivada')
@@ -423,10 +422,6 @@ export default function Rutinas({ session }) {
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => { setDetalle(r); setNotasEdit(r.notas_entrenador||''); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }}
                     className="flex-1 border border-black/10 text-[#0A0A0A] text-xs font-medium py-2 rounded-lg hover:bg-[#F5F5F0]">Ver rutina</button>
-                  {r.estado==='publicada' && (
-                    <button onClick={() => { navigator.clipboard.writeText(portalUrl(r.cliente_id)); setToast('Enlace copiado') }}
-                      className="flex-1 border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-medium py-2 rounded-lg hover:bg-[#FF5C00]/5">📋 Portal</button>
-                  )}
                   <button onClick={() => setMsgModal(r.cliente_id)} className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-lg hover:bg-[#F5F5F0]">✉️</button>
                 </div>
               </div>
@@ -702,11 +697,8 @@ export default function Rutinas({ session }) {
                   placeholder="Indicaciones especiales..." />
               </div>
               <div className="flex gap-2">
-                {detalle.estado==='borrador' ? (
+                {detalle.estado==='borrador' && (
                   <button onClick={() => publicar(detalle)} className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">✅ Publicar</button>
-                ) : (
-                  <button onClick={() => { navigator.clipboard.writeText(portalUrl(detalle.cliente_id)); setToast('Enlace copiado') }}
-                    className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">📋 Copiar enlace</button>
                 )}
                 <button onClick={() => guardarComoPlantilla(detalle)} className="border border-[#6366f1]/30 text-[#6366f1] text-sm py-3 px-3 rounded-xl hover:bg-[#6366f1]/5">📋</button>
                 <button onClick={async () => {

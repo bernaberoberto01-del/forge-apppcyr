@@ -157,10 +157,6 @@ export default function Mensajes({ session }) {
               className="text-xs border border-black/10 text-[#6B6B6B] px-3 py-1.5 rounded-lg hover:bg-[#F5F5F0] transition-all flex-shrink-0">
               👤 Perfil
             </button>
-            <a href={`/portal/${seleccionado.id}`} target="_blank" rel="noopener noreferrer"
-              className="text-xs border border-black/10 text-[#6B6B6B] px-3 py-1.5 rounded-lg hover:bg-[#F5F5F0] transition-all flex-shrink-0">
-              Portal →
-            </a>
           </div>
 
           {/* Mensajes */}

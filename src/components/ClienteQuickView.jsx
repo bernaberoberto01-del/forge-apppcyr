@@ -153,10 +153,6 @@ export default function ClienteQuickView({ clienteId, onClose }) {
                   className="border border-black/10 text-[#6B6B6B] text-xs font-medium py-2 rounded-xl hover:bg-[#F5F5F0]">
                   💪 Rutinas
                 </button>
-                <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/portal/${clienteId}`); onClose() }}
-                  className="border border-black/10 text-[#6B6B6B] text-xs font-medium py-2 rounded-xl hover:bg-[#F5F5F0]">
-                  🔗 Portal
-                </button>
                 <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${clienteId}`); onClose() }}
                   className="border border-black/10 text-[#6B6B6B] text-xs font-medium py-2 rounded-xl hover:bg-[#F5F5F0]">
                   📨 Enviar CI
