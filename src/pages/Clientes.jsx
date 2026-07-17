@@ -729,6 +729,10 @@ export default function Clientes({ session }) {
                         📧 Bienvenida
                       </button>
                     )}
+                    <button onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}`)
+                      showToast('✓ Enlace del portal copiado')
+                    }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">🔗 Enlace portal</button>
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${detalle.id}`); showToast('Enlace check-in copiado') }}
                       className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Enviar CI</button>
                     <button onClick={() => eliminar(detalle.id)} className="border border-red-100 text-red-500 text-sm font-medium py-2.5 rounded-xl hover:bg-red-50">🗑 Eliminar</button>

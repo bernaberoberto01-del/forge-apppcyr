@@ -37,6 +37,8 @@ export default function PortalCliente() {
   const [subTabProgreso, setSubTabProgreso] = useState('peso')
   const [medidas, setMedidas] = useState({})
   const [historialMedidas, setHistorialMedidas] = useState([])
+  const [marcas, setMarcas] = useState([])
+  const [formMarca, setFormMarca] = useState({ ejercicio: '', peso_kg: '', reps: '', notas: '' })
 
   // Verificar sesión de Supabase al montar
   useEffect(() => {
@@ -60,7 +62,7 @@ export default function PortalCliente() {
       setClienteId(cid)
 
       // Cargar datos en paralelo — cada uno con su propio catch para no bloquear los demás
-      const [ru, ci, pg, ms, bib, ft, pn, cfg] = await Promise.all([
+      const [ru, ci, pg, ms, bib, ft, pn, cfg, mc] = await Promise.all([
         supabase.from('rutinas').select('*').eq('cliente_id', cid).eq('estado','publicada').order('created_at', { ascending: false }).limit(1).then(r => r.data || []).catch(() => []),
         supabase.from('checkins').select('*').eq('cliente_id', cid).order('fecha', { ascending: false }).limit(12).then(r => r.data || []).catch(() => []),
         supabase.from('pagos').select('*').eq('cliente_id', cid).order('fecha_pago', { ascending: false }).then(r => r.data || []).catch(() => []),
@@ -69,6 +71,7 @@ export default function PortalCliente() {
         supabase.from('fotos_progreso').select('*').eq('cliente_id', cid).eq('visible_cliente', true).order('fecha', { ascending: false }).then(r => r.data || []).catch(() => []),
         supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).eq('estado','publicado').order('created_at', { ascending: false }).limit(1).then(r => r.data?.[0] || null).catch(() => null),
         supabase.from('configuracion').select('nombre_entrenador, foto_url, nombre_negocio').eq('entrenador_id', cl.entrenador_id).single().then(r => r.data || null).catch(() => null),
+        supabase.from('marcas_cliente').select('*').eq('cliente_id', cid).order('fecha', { ascending: false }).then(r => r.data || []).catch(() => []),
       ])
 
       setRutina(ru[0] || null)
@@ -79,6 +82,7 @@ export default function PortalCliente() {
       setFotos(ft)
       setPlanNutricion(pn)
       if (cfg) setConfigEntrenador(cfg)
+      setMarcas(mc)
       // Sesiones futuras del cliente
       const hoy = new Date().toISOString().split('T')[0]
       const { data: sesFut } = await supabase.from('sesiones').select('*')
@@ -417,7 +421,7 @@ export default function PortalCliente() {
           <>
             {/* subtabs: peso / medidas / fotos */}
             <div className="flex gap-2">
-              {[['peso','⚖️ Peso'],['medidas','📏 Medidas'],['fotos','📸 Fotos']].map(([id,label]) => (
+              {[['peso','⚖️ Peso'],['medidas','📏 Medidas'],['marcas','🏆 Marcas'],['fotos','📸 Fotos']].map(([id,label]) => (
                 <button key={id} onClick={() => setSubTabProgreso(id)}
                   className={`flex-1 py-2 text-xs font-semibold rounded-xl transition-all ${subTabProgreso===id?'text-white shadow-sm':'bg-white border border-black/10 text-[#6B6B6B]'}`}
                   style={subTabProgreso===id?{background:color}:{}}>
@@ -534,6 +538,126 @@ export default function PortalCliente() {
             )}
 
             {/* Subtab Fotos */}
+            {/* Subtab Marcas */}
+            {subTabProgreso === 'marcas' && (
+              <>
+                {/* Registrar nueva marca */}
+                <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-3">🏆 Nueva marca personal</p>
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-[#6B6B6B] mb-1 block">Ejercicio *</label>
+                      <input value={formMarca.ejercicio} onChange={e => setFormMarca(f=>({...f,ejercicio:e.target.value}))}
+                        placeholder="Ej: Press banca, Sentadilla, Peso muerto..."
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">Peso (kg)</label>
+                        <input type="number" value={formMarca.peso_kg} onChange={e => setFormMarca(f=>({...f,peso_kg:e.target.value}))}
+                          placeholder="80" className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">Reps</label>
+                        <input type="number" value={formMarca.reps} onChange={e => setFormMarca(f=>({...f,reps:e.target.value}))}
+                          placeholder="1" className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                      </div>
+                    </div>
+                    <input value={formMarca.notas} onChange={e => setFormMarca(f=>({...f,notas:e.target.value}))}
+                      placeholder="Notas opcionales (técnica, sensaciones...)"
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    <button onClick={async () => {
+                      if (!formMarca.ejercicio.trim()) return
+                      const { error } = await supabase.from('marcas_cliente').insert({
+                        entrenador_id: cliente.entrenador_id,
+                        cliente_id: cliente.id,
+                        ejercicio: formMarca.ejercicio.trim(),
+                        peso_kg: formMarca.peso_kg ? Number(formMarca.peso_kg) : null,
+                        reps: formMarca.reps ? Number(formMarca.reps) : null,
+                        notas: formMarca.notas || null,
+                        fecha: new Date().toISOString().split('T')[0]
+                      })
+                      if (!error) {
+                        const { data } = await supabase.from('marcas_cliente').select('*').eq('cliente_id', cliente.id).order('fecha', { ascending: false })
+                        setMarcas(data || [])
+                        setFormMarca({ ejercicio: '', peso_kg: '', reps: '', notas: '' })
+                      }
+                    }} disabled={!formMarca.ejercicio.trim()}
+                      className="w-full py-2.5 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
+                      style={{background: color}}>
+                      Guardar marca
+                    </button>
+                  </div>
+                </div>
+
+                {/* Historial de marcas agrupado por ejercicio */}
+                {marcas.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-black/5 p-8 text-center">
+                    <p className="text-3xl mb-2">🏆</p>
+                    <p className="text-sm text-[#6B6B6B]">Registra tu primera marca personal</p>
+                  </div>
+                ) : Object.entries(
+                    marcas.reduce((acc, m) => {
+                      if (!acc[m.ejercicio]) acc[m.ejercicio] = []
+                      acc[m.ejercicio].push(m)
+                      return acc
+                    }, {})
+                  ).map(([ejercicio, registros]) => {
+                    const mejor = registros.reduce((best, r) => !best || (r.peso_kg > best.peso_kg) ? r : best, null)
+                    return (
+                      <div key={ejercicio} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+                        <div className="px-4 py-3 bg-[#0A0A0A] flex items-center justify-between">
+                          <p className="text-white font-semibold text-sm">{ejercicio}</p>
+                          {mejor?.peso_kg && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-yellow-400 text-xs">🏆</span>
+                              <span className="text-white font-bold text-sm">{mejor.peso_kg}kg</span>
+                              {mejor.reps && <span className="text-white/50 text-xs">× {mejor.reps}</span>}
+                            </div>
+                          )}
+                        </div>
+                        {/* Mini gráfica de progresión */}
+                        {registros.filter(r=>r.peso_kg).length > 1 && (
+                          <div className="px-4 pt-3 pb-1">
+                            <div className="flex items-end gap-1 h-10">
+                              {registros.slice().reverse().filter(r=>r.peso_kg).map((r,i,arr) => {
+                                const min = Math.min(...arr.map(x=>x.peso_kg))
+                                const max = Math.max(...arr.map(x=>x.peso_kg))
+                                const h = max===min ? 60 : ((r.peso_kg-min)/(max-min))*70+30
+                                const isLast = i === arr.length - 1
+                                return (
+                                  <div key={r.id} className="flex-1 rounded-sm transition-all"
+                                    style={{height:`${h}%`, background: isLast ? color : `${color}40`}} />
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+                        <div className="divide-y divide-black/5">
+                          {registros.slice(0,4).map((r,i) => (
+                            <div key={r.id} className="px-4 py-2.5 flex items-center justify-between">
+                              <p className="text-xs text-[#6B6B6B]">
+                                {new Date(r.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                {r.peso_kg && <span className="text-sm font-bold text-[#0A0A0A]">{r.peso_kg}kg</span>}
+                                {r.reps && <span className="text-xs text-[#6B6B6B]">× {r.reps} reps</span>}
+                                {i === 0 && registros.length > 1 && r.peso_kg && registros[1].peso_kg && (
+                                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${r.peso_kg > registros[1].peso_kg ? 'bg-emerald-50 text-emerald-600' : r.peso_kg < registros[1].peso_kg ? 'bg-red-50 text-red-500' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                                    {r.peso_kg > registros[1].peso_kg ? '+' : ''}{(r.peso_kg - registros[1].peso_kg).toFixed(1)}kg
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })
+                }
+              </>
+            )}
+
             {subTabProgreso === 'fotos' && (
               <>
                 <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
