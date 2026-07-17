@@ -8,6 +8,7 @@ import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
 
 import Login from './pages/Login'
+import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
 import Rutinas from './pages/Rutinas'
@@ -115,6 +116,7 @@ export default function App() {
 
           {/* ── LOGIN ── */}
           <Route path="/health" element={<HealthCheck session={session} />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/login" element={
             session ? <Navigate to="/dashboard" replace /> : <Login />
           } />
