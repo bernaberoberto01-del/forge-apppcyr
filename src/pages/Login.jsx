@@ -118,7 +118,7 @@ export default function Login() {
             </svg>
           </div>
           <h1 className="text-white text-2xl font-bold">Forge</h1>
-          <p className="text-white/40 text-sm mt-1">Studio OS · Para entrenadores</p>
+          <p className="text-white/40 text-sm mt-1">Studio OS</p>
         </div>
 
         {/* Tabs */}
