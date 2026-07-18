@@ -204,9 +204,9 @@ export default function NutricionCuestionario() {
                   ['ayuno_16_8',    '⏱ Ayuno 16:8',    'Come en una ventana de 8 horas (ej: 12:00-20:00). Las otras 16h, solo agua o café.'],
                 ].map(([v,l,desc]) => (
                   <button key={v} onClick={() => set('tipo_dieta', v)} type="button"
-                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all ${form.tipo_dieta===v?'bg-[#FF5C00]/10 border-[#FF5C00]':'border-white/15 hover:border-white/30'}`}>
-                    <p className={`text-sm font-semibold ${form.tipo_dieta===v?'text-[#FF5C00]':'text-white'}`}>{l}</p>
-                    <p className="text-xs text-white/50 mt-0.5 leading-relaxed">{desc}</p>
+                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all ${form.tipo_dieta===v?'border-[#FF5C00] bg-[#FF5C00]/8':'border-black/10 bg-white hover:border-black/20'}`}>
+                    <p className={`text-sm font-semibold ${form.tipo_dieta===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                    <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{desc}</p>
                   </button>
                 ))}
               </div>
