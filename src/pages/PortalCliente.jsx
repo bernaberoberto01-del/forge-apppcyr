@@ -205,7 +205,7 @@ export default function PortalCliente() {
     {id:'rutina',label:'Rutina',icon:'💪'},
     {id:'progreso',label:'Progreso',icon:'📈'},
     {id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos},
-    ...(planNutricion||cliente?.nutricion_activa?[{id:'nutricion',label:'Nutrición',icon:'🥗'}]:[]),
+    ...(planNutricion||cliente?.nutricion_activa||tieneCuestNutricion?[{id:'nutricion',label:'Nutrición',icon:'🥗'}]:[]),
     ...(pagos.length>0?[{id:'pagos',label:'Pagos',icon:'💳'}]:[]),
   ]
 
