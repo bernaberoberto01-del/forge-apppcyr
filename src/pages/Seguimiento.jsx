@@ -39,6 +39,9 @@ export default function Seguimiento({ session }) {
   const [filtroAlerta, setFiltroAlerta] = useState('todos')
   const [detalleCI, setDetalleCI] = useState(null)
   const [quickView, setQuickView] = useState(null)
+  const [analizando, setAnalizando] = useState(false)
+  const [mensajeSugerido, setMensajeSugerido] = useState(null)
+  const [enviandoMensaje, setEnviandoMensaje] = useState(false)
   const [sesiones, setSesiones] = useState([])
   const [detalleSesion, setDetalleSesion] = useState(null)
   const [busquedaSes, setBusquedaSes] = useState('')
@@ -383,17 +386,68 @@ export default function Seguimiento({ session }) {
                 </div>
               )}
 
+
+              {/* Mensaje sugerido por IA */}
+              {mensajeSugerido && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                  <p className="text-xs font-bold text-amber-700 mb-2">✨ Mensaje sugerido por IA</p>
+                  <p className="text-sm text-amber-900 leading-relaxed whitespace-pre-wrap">{mensajeSugerido.texto}</p>
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={async () => {
+                      setEnviandoMensaje(true)
+                      await supabase.from('mensajes_cliente')
+                        .update({ tipo: 'entrenador', leido: false, leido_entrenador: true })
+                        .eq('id', mensajeSugerido.borrador_id)
+                      setMensajeSugerido(null)
+                      setEnviandoMensaje(false)
+                      setToast('✓ Mensaje enviado al cliente')
+                      setTimeout(() => setToast(''), 3000)
+                    }} disabled={enviandoMensaje}
+                      className="flex-1 bg-amber-600 text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50">
+                      {enviandoMensaje ? 'Enviando...' : '✉️ Enviar al cliente'}
+                    </button>
+                    <button onClick={() => setMensajeSugerido(null)}
+                      className="px-4 border border-amber-200 text-amber-700 text-sm py-2.5 rounded-xl">
+                      Descartar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Acciones */}
               <div className="flex gap-2 pt-1">
+                <button onClick={async () => {
+                  setAnalizando(true)
+                  setMensajeSugerido(null)
+                  const { data, error } = await supabase.functions.invoke('analizar-checkin', {
+                    body: { cliente_id: detalleCI.cliente_id, checkin_id: detalleCI.id }
+                  })
+                  if (!error && data?.mensaje_sugerido) {
+                    setMensajeSugerido({ texto: data.mensaje_sugerido, borrador_id: data.borrador_id })
+                  } else {
+                    setToast('Error al analizar — ' + (data?.error || error?.message || 'inténtalo de nuevo'))
+                    setTimeout(() => setToast(''), 3000)
+                  }
+                  setAnalizando(false)
+                }} disabled={analizando}
+                  className="flex-1 text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  style={{ background: '#6366f1' }}>
+                  {analizando
+                    ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Analizando...</>
+                    : '✨ Analizar con IA'
+                  }
+                </button>
                 <button onClick={() => { setQuickView(detalleCI.cliente_id); setDetalleCI(null) }}
                   className="flex-1 bg-[#F5F5F0] text-[#0A0A0A] text-sm font-medium py-2.5 rounded-xl hover:bg-black/10">
                   👤 Ver cliente
                 </button>
+              </div>
+              <div className="flex gap-2">
                 <button onClick={() => { copiarEnlaceCheckin(detalleCI.cliente_id); setDetalleCI(null) }}
                   className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0]">
                   🔗 Enviar nuevo CI
                 </button>
-                <button onClick={() => setDetalleCI(null)}
+                <button onClick={() => { setDetalleCI(null); setMensajeSugerido(null) }}
                   className="flex-1 bg-[#111] text-white text-sm font-semibold py-2.5 rounded-xl">
                   Cerrar
                 </button>
