@@ -87,9 +87,9 @@ export default function SesionCliente() {
     const clienteRef = cl !== undefined ? cl : cliente
     const marcasRef = marcas || []
     const contenido = ru.contenido || ru.borrador
-    const d = contenido?.dias?.find((x: any) => x.dia === dia) || contenido?.dias?.[dia - 1]
+    const d = contenido?.dias?.find((x) => x.dia === dia) || contenido?.dias?.[dia - 1]
     if (d?.ejercicios) {
-      setEjercicios(d.ejercicios.map((ej: any) => ({
+      setEjercicios(d.ejercicios.map((ej) => ({
         ejercicio_nombre: ej.nombre, patron: ej.patron, orden: ej.orden, notas: ej.notas || '',
         peso_recomendado: clienteRef ? calcularPesoRecomendado(ej, clienteRef, marcasRef) : null,
         sets: Array.from({ length: ej.series || 3 }, (_, i) => ({
