@@ -11,9 +11,52 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
   const durSeg = durMin * 60
   const [seg, setSeg] = useState(esPorTiempo ? 0 : durSeg)
   const [activo, setActivo] = useState(false)
+  const [cuentaAtras, setCuentaAtras] = useState(null) // 3, 2, 1 o null
   const intervalRef = useRef(null)
+  const audioCtx = useRef(null)
 
   useEffect(() => { return () => { if (intervalRef.current) clearInterval(intervalRef.current) } }, [])
+
+  // Crear AudioContext bajo demanda (requiere gesto del usuario)
+  function getAudio() {
+    if (!audioCtx.current) {
+      audioCtx.current = new (window.AudioContext || window.webkitAudioContext)()
+    }
+    return audioCtx.current
+  }
+
+  function beep(frecuencia = 880, duracion = 0.15, volumen = 0.5) {
+    try {
+      const ctx = getAudio()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.frequency.value = frecuencia
+      osc.type = 'sine'
+      gain.gain.setValueAtTime(volumen, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duracion)
+      osc.start(ctx.currentTime)
+      osc.stop(ctx.currentTime + duracion)
+    } catch(e) {}
+  }
+
+  function beepFin() {
+    // 3 pitidos largos al terminar
+    try {
+      const ctx = getAudio()
+      ;[0, 0.4, 0.8].forEach(delay => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain); gain.connect(ctx.destination)
+        osc.frequency.value = 660
+        gain.gain.setValueAtTime(0.6, ctx.currentTime + delay)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3)
+        osc.start(ctx.currentTime + delay)
+        osc.stop(ctx.currentTime + delay + 0.3)
+      })
+    } catch(e) {}
+  }
 
   function fmt(s) {
     const m = Math.floor(Math.abs(s) / 60)
@@ -25,19 +68,42 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
     if (activo) {
       clearInterval(intervalRef.current)
       setActivo(false)
+      setCuentaAtras(null)
       if (esPorTiempo) updateCardio(ejIdx, 'tiempo', fmt(seg))
     } else {
+      // Inicializar audio con el gesto del usuario
+      getAudio()
+      beep(660, 0.1)
       setActivo(true)
       intervalRef.current = setInterval(() => {
         setSeg(prev => {
           const next = esPorTiempo ? prev + 1 : prev - 1
+
+          // Fin del tiempo
           if (!esPorTiempo && next <= 0) {
             clearInterval(intervalRef.current)
             setActivo(false)
-            if (navigator.vibrate) navigator.vibrate([300, 100, 300])
+            setCuentaAtras(null)
+            beepFin()
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300])
             return 0
           }
-          if (esEMOM && next % 60 === 0 && navigator.vibrate) navigator.vibrate(200)
+
+          // EMOM: cuenta atrás 3-2-1 antes de cada cambio de minuto
+          if (esEMOM) {
+            const segEnMinuto = next % 60 // segundos que quedan en el minuto actual
+            if (segEnMinuto === 3) { setCuentaAtras(3); beep(440, 0.1); if(navigator.vibrate) navigator.vibrate(80) }
+            else if (segEnMinuto === 2) { setCuentaAtras(2); beep(440, 0.1); if(navigator.vibrate) navigator.vibrate(80) }
+            else if (segEnMinuto === 1) { setCuentaAtras(1); beep(440, 0.1); if(navigator.vibrate) navigator.vibrate(80) }
+            else if (segEnMinuto === 0) {
+              setCuentaAtras(null)
+              beep(880, 0.25) // pitido agudo = ¡cambia!
+              if(navigator.vibrate) navigator.vibrate([150, 50, 150])
+            } else {
+              setCuentaAtras(null)
+            }
+          }
+
           return next
         })
       }, 1000)
@@ -47,36 +113,62 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
   function reset() {
     clearInterval(intervalRef.current)
     setActivo(false)
+    setCuentaAtras(null)
     setSeg(esPorTiempo ? 0 : durSeg)
   }
 
   const pct = esPorTiempo
     ? (durSeg > 0 ? Math.min((seg / durSeg) * 100, 100) : 0)
     : (durSeg > 0 ? ((durSeg - seg) / durSeg) * 100 : 0)
-  const enRojo = !esPorTiempo && seg <= 30 && seg > 0 && activo
+  const enRojo = !esPorTiempo && seg <= 10 && seg > 0 && activo
+  const minutoActual = esEMOM && durSeg > 0 ? Math.floor((durSeg - seg) / 60) + 1 : null
 
   return (
-    <div className="bg-[#111] rounded-2xl p-4 text-center">
-      {durSeg > 0 && (
-        <div className="h-1.5 bg-white/10 rounded-full mb-4 overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-1000"
-            style={{ width: pct + '%', background: enRojo ? '#ef4444' : '#FF5C00' }} />
+    <div className="rounded-2xl overflow-hidden" style={{ background: cuentaAtras ? '#1a0a00' : '#111' }}>
+      {/* Cuenta atrás EMOM — ocupa toda la pantalla del bloque */}
+      {cuentaAtras && (
+        <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+          <p className="text-8xl font-black text-white animate-ping" style={{ color: '#FF5C00' }}>
+            {cuentaAtras}
+          </p>
         </div>
       )}
-      <p className="text-5xl font-bold font-mono tracking-wider mb-1"
-        style={{ color: enRojo ? '#ef4444' : 'white' }}>
-        {fmt(seg)}
-      </p>
-      {esAMRAP && <p className="text-white/30 text-xs mb-2">AMRAP {durMin} min</p>}
-      {esEMOM && activo && durSeg > 0 && <p className="text-white/50 text-xs mb-2">Minuto {Math.ceil((durSeg - seg) / 60 + 0.01)} de {durMin}</p>}
-      {esPorTiempo && <p className="text-white/30 text-xs mb-2">Tiempo transcurrido</p>}
-      <div className="flex gap-2 justify-center mt-2">
-        <button onClick={toggle}
-          className="px-8 py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-all"
-          style={{ background: activo ? '#6B6B6B' : '#FF5C00' }}>
-          {activo ? '⏸ Parar' : '▶ ' + (seg === (esPorTiempo ? 0 : durSeg) ? 'Iniciar' : 'Continuar')}
-        </button>
-        <button onClick={reset} className="px-4 py-3 rounded-xl text-white/50 border border-white/10 text-sm">↺</button>
+      <div className="p-4 text-center relative">
+        {durSeg > 0 && (
+          <div className="h-1.5 bg-white/10 rounded-full mb-4 overflow-hidden">
+            <div className="h-full rounded-full transition-all duration-1000"
+              style={{ width: pct + '%', background: enRojo ? '#ef4444' : '#FF5C00' }} />
+          </div>
+        )}
+
+        {/* Cuenta atrás 3-2-1 inline */}
+        {cuentaAtras ? (
+          <div className="py-2">
+            <p className="text-7xl font-black" style={{ color: '#FF5C00' }}>{cuentaAtras}</p>
+            <p className="text-white/40 text-sm mt-1">¡Prepárate!</p>
+          </div>
+        ) : (
+          <p className="text-5xl font-bold font-mono tracking-wider mb-1"
+            style={{ color: enRojo ? '#ef4444' : 'white' }}>
+            {fmt(seg)}
+          </p>
+        )}
+
+        {esAMRAP && !cuentaAtras && <p className="text-white/30 text-xs mb-2">AMRAP {durMin} min</p>}
+        {esEMOM && !cuentaAtras && activo && minutoActual && (
+          <p className="text-white/50 text-xs mb-2">Minuto {minutoActual} de {durMin}</p>
+        )}
+        {esEMOM && !activo && <p className="text-white/30 text-xs mb-2">EMOM {durMin} min · vibra + pitido cada minuto</p>}
+        {esPorTiempo && !cuentaAtras && <p className="text-white/30 text-xs mb-2">Tiempo transcurrido</p>}
+
+        <div className="flex gap-2 justify-center mt-2">
+          <button onClick={toggle}
+            className="px-8 py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-all"
+            style={{ background: activo ? '#6B6B6B' : '#FF5C00' }}>
+            {activo ? '⏸ Parar' : '▶ ' + (seg === (esPorTiempo ? 0 : durSeg) ? 'Iniciar' : 'Continuar')}
+          </button>
+          <button onClick={reset} className="px-4 py-3 rounded-xl text-white/50 border border-white/10 text-sm">↺</button>
+        </div>
       </div>
     </div>
   )
