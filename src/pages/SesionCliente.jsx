@@ -18,14 +18,49 @@ export default function SesionCliente() {
   const [guardando, setGuardando] = useState(false)
   const [datosCardio, setDatosCardio] = useState({}) // { ejIdx: { km, ritmo, fc_media, fc_max, notas } }
 
-  function esCardio(ej) {
+  // Tipos de formulario por ejercicio:
+  // 'carrera'   → km, ritmo, FC media, FC máxima, notas
+  // 'fuerza'    → sets con peso + reps + ✓
+  // 'corporal'  → sets con reps + ✓ (sin peso — dominadas, fondos, planchas, core)
+  // 'skip'      → sin registro (calentamiento, estiramientos, movilidad)
+
+  function tipoFormulario(ej) {
     const patron = (ej.patron || '').toLowerCase()
     const nombre = (ej.ejercicio_nombre || '').toLowerCase()
-    return patron.includes('cardio') || patron.includes('carrera') || patron.includes('z2') ||
-      patron.includes('intervalo') || patron.includes('fartlek') || patron.includes('calentamiento') ||
-      patron.includes('movilidad') || patron.includes('estiramientos') || patron.includes('core') ||
+
+    // SKIP — no necesita registro
+    if (
+      patron.includes('calentamiento') || patron.includes('preparacion') ||
+      patron.includes('estiramientos') || patron.includes('movilidad') ||
+      nombre.includes('calentamiento') || nombre.includes('estiramientos') ||
+      nombre.includes('vuelta a la calma') || nombre.includes('stretching') ||
+      nombre.includes('activacion neuromuscular')
+    ) return 'skip'
+
+    // CARRERA — datos de running
+    if (
+      patron.includes('cardio') || patron.includes('carrera') ||
+      patron.includes('z2') || patron.includes('interval') || patron.includes('fartlek') ||
       nombre.includes('carrera') || nombre.includes('rodaje') || nombre.includes('fartlek') ||
-      nombre.includes('calentamiento') || nombre.includes('estiramientos') || nombre.includes('core')
+      nombre.includes('tirada') || nombre.includes('series 400') || nombre.includes('assault bike') ||
+      nombre.includes('remo ergometro') || nombre.includes('remo erg')
+    ) return 'carrera'
+
+    // CORPORAL — reps sin peso (core, calistenia, peso corporal)
+    if (
+      patron.includes('core') || patron.includes('antirotacion') ||
+      patron.includes('calistenia') || patron.includes('peso corporal') ||
+      nombre.includes('plank') || nombre.includes('plancha') || nombre.includes('dead bug') ||
+      nombre.includes('bird dog') || nombre.includes('pallof') || nombre.includes('crunch') ||
+      nombre.includes('abdominal') || nombre.includes('hollow') || nombre.includes('l-sit') ||
+      nombre.includes('muscle up') || nombre.includes('handstand') ||
+      (nombre.includes('dominadas') && !nombre.includes('lastrad')) ||
+      (nombre.includes('fondos') && !nombre.includes('lastrad')) ||
+      (nombre.includes('flexiones') && !nombre.includes('lastrad'))
+    ) return 'corporal'
+
+    // FUERZA por defecto — peso + reps
+    return 'fuerza'
   }
 
   function updateCardio(ejIdx, field, val) {
@@ -171,34 +206,34 @@ export default function SesionCliente() {
     }).select('id').single()
 
     if (!sesionError && sesionData?.id) {
-      // Fuerza: ejercicios con sets de peso/reps
-      const ejsFuerza = ejercicios.filter((e, i) => !esCardio(e) && e.sets.some(s => s.peso || s.completado))
-      if (ejsFuerza.length > 0) {
-        await supabase.from('sesion_ejercicios').insert(
-          ejsFuerza.map(e => ({
-            sesion_id: sesionData.id, cliente_id: clienteId,
-            entrenador_id: cliente.entrenador_id,
-            ejercicio_nombre: e.ejercicio_nombre, patron: e.patron, orden: e.orden,
-            sets: e.sets, notas: e.notas
-          }))
-        )
-      }
-      // Cardio: ejercicios con datos de carrera
-      const ejsCardio = ejercicios.filter((e, i) => esCardio(e) && datosCardio[i] && Object.values(datosCardio[i]).some(v => v))
-      if (ejsCardio.length > 0) {
-        await supabase.from('sesion_ejercicios').insert(
-          ejsCardio.map(e => {
-            const i = ejercicios.indexOf(e)
-            const dc = datosCardio[i] || {}
-            return {
-              sesion_id: sesionData.id, cliente_id: clienteId,
-              entrenador_id: cliente.entrenador_id,
+      // Guardar por tipo de formulario
+      const insertsEj = []
+      ejercicios.forEach((e, i) => {
+        const tipo = tipoFormulario(e)
+        if (tipo === 'skip') return
+        if (tipo === 'carrera') {
+          const dc = datosCardio[i] || {}
+          if (Object.values(dc).some(v => v)) {
+            insertsEj.push({
+              sesion_id: sesionData.id, cliente_id: clienteId, entrenador_id: cliente.entrenador_id,
               ejercicio_nombre: e.ejercicio_nombre, patron: e.patron, orden: e.orden,
               sets: [{ km: dc.km || null, ritmo: dc.ritmo || null, fc_media: dc.fc_media || null, fc_max: dc.fc_max || null }],
               notas: dc.notas || e.notas
-            }
-          })
-        )
+            })
+          }
+        } else {
+          // fuerza o corporal
+          if (e.sets.some(s => s.peso || s.completado)) {
+            insertsEj.push({
+              sesion_id: sesionData.id, cliente_id: clienteId, entrenador_id: cliente.entrenador_id,
+              ejercicio_nombre: e.ejercicio_nombre, patron: e.patron, orden: e.orden,
+              sets: e.sets, notas: e.notas
+            })
+          }
+        }
+      })
+      if (insertsEj.length > 0) {
+        await supabase.from('sesion_ejercicios').insert(insertsEj)
       }
     }
     setEnviado(true)
@@ -283,23 +318,37 @@ export default function SesionCliente() {
         )}
 
         {/* Ejercicios */}
-        {paso === 1 && ejercicios.map((ej, ejIdx) => (
+        {paso === 1 && ejercicios.map((ej, ejIdx) => {
+          const tipo = tipoFormulario(ej)
+
+          // SKIP — calentamiento y estiramientos no necesitan registro
+          if (tipo === 'skip') return (
+            <div key={ejIdx} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden opacity-60">
+              <div className="bg-[#0A0A0A]/70 px-4 py-3 flex items-center gap-2">
+                <span className="w-6 h-6 bg-white/20 text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
+                <p className="text-white text-sm flex-1">{ej.ejercicio_nombre}</p>
+                <span className="text-xs bg-white/10 text-white/50 px-2 py-0.5 rounded-full">Sin registro</span>
+              </div>
+              {ej.notas && <p className="text-xs text-[#6B6B6B] px-4 py-2">{ej.notas}</p>}
+            </div>
+          )
+
+          return (
           <div key={ejIdx} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
             <div className="bg-[#0A0A0A] px-4 py-3 flex items-center gap-2">
               <span className="w-6 h-6 bg-[#FF5C00] text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
               <p className="text-white text-sm font-semibold flex-1">{ej.ejercicio_nombre}</p>
-              {!esCardio(ej) && ej.peso_recomendado && (
-                <span className="text-xs bg-[#FF5C00]/20 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
-                  ~{ej.peso_recomendado}kg
-                </span>
+              {tipo === 'fuerza' && ej.peso_recomendado && (
+                <span className="text-xs bg-[#FF5C00]/20 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">~{ej.peso_recomendado}kg</span>
               )}
-              {esCardio(ej) && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-medium flex-shrink-0">🏃 Cardio</span>}
+              {tipo === 'carrera' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-medium">🏃 Carrera</span>}
+              {tipo === 'corporal' && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium">💪 Corporal</span>}
             </div>
 
-            {esCardio(ej) ? (
-              /* ── Formulario CARDIO ── */
+            {/* CARRERA */}
+            {tipo === 'carrera' && (
               <div className="p-4 space-y-3">
-                <p className="text-xs text-[#6B6B6B] mb-2">{ej.notas}</p>
+                {ej.notas && <p className="text-xs text-[#6B6B6B] italic">{ej.notas}</p>}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-xs text-[#6B6B6B] mb-1 block">Distancia (km)</label>
@@ -326,16 +375,38 @@ export default function SesionCliente() {
                       placeholder="168" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
                   </div>
                 </div>
-                <div>
-                  <label className="text-xs text-[#6B6B6B] mb-1 block">Sensaciones / notas</label>
-                  <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
-                    onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
-                    placeholder="Cómo fue el ritmo, molestias, condiciones..."
-                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
-                </div>
+                <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
+                  onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
+                  placeholder="Sensaciones, condiciones, molestias..."
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
               </div>
-            ) : (
-              /* ── Formulario FUERZA ── */
+            )}
+
+            {/* CORPORAL — solo reps, sin peso */}
+            {tipo === 'corporal' && (
+              <div className="p-3 space-y-2">
+                <div className="grid grid-cols-8 gap-2 px-1 mb-1">
+                  <p className="col-span-1 text-xs text-[#6B6B6B]">Set</p>
+                  <p className="col-span-5 text-xs text-[#6B6B6B]">Repeticiones</p>
+                  <p className="col-span-2 text-xs text-[#6B6B6B]">✓</p>
+                </div>
+                {ej.sets.map((s, setIdx) => (
+                  <div key={setIdx} className="grid grid-cols-8 gap-2 items-center">
+                    <span className="col-span-1 text-xs font-bold text-[#6B6B6B]">{setIdx + 1}</span>
+                    <input value={s.reps} onChange={e => updateSet(ejIdx, setIdx, 'reps', e.target.value)}
+                      placeholder={s.reps || '—'} className="col-span-5 border border-black/10 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                    <button type="button" onClick={() => updateSet(ejIdx, setIdx, 'completado', !s.completado)}
+                      className={`col-span-2 h-9 rounded-lg text-sm font-bold transition-all ${s.completado ? 'bg-emerald-500 text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                      {s.completado ? '✓' : '○'}
+                    </button>
+                  </div>
+                ))}
+                {ej.notas && <p className="text-xs text-[#6B6B6B] italic mt-1 px-1">{ej.notas}</p>}
+              </div>
+            )}
+
+            {/* FUERZA — peso + reps */}
+            {tipo === 'fuerza' && (
               <div className="p-3 space-y-2">
                 <div className="grid grid-cols-12 gap-2 px-1 mb-1">
                   <p className="col-span-1 text-xs text-[#6B6B6B]">Set</p>
@@ -360,7 +431,8 @@ export default function SesionCliente() {
             </div>
             )}
           </div>
-        ))}
+          )
+        })}
 
         {/* Valoración */}
         {paso === 2 && (
