@@ -138,6 +138,7 @@ export default function PortalCliente() {
   useEffect(()=>{
     if(tab==='mensajes'&&mensajes.length&&!mensajesLeidos){
       supabase.from('mensajes_cliente').update({leido:true}).eq('cliente_id',clienteId).eq('leido',false)
+      setMensajes(prev => prev.map(m => ({...m, leido: true})))
       setMensajesLeidos(true)
     }
     if(tab==='mensajes') setTimeout(()=>mensajesEndRef.current?.scrollIntoView({behavior:'smooth'}),100)
