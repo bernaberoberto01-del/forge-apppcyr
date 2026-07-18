@@ -231,7 +231,7 @@ export default function PortalCliente() {
               className={`flex-shrink-0 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all relative whitespace-nowrap ${tab===t.id?'border-b-2 text-[#0A0A0A]':'border-transparent text-[#6B6B6B]'}`}
               style={tab===t.id?{borderBottomColor:color}:{}}>
               {t.label}
-              {t.badge>0&&<span className="absolute top-1.5 right-1 w-4 h-4 rounded-full text-white flex items-center justify-center text-[9px] font-bold" style={{background:'#ef4444'}}>{t.badge}</span>}
+              {t.badge>0&&<span className="absolute top-2 right-1 w-2 h-2 rounded-full" style={{background:color}}/>}
             </button>
           ))}
         </div>
@@ -263,7 +263,7 @@ export default function PortalCliente() {
                 style={tab===t.id?{background:color}:{}}>
                 <span className="text-base w-5 text-center flex-shrink-0">{t.icon}</span>
                 <span>{t.label}</span>
-                {t.badge>0&&<span className="ml-auto w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold bg-red-500">{t.badge}</span>}
+                {t.badge>0&&<span className="ml-auto w-2.5 h-2.5 rounded-full flex-shrink-0" style={{background:color}}/>}
               </button>
             ))}
           </nav>
@@ -315,22 +315,41 @@ export default function PortalCliente() {
                   </div>
                 )}
 
-                {/* Cards rápidas */}
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={()=>setTab('progreso')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
-                    <p className="text-2xl mb-2">📊</p>
-                    <p className="text-2xl font-bold text-[#0A0A0A]">{checkins.length}</p>
-                    <p className="text-xs text-[#6B6B6B] mt-0.5">Check-ins realizados</p>
-                  </button>
-                  <button onClick={()=>setTab('mensajes')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all relative">
-                    <p className="text-2xl mb-2">💬</p>
-                    {mensajesNoLeidos > 0
-                      ? <><p className="text-2xl font-bold text-[#0A0A0A]">{mensajesNoLeidos}</p><p className="text-xs text-[#6B6B6B] mt-0.5">Mensaje{mensajesNoLeidos>1?'s':''} nuevo{mensajesNoLeidos>1?'s':''}</p></>
-                      : <><p className="text-2xl font-bold text-[#0A0A0A]">—</p><p className="text-xs text-[#6B6B6B] mt-0.5">Mensajes</p></>
-                    }
-                    {mensajesNoLeidos>0&&<span className="absolute top-3 right-3 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center font-bold">{mensajesNoLeidos}</span>}
-                  </button>
-                </div>
+                {/* Botón principal mensajería */}
+                <button onClick={()=>setTab('mensajes')}
+                  className="relative w-full bg-white rounded-2xl border border-black/6 p-6 text-left hover:border-black/12 hover:shadow-sm transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl flex-shrink-0" style={{background:color}}>
+                      💬
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {mensajesNoLeidos > 0 ? (
+                        <>
+                          <p className="font-bold text-[#0A0A0A] text-base">
+                            {mensajesNoLeidos === 1 ? 'Tienes un mensaje nuevo' : `Tienes ${mensajesNoLeidos} mensajes nuevos`}
+                          </p>
+                          <p className="text-sm text-[#6B6B6B] mt-0.5">Tu entrenador te ha escrito</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-bold text-[#0A0A0A] text-base">Mensajes</p>
+                          <p className="text-sm text-[#6B6B6B] mt-0.5">Escríbele a tu entrenador</p>
+                        </>
+                      )}
+                    </div>
+                    <span className="text-[#6B6B6B] text-xl flex-shrink-0">→</span>
+                  </div>
+                  {mensajesNoLeidos > 0 && (
+                    <span className="absolute top-4 right-4 w-3 h-3 rounded-full" style={{background:color}}/>
+                  )}
+                </button>
+
+                {/* Card check-ins */}
+                <button onClick={()=>setTab('progreso')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
+                  <p className="text-2xl mb-2">📊</p>
+                  <p className="text-2xl font-bold text-[#0A0A0A]">{checkins.length}</p>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Check-ins realizados</p>
+                </button>
 
                 {/* Acciones online */}
                 {cliente?.tipo==='online'&&(

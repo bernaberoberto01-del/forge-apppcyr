@@ -68,7 +68,9 @@ export default function Mensajes({ session }) {
       entrenador_id: uid,
       cliente_id: seleccionado.id,
       contenido: msg,
-      leido: false
+      tipo: 'entrenador',
+      leido: false,
+      leido_entrenador: true
     })
     if (!error) {
       setTexto('')
