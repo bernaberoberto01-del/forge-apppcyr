@@ -360,8 +360,7 @@ export default function SesionCliente() {
               <div className="p-4 space-y-3">
                 {ej.notas && <p className="text-xs text-[#6B6B6B] italic bg-[#F5F5F0] rounded-xl px-3 py-2">{ej.notas}</p>}
                 <div className="grid grid-cols-2 gap-2">
-                  {/* Detectar subtipo por nombre */}
-                  {(ej.ejercicio_nombre?.toLowerCase().includes('amrap') || datosCardio[ejIdx]?.subtipo === 'amrap') && (
+                  {ej.ejercicio_nombre?.toLowerCase().includes('amrap') && (
                     <>
                       <div>
                         <label className="text-xs text-[#6B6B6B] mb-1 block">Rondas completadas</label>
@@ -377,7 +376,7 @@ export default function SesionCliente() {
                       </div>
                     </>
                   )}
-                  {(ej.ejercicio_nombre?.toLowerCase().includes('emom') || datosCardio[ejIdx]?.subtipo === 'emom') && (
+                  {ej.ejercicio_nombre?.toLowerCase().includes('emom') && (
                     <>
                       <div>
                         <label className="text-xs text-[#6B6B6B] mb-1 block">Minutos completados</label>
@@ -396,7 +395,6 @@ export default function SesionCliente() {
                       </div>
                     </>
                   )}
-                  {/* Por tiempo / Chipper / Finisher — campo tiempo */}
                   {!ej.ejercicio_nombre?.toLowerCase().includes('amrap') && !ej.ejercicio_nombre?.toLowerCase().includes('emom') && (
                     <div className="col-span-2">
                       <label className="text-xs text-[#6B6B6B] mb-1 block">Tiempo total (min:seg)</label>
@@ -405,10 +403,24 @@ export default function SesionCliente() {
                         placeholder="12:45" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
                     </div>
                   )}
+                  {/* RPE específico del MetCon */}
+                  <div>
+                    <label className="text-xs text-[#6B6B6B] mb-1 block">Esfuerzo RPE (1-10)</label>
+                    <input type="number" min="1" max="10" value={datosCardio[ejIdx]?.rpe_metcon || ''}
+                      onChange={e => updateCardio(ejIdx, 'rpe_metcon', e.target.value)}
+                      placeholder="8" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                  </div>
+                  {/* Pesos usados */}
+                  <div>
+                    <label className="text-xs text-[#6B6B6B] mb-1 block">Pesos usados</label>
+                    <input type="text" value={datosCardio[ejIdx]?.pesos || ''}
+                      onChange={e => updateCardio(ejIdx, 'pesos', e.target.value)}
+                      placeholder="KB 24kg, barra 60kg" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  </div>
                 </div>
                 <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
                   onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
-                  placeholder="Sensaciones, pesos usados, nivel de esfuerzo..."
+                  placeholder="Sensaciones, qué fue bien o mal, nivel de fatiga..."
                   className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
               </div>
             )}
