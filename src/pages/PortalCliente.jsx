@@ -315,34 +315,62 @@ export default function PortalCliente() {
                   </div>
                 )}
 
-                {/* Botón principal mensajería */}
-                <button onClick={()=>setTab('mensajes')}
-                  className="relative w-full bg-white rounded-2xl border border-black/6 p-6 text-left hover:border-black/12 hover:shadow-sm transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-2xl flex-shrink-0" style={{background:color}}>
-                      💬
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {mensajesNoLeidos > 0 ? (
-                        <>
-                          <p className="font-bold text-[#0A0A0A] text-base">
-                            {mensajesNoLeidos === 1 ? 'Tienes un mensaje nuevo' : `Tienes ${mensajesNoLeidos} mensajes nuevos`}
-                          </p>
-                          <p className="text-sm text-[#6B6B6B] mt-0.5">Tu entrenador te ha escrito</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="font-bold text-[#0A0A0A] text-base">Mensajes</p>
-                          <p className="text-sm text-[#6B6B6B] mt-0.5">Escríbele a tu entrenador</p>
-                        </>
+                {/* Gráfica de progreso — motivación principal */}
+                {checkins.length >= 2 ? (() => {
+                  const pesosConFecha = checkins.slice().reverse().filter(c => c.peso)
+                  const primero = checkins[checkins.length - 1]
+                  const ultimo = checkins[0]
+                  const diff = primero.peso && ultimo.peso ? +(ultimo.peso - primero.peso).toFixed(1) : null
+                  const bajando = diff !== null && diff < 0
+                  const subiendo = diff !== null && diff > 0
+                  const sem = primero.fecha && ultimo.fecha
+                    ? Math.ceil((new Date(ultimo.fecha) - new Date(primero.fecha)) / (7 * 864e5))
+                    : null
+                  return (
+                    <button onClick={() => setTab('progreso')}
+                      className="w-full bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-widest mb-1">Tu progreso</p>
+                          {diff !== null && (
+                            <p className="text-3xl font-bold" style={{color: bajando ? '#10b981' : subiendo ? '#6366f1' : '#0A0A0A'}}>
+                              {bajando ? '' : '+'}{diff}kg
+                            </p>
+                          )}
+                          {sem && <p className="text-xs text-[#6B6B6B] mt-0.5">en {sem} semana{sem !== 1 ? 's' : ''}</p>}
+                        </div>
+                        <span className="text-[#6B6B6B] text-sm">Ver todo →</span>
+                      </div>
+                      {/* Mini gráfica de barras */}
+                      {pesosConFecha.length > 1 && (
+                        <div className="flex items-end gap-1 h-14">
+                          {pesosConFecha.map((c, i) => {
+                            const min = Math.min(...pesosConFecha.map(x => x.peso))
+                            const max = Math.max(...pesosConFecha.map(x => x.peso))
+                            const h = max === min ? 60 : ((c.peso - min) / (max - min)) * 70 + 30
+                            const isLast = i === pesosConFecha.length - 1
+                            return (
+                              <div key={c.id} className="flex-1 flex flex-col items-center gap-1">
+                                <div className="w-full rounded-sm transition-all"
+                                  style={{ height: `${h}%`, background: isLast ? color : `${color}35` }} />
+                              </div>
+                            )
+                          })}
+                        </div>
                       )}
-                    </div>
-                    <span className="text-[#6B6B6B] text-xl flex-shrink-0">→</span>
-                  </div>
-                  {mensajesNoLeidos > 0 && (
-                    <span className="absolute top-4 right-4 w-3 h-3 rounded-full" style={{background:color}}/>
-                  )}
-                </button>
+                      <div className="flex justify-between mt-2">
+                        <p className="text-xs text-[#6B6B6B]">{primero.peso && `${primero.peso}kg`}</p>
+                        <p className="text-xs font-semibold" style={{color}}>{ultimo.peso && `${ultimo.peso}kg`}</p>
+                      </div>
+                    </button>
+                  )
+                })() : (
+                  <button onClick={() => setTab('progreso')}
+                    className="w-full bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
+                    <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-widest mb-2">Tu progreso</p>
+                    <p className="text-sm text-[#6B6B6B]">Completa tu primer check-in para ver tu evolución aquí</p>
+                  </button>
+                )}
 
                 {/* Card check-ins */}
                 <button onClick={()=>setTab('progreso')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
