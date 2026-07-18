@@ -6,7 +6,7 @@ const PASOS = ['Datos personales','Tu objetivo','Experiencia','Marcas básicas',
 
 const init = {
   nombre:'', email:'', telefono:'', edad:'', sexo:'', peso_actual:'', altura:'', tipo:'presencial',
-  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'', acepta_rgpd: false,
+  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'', acepta_rgpd: false, acepta_ia: false,
   nivel:'principiante', anos_entrenando:0,
   marca_press_banca:'', marca_sentadilla:'', marca_peso_muerto:'', marca_dominadas:'', marca_flexiones:'', marca_press_militar:'',
   material:'gimnasio', dias_semana:3, duracion_sesion:60, horario_preferido:'',
@@ -144,6 +144,8 @@ export default function RegistroCliente() {
         como_nos_conocio: form.como_nos_conocio || null,
         tipo_entrenamiento: form.tipo_entrenamiento || null,
         acepta_rgpd: form.acepta_rgpd || false,
+        acepta_ia: form.acepta_ia || false,
+        fecha_consentimiento: new Date().toISOString(),
         procesado: false,
       })
       if (err) throw err
@@ -426,20 +428,29 @@ export default function RegistroCliente() {
             </button>
           )}
           {paso === PASOS.length - 1 && (
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input type="checkbox" checked={form.acepta_rgpd} onChange={e => set('acepta_rgpd', e.target.checked)}
-                className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
-              <span className="text-xs text-[#6B6B6B] leading-relaxed">
-                Acepto el tratamiento de mis datos personales y de salud conforme al <span className="text-[#FF5C00] underline">RGPD</span>. Mis datos no serán cedidos a terceros.
-              </span>
-            </label>
+            <div className="space-y-2">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={form.acepta_rgpd} onChange={e => set('acepta_rgpd', e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
+                <span className="text-xs text-[#6B6B6B] leading-relaxed">
+                  He leído y acepto la <span className="text-[#FF5C00] underline cursor-pointer" onClick={() => window.open('/privacidad', '_blank')}>Política de Privacidad</span> y el tratamiento de mis datos personales y de salud conforme al RGPD.
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={form.acepta_ia || false} onChange={e => set('acepta_ia', e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
+                <span className="text-xs text-[#6B6B6B] leading-relaxed">
+                  Entiendo y acepto que mis datos (objetivo, nivel, lesiones y métricas de seguimiento) serán procesados por sistemas de Inteligencia Artificial (Anthropic/Claude) para generar rutinas, planes nutricionales y análisis personalizados. Este procesamiento es necesario para el servicio.
+                </span>
+              </label>
+            </div>
           )}
           {paso < PASOS.length - 1 ? (
             <button onClick={siguiente} className="flex-1 bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95">
               Siguiente →
             </button>
           ) : (
-            <button onClick={enviar} disabled={loading || !form.acepta_rgpd} className="flex-1 bg-[#111] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-40">
+            <button onClick={enviar} disabled={loading || !form.acepta_rgpd || !form.acepta_ia} className="flex-1 bg-[#111] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-40">
               {loading ? 'Enviando...' : '✅ Enviar cuestionario'}
             </button>
           )}

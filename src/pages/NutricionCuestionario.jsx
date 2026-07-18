@@ -10,70 +10,62 @@ export default function NutricionCuestionario() {
   const [cliente, setCliente] = useState(null)
   const [paso, setPaso] = useState(0)
   const [form, setForm] = useState({ sexo:'', peso:'', altura:'', edad:'', nivel_actividad:'', objetivo:'', velocidad_progreso:'', comidas_dia:'', tiempo_cocina:'', tipo_dieta:'', entrena_cuando:'', alergias:'', alimentos_no_gustan:'', alimentos_favoritos:'', suplementos:'', notas:'' })
+  const [aceptaRgpd, setAceptaRgpd] = useState(false)
+  const [aceptaIa, setAceptaIa] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [loading, setLoading] = useState(false)
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
 
   useEffect(() => {
-    if (!clienteId) return
+    if (!clienteId || !entrenadorId) return
     async function precargar() {
-      // 1. Datos de la ficha + cuestionario de registro (altura, edad, sexo)
-      const [{ data: cl }, { data: reg }] = await Promise.all([
-        supabase.from('clientes').select('nombre, peso_actual, objetivo, lesiones, nivel, dias_semana').eq('id', clienteId).single(),
-        supabase.from('cuestionarios').select('altura, edad, sexo').eq('cliente_id', clienteId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-      ])
+      try {
+        const res = await fetch(
+          `https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/datos-cuestionario?cliente_id=${clienteId}&entrenador_id=${entrenadorId}`
+        )
+        if (!res.ok) return
+        const d = await res.json()
+        setCliente({ nombre: d.nombre })
 
-      if (cl) {
-        setCliente(cl)
         const objMap = {
           perdida_grasa: 'perdida_grasa', hipertrofia: 'ganancia_muscular',
           ganancia_muscular: 'ganancia_muscular', fuerza: 'rendimiento',
           resistencia: 'rendimiento', tonificacion: 'recomposicion',
           wellness: 'salud', mantenimiento: 'mantenimiento'
         }
-        setForm(f => ({
-          ...f,
-          peso: cl.peso_actual ? String(cl.peso_actual) : f.peso,
-          objetivo: (cl.objetivo && objMap[cl.objetivo]) ? objMap[cl.objetivo] : f.objetivo,
-          // Datos físicos del cuestionario de registro
-          altura: reg?.altura ? String(reg.altura) : f.altura,
-          edad: reg?.edad ? String(reg.edad) : f.edad,
-          sexo: reg?.sexo || f.sexo,
-        }))
-      }
 
-      // 2. Cuestionario de nutrición anterior si existe
-      const { data: cuest } = await supabase.from('cuestionarios_nutricion')
-        .select('*').eq('cliente_id', clienteId)
-        .order('created_at', { ascending: false }).limit(1).maybeSingle()
-      if (cuest) {
         setForm(f => ({
           ...f,
-          sexo: cuest.sexo || f.sexo,
-          peso: cuest.peso ? String(cuest.peso) : f.peso,
-          altura: cuest.altura ? String(cuest.altura) : f.altura,
-          edad: cuest.edad ? String(cuest.edad) : f.edad,
-          nivel_actividad: cuest.nivel_actividad || f.nivel_actividad,
-          objetivo: cuest.objetivo || f.objetivo,
-          velocidad_progreso: cuest.velocidad_progreso || f.velocidad_progreso,
-          comidas_dia: cuest.comidas_dia ? String(cuest.comidas_dia) : f.comidas_dia,
-          tiempo_cocina: cuest.tiempo_cocina || f.tiempo_cocina,
-          tipo_dieta: cuest.tipo_dieta || f.tipo_dieta,
-          entrena_cuando: cuest.entrena_cuando || f.entrena_cuando,
-          alergias: cuest.alergias || f.alergias,
-          alimentos_no_gustan: cuest.alimentos_no_gustan || f.alimentos_no_gustan,
-          alimentos_favoritos: cuest.alimentos_favoritos || f.alimentos_favoritos,
-          suplementos: cuest.suplementos || f.suplementos,
-          notas: cuest.notas || f.notas,
+          peso: d.peso_actual ? String(d.peso_actual) : f.peso,
+          objetivo: (d.objetivo && objMap[d.objetivo]) ? objMap[d.objetivo] : f.objetivo,
+          altura: d.altura ? String(d.altura) : f.altura,
+          edad: d.edad ? String(d.edad) : f.edad,
+          sexo: d.sexo || f.sexo,
+          // Cuestionario previo si existe
+          ...(d.cuestionario_previo ? {
+            nivel_actividad: d.cuestionario_previo.nivel_actividad || f.nivel_actividad,
+            velocidad_progreso: d.cuestionario_previo.velocidad_progreso || f.velocidad_progreso,
+            comidas_dia: d.cuestionario_previo.comidas_dia ? String(d.cuestionario_previo.comidas_dia) : f.comidas_dia,
+            tiempo_cocina: d.cuestionario_previo.tiempo_cocina || f.tiempo_cocina,
+            tipo_dieta: d.cuestionario_previo.tipo_dieta || f.tipo_dieta,
+            entrena_cuando: d.cuestionario_previo.entrena_cuando || f.entrena_cuando,
+            alergias: d.cuestionario_previo.alergias || f.alergias,
+            alimentos_no_gustan: d.cuestionario_previo.alimentos_no_gustan || f.alimentos_no_gustan,
+            alimentos_favoritos: d.cuestionario_previo.alimentos_favoritos || f.alimentos_favoritos,
+            suplementos: d.cuestionario_previo.suplementos || f.suplementos,
+            notas: d.cuestionario_previo.notas || f.notas,
+            objetivo: d.cuestionario_previo.objetivo || (d.objetivo && objMap[d.objetivo]) || f.objetivo,
+          } : {})
         }))
-      }
+      } catch(e) {}
     }
     precargar()
-  }, [clienteId])
+  }, [clienteId, entrenadorId])
+
 
   async function enviar() {
     setLoading(true)
-    await supabase.from('cuestionarios_nutricion').insert({ ...form, cliente_id: clienteId, entrenador_id: entrenadorId, peso: form.peso?Number(form.peso):null, altura: form.altura?Number(form.altura):null, edad: form.edad?Number(form.edad):null, comidas_dia: form.comidas_dia?Number(form.comidas_dia):null })
+    await supabase.from('cuestionarios_nutricion').insert({ ...form, cliente_id: clienteId, entrenador_id: entrenadorId, peso: form.peso?Number(form.peso):null, altura: form.altura?Number(form.altura):null, edad: form.edad?Number(form.edad):null, comidas_dia: form.comidas_dia?Number(form.comidas_dia):null, acepta_rgpd: aceptaRgpd, acepta_ia: aceptaIa, fecha_consentimiento: new Date().toISOString() })
     setEnviado(true)
     setLoading(false)
   }
@@ -242,9 +234,26 @@ export default function NutricionCuestionario() {
           {paso < PASOS.length-1 ? (
             <button onClick={()=>setPaso(p=>p+1)} className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">Siguiente →</button>
           ) : (
-            <button onClick={enviar} disabled={loading} className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
-              {loading ? '⏳ Enviando...' : '✅ Enviar cuestionario'}
-            </button>
+            <div className="flex-1 space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={aceptaRgpd} onChange={e=>setAceptaRgpd(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                <span className="text-xs text-white/60 leading-relaxed">
+                  Acepto la <span className="text-[#FF5C00] underline">Política de Privacidad</span> y el tratamiento de mis datos de salud y nutrición conforme al RGPD.
+                </span>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" checked={aceptaIa} onChange={e=>setAceptaIa(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                <span className="text-xs text-white/60 leading-relaxed">
+                  Entiendo que mis datos nutricionales (peso, alergias, objetivos) serán procesados por Inteligencia Artificial (Anthropic/Claude) para generar mi plan personalizado.
+                </span>
+              </label>
+              <button onClick={enviar} disabled={loading||!aceptaRgpd||!aceptaIa}
+                className="w-full bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
+                {loading ? '⏳ Enviando...' : '✅ Enviar cuestionario'}
+              </button>
+            </div>
           )}
         </div>
       </div>
