@@ -84,8 +84,9 @@ export default function SesionCliente() {
     'curl':               { principiante: 0.15, intermedio: 0.25, avanzado: 0.35 },
     'press frances':      { principiante: 0.15, intermedio: 0.25, avanzado: 0.35 },
   }
-  // Factor de seguridad: sugerimos el 70% del 1RM estimado para entrenar con margen
-  const FACTOR_TRABAJO = 0.70
+  // Factor de trabajo por nivel (% del 1RM estimado para entrenar)
+  // Principiante: 55-60% | Intermedio: 65-70% | Avanzado: 80-85%
+  const FACTOR_TRABAJO = { principiante: 0.575, intermedio: 0.675, avanzado: 0.825 }
 
   function calcularPesoRecomendado(ej, cliente, marcas) {
     const nombreEj = (ej.nombre || ej.ejercicio_nombre || '').toLowerCase().trim()
@@ -111,8 +112,8 @@ export default function SesionCliente() {
     if (refKey) {
       const pct = REFS_EJERCICIO[refKey][nivel]
       if (!pct) return null
-      // 70% del 1RM estimado = peso de trabajo seguro con margen
-      return Math.round(pesoCorporal * pct * FACTOR_TRABAJO / 2.5) * 2.5
+      // % de trabajo según nivel del cliente
+      return Math.round(pesoCorporal * pct * FACTOR_TRABAJO[nivel] / 2.5) * 2.5
     }
 
     return null
