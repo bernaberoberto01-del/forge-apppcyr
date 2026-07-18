@@ -37,6 +37,15 @@ export default function SesionCliente() {
       nombre.includes('activacion neuromuscular')
     ) return 'skip'
 
+    // METCON — trabajo por tiempo (AMRAP, EMOM, For Time, Chipper)
+    if (
+      nombre.includes('amrap') || nombre.includes('emom') ||
+      nombre.includes('chipper') || nombre.includes('por tiempo') ||
+      nombre.includes('for time') || nombre.includes('metcon') ||
+      patron.includes('metabolico') || patron.includes('metcon') ||
+      nombre.includes('finisher')
+    ) return 'metcon'
+
     // CARRERA — datos de running
     if (
       patron.includes('cardio') || patron.includes('carrera') ||
@@ -211,7 +220,7 @@ export default function SesionCliente() {
       ejercicios.forEach((e, i) => {
         const tipo = tipoFormulario(e)
         if (tipo === 'skip') return
-        if (tipo === 'carrera') {
+        if (tipo === 'carrera' || tipo === 'metcon') {
           const dc = datosCardio[i] || {}
           if (Object.values(dc).some(v => v)) {
             insertsEj.push({
@@ -341,9 +350,68 @@ export default function SesionCliente() {
               {tipo === 'fuerza' && ej.peso_recomendado && (
                 <span className="text-xs bg-[#FF5C00]/20 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">~{ej.peso_recomendado}kg</span>
               )}
+              {tipo === 'metcon' && <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-medium">⏱ MetCon</span>}
               {tipo === 'carrera' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-medium">🏃 Carrera</span>}
               {tipo === 'corporal' && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-medium">💪 Corporal</span>}
             </div>
+
+            {/* METCON — AMRAP / EMOM / Por tiempo / Chipper */}
+            {tipo === 'metcon' && (
+              <div className="p-4 space-y-3">
+                {ej.notas && <p className="text-xs text-[#6B6B6B] italic bg-[#F5F5F0] rounded-xl px-3 py-2">{ej.notas}</p>}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Detectar subtipo por nombre */}
+                  {(ej.ejercicio_nombre?.toLowerCase().includes('amrap') || datosCardio[ejIdx]?.subtipo === 'amrap') && (
+                    <>
+                      <div>
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">Rondas completadas</label>
+                        <input type="number" value={datosCardio[ejIdx]?.rondas || ''}
+                          onChange={e => updateCardio(ejIdx, 'rondas', e.target.value)}
+                          placeholder="5" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">Reps ronda extra</label>
+                        <input type="number" value={datosCardio[ejIdx]?.reps_extra || ''}
+                          onChange={e => updateCardio(ejIdx, 'reps_extra', e.target.value)}
+                          placeholder="12" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      </div>
+                    </>
+                  )}
+                  {(ej.ejercicio_nombre?.toLowerCase().includes('emom') || datosCardio[ejIdx]?.subtipo === 'emom') && (
+                    <>
+                      <div>
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">Minutos completados</label>
+                        <input type="number" value={datosCardio[ejIdx]?.minutos || ''}
+                          onChange={e => updateCardio(ejIdx, 'minutos', e.target.value)}
+                          placeholder="16" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">¿Fallaste algún minuto?</label>
+                        <select value={datosCardio[ejIdx]?.fallo || 'no'}
+                          onChange={e => updateCardio(ejIdx, 'fallo', e.target.value)}
+                          className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]">
+                          <option value="no">No, todo completado</option>
+                          <option value="si">Sí, algún minuto</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                  {/* Por tiempo / Chipper / Finisher — campo tiempo */}
+                  {!ej.ejercicio_nombre?.toLowerCase().includes('amrap') && !ej.ejercicio_nombre?.toLowerCase().includes('emom') && (
+                    <div className="col-span-2">
+                      <label className="text-xs text-[#6B6B6B] mb-1 block">Tiempo total (min:seg)</label>
+                      <input type="text" value={datosCardio[ejIdx]?.tiempo || ''}
+                        onChange={e => updateCardio(ejIdx, 'tiempo', e.target.value)}
+                        placeholder="12:45" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                    </div>
+                  )}
+                </div>
+                <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
+                  onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
+                  placeholder="Sensaciones, pesos usados, nivel de esfuerzo..."
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
+              </div>
+            )}
 
             {/* CARRERA */}
             {tipo === 'carrera' && (
