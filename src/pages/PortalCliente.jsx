@@ -231,7 +231,7 @@ export default function PortalCliente() {
               className={`flex-shrink-0 px-4 py-2.5 text-xs font-semibold border-b-2 transition-all relative whitespace-nowrap ${tab===t.id?'border-b-2 text-[#0A0A0A]':'border-transparent text-[#6B6B6B]'}`}
               style={tab===t.id?{borderBottomColor:color}:{}}>
               {t.label}
-              {t.badge>0&&<span className="absolute top-2 right-1 w-2 h-2 rounded-full" style={{background:color}}/>}
+              {t.badge>0&&<span className="absolute top-1.5 right-1 w-4 h-4 rounded-full text-white flex items-center justify-center text-[9px] font-bold" style={{background:color}}>{t.badge}</span>}
             </button>
           ))}
         </div>
@@ -263,7 +263,7 @@ export default function PortalCliente() {
                 style={tab===t.id?{background:color}:{}}>
                 <span className="text-base w-5 text-center flex-shrink-0">{t.icon}</span>
                 <span>{t.label}</span>
-                {t.badge>0&&<span className="ml-auto w-2.5 h-2.5 rounded-full flex-shrink-0" style={{background:color}}/>}
+                {t.badge>0&&<span className="ml-auto w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0" style={{background:color}}>{t.badge}</span>}
               </button>
             ))}
           </nav>
