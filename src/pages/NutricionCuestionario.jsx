@@ -15,8 +15,53 @@ export default function NutricionCuestionario() {
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
 
   useEffect(() => {
-    if (clienteId) supabase.from('clientes').select('nombre,peso_actual').eq('id',clienteId).single().then(({data})=>{ if(data) { setCliente(data); if(data.peso_actual) set('peso', data.peso_actual) } })
-  },[clienteId])
+    if (!clienteId) return
+    async function precargar() {
+      // 1. Datos de la ficha del cliente
+      const { data: cl } = await supabase.from('clientes')
+        .select('nombre, peso_actual, objetivo, lesiones, nivel, dias_semana')
+        .eq('id', clienteId).single()
+      if (cl) {
+        setCliente(cl)
+        // Mapear objetivo de entrenamiento → objetivo nutricional
+        const objMap = {
+          perdida_grasa: 'perdida_grasa', hipertrofia: 'ganancia_muscular',
+          ganancia_muscular: 'ganancia_muscular', fuerza: 'rendimiento',
+          resistencia: 'rendimiento', tonificacion: 'recomposicion',
+          wellness: 'salud', mantenimiento: 'mantenimiento'
+        }
+        if (cl.peso_actual) setForm(f => ({ ...f, peso: String(cl.peso_actual) }))
+        if (cl.objetivo && objMap[cl.objetivo]) setForm(f => ({ ...f, objetivo: objMap[cl.objetivo] }))
+      }
+
+      // 2. Cuestionario anterior si existe — precargar todas las respuestas
+      const { data: cuest } = await supabase.from('cuestionarios_nutricion')
+        .select('*').eq('cliente_id', clienteId)
+        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      if (cuest) {
+        setForm(f => ({
+          ...f,
+          sexo: cuest.sexo || f.sexo,
+          peso: cuest.peso ? String(cuest.peso) : f.peso,
+          altura: cuest.altura ? String(cuest.altura) : f.altura,
+          edad: cuest.edad ? String(cuest.edad) : f.edad,
+          nivel_actividad: cuest.nivel_actividad || f.nivel_actividad,
+          objetivo: cuest.objetivo || f.objetivo,
+          velocidad_progreso: cuest.velocidad_progreso || f.velocidad_progreso,
+          comidas_dia: cuest.comidas_dia ? String(cuest.comidas_dia) : f.comidas_dia,
+          tiempo_cocina: cuest.tiempo_cocina || f.tiempo_cocina,
+          tipo_dieta: cuest.tipo_dieta || f.tipo_dieta,
+          entrena_cuando: cuest.entrena_cuando || f.entrena_cuando,
+          alergias: cuest.alergias || f.alergias,
+          alimentos_no_gustan: cuest.alimentos_no_gustan || f.alimentos_no_gustan,
+          alimentos_favoritos: cuest.alimentos_favoritos || f.alimentos_favoritos,
+          suplementos: cuest.suplementos || f.suplementos,
+          notas: cuest.notas || f.notas,
+        }))
+      }
+    }
+    precargar()
+  }, [clienteId])
 
   async function enviar() {
     setLoading(true)
