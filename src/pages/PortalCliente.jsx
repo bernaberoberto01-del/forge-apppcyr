@@ -124,7 +124,13 @@ export default function PortalCliente() {
         supabase.from('marcas_cliente').select('*').eq('cliente_id',cid).order('fecha',{ascending:false}).then(r=>r.data||[]).catch(()=>[]),
         supabase.from('medidas_cliente').select('*').eq('cliente_id',cid).order('fecha',{ascending:false}).then(r=>r.data||[]).catch(()=>[]),
       ])
-      setRutina(ru[0]||null); setCheckins(ci); setPagos(pg); setMensajes(ms)
+      setRutina(ru[0]||null); setCheckins(ci); setPagos(pg)
+      // Marcar mensajes del entrenador como leídos en BD al cargar
+      const msgsNoLeidos = ms.filter(m => !m.leido && m.tipo === 'entrenador')
+      if (msgsNoLeidos.length > 0) {
+        supabase.from('mensajes_cliente').update({leido:true}).eq('cliente_id',cid).eq('tipo','entrenador').eq('leido',false)
+      }
+      setMensajes(ms.map(m => m.tipo === 'entrenador' ? {...m, leido: true} : m))
       setFotos(ft); setPlanNutricion(pn); if(cfg)setConfigEntrenador(cfg)
       setMarcas(mc); setHistorialMedidas(meds)
       const hoy=new Date().toISOString().split('T')[0]
