@@ -17,24 +17,32 @@ export default function NutricionCuestionario() {
   useEffect(() => {
     if (!clienteId) return
     async function precargar() {
-      // 1. Datos de la ficha del cliente
-      const { data: cl } = await supabase.from('clientes')
-        .select('nombre, peso_actual, objetivo, lesiones, nivel, dias_semana')
-        .eq('id', clienteId).single()
+      // 1. Datos de la ficha + cuestionario de registro (altura, edad, sexo)
+      const [{ data: cl }, { data: reg }] = await Promise.all([
+        supabase.from('clientes').select('nombre, peso_actual, objetivo, lesiones, nivel, dias_semana').eq('id', clienteId).single(),
+        supabase.from('cuestionarios').select('altura, edad, sexo').eq('cliente_id', clienteId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      ])
+
       if (cl) {
         setCliente(cl)
-        // Mapear objetivo de entrenamiento → objetivo nutricional
         const objMap = {
           perdida_grasa: 'perdida_grasa', hipertrofia: 'ganancia_muscular',
           ganancia_muscular: 'ganancia_muscular', fuerza: 'rendimiento',
           resistencia: 'rendimiento', tonificacion: 'recomposicion',
           wellness: 'salud', mantenimiento: 'mantenimiento'
         }
-        if (cl.peso_actual) setForm(f => ({ ...f, peso: String(cl.peso_actual) }))
-        if (cl.objetivo && objMap[cl.objetivo]) setForm(f => ({ ...f, objetivo: objMap[cl.objetivo] }))
+        setForm(f => ({
+          ...f,
+          peso: cl.peso_actual ? String(cl.peso_actual) : f.peso,
+          objetivo: (cl.objetivo && objMap[cl.objetivo]) ? objMap[cl.objetivo] : f.objetivo,
+          // Datos físicos del cuestionario de registro
+          altura: reg?.altura ? String(reg.altura) : f.altura,
+          edad: reg?.edad ? String(reg.edad) : f.edad,
+          sexo: reg?.sexo || f.sexo,
+        }))
       }
 
-      // 2. Cuestionario anterior si existe — precargar todas las respuestas
+      // 2. Cuestionario de nutrición anterior si existe
       const { data: cuest } = await supabase.from('cuestionarios_nutricion')
         .select('*').eq('cliente_id', clienteId)
         .order('created_at', { ascending: false }).limit(1).maybeSingle()
