@@ -858,6 +858,12 @@ export default function PortalCliente() {
                         <p className="text-sm text-amber-800">{planNutricion.notas_entrenador}</p>
                       </div>
                     )}
+                    {/* Botón actualizar cuestionario */}
+                    <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+                      target="_blank" rel="noreferrer"
+                      className="flex items-center justify-center gap-2 w-full border border-black/10 text-[#6B6B6B] text-sm font-medium py-3 rounded-xl hover:bg-[#F7F6F3] transition-all">
+                      📋 Actualizar mis datos nutricionales
+                    </a>
                   </>
                 )}
               </>
