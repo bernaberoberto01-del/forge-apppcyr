@@ -776,10 +776,16 @@ export default function PortalCliente() {
             {tab==='nutricion'&&(
               <>
                 {!planNutricion?(
-                  <div className="bg-white rounded-2xl border border-black/6 p-12 text-center">
+                  <div className="bg-white rounded-2xl border border-black/6 p-8 text-center">
                     <p className="text-5xl mb-4">🥗</p>
-                    <p className="font-bold text-[#0A0A0A] text-lg">Plan en preparación</p>
-                    <p className="text-sm text-[#6B6B6B] mt-2">Tu entrenador está personalizando tu nutrición</p>
+                    <p className="font-bold text-[#0A0A0A] text-lg mb-2">Plan en preparación</p>
+                    <p className="text-sm text-[#6B6B6B] mb-6">Rellena el cuestionario para que tu entrenador pueda crear un plan nutricional personalizado para ti.</p>
+                    <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+                      target="_blank" rel="noreferrer"
+                      className="inline-block px-6 py-3 rounded-xl text-white text-sm font-semibold"
+                      style={{background:color}}>
+                      📋 Rellenar cuestionario nutricional
+                    </a>
                   </div>
                 ):(
                   <>

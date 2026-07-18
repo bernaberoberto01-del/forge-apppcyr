@@ -148,6 +148,13 @@ export default function Nutricion({ session }) {
                     <p className="text-xs text-[#6B6B6B]">{tieneCuest ? '✓ Cuestionario completado' : '⚠ Sin cuestionario'}</p>
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
+                    <button onClick={() => {
+                      navigator.clipboard.writeText(cuestUrl(uid, c.id))
+                      setToast({ msg: '✓ Enlace cuestionario copiado' })
+                      setTimeout(() => setToast(null), 3000)
+                    }} className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:border-[#111]" title="Copiar enlace para el cliente">
+                      🔗 Enlace
+                    </button>
                     {!tieneCuest && (
                       <button onClick={() => { setModalCuest(c); setCuest({ peso: c.peso_actual, objetivo: c.objetivo }) }}
                         className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:border-[#111]">
@@ -429,6 +436,13 @@ export default function Nutricion({ session }) {
                 <button onClick={() => abrirCuestionario({ id: detalle.cliente_id, nombre: detalle.clientes?.nombre, peso_actual: detalle.clientes?.peso_actual, objetivo: detalle.objetivo })}
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]" title="Editar cuestionario">
                   📋
+                </button>
+                <button onClick={() => {
+                  navigator.clipboard.writeText(cuestUrl(uid, detalle.cliente_id))
+                  setToast({ msg: '✓ Enlace del cuestionario copiado' })
+                  setTimeout(() => setToast(null), 3000)
+                }} className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]" title="Copiar enlace cuestionario para el cliente">
+                  🔗
                 </button>
               </div>
             </div>
