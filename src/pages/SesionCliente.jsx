@@ -46,32 +46,46 @@ export default function SesionCliente() {
   }, [clienteSession])
 
   // Tabla de referencia por patrón y nivel (% del peso corporal)
+  // % del peso corporal como 1RM estimado por ejercicio y nivel
+  // Fuente: estándares de Symmetric Strength y criterio conservador para seguridad
   const REFS_EJERCICIO = {
-    'sentadilla':         { principiante: 0.60, intermedio: 1.00, avanzado: 1.40 },
-    'sentadilla trasera': { principiante: 0.60, intermedio: 1.00, avanzado: 1.40 },
-    'front squat':        { principiante: 0.50, intermedio: 0.85, avanzado: 1.20 },
+    // Pierna / rodilla
+    'sentadilla':         { principiante: 0.75, intermedio: 1.15, avanzado: 1.50 },
+    'sentadilla trasera': { principiante: 0.75, intermedio: 1.15, avanzado: 1.50 },
+    'front squat':        { principiante: 0.60, intermedio: 0.95, avanzado: 1.25 },
     'goblet squat':       { principiante: 0.25, intermedio: 0.40, avanzado: 0.55 },
-    'press banca':        { principiante: 0.55, intermedio: 0.85, avanzado: 1.15 },
-    'press inclinado':    { principiante: 0.45, intermedio: 0.70, avanzado: 1.00 },
-    'press militar':      { principiante: 0.35, intermedio: 0.60, avanzado: 0.80 },
-    'push press':         { principiante: 0.50, intermedio: 0.75, avanzado: 1.00 },
-    'push jerk':          { principiante: 0.55, intermedio: 0.80, avanzado: 1.10 },
-    'press hombro':       { principiante: 0.35, intermedio: 0.60, avanzado: 0.80 },
-    'remo barra':         { principiante: 0.50, intermedio: 0.80, avanzado: 1.10 },
-    'remo':               { principiante: 0.50, intermedio: 0.80, avanzado: 1.10 },
-    'jalón':              { principiante: 0.45, intermedio: 0.70, avanzado: 0.95 },
-    'peso muerto sumo':   { principiante: 0.85, intermedio: 1.35, avanzado: 1.85 },
-    'peso muerto rumano': { principiante: 0.60, intermedio: 1.00, avanzado: 1.40 },
-    'peso muerto':        { principiante: 0.80, intermedio: 1.30, avanzado: 1.80 },
-    'hip thrust':         { principiante: 0.60, intermedio: 1.00, avanzado: 1.50 },
-    'power clean':        { principiante: 0.55, intermedio: 0.85, avanzado: 1.15 },
-    'clean':              { principiante: 0.50, intermedio: 0.80, avanzado: 1.10 },
-    'snatch':             { principiante: 0.35, intermedio: 0.60, avanzado: 0.85 },
-    'thruster':           { principiante: 0.40, intermedio: 0.65, avanzado: 0.90 },
+    // Empuje horizontal
+    'press banca':        { principiante: 0.60, intermedio: 0.90, avanzado: 1.20 },
+    'press inclinado':    { principiante: 0.50, intermedio: 0.75, avanzado: 1.00 },
+    'press declinado':    { principiante: 0.60, intermedio: 0.90, avanzado: 1.20 },
+    // Empuje vertical
+    'press militar':      { principiante: 0.40, intermedio: 0.60, avanzado: 0.80 },
+    'push press':         { principiante: 0.50, intermedio: 0.70, avanzado: 0.90 },
+    'push jerk':          { principiante: 0.55, intermedio: 0.75, avanzado: 0.95 },
+    'press hombro':       { principiante: 0.40, intermedio: 0.60, avanzado: 0.80 },
+    // Tirón horizontal
+    'remo barra':         { principiante: 0.55, intermedio: 0.85, avanzado: 1.10 },
+    'remo':               { principiante: 0.55, intermedio: 0.85, avanzado: 1.10 },
+    // Tirón vertical
+    'jalón':              { principiante: 0.50, intermedio: 0.75, avanzado: 1.00 },
+    // Cadena posterior / bisagra
+    'peso muerto sumo':   { principiante: 0.90, intermedio: 1.40, avanzado: 1.80 },
+    'peso muerto rumano': { principiante: 0.65, intermedio: 1.00, avanzado: 1.35 },
+    'peso muerto':        { principiante: 0.85, intermedio: 1.35, avanzado: 1.75 },
+    'hip thrust':         { principiante: 0.65, intermedio: 1.10, avanzado: 1.50 },
+    // Olímpicos — requieren técnica: conservador hasta avanzado
+    'power clean':        { principiante: 0.40, intermedio: 0.65, avanzado: 0.90 },
+    'clean':              { principiante: 0.40, intermedio: 0.65, avanzado: 0.90 },
+    'snatch':             { principiante: 0.25, intermedio: 0.45, avanzado: 0.65 },
+    'thruster':           { principiante: 0.35, intermedio: 0.55, avanzado: 0.75 },
+    // Accesorios / complementarios
     'farmer carry':       { principiante: 0.30, intermedio: 0.50, avanzado: 0.70 },
-    'kettlebell swing':   { principiante: 0.20, intermedio: 0.35, avanzado: 0.50 },
-    'curl':               { principiante: 0.18, intermedio: 0.28, avanzado: 0.38 },
+    'kettlebell swing':   { principiante: 0.18, intermedio: 0.30, avanzado: 0.45 },
+    'curl':               { principiante: 0.15, intermedio: 0.25, avanzado: 0.35 },
+    'press frances':      { principiante: 0.15, intermedio: 0.25, avanzado: 0.35 },
   }
+  // Factor de seguridad: sugerimos el 70% del 1RM estimado para entrenar con margen
+  const FACTOR_TRABAJO = 0.70
 
   function calcularPesoRecomendado(ej, cliente, marcas) {
     const nombreEj = (ej.nombre || ej.ejercicio_nombre || '').toLowerCase().trim()
@@ -97,7 +111,8 @@ export default function SesionCliente() {
     if (refKey) {
       const pct = REFS_EJERCICIO[refKey][nivel]
       if (!pct) return null
-      return Math.round(pesoCorporal * pct / 2.5) * 2.5
+      // 70% del 1RM estimado = peso de trabajo seguro con margen
+      return Math.round(pesoCorporal * pct * FACTOR_TRABAJO / 2.5) * 2.5
     }
 
     return null
