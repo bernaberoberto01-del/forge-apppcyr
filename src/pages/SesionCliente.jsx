@@ -46,38 +46,58 @@ export default function SesionCliente() {
   }, [clienteSession])
 
   // Tabla de referencia por patrón y nivel (% del peso corporal)
-  const REFS = {
-    empuje_horizontal: { principiante: 0.55, intermedio: 0.80, avanzado: 1.10 },
-    empuje_vertical:   { principiante: 0.35, intermedio: 0.55, avanzado: 0.75 },
-    tiron_horizontal:  { principiante: 0.50, intermedio: 0.75, avanzado: 1.00 },
-    tiron_vertical:    { principiante: 0.45, intermedio: 0.70, avanzado: 0.95 },
-    sentadilla:        { principiante: 0.65, intermedio: 1.00, avanzado: 1.40 },
-    bisagra:           { principiante: 0.80, intermedio: 1.20, avanzado: 1.70 },
-    core:              { principiante: 0, intermedio: 0, avanzado: 0 },
-    cardio:            { principiante: 0, intermedio: 0, avanzado: 0 },
+  const REFS_EJERCICIO = {
+    'sentadilla':         { principiante: 0.60, intermedio: 1.00, avanzado: 1.40 },
+    'sentadilla trasera': { principiante: 0.60, intermedio: 1.00, avanzado: 1.40 },
+    'front squat':        { principiante: 0.50, intermedio: 0.85, avanzado: 1.20 },
+    'goblet squat':       { principiante: 0.25, intermedio: 0.40, avanzado: 0.55 },
+    'press banca':        { principiante: 0.55, intermedio: 0.85, avanzado: 1.15 },
+    'press inclinado':    { principiante: 0.45, intermedio: 0.70, avanzado: 1.00 },
+    'press militar':      { principiante: 0.35, intermedio: 0.60, avanzado: 0.80 },
+    'push press':         { principiante: 0.50, intermedio: 0.75, avanzado: 1.00 },
+    'push jerk':          { principiante: 0.55, intermedio: 0.80, avanzado: 1.10 },
+    'press hombro':       { principiante: 0.35, intermedio: 0.60, avanzado: 0.80 },
+    'remo barra':         { principiante: 0.50, intermedio: 0.80, avanzado: 1.10 },
+    'remo':               { principiante: 0.50, intermedio: 0.80, avanzado: 1.10 },
+    'jalón':              { principiante: 0.45, intermedio: 0.70, avanzado: 0.95 },
+    'peso muerto sumo':   { principiante: 0.85, intermedio: 1.35, avanzado: 1.85 },
+    'peso muerto rumano': { principiante: 0.60, intermedio: 1.00, avanzado: 1.40 },
+    'peso muerto':        { principiante: 0.80, intermedio: 1.30, avanzado: 1.80 },
+    'hip thrust':         { principiante: 0.60, intermedio: 1.00, avanzado: 1.50 },
+    'power clean':        { principiante: 0.55, intermedio: 0.85, avanzado: 1.15 },
+    'clean':              { principiante: 0.50, intermedio: 0.80, avanzado: 1.10 },
+    'snatch':             { principiante: 0.35, intermedio: 0.60, avanzado: 0.85 },
+    'thruster':           { principiante: 0.40, intermedio: 0.65, avanzado: 0.90 },
+    'farmer carry':       { principiante: 0.30, intermedio: 0.50, avanzado: 0.70 },
+    'kettlebell swing':   { principiante: 0.20, intermedio: 0.35, avanzado: 0.50 },
+    'curl':               { principiante: 0.18, intermedio: 0.28, avanzado: 0.38 },
   }
 
   function calcularPesoRecomendado(ej, cliente, marcas) {
-    const nombreEj = (ej.nombre || ej.ejercicio_nombre || '').toLowerCase()
-    const patron = (ej.patron || '').toLowerCase()
-    const nivel = cliente.nivel || 'principiante'
-    const pesoCorporal = cliente.peso_actual || 70
+    const nombreEj = (ej.nombre || ej.ejercicio_nombre || '').toLowerCase().trim()
+    const nivel = cliente?.nivel || 'principiante'
+    const pesoCorporal = parseFloat(cliente?.peso_actual) || 75
 
-    // 1. Si tiene marca registrada de este ejercicio — usar esa como referencia directa
-    const marcaEj = marcas
-      .filter(m => m.ejercicio?.toLowerCase().includes(nombreEj.split(' ')[0]) || nombreEj.includes(m.ejercicio?.toLowerCase().split(' ')[0]))
-      .sort((a, b) => b.peso_kg - a.peso_kg)[0]
-    if (marcaEj?.peso_kg) {
-      // Sugerir el 85% de su mejor marca para entrenar con margen
+    // 1. Si tiene marca registrada de este ejercicio → usar 85% de su mejor marca
+    const marcaEj = marcas?.find(m => {
+      const nm = (m.ejercicio || '').toLowerCase()
+      return nm === nombreEj || nombreEj.includes(nm.split(' ')[0]) || nm.includes(nombreEj.split(' ')[0])
+    })
+    if (marcaEj?.peso_kg > 0) {
       return Math.round(marcaEj.peso_kg * 0.85 / 2.5) * 2.5
     }
 
-    // 2. Si no tiene marca — usar tabla de referencia por patrón y nivel
-    const patronKey = Object.keys(REFS).find(k => patron.includes(k) || k.includes(patron))
-    if (patronKey && REFS[patronKey][nivel] > 0) {
-      const pesoRef = pesoCorporal * REFS[patronKey][nivel]
-      // Redondear al múltiplo de 2.5 más cercano
-      return Math.round(pesoRef / 2.5) * 2.5
+    // 2. Buscar en tabla por nombre del ejercicio
+    const refKey = Object.keys(REFS_EJERCICIO).find(k =>
+      nombreEj === k ||
+      nombreEj.includes(k) ||
+      k.includes(nombreEj) ||
+      nombreEj.split(' ').some(w => w.length > 3 && k.includes(w))
+    )
+    if (refKey) {
+      const pct = REFS_EJERCICIO[refKey][nivel]
+      if (!pct) return null
+      return Math.round(pesoCorporal * pct / 2.5) * 2.5
     }
 
     return null
