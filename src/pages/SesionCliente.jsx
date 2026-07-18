@@ -16,6 +16,21 @@ export default function SesionCliente() {
   const [sensaciones, setSensaciones] = useState('')
   const [duracion, setDuracion] = useState(60)
   const [guardando, setGuardando] = useState(false)
+  const [datosCardio, setDatosCardio] = useState({}) // { ejIdx: { km, ritmo, fc_media, fc_max, notas } }
+
+  function esCardio(ej) {
+    const patron = (ej.patron || '').toLowerCase()
+    const nombre = (ej.ejercicio_nombre || '').toLowerCase()
+    return patron.includes('cardio') || patron.includes('carrera') || patron.includes('z2') ||
+      patron.includes('intervalo') || patron.includes('fartlek') || patron.includes('calentamiento') ||
+      patron.includes('movilidad') || patron.includes('estiramientos') || patron.includes('core') ||
+      nombre.includes('carrera') || nombre.includes('rodaje') || nombre.includes('fartlek') ||
+      nombre.includes('calentamiento') || nombre.includes('estiramientos') || nombre.includes('core')
+  }
+
+  function updateCardio(ejIdx, field, val) {
+    setDatosCardio(prev => ({ ...prev, [ejIdx]: { ...(prev[ejIdx] || {}), [field]: val } }))
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setClienteSession(session?.user || null))
@@ -156,15 +171,33 @@ export default function SesionCliente() {
     }).select('id').single()
 
     if (!sesionError && sesionData?.id) {
-      const ejsFiltrados = ejercicios.filter(e => e.sets.some(s => s.peso || s.completado))
-      if (ejsFiltrados.length > 0) {
+      // Fuerza: ejercicios con sets de peso/reps
+      const ejsFuerza = ejercicios.filter((e, i) => !esCardio(e) && e.sets.some(s => s.peso || s.completado))
+      if (ejsFuerza.length > 0) {
         await supabase.from('sesion_ejercicios').insert(
-          ejsFiltrados.map(e => ({
+          ejsFuerza.map(e => ({
             sesion_id: sesionData.id, cliente_id: clienteId,
             entrenador_id: cliente.entrenador_id,
             ejercicio_nombre: e.ejercicio_nombre, patron: e.patron, orden: e.orden,
             sets: e.sets, notas: e.notas
           }))
+        )
+      }
+      // Cardio: ejercicios con datos de carrera
+      const ejsCardio = ejercicios.filter((e, i) => esCardio(e) && datosCardio[i] && Object.values(datosCardio[i]).some(v => v))
+      if (ejsCardio.length > 0) {
+        await supabase.from('sesion_ejercicios').insert(
+          ejsCardio.map(e => {
+            const i = ejercicios.indexOf(e)
+            const dc = datosCardio[i] || {}
+            return {
+              sesion_id: sesionData.id, cliente_id: clienteId,
+              entrenador_id: cliente.entrenador_id,
+              ejercicio_nombre: e.ejercicio_nombre, patron: e.patron, orden: e.orden,
+              sets: [{ km: dc.km || null, ritmo: dc.ritmo || null, fc_media: dc.fc_media || null, fc_max: dc.fc_max || null }],
+              notas: dc.notas || e.notas
+            }
+          })
         )
       }
     }
@@ -255,19 +288,61 @@ export default function SesionCliente() {
             <div className="bg-[#0A0A0A] px-4 py-3 flex items-center gap-2">
               <span className="w-6 h-6 bg-[#FF5C00] text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
               <p className="text-white text-sm font-semibold flex-1">{ej.ejercicio_nombre}</p>
-              {ej.peso_recomendado && (
+              {!esCardio(ej) && ej.peso_recomendado && (
                 <span className="text-xs bg-[#FF5C00]/20 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
                   ~{ej.peso_recomendado}kg
                 </span>
               )}
+              {esCardio(ej) && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-medium flex-shrink-0">🏃 Cardio</span>}
             </div>
-            <div className="p-3 space-y-2">
-              <div className="grid grid-cols-12 gap-2 px-1 mb-1">
-                <p className="col-span-1 text-xs text-[#6B6B6B]">Set</p>
-                <p className="col-span-5 text-xs text-[#6B6B6B]">Peso (kg)</p>
-                <p className="col-span-4 text-xs text-[#6B6B6B]">Reps</p>
-                <p className="col-span-2 text-xs text-[#6B6B6B]">✓</p>
+
+            {esCardio(ej) ? (
+              /* ── Formulario CARDIO ── */
+              <div className="p-4 space-y-3">
+                <p className="text-xs text-[#6B6B6B] mb-2">{ej.notas}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-[#6B6B6B] mb-1 block">Distancia (km)</label>
+                    <input type="number" step="0.1" value={datosCardio[ejIdx]?.km || ''}
+                      onChange={e => updateCardio(ejIdx, 'km', e.target.value)}
+                      placeholder="8.5" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#6B6B6B] mb-1 block">Ritmo (min/km)</label>
+                    <input type="text" value={datosCardio[ejIdx]?.ritmo || ''}
+                      onChange={e => updateCardio(ejIdx, 'ritmo', e.target.value)}
+                      placeholder="5:30" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#6B6B6B] mb-1 block">FC media (ppm)</label>
+                    <input type="number" value={datosCardio[ejIdx]?.fc_media || ''}
+                      onChange={e => updateCardio(ejIdx, 'fc_media', e.target.value)}
+                      placeholder="145" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#6B6B6B] mb-1 block">FC máxima (ppm)</label>
+                    <input type="number" value={datosCardio[ejIdx]?.fc_max || ''}
+                      onChange={e => updateCardio(ejIdx, 'fc_max', e.target.value)}
+                      placeholder="168" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-[#6B6B6B] mb-1 block">Sensaciones / notas</label>
+                  <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
+                    onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
+                    placeholder="Cómo fue el ritmo, molestias, condiciones..."
+                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
+                </div>
               </div>
+            ) : (
+              /* ── Formulario FUERZA ── */
+              <div className="p-3 space-y-2">
+                <div className="grid grid-cols-12 gap-2 px-1 mb-1">
+                  <p className="col-span-1 text-xs text-[#6B6B6B]">Set</p>
+                  <p className="col-span-5 text-xs text-[#6B6B6B]">Peso (kg)</p>
+                  <p className="col-span-4 text-xs text-[#6B6B6B]">Reps</p>
+                  <p className="col-span-2 text-xs text-[#6B6B6B]">✓</p>
+                </div>
               {ej.sets.map((s, setIdx) => (
                 <div key={setIdx} className="grid grid-cols-12 gap-2 items-center">
                   <span className="col-span-1 text-xs font-bold text-[#6B6B6B]">{setIdx + 1}</span>
@@ -283,6 +358,7 @@ export default function SesionCliente() {
               ))}
               {ej.notas && <p className="text-xs text-[#6B6B6B] italic mt-1 px-1">{ej.notas}</p>}
             </div>
+            )}
           </div>
         ))}
 
