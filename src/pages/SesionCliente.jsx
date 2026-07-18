@@ -32,23 +32,72 @@ export default function SesionCliente() {
       if (!cl) { setLoading(false); return }
       setCliente(cl)
       setClienteId(cl.id)
-      const { data: ru } = await supabase.from('rutinas').select('*').eq('cliente_id', cl.id).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1)
+      const [{ data: ru }, { data: marcas }] = await Promise.all([
+        supabase.from('rutinas').select('*').eq('cliente_id', cl.id).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
+        supabase.from('marcas_cliente').select('ejercicio, peso_kg').eq('cliente_id', cl.id).order('fecha', { ascending: false })
+      ])
       if (ru?.[0]) {
         setRutina(ru[0])
-        cargarDia(ru[0], 1)
+        cargarDia(ru[0], 1, cl, marcas || [])
       }
       setLoading(false)
     }
     cargar()
   }, [clienteSession])
 
-  function cargarDia(ru, dia) {
+  // Tabla de referencia por patrón y nivel (% del peso corporal)
+  const REFS = {
+    empuje_horizontal: { principiante: 0.55, intermedio: 0.80, avanzado: 1.10 },
+    empuje_vertical:   { principiante: 0.35, intermedio: 0.55, avanzado: 0.75 },
+    tiron_horizontal:  { principiante: 0.50, intermedio: 0.75, avanzado: 1.00 },
+    tiron_vertical:    { principiante: 0.45, intermedio: 0.70, avanzado: 0.95 },
+    sentadilla:        { principiante: 0.65, intermedio: 1.00, avanzado: 1.40 },
+    bisagra:           { principiante: 0.80, intermedio: 1.20, avanzado: 1.70 },
+    core:              { principiante: 0, intermedio: 0, avanzado: 0 },
+    cardio:            { principiante: 0, intermedio: 0, avanzado: 0 },
+  }
+
+  function calcularPesoRecomendado(ej, cliente, marcas) {
+    const nombreEj = (ej.nombre || ej.ejercicio_nombre || '').toLowerCase()
+    const patron = (ej.patron || '').toLowerCase()
+    const nivel = cliente.nivel || 'principiante'
+    const pesoCorporal = cliente.peso_actual || 70
+
+    // 1. Si tiene marca registrada de este ejercicio — usar esa como referencia directa
+    const marcaEj = marcas
+      .filter(m => m.ejercicio?.toLowerCase().includes(nombreEj.split(' ')[0]) || nombreEj.includes(m.ejercicio?.toLowerCase().split(' ')[0]))
+      .sort((a, b) => b.peso_kg - a.peso_kg)[0]
+    if (marcaEj?.peso_kg) {
+      // Sugerir el 85% de su mejor marca para entrenar con margen
+      return Math.round(marcaEj.peso_kg * 0.85 / 2.5) * 2.5
+    }
+
+    // 2. Si no tiene marca — usar tabla de referencia por patrón y nivel
+    const patronKey = Object.keys(REFS).find(k => patron.includes(k) || k.includes(patron))
+    if (patronKey && REFS[patronKey][nivel] > 0) {
+      const pesoRef = pesoCorporal * REFS[patronKey][nivel]
+      // Redondear al múltiplo de 2.5 más cercano
+      return Math.round(pesoRef / 2.5) * 2.5
+    }
+
+    return null
+  }
+
+  function cargarDia(ru, dia, cl, marcas) {
+    const clienteRef = cl !== undefined ? cl : cliente
+    const marcasRef = marcas || []
     const contenido = ru.contenido || ru.borrador
-    const d = contenido?.dias?.find(x => x.dia === dia) || contenido?.dias?.[dia - 1]
+    const d = contenido?.dias?.find((x: any) => x.dia === dia) || contenido?.dias?.[dia - 1]
     if (d?.ejercicios) {
-      setEjercicios(d.ejercicios.map(ej => ({
+      setEjercicios(d.ejercicios.map((ej: any) => ({
         ejercicio_nombre: ej.nombre, patron: ej.patron, orden: ej.orden, notas: ej.notas || '',
-        sets: Array.from({ length: ej.series || 3 }, (_, i) => ({ set: i + 1, peso: '', reps: ej.reps || '', completado: false }))
+        peso_recomendado: clienteRef ? calcularPesoRecomendado(ej, clienteRef, marcasRef) : null,
+        sets: Array.from({ length: ej.series || 3 }, (_, i) => ({
+          set: i + 1,
+          peso: clienteRef ? (calcularPesoRecomendado(ej, clienteRef, marcasRef) || '') : '',
+          reps: ej.reps || '',
+          completado: false
+        }))
       })))
     }
   }
