@@ -324,8 +324,10 @@ export default function PortalCliente() {
                   </button>
                   <button onClick={()=>setTab('mensajes')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all relative">
                     <p className="text-2xl mb-2">💬</p>
-                    <p className="text-2xl font-bold text-[#0A0A0A]">{mensajes.filter(m=>m.tipo!=='sistema').length}</p>
-                    <p className="text-xs text-[#6B6B6B] mt-0.5">Mensajes</p>
+                    {mensajesNoLeidos > 0
+                      ? <><p className="text-2xl font-bold text-[#0A0A0A]">{mensajesNoLeidos}</p><p className="text-xs text-[#6B6B6B] mt-0.5">Mensaje{mensajesNoLeidos>1?'s':''} nuevo{mensajesNoLeidos>1?'s':''}</p></>
+                      : <><p className="text-2xl font-bold text-[#0A0A0A]">—</p><p className="text-xs text-[#6B6B6B] mt-0.5">Mensajes</p></>
+                    }
                     {mensajesNoLeidos>0&&<span className="absolute top-3 right-3 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center font-bold">{mensajesNoLeidos}</span>}
                   </button>
                 </div>

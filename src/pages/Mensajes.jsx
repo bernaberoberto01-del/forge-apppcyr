@@ -178,21 +178,36 @@ export default function Mensajes({ session }) {
               </div>
             ) : (
               <>
-                {mensajes.map(m => (
-                  <div key={m.id} className="flex justify-end">
-                    <div className="max-w-[80%]">
-                      <div className="bg-[#111] text-white text-sm px-4 py-3 rounded-2xl rounded-br-sm leading-relaxed">
-                        {m.contenido}
-                      </div>
-                      <div className="flex items-center justify-end gap-1.5 mt-1">
-                        <p className="text-xs text-[#6B6B6B]">
-                          {new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'})} · {new Date(m.created_at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}
-                        </p>
-                        <span className="text-xs text-[#6B6B6B]">{m.leido ? '✓✓' : '✓'}</span>
+                {mensajes.map(m => {
+                  const esMio = m.tipo === 'entrenador'
+                  return (
+                    <div key={m.id} className={`flex ${esMio ? 'justify-end' : 'justify-start'}`}>
+                      <div className="max-w-[80%]">
+                        {!esMio && (
+                          <p className="text-xs text-[#6B6B6B] font-medium mb-1 px-1">
+                            {seleccionado?.nombre?.split(' ')[0]}
+                          </p>
+                        )}
+                        <div className={`text-sm px-4 py-3 rounded-2xl leading-relaxed ${
+                          esMio
+                            ? 'bg-[#111] text-white rounded-br-sm'
+                            : 'bg-white border border-black/8 text-[#0A0A0A] rounded-bl-sm'
+                        } ${m.tipo === 'borrador_ia' ? 'border-2 border-dashed border-amber-300 bg-amber-50 text-amber-900' : ''}`}>
+                          {m.tipo === 'borrador_ia' && (
+                            <p className="text-xs font-semibold text-amber-600 mb-1.5">✨ Sugerencia IA</p>
+                          )}
+                          {m.contenido}
+                        </div>
+                        <div className={`flex items-center gap-1.5 mt-1 ${esMio ? 'justify-end' : 'justify-start'}`}>
+                          <p className="text-xs text-[#6B6B6B]">
+                            {new Date(m.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'})} · {new Date(m.created_at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})}
+                          </p>
+                          {esMio && <span className="text-xs text-[#6B6B6B]">{m.leido ? '✓✓' : '✓'}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
                 <div ref={endRef} />
               </>
             )}
