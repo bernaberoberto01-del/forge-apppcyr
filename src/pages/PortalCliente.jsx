@@ -81,6 +81,7 @@ export default function PortalCliente() {
   const [mensajesLeidos, setMensajesLeidos] = useState(false)
   const [configEntrenador, setConfigEntrenador] = useState(null)
   const [planNutricion, setPlanNutricion] = useState(null)
+  const [tieneCuestNutricion, setTieneCuestNutricion] = useState(false)
   const [diaActivoNutr, setDiaActivoNutr] = useState(0)
   const [cancelando, setCancelando] = useState(null)
   const [motivoCancel, setMotivoCancel] = useState('')
@@ -113,7 +114,7 @@ export default function PortalCliente() {
       const {data:cl,error}=await supabase.from('clientes').select('*').eq('auth_user_id',clienteSession.id).maybeSingle()
       if(error||!cl){setNotFound(true);setLoading(false);return}
       const cid=cl.id; setCliente(cl); setClienteId(cid)
-      const [ru,ci,pg,ms,ft,pn,cfg,mc,meds]=await Promise.all([
+      const [ru,ci,pg,ms,ft,pn,cfg,mc,meds,tieneCuest]=await Promise.all([
         supabase.from('rutinas').select('*').eq('cliente_id',cid).eq('estado','publicada').order('created_at',{ascending:false}).limit(1).then(r=>r.data||[]).catch(()=>[]),
         supabase.from('checkins').select('*').eq('cliente_id',cid).order('fecha',{ascending:false}).limit(12).then(r=>r.data||[]).catch(()=>[]),
         supabase.from('pagos').select('*').eq('cliente_id',cid).order('fecha_pago',{ascending:false}).then(r=>r.data||[]).catch(()=>[]),
@@ -123,16 +124,12 @@ export default function PortalCliente() {
         supabase.from('configuracion').select('nombre_entrenador,foto_url,nombre_negocio,color_acento').eq('entrenador_id',cl.entrenador_id).single().then(r=>r.data||null).catch(()=>null),
         supabase.from('marcas_cliente').select('*').eq('cliente_id',cid).order('fecha',{ascending:false}).then(r=>r.data||[]).catch(()=>[]),
         supabase.from('medidas_cliente').select('*').eq('cliente_id',cid).order('fecha',{ascending:false}).then(r=>r.data||[]).catch(()=>[]),
+        supabase.from('cuestionarios_nutricion').select('id').eq('cliente_id',cid).limit(1).then(r=>!!(r.data?.length)).catch(()=>false),
       ])
       setRutina(ru[0]||null); setCheckins(ci); setPagos(pg)
-      // Marcar mensajes del entrenador como leídos en BD al cargar
-      const msgsNoLeidos = ms.filter(m => !m.leido && m.tipo === 'entrenador')
-      if (msgsNoLeidos.length > 0) {
-        supabase.from('mensajes_cliente').update({leido:true}).eq('cliente_id',cid).eq('tipo','entrenador').eq('leido',false)
-      }
       setMensajes(ms.map(m => m.tipo === 'entrenador' ? {...m, leido: true} : m))
       setFotos(ft); setPlanNutricion(pn); if(cfg)setConfigEntrenador(cfg)
-      setMarcas(mc); setHistorialMedidas(meds)
+      setMarcas(mc); setHistorialMedidas(meds); setTieneCuestNutricion(tieneCuest)
       const hoy=new Date().toISOString().split('T')[0]
       const {data:sesFut}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).gte('fecha',hoy).eq('cancelada',false).order('fecha').order('hora').limit(8)
       setSesionesPortal(sesFut||[])
@@ -776,17 +773,34 @@ export default function PortalCliente() {
             {tab==='nutricion'&&(
               <>
                 {!planNutricion?(
-                  <div className="bg-white rounded-2xl border border-black/6 p-8 text-center">
-                    <p className="text-5xl mb-4">🥗</p>
-                    <p className="font-bold text-[#0A0A0A] text-lg mb-2">Plan en preparación</p>
-                    <p className="text-sm text-[#6B6B6B] mb-6">Rellena el cuestionario para que tu entrenador pueda crear un plan nutricional personalizado para ti.</p>
-                    <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
-                      target="_blank" rel="noreferrer"
-                      className="inline-block px-6 py-3 rounded-xl text-white text-sm font-semibold"
-                      style={{background:color}}>
-                      📋 Rellenar cuestionario nutricional
-                    </a>
-                  </div>
+                  tieneCuestNutricion ? (
+                    /* Estado 2: cuestionario respondido, plan en preparación */
+                    <div className="bg-white rounded-2xl border border-black/6 p-10 text-center">
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl" style={{background:`${color}15`}}>
+                        ⏳
+                      </div>
+                      <p className="font-bold text-[#0A0A0A] text-lg mb-2">Cuestionario recibido</p>
+                      <p className="text-sm text-[#6B6B6B] leading-relaxed">Tu entrenador ya tiene tus datos y está preparando tu plan nutricional personalizado. En breve lo verás aquí.</p>
+                      <div className="mt-5 flex items-center justify-center gap-2">
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{background:color, animationDelay:'0ms'}}/>
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{background:color, animationDelay:'150ms'}}/>
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{background:color, animationDelay:'300ms'}}/>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Estado 1: sin cuestionario todavía */
+                    <div className="bg-white rounded-2xl border border-black/6 p-8 text-center">
+                      <p className="text-5xl mb-4">🥗</p>
+                      <p className="font-bold text-[#0A0A0A] text-lg mb-2">Plan en preparación</p>
+                      <p className="text-sm text-[#6B6B6B] mb-6">Rellena el cuestionario para que tu entrenador pueda crear un plan nutricional personalizado para ti.</p>
+                      <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+                        target="_blank" rel="noreferrer"
+                        className="inline-block px-6 py-3 rounded-xl text-white text-sm font-semibold"
+                        style={{background:color}}>
+                        📋 Rellenar cuestionario nutricional
+                      </a>
+                    </div>
+                  )
                 ):(
                   <>
                     <div className="rounded-2xl p-5 text-white" style={{background:'#111'}}>
