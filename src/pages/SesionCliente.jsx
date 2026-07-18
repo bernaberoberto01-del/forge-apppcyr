@@ -356,12 +356,119 @@ export default function SesionCliente() {
             </div>
 
             {/* METCON — AMRAP / EMOM / Por tiempo / Chipper */}
-            {tipo === 'metcon' && (
-              <div className="p-4 space-y-3">
-                {ej.notas && <p className="text-xs text-[#6B6B6B] italic bg-[#F5F5F0] rounded-xl px-3 py-2">{ej.notas}</p>}
-                <div className="grid grid-cols-2 gap-2">
-                  {ej.ejercicio_nombre?.toLowerCase().includes('amrap') && (
-                    <>
+            {tipo === 'metcon' && (() => {
+              const nombreLow = ej.ejercicio_nombre?.toLowerCase() || ''
+              const esAMRAP = nombreLow.includes('amrap')
+              const esEMOM = nombreLow.includes('emom')
+              const esPorTiempo = !esAMRAP && !esEMOM
+
+              // Extraer duración del nombre (ej: "AMRAP 12 minutos" → 12)
+              const minMatch = ej.ejercicio_nombre?.match(/(\d+)\s*min/i)
+              const durMetcon = minMatch ? parseInt(minMatch[1]) : (esAMRAP ? 12 : esEMOM ? 16 : 0)
+
+              const cronKey = `cron_${ejIdx}`
+              const [cronActivo, setCronActivo] = [
+                datosCardio[ejIdx]?.cronActivo || false,
+                v => updateCardio(ejIdx, 'cronActivo', v)
+              ]
+              const [cronSeg, setCronSeg] = [
+                datosCardio[ejIdx]?.cronSeg ?? (esPorTiempo ? 0 : durMetcon * 60),
+                v => updateCardio(ejIdx, 'cronSeg', v)
+              ]
+              const [cronInterval, setCronInterval] = [
+                datosCardio[ejIdx]?.cronInterval || null,
+                v => updateCardio(ejIdx, 'cronInterval', v)
+              ]
+
+              function formatTime(seg) {
+                const m = Math.floor(Math.abs(seg) / 60)
+                const s = Math.abs(seg) % 60
+                return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+              }
+
+              function toggleCron() {
+                if (cronActivo) {
+                  // Parar
+                  if (cronInterval) clearInterval(cronInterval)
+                  setCronActivo(false)
+                  setCronInterval(null)
+                  // Si es por tiempo, guardar el tiempo en el campo
+                  if (esPorTiempo) {
+                    updateCardio(ejIdx, 'tiempo', formatTime(cronSeg))
+                  }
+                } else {
+                  // Arrancar
+                  setCronActivo(true)
+                  const id = setInterval(() => {
+                    setCronSeg(prev => {
+                      const next = esPorTiempo ? prev + 1 : prev - 1
+                      if (!esPorTiempo && next <= 0) {
+                        clearInterval(id)
+                        setCronActivo(false)
+                        // Vibrar si disponible
+                        if (navigator.vibrate) navigator.vibrate([300, 100, 300])
+                        return 0
+                      }
+                      // EMOM: vibrar cada minuto
+                      if (esEMOM && next % 60 === 0 && navigator.vibrate) navigator.vibrate(200)
+                      return next
+                    })
+                  }, 1000)
+                  setCronInterval(id)
+                }
+              }
+
+              function resetCron() {
+                if (cronInterval) clearInterval(cronInterval)
+                setCronActivo(false)
+                setCronInterval(null)
+                setCronSeg(esPorTiempo ? 0 : durMetcon * 60)
+              }
+
+              const pct = esPorTiempo
+                ? Math.min((cronSeg / (durMetcon * 60 || 1)) * 100, 100)
+                : ((durMetcon * 60 - cronSeg) / (durMetcon * 60 || 1)) * 100
+              const colorCron = cronSeg <= 30 && !esPorTiempo ? '#ef4444' : '#FF5C00'
+              const minutoActual = esEMOM ? (durMetcon * 60 - cronSeg) / 60 + 1 : null
+
+              return (
+                <div className="p-4 space-y-3">
+                  {ej.notas && <p className="text-xs text-[#6B6B6B] italic bg-[#F5F5F0] rounded-xl px-3 py-2">{ej.notas}</p>}
+
+                  {/* Cronómetro */}
+                  <div className="bg-[#111] rounded-2xl p-4 text-center">
+                    {/* Barra de progreso */}
+                    {durMetcon > 0 && (
+                      <div className="h-1.5 bg-white/10 rounded-full mb-4 overflow-hidden">
+                        <div className="h-full rounded-full transition-all duration-1000"
+                          style={{ width: `${pct}%`, background: colorCron }} />
+                      </div>
+                    )}
+                    <p className="text-5xl font-bold font-mono text-white tracking-wider mb-1"
+                      style={{ color: cronSeg <= 30 && !esPorTiempo ? '#ef4444' : 'white' }}>
+                      {formatTime(cronSeg)}
+                    </p>
+                    {esEMOM && cronActivo && (
+                      <p className="text-white/50 text-xs mb-3">Minuto {Math.ceil((durMetcon * 60 - cronSeg) / 60 + 0.01)} de {durMetcon}</p>
+                    )}
+                    {esAMRAP && <p className="text-white/30 text-xs mb-3">AMRAP {durMetcon} min</p>}
+                    {esPorTiempo && <p className="text-white/30 text-xs mb-3">Tiempo transcurrido</p>}
+                    <div className="flex gap-2 justify-center mt-3">
+                      <button onClick={toggleCron}
+                        className="px-8 py-3 rounded-xl text-white font-bold text-sm transition-all active:scale-95"
+                        style={{ background: cronActivo ? '#6B6B6B' : colorCron }}>
+                        {cronActivo ? '⏸ Parar' : cronSeg === 0 || cronSeg === durMetcon * 60 ? '▶ Iniciar' : '▶ Continuar'}
+                      </button>
+                      <button onClick={resetCron}
+                        className="px-4 py-3 rounded-xl text-white/50 border border-white/10 text-sm">
+                        ↺
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Campos de resultado */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {esAMRAP && <>
                       <div>
                         <label className="text-xs text-[#6B6B6B] mb-1 block">Rondas completadas</label>
                         <input type="number" value={datosCardio[ejIdx]?.rondas || ''}
@@ -374,15 +481,13 @@ export default function SesionCliente() {
                           onChange={e => updateCardio(ejIdx, 'reps_extra', e.target.value)}
                           placeholder="12" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
                       </div>
-                    </>
-                  )}
-                  {ej.ejercicio_nombre?.toLowerCase().includes('emom') && (
-                    <>
+                    </>}
+                    {esEMOM && <>
                       <div>
                         <label className="text-xs text-[#6B6B6B] mb-1 block">Minutos completados</label>
                         <input type="number" value={datosCardio[ejIdx]?.minutos || ''}
                           onChange={e => updateCardio(ejIdx, 'minutos', e.target.value)}
-                          placeholder="16" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                          placeholder={String(durMetcon)} className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
                       </div>
                       <div>
                         <label className="text-xs text-[#6B6B6B] mb-1 block">¿Fallaste algún minuto?</label>
@@ -393,37 +498,35 @@ export default function SesionCliente() {
                           <option value="si">Sí, algún minuto</option>
                         </select>
                       </div>
-                    </>
-                  )}
-                  {!ej.ejercicio_nombre?.toLowerCase().includes('amrap') && !ej.ejercicio_nombre?.toLowerCase().includes('emom') && (
-                    <div className="col-span-2">
-                      <label className="text-xs text-[#6B6B6B] mb-1 block">Tiempo total (min:seg)</label>
-                      <input type="text" value={datosCardio[ejIdx]?.tiempo || ''}
-                        onChange={e => updateCardio(ejIdx, 'tiempo', e.target.value)}
-                        placeholder="12:45" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                    </>}
+                    {esPorTiempo && (
+                      <div className="col-span-2">
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">Tiempo total (se rellena al parar)</label>
+                        <input type="text" value={datosCardio[ejIdx]?.tiempo || ''}
+                          onChange={e => updateCardio(ejIdx, 'tiempo', e.target.value)}
+                          placeholder="00:00" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00] font-mono text-lg" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs text-[#6B6B6B] mb-1 block">Esfuerzo RPE (1-10)</label>
+                      <input type="number" min="1" max="10" value={datosCardio[ejIdx]?.rpe_metcon || ''}
+                        onChange={e => updateCardio(ejIdx, 'rpe_metcon', e.target.value)}
+                        placeholder="8" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
                     </div>
-                  )}
-                  {/* RPE específico del MetCon */}
-                  <div>
-                    <label className="text-xs text-[#6B6B6B] mb-1 block">Esfuerzo RPE (1-10)</label>
-                    <input type="number" min="1" max="10" value={datosCardio[ejIdx]?.rpe_metcon || ''}
-                      onChange={e => updateCardio(ejIdx, 'rpe_metcon', e.target.value)}
-                      placeholder="8" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                    <div>
+                      <label className="text-xs text-[#6B6B6B] mb-1 block">Pesos usados</label>
+                      <input type="text" value={datosCardio[ejIdx]?.pesos || ''}
+                        onChange={e => updateCardio(ejIdx, 'pesos', e.target.value)}
+                        placeholder="KB 24kg, barra 60kg" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    </div>
                   </div>
-                  {/* Pesos usados */}
-                  <div>
-                    <label className="text-xs text-[#6B6B6B] mb-1 block">Pesos usados</label>
-                    <input type="text" value={datosCardio[ejIdx]?.pesos || ''}
-                      onChange={e => updateCardio(ejIdx, 'pesos', e.target.value)}
-                      placeholder="KB 24kg, barra 60kg" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
-                  </div>
+                  <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
+                    onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
+                    placeholder="Sensaciones, qué fue bien o mal..."
+                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
                 </div>
-                <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
-                  onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
-                  placeholder="Sensaciones, qué fue bien o mal, nivel de fatiga..."
-                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
-              </div>
-            )}
+              )
+            })()}
 
             {/* CARRERA */}
             {tipo === 'carrera' && (
