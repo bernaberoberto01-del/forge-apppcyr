@@ -433,10 +433,45 @@ export default function Nutricion({ session }) {
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-4 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
                   {generando===detalle.cliente_id ? <span className='flex items-center gap-1.5'><span className='w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin'/> Generando...</span> : '🔄 Regenerar'}
                 </button>
-                <button onClick={() => abrirCuestionario({ id: detalle.cliente_id, nombre: detalle.clientes?.nombre, peso_actual: detalle.clientes?.peso_actual, objetivo: detalle.objetivo })}
-                  className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]" title="Editar cuestionario">
+                <button onClick={() => {
+                  // Cargar datos del cuestionario existente antes de abrir el modal
+                  supabase.from('cuestionarios_nutricion').select('*')
+                    .eq('cliente_id', detalle.cliente_id)
+                    .order('created_at', { ascending: false }).limit(1).maybeSingle()
+                    .then(({ data }) => {
+                      setModalCuest({ id: detalle.cliente_id, nombre: detalle.clientes?.nombre })
+                      setCuest(data || { peso: detalle.clientes?.peso_actual, objetivo: detalle.objetivo })
+                    })
+                }} className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]" title="Editar cuestionario">
                   📋
                 </button>
+                {/* Botón pausar / despublicar plan */}
+                {detalle.estado === 'publicado' && (
+                  <button onClick={async () => {
+                    await supabase.from('planes_nutricion')
+                      .update({ estado: 'borrador' })
+                      .eq('cliente_id', detalle.cliente_id)
+                      .eq('estado', 'publicado')
+                    setToast({ msg: '⏸ Plan pausado — el cliente ya no lo ve' })
+                    setTimeout(() => setToast(null), 3000)
+                    cargar()
+                  }} className="border border-amber-200 text-amber-600 text-sm py-3 px-3 rounded-xl hover:bg-amber-50" title="Pausar plan — el cliente deja de verlo">
+                    ⏸
+                  </button>
+                )}
+                {detalle.estado === 'borrador' && (
+                  <button onClick={async () => {
+                    await supabase.from('planes_nutricion')
+                      .update({ estado: 'publicado' })
+                      .eq('cliente_id', detalle.cliente_id)
+                      .eq('estado', 'borrador')
+                    setToast({ msg: '✓ Plan publicado — el cliente ya puede verlo' })
+                    setTimeout(() => setToast(null), 3000)
+                    cargar()
+                  }} className="border border-emerald-200 text-emerald-600 text-sm py-3 px-3 rounded-xl hover:bg-emerald-50" title="Publicar plan">
+                    ▶
+                  </button>
+                )}
                 <button onClick={() => {
                   navigator.clipboard.writeText(cuestUrl(uid, detalle.cliente_id))
                   setToast({ msg: '✓ Enlace del cuestionario copiado' })
