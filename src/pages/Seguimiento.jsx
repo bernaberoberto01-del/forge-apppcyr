@@ -34,7 +34,10 @@ export default function Seguimiento({ session }) {
   const [loading, setLoading] = useState(false)
   const [filtroCliente, setFiltroCliente] = useState('todos')
   const uid = session.user.id
-  const [tabPrincipal, setTabPrincipal] = useState('checkins') // checkins | sesiones
+  const [tabPrincipal, setTabPrincipal] = useState('checkins') // checkins | sesiones | mensual
+  const [lanzandoMensual, setLanzandoMensual] = useState(false)
+  const [borradores, setBorradores] = useState([])
+  const [publicandoBorrador, setPublicandoBorrador] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [filtroAlerta, setFiltroAlerta] = useState('todos')
   const [detalleCI, setDetalleCI] = useState(null)
@@ -61,14 +64,37 @@ export default function Seguimiento({ session }) {
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
-    const [{ data: ci }, { data: cl }, { data: se }] = await Promise.all([
+    const [{ data: ci }, { data: cl }, { data: se }, { data: bors }] = await Promise.all([
       supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(200),
       supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(300),
+      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'borrador').order('created_at', { ascending: false }),
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
     setSesiones(se || [])
+    setBorradores(bors || [])
+  }
+
+  async function lanzarMensual() {
+    setLanzandoMensual(true)
+    try {
+      const res = await fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/actualizar-rutina-mensual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-secret': 'forge-admin-2024' }
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setToast(`✓ ${data.procesados} rutinas generadas para revisión`)
+        cargar()
+      } else {
+        setToast('Error: ' + (data.error || 'inténtalo de nuevo'))
+      }
+    } catch (e) {
+      setToast('Error de conexión')
+    }
+    setLanzandoMensual(false)
+    setTimeout(() => setToast(''), 4000)
   }
 
   async function reenviarCheckin() {
@@ -180,6 +206,11 @@ export default function Seguimiento({ session }) {
         <button onClick={() => setTabPrincipal('sesiones')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${tabPrincipal==='sesiones'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
           🏋️ Sesiones ({sesiones.length})
+        </button>
+        <button onClick={() => setTabPrincipal('mensual')}
+          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all relative ${tabPrincipal==='mensual'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
+          🔄 Mensual
+          {borradores.length > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-[#FF5C00] text-white rounded-full text-[9px] font-bold flex items-center justify-center">{borradores.length}</span>}
         </button>
       </div>
 
@@ -640,6 +671,97 @@ export default function Seguimiento({ session }) {
         </div>
       )}
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
+
+      {/* ── TAB MENSUAL ── */}
+      {tabPrincipal === 'mensual' && (
+        <div className="space-y-4">
+          {/* Botón lanzar análisis */}
+          <div className="bg-[#111] rounded-2xl p-5">
+            <p className="text-white font-bold text-lg mb-1">🔄 Actualización mensual</p>
+            <p className="text-white/50 text-sm mb-4">Analiza los check-ins del último mes de todos tus clientes y genera una nueva rutina adaptada para cada uno. Tú revisas y publicas.</p>
+            <div className="bg-white/5 rounded-xl p-3 mb-4 space-y-1.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-white/60">Clientes con datos suficientes (2+ check-ins)</span>
+                <span className="text-white font-bold">
+                  {clientes.filter(c => checkins.filter(ci => ci.cliente_id === c.id).length >= 2).length} / {clientes.length}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/60">Borradores pendientes de revisar</span>
+                <span className="font-bold" style={{color: borradores.length > 0 ? '#FF5C00' : 'white'}}>{borradores.length}</span>
+              </div>
+            </div>
+            <button onClick={lanzarMensual} disabled={lanzandoMensual}
+              className="w-full py-3 rounded-xl text-white font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{background:'#FF5C00'}}>
+              {lanzandoMensual
+                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Analizando clientes...</>
+                : '✨ Lanzar análisis mensual con IA'
+              }
+            </button>
+            <p className="text-white/30 text-xs text-center mt-2">Solo procesa clientes con 2+ check-ins en los últimos 30 días</p>
+          </div>
+
+          {/* Borradores pendientes */}
+          {borradores.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-black/6 p-8 text-center">
+              <p className="text-3xl mb-3">✓</p>
+              <p className="text-sm font-semibold text-[#0A0A0A]">Sin borradores pendientes</p>
+              <p className="text-xs text-[#6B6B6B] mt-1">Lanza el análisis mensual para generar nuevas rutinas</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm font-bold text-[#0A0A0A]">{borradores.length} rutina{borradores.length > 1 ? 's' : ''} pendiente{borradores.length > 1 ? 's' : ''} de revisión</p>
+              {borradores.map(b => (
+                <div key={b.id} className="bg-white rounded-2xl border border-black/6 p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <p className="font-bold text-[#0A0A0A] text-sm">{b.clientes?.nombre}</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">{b.nombre}</p>
+                    </div>
+                    <span className="text-xs bg-amber-50 text-amber-700 font-semibold px-2.5 py-1 rounded-full flex-shrink-0">Borrador</span>
+                  </div>
+                  {b.notas_entrenador && (
+                    <div className="bg-[#F7F6F3] rounded-xl px-3 py-2.5 mb-3">
+                      <p className="text-xs font-semibold text-[#6B6B6B] mb-1">Ajustes aplicados por la IA</p>
+                      <p className="text-sm text-[#0A0A0A] leading-relaxed">{b.notas_entrenador}</p>
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button onClick={() => setQuickView(b.cliente_id)}
+                      className="flex-1 border border-black/10 text-[#6B6B6B] text-sm py-2.5 rounded-xl hover:bg-[#F7F6F3]">
+                      👤 Ver ficha
+                    </button>
+                    <button onClick={async () => {
+                      setPublicandoBorrador(b.id)
+                      // Archivar rutina publicada actual
+                      await supabase.from('rutinas').update({ estado: 'archivada' })
+                        .eq('cliente_id', b.cliente_id).eq('estado', 'publicada')
+                      // Publicar el borrador
+                      await supabase.from('rutinas').update({ estado: 'publicada' }).eq('id', b.id)
+                      setToast(`✓ Rutina de ${b.clientes?.nombre} publicada`)
+                      setTimeout(() => setToast(''), 3000)
+                      cargar()
+                      setPublicandoBorrador(null)
+                    }} disabled={publicandoBorrador === b.id}
+                      className="flex-1 text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50"
+                      style={{background:'#FF5C00'}}>
+                      {publicandoBorrador === b.id ? 'Publicando...' : '▶ Publicar rutina'}
+                    </button>
+                    <button onClick={async () => {
+                      if (!confirm(`¿Descartar la rutina borrador de ${b.clientes?.nombre}?`)) return
+                      await supabase.from('rutinas').delete().eq('id', b.id)
+                      cargar()
+                    }} className="border border-red-100 text-red-400 text-sm px-3 py-2.5 rounded-xl hover:bg-red-50">
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
