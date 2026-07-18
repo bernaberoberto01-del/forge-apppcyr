@@ -98,6 +98,8 @@ export default function PortalCliente() {
   const [historialMedidas, setHistorialMedidas] = useState([])
   const [marcas, setMarcas] = useState([])
   const [formMarca, setFormMarca] = useState({ ejercicio:'', peso_kg:'', reps:'', notas:'' })
+  const [formPerfil, setFormPerfil] = useState(null)
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false)
   const mensajesEndRef = useRef(null)
 
   useEffect(()=>{
@@ -207,6 +209,7 @@ export default function PortalCliente() {
     {id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos},
     ...(planNutricion||cliente?.nutricion_activa||tieneCuestNutricion?[{id:'nutricion',label:'Nutrición',icon:'🥗'}]:[]),
     ...(pagos.length>0?[{id:'pagos',label:'Pagos',icon:'💳'}]:[]),
+    {id:'ajustes',label:'Ajustes',icon:'⚙️'},
   ]
 
   // ── Layout ──────────────────────────────────────────────────────────────────
@@ -646,17 +649,41 @@ export default function PortalCliente() {
                             <p className="font-semibold text-[#0A0A0A]">{ejercicio}</p>
                             {mejor?.peso_kg&&<div className="flex items-center gap-1.5"><span className="text-yellow-400">🏆</span><span className="font-bold text-[#0A0A0A]">{mejor.peso_kg}kg</span>{mejor.reps&&<span className="text-[#6B6B6B] text-sm">× {mejor.reps}</span>}</div>}
                           </div>
-                          {registros.filter(r=>r.peso_kg).length>1&&(
-                            <div className="px-5 pt-4 pb-1">
-                              <div className="flex items-end gap-1 h-10">
-                                {registros.slice().reverse().filter(r=>r.peso_kg).map((r,i,arr)=>{
-                                  const min=Math.min(...arr.map(x=>x.peso_kg)),max=Math.max(...arr.map(x=>x.peso_kg))
-                                  const h=max===min?60:((r.peso_kg-min)/(max-min))*70+30
-                                  return<div key={r.id} className="flex-1 rounded-sm" style={{height:`${h}%`,background:i===arr.length-1?color:`${color}40`}}/>
-                                })}
+                          {registros.filter(r=>r.peso_kg).length>1&&(()=>{
+                            const pts=registros.slice().reverse().filter(r=>r.peso_kg)
+                            const min=Math.min(...pts.map(x=>x.peso_kg))
+                            const max=Math.max(...pts.map(x=>x.peso_kg))
+                            const W=300, H=60, pad=8
+                            const x=i=>pad+(i/(pts.length-1))*(W-pad*2)
+                            const y=v=>H-pad-((v-min)/(max-min||1))*(H-pad*2)
+                            const d=pts.map((p,i)=>`${i===0?'M':'L'}${x(i).toFixed(1)},${y(p.peso_kg).toFixed(1)}`).join(' ')
+                            return(
+                              <div className="px-5 pt-4 pb-2">
+                                <div className="flex justify-between text-xs text-[#6B6B6B] mb-1">
+                                  <span>{pts[0]?.peso_kg}kg</span>
+                                  <span className="font-semibold" style={{color}}>→ {pts[pts.length-1]?.peso_kg}kg</span>
+                                </div>
+                                <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{height:60}}>
+                                  <defs>
+                                    <linearGradient id={`grad-${ejercicio.replace(/\s/g,'')}`} x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="0%" stopColor={color} stopOpacity="0.2"/>
+                                      <stop offset="100%" stopColor={color} stopOpacity="0"/>
+                                    </linearGradient>
+                                  </defs>
+                                  <path d={`${d} L${x(pts.length-1).toFixed(1)},${H} L${pad},${H} Z`}
+                                    fill={`url(#grad-${ejercicio.replace(/\s/g,'')})`}/>
+                                  <path d={d} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                  {pts.map((p,i)=>(
+                                    <circle key={i} cx={x(i)} cy={y(p.peso_kg)} r="3" fill={i===pts.length-1?color:'white'} stroke={color} strokeWidth="2"/>
+                                  ))}
+                                </svg>
+                                <div className="flex justify-between text-xs text-[#6B6B6B] mt-1">
+                                  <span>{new Date(pts[0].fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</span>
+                                  <span>{new Date(pts[pts.length-1].fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</span>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )
+                          })()}
                           <div className="divide-y divide-black/5">
                             {registros.slice(0,5).map((r,i)=>(
                               <div key={r.id} className="px-5 py-3 flex items-center justify-between">
@@ -913,6 +940,58 @@ export default function PortalCliente() {
                       <p className="text-sm font-bold text-emerald-600 flex-shrink-0">+{Number(p.importe).toFixed(0)}€</p>
                     </div>
                   ))}
+                </div>
+              </>
+            )}
+
+            {/* ══ AJUSTES ══════════════════════════════════════════════════ */}
+            {tab==='ajustes'&&(
+              <>
+                <div className="bg-white rounded-2xl border border-black/6 p-5">
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-4">⚙️ Mi perfil</p>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-[#6B6B6B] mb-1 block">Peso actual (kg)</label>
+                      <input type="number" step="0.1"
+                        defaultValue={cliente?.peso_actual||''}
+                        onChange={e=>setFormPerfil(f=>({...(f||{}),peso_actual:e.target.value}))}
+                        placeholder="75.5"
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#6B6B6B] mb-1 block">Mi objetivo actual</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[['perdida_grasa','🔥 Pérdida de grasa'],['ganancia_muscular','💪 Ganar músculo'],['tonificacion','✨ Tonificación'],['mantenimiento','⚖️ Mantenimiento'],['fuerza','🏋️ Fuerza máxima'],['resistencia','🏃 Resistencia']].map(([val,label])=>(
+                          <button key={val} type="button"
+                            onClick={()=>setFormPerfil(f=>({...(f||{}),objetivo:val}))}
+                            className={`py-2.5 px-3 rounded-xl text-xs font-semibold text-left transition-all border ${(formPerfil?.objetivo||cliente?.objetivo)===val?'text-white border-transparent':'bg-[#F7F6F3] border-transparent text-[#6B6B6B]'}`}
+                            style={(formPerfil?.objetivo||cliente?.objetivo)===val?{background:color}:{}}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <button onClick={async()=>{
+                      if(!formPerfil||!Object.keys(formPerfil).length) return
+                      setGuardandoPerfil(true)
+                      const updates={}
+                      if(formPerfil.peso_actual) updates.peso_actual=Number(formPerfil.peso_actual)
+                      if(formPerfil.objetivo) updates.objetivo=formPerfil.objetivo
+                      const {error}=await supabase.from('clientes').update(updates).eq('id',cliente.id)
+                      if(!error){
+                        if(formPerfil.objetivo&&formPerfil.objetivo!==cliente.objetivo){
+                          await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{contenido:`He actualizado mi objetivo: ahora es "${formPerfil.objetivo.replace(/_/g,' ')}".`}}}).catch(()=>{})
+                        }
+                        setFormPerfil(null)
+                      }
+                      setGuardandoPerfil(false)
+                    }} disabled={!formPerfil||!Object.keys(formPerfil).length||guardandoPerfil}
+                      className="w-full py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
+                      style={{background:color}}>
+                      {guardandoPerfil?'Guardando...':'Guardar cambios'}
+                    </button>
+                    <p className="text-xs text-[#6B6B6B] text-center">Al cambiar tu objetivo tu entrenador recibirá una notificación para adaptar tu plan.</p>
+                  </div>
                 </div>
               </>
             )}

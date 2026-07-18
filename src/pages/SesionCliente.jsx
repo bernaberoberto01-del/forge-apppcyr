@@ -5,13 +5,19 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
   const nombreLow = ej.ejercicio_nombre?.toLowerCase() || ''
   const esAMRAP = nombreLow.includes('amrap')
   const esEMOM = nombreLow.includes('emom')
-  const esPorTiempo = !esAMRAP && !esEMOM
+  const esTabata = nombreLow.includes('tabata')
+  const esPorTiempo = !esAMRAP && !esEMOM && !esTabata
   const minMatch = ej.ejercicio_nombre?.match(/(\d+)\s*min/i)
-  const durMin = minMatch ? parseInt(minMatch[1]) : (esAMRAP ? 12 : esEMOM ? 16 : 0)
-  const durSeg = durMin * 60
+  // Tabata: 8 rondas × (20s trabajo + 10s descanso) = 4 min por defecto
+  const durMin = esTabata ? 4 : (minMatch ? parseInt(minMatch[1]) : (esAMRAP ? 12 : esEMOM ? 16 : 0))
+  const durSeg = esTabata ? 240 : durMin * 60
   const [seg, setSeg] = useState(esPorTiempo ? 0 : durSeg)
   const [activo, setActivo] = useState(false)
-  const [cuentaAtras, setCuentaAtras] = useState(null) // 3, 2, 1 o null
+  const [cuentaAtras, setCuentaAtras] = useState(null)
+  // Estado Tabata
+  const [tabataFase, setTabataFase] = useState('trabajo') // trabajo | descanso
+  const [tabataRonda, setTabataRonda] = useState(1)
+  const [tabataSeg, setTabataSeg] = useState(20) // 20s trabajo, 10s descanso // 3, 2, 1 o null
   const intervalRef = useRef(null)
   const audioCtx = useRef(null)
 
@@ -75,6 +81,35 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
       getAudio()
       beep(660, 0.1)
       setActivo(true)
+
+      if (esTabata) {
+        // Tabata: 20s trabajo → 10s descanso × 8 rondas
+        // Usar ref para estado mutable en el interval
+        const state = { fase: 'trabajo', ronda: 1, seg: 20 }
+        setTabataFase('trabajo'); setTabataRonda(1); setTabataSeg(20)
+        intervalRef.current = setInterval(() => {
+          state.seg -= 1
+          if (state.seg <= 0) {
+            if (state.fase === 'trabajo') {
+              state.fase = 'descanso'; state.seg = 10
+              beep(440, 0.2); if (navigator.vibrate) navigator.vibrate(100)
+              setTabataFase('descanso')
+            } else {
+              if (state.ronda >= 8) {
+                clearInterval(intervalRef.current); setActivo(false)
+                beepFin(); if (navigator.vibrate) navigator.vibrate([300,100,300,100,300])
+                return
+              }
+              state.ronda += 1; state.fase = 'trabajo'; state.seg = 20
+              beep(880, 0.25); if (navigator.vibrate) navigator.vibrate([150,50,150])
+              setTabataFase('trabajo'); setTabataRonda(state.ronda)
+            }
+          }
+          if (state.seg === 3) { beep(440, 0.08); if (navigator.vibrate) navigator.vibrate(60) }
+          setTabataSeg(state.seg)
+        }, 1000)
+        return
+      }
       intervalRef.current = setInterval(() => {
         setSeg(prev => {
           const next = esPorTiempo ? prev + 1 : prev - 1
@@ -134,6 +169,22 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
         </div>
       )}
       <div className="p-4 text-center relative">
+        {/* TABATA */}
+        {esTabata ? (
+          <div className="p-4 text-center relative">
+            <div className={`rounded-xl py-3 mb-3 transition-all ${tabataFase==='trabajo'?'bg-[#FF5C00]':'bg-[#6B6B6B]'}`}>
+              <p className="text-white text-xs font-bold uppercase tracking-widest">{tabataFase==='trabajo'?'🔥 TRABAJO':'💤 DESCANSO'}</p>
+              <p className="text-white text-5xl font-bold font-mono mt-1">{String(tabataSeg).padStart(2,'0')}s</p>
+            </div>
+            <div className="flex justify-center gap-1 mb-3">
+              {[1,2,3,4,5,6,7,8].map(r=>(
+                <div key={r} className={`w-6 h-2 rounded-full transition-all ${r<tabataRonda?'bg-emerald-400':r===tabataRonda?'bg-[#FF5C00]':'bg-white/20'}`}/>
+              ))}
+            </div>
+            <p className="text-white/50 text-xs mb-3">Ronda {tabataRonda} de 8 · 20s trabajo / 10s descanso</p>
+          </div>
+        ) : (
+        <>
         {durSeg > 0 && (
           <div className="h-1.5 bg-white/10 rounded-full mb-4 overflow-hidden">
             <div className="h-full rounded-full transition-all duration-1000"
@@ -160,12 +211,13 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
         )}
         {esEMOM && !activo && <p className="text-white/30 text-xs mb-2">EMOM {durMin} min · vibra + pitido cada minuto</p>}
         {esPorTiempo && !cuentaAtras && <p className="text-white/30 text-xs mb-2">Tiempo transcurrido</p>}
+        </>)}
 
         <div className="flex gap-2 justify-center mt-2">
           <button onClick={toggle}
             className="px-8 py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-all"
             style={{ background: activo ? '#6B6B6B' : '#FF5C00' }}>
-            {activo ? '⏸ Parar' : '▶ ' + (seg === (esPorTiempo ? 0 : durSeg) ? 'Iniciar' : 'Continuar')}
+            {activo ? '⏸ Parar' : esTabata ? '▶ Iniciar Tabata' : '▶ ' + (seg === (esPorTiempo ? 0 : durSeg) ? 'Iniciar' : 'Continuar')}
           </button>
           <button onClick={reset} className="px-4 py-3 rounded-xl text-white/50 border border-white/10 text-sm">↺</button>
         </div>
@@ -210,11 +262,12 @@ export default function SesionCliente() {
       nombre.includes('activacion neuromuscular')
     ) return 'skip'
 
-    // METCON — trabajo por tiempo (AMRAP, EMOM, For Time, Chipper)
+    // METCON — trabajo por tiempo (AMRAP, EMOM, For Time, Chipper, Tabata)
     if (
       nombre.includes('amrap') || nombre.includes('emom') ||
       nombre.includes('chipper') || nombre.includes('por tiempo') ||
       nombre.includes('for time') || nombre.includes('metcon') ||
+      nombre.includes('tabata') ||
       patron.includes('metabolico') || patron.includes('metcon') ||
       nombre.includes('finisher')
     ) return 'metcon'

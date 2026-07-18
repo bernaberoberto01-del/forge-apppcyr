@@ -273,10 +273,25 @@ export default function Seguimiento({ session }) {
               <div className="text-right">
                 {ci.peso && <p className="text-base font-bold text-[#FF5C00]">{ci.peso}kg</p>}
                 {ci.pasos_diarios && <p className="text-xs text-[#6B6B6B]">👟 {ci.pasos_diarios.toLocaleString()}</p>}
-                <button onClick={() => copiarEnlaceCheckin(ci.cliente_id)}
-                  className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] mt-1 transition-colors">
-                  🔗 CI
-                </button>
+                <div className="flex gap-1 justify-end mt-1">
+                  <button onClick={e => { e.stopPropagation(); copiarEnlaceCheckin(ci.cliente_id) }}
+                    className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors px-1.5 py-1">
+                    🔗
+                  </button>
+                  <button onClick={async e => {
+                    e.stopPropagation()
+                    setAnalizando(true)
+                    setMensajeSugerido(null)
+                    setDetalleCI(ci)
+                    const { data } = await supabase.functions.invoke('analizar-checkin', { body: { cliente_id: ci.cliente_id, checkin_id: ci.id } })
+                    if (data?.mensaje_sugerido) setMensajeSugerido({ texto: data.mensaje_sugerido, borrador_id: data.borrador_id })
+                    else { setToast('Error al analizar'); setTimeout(() => setToast(''), 3000) }
+                    setAnalizando(false)
+                  }} className="text-xs font-semibold px-2 py-1 rounded-lg text-white flex items-center gap-1"
+                    style={{background:'#6366f1'}}>
+                    ✨ IA
+                  </button>
+                </div>
               </div>
             </div>
             <div className="flex gap-1.5 flex-wrap">
