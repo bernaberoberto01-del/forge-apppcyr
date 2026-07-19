@@ -389,28 +389,33 @@ export default function PortalCliente() {
                 {/* Acciones online */}
                 {cliente?.tipo==='online'&&(
                   <div className="grid grid-cols-2 gap-3">
-                    <a href="/seguimiento" className="bg-white rounded-2xl border border-black/6 p-5 flex flex-col items-start hover:border-black/12 hover:shadow-sm transition-all">
+                    <a href="/seguimiento"
+                      className="rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all"
+                      style={{background:color}}>
                       <span className="text-2xl mb-2">📋</span>
-                      <p className="text-sm font-bold text-[#0A0A0A]">Check-in semanal</p>
-                      <p className="text-xs text-[#6B6B6B] mt-0.5">Cómo te encuentras</p>
+                      <p className="text-sm font-bold text-white">Check-in semanal</p>
+                      <p className="text-xs text-white/70 mt-0.5">Cómo te encuentras</p>
                     </a>
-                    <a href="/sesion" className="bg-white rounded-2xl border border-black/6 p-5 flex flex-col items-start hover:border-black/12 hover:shadow-sm transition-all">
+                    <a href="/sesion"
+                      className="bg-[#111] rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all">
                       <span className="text-2xl mb-2">🏋️</span>
-                      <p className="text-sm font-bold text-[#0A0A0A]">Registrar entreno</p>
-                      <p className="text-xs text-[#6B6B6B] mt-0.5">Apunta el entreno de hoy</p>
+                      <p className="text-sm font-bold text-white">Registrar entreno</p>
+                      <p className="text-xs text-white/50 mt-0.5">Apunta el entreno de hoy</p>
                     </a>
                   </div>
                 )}
 
                 {/* Check-in presencial */}
                 {cliente?.tipo==='presencial'&&(
-                  <a href="/seguimiento" className="flex items-center gap-4 bg-white rounded-2xl border border-black/6 p-5 hover:border-black/12 hover:shadow-sm transition-all">
+                  <a href="/seguimiento"
+                    className="flex items-center gap-4 rounded-2xl p-5 active:scale-95 transition-all"
+                    style={{background:color}}>
                     <span className="text-3xl">📋</span>
                     <div>
-                      <p className="text-sm font-bold text-[#0A0A0A]">Check-in semanal</p>
-                      <p className="text-xs text-[#6B6B6B]">Cuéntame cómo va la semana</p>
+                      <p className="text-sm font-bold text-white">Check-in semanal</p>
+                      <p className="text-xs text-white/70">Cuéntame cómo va la semana</p>
                     </div>
-                    <span className="ml-auto text-[#6B6B6B]">→</span>
+                    <span className="ml-auto text-white/70">→</span>
                   </a>
                 )}
 
@@ -946,54 +951,203 @@ export default function PortalCliente() {
 
             {/* ══ AJUSTES ══════════════════════════════════════════════════ */}
             {tab==='ajustes'&&(
-              <>
-                <div className="bg-white rounded-2xl border border-black/6 p-5">
-                  <p className="text-sm font-bold text-[#0A0A0A] mb-4">⚙️ Mi perfil</p>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-xs text-[#6B6B6B] mb-1 block">Peso actual (kg)</label>
-                      <input type="number" step="0.1"
-                        defaultValue={cliente?.peso_actual||''}
-                        onChange={e=>setFormPerfil(f=>({...(f||{}),peso_actual:e.target.value}))}
-                        placeholder="75.5"
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+              <div className="space-y-3">
+
+                {/* BLOQUE 1 — Mi plan */}
+                <div className="bg-white rounded-2xl border border-black/6 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-black/6">
+                    <p className="text-sm font-bold text-[#0A0A0A]">Mi plan</p>
+                    <p className="text-xs text-[#6B6B6B] mt-0.5">Tu entrenador recibirá una notificación si cambias algo</p>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    {/* Peso actual y objetivo */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Peso actual (kg)</label>
+                        <input type="number" step="0.1"
+                          defaultValue={cliente?.peso_actual||''}
+                          onChange={e=>setFormPerfil(f=>({...(f||{}),peso_actual:e.target.value}))}
+                          placeholder="75.5"
+                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-[#FF5C00]"/>
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Peso objetivo (kg)</label>
+                        <input type="number" step="0.1"
+                          defaultValue={cliente?.peso_objetivo||''}
+                          onChange={e=>setFormPerfil(f=>({...(f||{}),peso_objetivo:e.target.value}))}
+                          placeholder="70.0"
+                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm text-center focus:outline-none focus:border-[#FF5C00]"/>
+                      </div>
                     </div>
+
+                    {/* Objetivo */}
                     <div>
-                      <label className="text-xs text-[#6B6B6B] mb-1 block">Mi objetivo actual</label>
+                      <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Mi objetivo</label>
                       <div className="grid grid-cols-2 gap-2">
-                        {[['perdida_grasa','🔥 Pérdida de grasa'],['ganancia_muscular','💪 Ganar músculo'],['tonificacion','✨ Tonificación'],['mantenimiento','⚖️ Mantenimiento'],['fuerza','🏋️ Fuerza máxima'],['resistencia','🏃 Resistencia']].map(([val,label])=>(
+                        {[
+                          ['perdida_grasa','🔥','Pérdida de grasa'],
+                          ['ganancia_muscular','💪','Ganar músculo'],
+                          ['tonificacion','✨','Tonificación'],
+                          ['mantenimiento','⚖️','Mantenimiento'],
+                          ['fuerza','🏋️','Fuerza máxima'],
+                          ['resistencia','🏃','Resistencia'],
+                        ].map(([val,icon,label])=>(
                           <button key={val} type="button"
                             onClick={()=>setFormPerfil(f=>({...(f||{}),objetivo:val}))}
-                            className={`py-2.5 px-3 rounded-xl text-xs font-semibold text-left transition-all border ${(formPerfil?.objetivo||cliente?.objetivo)===val?'text-white border-transparent':'bg-[#F7F6F3] border-transparent text-[#6B6B6B]'}`}
+                            className={`py-2.5 px-3 rounded-xl text-xs font-semibold text-left transition-all flex items-center gap-2 ${
+                              (formPerfil?.objetivo||cliente?.objetivo)===val
+                                ? 'text-white'
+                                : 'bg-[#F7F6F3] text-[#6B6B6B]'
+                            }`}
                             style={(formPerfil?.objetivo||cliente?.objetivo)===val?{background:color}:{}}>
-                            {label}
+                            <span>{icon}</span>{label}
                           </button>
                         ))}
                       </div>
                     </div>
+
+                    {/* Días por semana */}
+                    <div>
+                      <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Días disponibles para entrenar</label>
+                      <div className="flex gap-2">
+                        {[2,3,4,5,6].map(d=>(
+                          <button key={d} type="button"
+                            onClick={()=>setFormPerfil(f=>({...(f||{}),dias_semana:d}))}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                              (formPerfil?.dias_semana||cliente?.dias_semana)===d
+                                ? 'text-white'
+                                : 'bg-[#F7F6F3] text-[#6B6B6B]'
+                            }`}
+                            style={(formPerfil?.dias_semana||cliente?.dias_semana)===d?{background:color}:{}}>
+                            {d}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Lesiones */}
+                    <div>
+                      <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Lesiones o limitaciones actuales</label>
+                      <textarea
+                        defaultValue={cliente?.lesiones||''}
+                        onChange={e=>setFormPerfil(f=>({...(f||{}),lesiones:e.target.value}))}
+                        placeholder="Ninguna / Describe cualquier molestia o limitación"
+                        rows={2}
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"/>
+                    </div>
+
                     <button onClick={async()=>{
                       if(!formPerfil||!Object.keys(formPerfil).length) return
                       setGuardandoPerfil(true)
                       const updates={}
                       if(formPerfil.peso_actual) updates.peso_actual=Number(formPerfil.peso_actual)
+                      if(formPerfil.peso_objetivo) updates.peso_objetivo=Number(formPerfil.peso_objetivo)
                       if(formPerfil.objetivo) updates.objetivo=formPerfil.objetivo
-                      const {error}=await supabase.from('clientes').update(updates).eq('id',cliente.id)
-                      if(!error){
-                        if(formPerfil.objetivo&&formPerfil.objetivo!==cliente.objetivo){
-                          await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{contenido:`He actualizado mi objetivo: ahora es "${formPerfil.objetivo.replace(/_/g,' ')}".`}}}).catch(()=>{})
-                        }
-                        setFormPerfil(null)
+                      if(formPerfil.dias_semana) updates.dias_semana=formPerfil.dias_semana
+                      if(formPerfil.lesiones!==undefined) updates.lesiones=formPerfil.lesiones
+                      await supabase.from('clientes').update(updates).eq('id',cliente.id)
+                      // Notificar cambios al entrenador
+                      const cambios=[]
+                      if(formPerfil.objetivo&&formPerfil.objetivo!==cliente.objetivo) cambios.push(`objetivo: ${formPerfil.objetivo.replace(/_/g,' ')}`)
+                      if(formPerfil.dias_semana&&formPerfil.dias_semana!==cliente.dias_semana) cambios.push(`días/semana: ${formPerfil.dias_semana}`)
+                      if(formPerfil.lesiones&&formPerfil.lesiones!==cliente.lesiones) cambios.push(`lesiones: ${formPerfil.lesiones}`)
+                      if(cambios.length) {
+                        await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{
+                          contenido:`He actualizado mi perfil: ${cambios.join(' · ')}.`
+                        }}}).catch(()=>{})
                       }
+                      setFormPerfil(null)
                       setGuardandoPerfil(false)
                     }} disabled={!formPerfil||!Object.keys(formPerfil).length||guardandoPerfil}
-                      className="w-full py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-40"
+                      className="w-full py-3 rounded-xl text-white text-sm font-bold disabled:opacity-40 transition-all active:scale-95"
                       style={{background:color}}>
                       {guardandoPerfil?'Guardando...':'Guardar cambios'}
                     </button>
-                    <p className="text-xs text-[#6B6B6B] text-center">Al cambiar tu objetivo tu entrenador recibirá una notificación para adaptar tu plan.</p>
                   </div>
                 </div>
-              </>
+
+                {/* BLOQUE 2 — Mi cuenta */}
+                <div className="bg-white rounded-2xl border border-black/6 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-black/6">
+                    <p className="text-sm font-bold text-[#0A0A0A]">Mi cuenta</p>
+                  </div>
+                  <div className="divide-y divide-black/5">
+                    <button onClick={async()=>{
+                      const {error}=await supabase.auth.resetPasswordForEmail(clienteSession?.email||'')
+                      if(!error) alert('Te hemos enviado un email para cambiar tu contraseña.')
+                    }} className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#F7F6F3] transition-all text-left">
+                      <div className="flex items-center gap-3">
+                        <span className="w-9 h-9 bg-[#F7F6F3] rounded-xl flex items-center justify-center text-base">🔑</span>
+                        <span className="text-sm font-medium text-[#0A0A0A]">Cambiar contraseña</span>
+                      </div>
+                      <span className="text-[#6B6B6B]">→</span>
+                    </button>
+                    <div className="flex items-center justify-between px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <span className="w-9 h-9 bg-[#F7F6F3] rounded-xl flex items-center justify-center text-base">📧</span>
+                        <div>
+                          <p className="text-sm font-medium text-[#0A0A0A]">Email</p>
+                          <p className="text-xs text-[#6B6B6B]">{clienteSession?.email||''}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <button onClick={async()=>{
+                      await supabase.auth.signOut()
+                      window.location.href='/'
+                    }} className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#F7F6F3] transition-all text-left">
+                      <div className="flex items-center gap-3">
+                        <span className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-base">🚪</span>
+                        <span className="text-sm font-medium text-red-500">Cerrar sesión</span>
+                      </div>
+                      <span className="text-red-400">→</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* BLOQUE 3 — Legal */}
+                <div className="bg-white rounded-2xl border border-black/6 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-black/6">
+                    <p className="text-sm font-bold text-[#0A0A0A]">Legal y privacidad</p>
+                  </div>
+                  <div className="divide-y divide-black/5">
+                    <a href="/privacidad.html" target="_blank" rel="noreferrer"
+                      className="flex items-center justify-between px-5 py-4 hover:bg-[#F7F6F3] transition-all">
+                      <div className="flex items-center gap-3">
+                        <span className="w-9 h-9 bg-[#F7F6F3] rounded-xl flex items-center justify-center text-base">🔒</span>
+                        <span className="text-sm font-medium text-[#0A0A0A]">Política de Privacidad</span>
+                      </div>
+                      <span className="text-[#6B6B6B]">→</span>
+                    </a>
+                    <button onClick={async()=>{
+                      await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{
+                        contenido:'Solicito una copia de todos mis datos personales almacenados en el sistema (derecho de acceso RGPD).'
+                      }}}).catch(()=>{})
+                      alert('Tu solicitud ha sido enviada a tu entrenador. Te responderemos en un plazo máximo de 30 días.')
+                    }} className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#F7F6F3] transition-all text-left">
+                      <div className="flex items-center gap-3">
+                        <span className="w-9 h-9 bg-[#F7F6F3] rounded-xl flex items-center justify-center text-base">📂</span>
+                        <span className="text-sm font-medium text-[#0A0A0A]">Solicitar mis datos</span>
+                      </div>
+                      <span className="text-[#6B6B6B]">→</span>
+                    </button>
+                    <button onClick={async()=>{
+                      if(!confirm('¿Seguro que quieres solicitar la eliminación de tu cuenta y todos tus datos? Esta acción no se puede deshacer.')) return
+                      await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{
+                        contenido:'Solicito la eliminación de mi cuenta y todos mis datos personales (derecho al olvido RGPD).'
+                      }}}).catch(()=>{})
+                      alert('Tu solicitud ha sido enviada a tu entrenador. Procesaremos la eliminación en un plazo máximo de 30 días.')
+                    }} className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#F7F6F3] transition-all text-left">
+                      <div className="flex items-center gap-3">
+                        <span className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-base">🗑</span>
+                        <span className="text-sm font-medium text-red-500">Eliminar mi cuenta</span>
+                      </div>
+                      <span className="text-red-400">→</span>
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-center text-xs text-[#9B9B9B] pb-2">Forge Studio OS · v1.0</p>
+              </div>
             )}
 
           </div>
