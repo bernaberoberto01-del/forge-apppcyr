@@ -6,7 +6,7 @@ const PASOS = ['Datos personales','Tu objetivo','Experiencia','Marcas básicas',
 
 const init = {
   nombre:'', email:'', telefono:'', edad:'', sexo:'', peso_actual:'', altura:'', tipo:'presencial',
-  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'', acepta_rgpd: false, acepta_ia: false,
+  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'', formato_entrenamiento:'', acepta_rgpd: false, acepta_ia: false,
   nivel:'principiante', anos_entrenando:0,
   marca_press_banca:'', marca_sentadilla:'', marca_peso_muerto:'', marca_dominadas:'', marca_flexiones:'', marca_press_militar:'',
   material:'gimnasio', dias_semana:3, duracion_sesion:60, horario_preferido:'',
@@ -143,6 +143,7 @@ export default function RegistroCliente() {
         compromisos: form.compromisos || null,
         como_nos_conocio: form.como_nos_conocio || null,
         tipo_entrenamiento: form.tipo_entrenamiento || null,
+        formato_entrenamiento: form.formato_entrenamiento || null,
         acepta_rgpd: form.acepta_rgpd || false,
         acepta_ia: form.acepta_ia || false,
         fecha_consentimiento: new Date().toISOString(),
@@ -276,6 +277,31 @@ export default function RegistroCliente() {
                       className={`p-3 rounded-xl border text-left transition-all ${form.tipo_entrenamiento===t.id ? 'bg-[#FF5C00] border-[#FF5C00]' : 'border-black/10 hover:border-[#FF5C00]/50'}`}>
                       <p className={`text-sm font-semibold ${form.tipo_entrenamiento===t.id?'text-white':'text-[#0A0A0A]'}`}>{t.icon} {t.label}</p>
                       <p className={`text-xs mt-0.5 leading-tight ${form.tipo_entrenamiento===t.id?'text-white/80':'text-[#6B6B6B]'}`}>{t.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Formato de entrenamiento preferido */}
+              <div>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">¿Cómo te gusta entrenar?</label>
+                <p className="text-xs text-[#6B6B6B] mb-3">Esto nos ayuda a crear rutinas que se adapten a ti y que puedas mantener</p>
+                <div className="grid grid-cols-1 gap-2">
+                  {[
+                    ['superseries', '↕️ Superseries / Biseries', 'Encadeno 2 ejercicios seguidos y luego descanso. Más eficiente.'],
+                    ['circuitos', '🔄 Circuitos', 'Hago 3-4 ejercicios seguidos sin parar. Me gusta el ritmo alto.'],
+                    ['descanso_tradicional', '⏱ Descanso tradicional', 'Prefiero descansar bien entre cada ejercicio. Me concentro más.'],
+                    ['sin_preferencia', '🎯 Sin preferencia', 'Que mi entrenador decida lo que mejor me conviene.'],
+                  ].map(([val, label, desc]) => (
+                    <button key={val} type="button" onClick={() => set('formato_entrenamiento', val)}
+                      className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-3 ${form.formato_entrenamiento===val ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/10 hover:border-[#FF5C00]/30'}`}>
+                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${form.formato_entrenamiento===val ? 'border-[#FF5C00]' : 'border-black/20'}`}>
+                        {form.formato_entrenamiento===val && <div className="w-2 h-2 rounded-full bg-[#FF5C00]"/>}
+                      </div>
+                      <div>
+                        <p className={`text-sm font-semibold ${form.formato_entrenamiento===val?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{label}</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{desc}</p>
+                      </div>
                     </button>
                   ))}
                 </div>

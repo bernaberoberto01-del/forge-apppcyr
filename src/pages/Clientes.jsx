@@ -23,7 +23,7 @@ const OBJ = {
   cambio_rapido_30dias: { label: 'Cambio 30 días', color: 'bg-red-50 text-red-700' },
 }
 const OBJETIVOS_LIST = Object.entries(OBJ)
-const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'' }
+const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'' }
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const AVATAR_COLORS = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
 const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
@@ -226,7 +226,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'' })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'' })
     setEditId(c.id); setModal(true); setDetalle(null)
   }
 
@@ -579,6 +579,22 @@ export default function Clientes({ session }) {
                       className={`p-2.5 rounded-xl border text-left transition-all ${form.tipo_entrenamiento===t.id?'bg-[#FF5C00] border-[#FF5C00]':'border-black/10 hover:border-[#FF5C00]/50'}`}>
                       <p className={`text-xs font-semibold ${form.tipo_entrenamiento===t.id?'text-white':'text-[#0A0A0A]'}`}>{t.icon} {t.label}</p>
                       <p className={`text-xs mt-0.5 leading-tight ${form.tipo_entrenamiento===t.id?'text-white/80':'text-[#6B6B6B]'} hidden md:block`}>{t.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Formato de entrenamiento preferido</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ['superseries','↕️ Superseries'],
+                    ['circuitos','🔄 Circuitos'],
+                    ['descanso_tradicional','⏱ Descanso tradicional'],
+                    ['sin_preferencia','🎯 Sin preferencia'],
+                  ].map(([val,label])=>(
+                    <button key={val} type="button" onClick={()=>setForm({...form,formato_entrenamiento:val})}
+                      className={`py-2 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${form.formato_entrenamiento===val?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]/50'}`}>
+                      {label}
                     </button>
                   ))}
                 </div>
