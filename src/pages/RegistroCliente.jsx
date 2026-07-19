@@ -281,9 +281,28 @@ export default function RegistroCliente() {
                 </div>
               </div>
               <Textarea label="Descríbelo con tus palabras" value={form.objetivo_detalle} onChange={e => set('objetivo_detalle', e.target.value)} placeholder="Ej: Quiero perder 8kg antes del verano..." />
-              <Select label="¿En qué plazo?" value={form.plazo} onChange={e => set('plazo', e.target.value)} options={[
-                ['30_dias','30 días'],['3_meses','3 meses'],['6_meses','6 meses'],['1_ano','1 año'],['sin_prisa','Sin prisa']
-              ]} />
+              <div>
+                <Select label="¿En qué plazo?" value={form.plazo} onChange={e => set('plazo', e.target.value)} options={[
+                  ['30_dias','30 días'],['3_meses','3 meses'],['6_meses','6 meses'],['1_ano','1 año'],['sin_prisa','Sin prisa']
+                ]} />
+                {form.plazo === '30_dias' && form.nivel === 'principiante' && (
+                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <p className="text-sm font-bold text-amber-800 mb-1">⚠️ Este plan requiere base previa</p>
+                    <p className="text-xs text-amber-700 leading-relaxed">El cambio en 30 días está diseñado para personas con hábito de entrenamiento establecido. Sin una base previa, el riesgo de frustración y abandono es alto.</p>
+                    <p className="text-xs text-amber-700 leading-relaxed mt-1.5">Si estás empezando, el plan de <strong>3 meses</strong> está diseñado para ti — construye el hábito primero y los resultados duran más.</p>
+                    <div className="flex gap-2 mt-3">
+                      <button type="button" onClick={() => set('plazo', '3_meses')}
+                        className="flex-1 bg-amber-600 text-white text-xs font-bold py-2.5 rounded-lg">
+                        Cambiar a 3 meses
+                      </button>
+                      <button type="button" onClick={() => {}}
+                        className="flex-1 border border-amber-300 text-amber-700 text-xs font-medium py-2.5 rounded-lg">
+                        Continuar con 30 días
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -308,6 +327,25 @@ export default function RegistroCliente() {
                       <p className={`text-xs mt-0.5 ${form.nivel===v ? 'text-white/80' : 'text-[#6B6B6B]'}`}>{d}</p>
                     </button>
                   ))}
+                </div>
+                {/* Aviso si eligió 30 días pero es principiante */}
+                {form.plazo === '30_dias' && form.nivel === 'principiante' && (
+                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <p className="text-sm font-bold text-amber-800 mb-1">⚠️ El plan de 30 días requiere base previa</p>
+                    <p className="text-xs text-amber-700 leading-relaxed">Con nivel principiante, el cambio en 30 días tiene un alto riesgo de frustración y abandono. Sin hábito establecido, los resultados no se mantienen.</p>
+                    <p className="text-xs text-amber-700 mt-1.5 leading-relaxed">Tu entrenador te recomienda empezar con <strong>3 meses</strong> — construye la base y los resultados duran.</p>
+                    <div className="flex gap-2 mt-3">
+                      <button type="button" onClick={() => set('plazo', '3_meses')}
+                        className="flex-1 bg-amber-600 text-white text-xs font-bold py-2.5 rounded-lg">
+                        ✓ Cambiar a 3 meses
+                      </button>
+                      <button type="button" onClick={() => {}}
+                        className="flex-1 border border-amber-300 text-amber-700 text-xs font-medium py-2.5 rounded-lg">
+                        Continuar con 30 días
+                      </button>
+                    </div>
+                  </div>
+                )}
                 </div>
               </div>
               <div>
