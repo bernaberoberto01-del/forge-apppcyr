@@ -513,7 +513,7 @@ export default function PortalCliente() {
                                     <div className="h-px flex-1 bg-black/5"/>
                                   </div>
                                 )}
-                                {grupo.ejercicios.map((ej:any, ei:number) => (
+                                {grupo.ejercicios.map((ej, ei) => (
                                   <div key={ei} className={`px-5 py-3 flex items-start gap-3 ${grupo.tipo !== 'single' && ei < grupo.ejercicios.length-1 ? 'border-l-2 ml-5 pl-4 border-dashed' : ''}`}
                                     style={grupo.tipo !== 'single' && ei < grupo.ejercicios.length-1 ? {borderColor:`${color}40`} : {}}>
                                     <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5"
