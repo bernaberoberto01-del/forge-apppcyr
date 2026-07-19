@@ -469,14 +469,14 @@ export default function RegistroCliente() {
                 <input type="checkbox" checked={form.acepta_rgpd} onChange={e => set('acepta_rgpd', e.target.checked)}
                   className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
                 <span className="text-xs text-[#6B6B6B] leading-relaxed">
-                  He leído y acepto la <span className="text-[#FF5C00] underline cursor-pointer" onClick={() => window.open('/privacidad', '_blank')}>Política de Privacidad</span> y el tratamiento de mis datos personales y de salud conforme al RGPD.
+                  He leído y acepto la <span className="text-[#FF5C00] underline cursor-pointer" onClick={() => window.open('/privacidad.html', '_blank')}>Política de Privacidad</span> y el tratamiento de mis datos personales conforme al RGPD.
                 </span>
               </label>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={form.acepta_ia || false} onChange={e => set('acepta_ia', e.target.checked)}
                   className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
                 <span className="text-xs text-[#6B6B6B] leading-relaxed">
-                  Entiendo y acepto que mis datos (objetivo, nivel, lesiones y métricas de seguimiento) serán procesados por sistemas de Inteligencia Artificial (Anthropic/Claude) para generar rutinas, planes nutricionales y análisis personalizados. Este procesamiento es necesario para el servicio.
+                  Acepto que mis datos se utilicen para personalizar mi programa de entrenamiento y nutrición mediante herramientas digitales avanzadas.
                 </span>
               </label>
             </div>
