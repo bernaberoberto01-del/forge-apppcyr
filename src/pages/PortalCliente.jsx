@@ -490,9 +490,9 @@ export default function PortalCliente() {
                           {(()=>{
                             const ejercicios = dia.ejercicios||[]
                             // Agrupar por campo agrupacion
-                            const grupos: any[] = []
+                            const grupos = []
                             const vistos = new Set()
-                            ejercicios.forEach((ej:any) => {
+                            ejercicios.forEach((ej) => {
                               if (!ej.agrupacion) { grupos.push({ tipo:'single', ejercicios:[ej] }); return }
                               const clave = ej.agrupacion.replace(/\d+$/,'') // A1,A2 → A
                               if (vistos.has(clave)) return
@@ -501,7 +501,7 @@ export default function PortalCliente() {
                               const tipo = miembros.length === 2 ? 'biserie' : miembros.length === 3 ? 'triserie' : 'circuito'
                               grupos.push({ tipo, clave, ejercicios: miembros })
                             })
-                            return grupos.map((grupo:any, gi:number) => (
+                            return grupos.map((grupo, gi) => (
                               <div key={gi}>
                                 {grupo.tipo !== 'single' && (
                                   <div className="px-5 pt-3 pb-1 flex items-center gap-2">
