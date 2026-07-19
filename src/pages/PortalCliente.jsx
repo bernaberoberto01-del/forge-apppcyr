@@ -487,19 +487,52 @@ export default function PortalCliente() {
                           <p className="font-semibold text-[#0A0A0A] text-sm">{dia.nombre||dia.dia}</p>
                         </div>
                         <div className="divide-y divide-black/5">
-                          {(dia.ejercicios||[]).map((ej,ei)=>(
-                            <div key={ei} className="px-5 py-3.5 flex items-start gap-3">
-                              <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5" style={{background:color}}>{ei+1}</div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-[#0A0A0A]">{ej.nombre}</p>
-                                {ej.notas&&<p className="text-xs text-[#6B6B6B] mt-0.5">{ej.notas}</p>}
+                          {(()=>{
+                            const ejercicios = dia.ejercicios||[]
+                            // Agrupar por campo agrupacion
+                            const grupos: any[] = []
+                            const vistos = new Set()
+                            ejercicios.forEach((ej:any) => {
+                              if (!ej.agrupacion) { grupos.push({ tipo:'single', ejercicios:[ej] }); return }
+                              const clave = ej.agrupacion.replace(/\d+$/,'') // A1,A2 → A
+                              if (vistos.has(clave)) return
+                              vistos.add(clave)
+                              const miembros = ejercicios.filter((e:any) => e.agrupacion?.startsWith(clave))
+                              const tipo = miembros.length === 2 ? 'biserie' : miembros.length === 3 ? 'triserie' : 'circuito'
+                              grupos.push({ tipo, clave, ejercicios: miembros })
+                            })
+                            return grupos.map((grupo:any, gi:number) => (
+                              <div key={gi}>
+                                {grupo.tipo !== 'single' && (
+                                  <div className="px-5 pt-3 pb-1 flex items-center gap-2">
+                                    <div className="h-px flex-1 bg-black/5"/>
+                                    <span className="text-xs font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
+                                      style={{background:`${color}15`,color}}>
+                                      {grupo.tipo === 'biserie' ? '↕ Biserie' : grupo.tipo === 'triserie' ? '↕ Triserie' : '↕ Circuito'}
+                                    </span>
+                                    <div className="h-px flex-1 bg-black/5"/>
+                                  </div>
+                                )}
+                                {grupo.ejercicios.map((ej:any, ei:number) => (
+                                  <div key={ei} className={`px-5 py-3 flex items-start gap-3 ${grupo.tipo !== 'single' && ei < grupo.ejercicios.length-1 ? 'border-l-2 ml-5 pl-4 border-dashed' : ''}`}
+                                    style={grupo.tipo !== 'single' && ei < grupo.ejercicios.length-1 ? {borderColor:`${color}40`} : {}}>
+                                    <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5"
+                                      style={{background: grupo.tipo !== 'single' ? `${color}90` : color}}>
+                                      {ej.agrupacion || (gi+1)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-[#0A0A0A]">{ej.nombre}</p>
+                                      {ej.notas&&<p className="text-xs text-[#6B6B6B] mt-0.5">{ej.notas}</p>}
+                                    </div>
+                                    <div className="text-right flex-shrink-0">
+                                      <p className="text-sm font-bold" style={{color}}>{ej.series}×{ej.reps}</p>
+                                      {ej.descanso && ej.descanso !== '-' && <p className="text-xs text-[#6B6B6B]">💤 {ej.descanso}</p>}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
-                              <div className="text-right flex-shrink-0">
-                                <p className="text-sm font-bold" style={{color}}>{ej.series}×{ej.reps}</p>
-                                <p className="text-xs text-[#6B6B6B]">{ej.descanso}</p>
-                              </div>
-                            </div>
-                          ))}
+                            ))
+                          })()}
                         </div>
                       </div>
                     ))}
