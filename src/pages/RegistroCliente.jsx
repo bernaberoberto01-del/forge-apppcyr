@@ -346,7 +346,6 @@ export default function RegistroCliente() {
                     </div>
                   </div>
                 )}
-                </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Años entrenando: <span className="text-[#FF5C00]">{form.anos_entrenando}</span></label>
