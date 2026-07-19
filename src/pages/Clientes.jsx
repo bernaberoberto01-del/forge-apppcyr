@@ -23,7 +23,7 @@ const OBJ = {
   cambio_rapido_30dias: { label: 'Cambio 30 días', color: 'bg-red-50 text-red-700' },
 }
 const OBJETIVOS_LIST = Object.entries(OBJ)
-const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',notas:'',precio_mensual:'',tipo_entrenamiento:'' }
+const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'' }
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const AVATAR_COLORS = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
 const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
@@ -153,6 +153,8 @@ export default function Clientes({ session }) {
       dias_semana: c.dias_semana || 3,
       material: normMaterial(c.material),
       lesiones: c.lesiones || null,
+      enfermedades: c.enfermedades || null,
+      medicacion: c.medicacion || null,
       notas: [
         c.edad ? `Edad: ${c.edad}` : null,
         c.altura ? `Altura: ${c.altura}cm` : null,
@@ -224,7 +226,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'' })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'' })
     setEditId(c.id); setModal(true); setDetalle(null)
   }
 
@@ -581,11 +583,33 @@ export default function Clientes({ session }) {
                   ))}
                 </div>
               </div>
+              {/* Salud — campos críticos para la generación de rutinas */}
+              <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-3">
+                <p className="text-xs font-bold text-red-700">⚕️ Salud — afecta a la generación de rutinas</p>
+                <div>
+                  <label className="text-xs font-semibold text-red-700 mb-1 block">Lesiones o limitaciones físicas</label>
+                  <textarea value={form.lesiones} onChange={e => setForm({...form,lesiones:e.target.value})} rows={2}
+                    className="w-full border border-red-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 resize-none bg-white"
+                    placeholder="Ej: Condromalacia rodilla derecha, lumbalgia crónica..." />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-red-700 mb-1 block">Enfermedades o condiciones médicas</label>
+                  <textarea value={form.enfermedades||''} onChange={e => setForm({...form,enfermedades:e.target.value})} rows={2}
+                    className="w-full border border-red-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 resize-none bg-white"
+                    placeholder="Ej: Hipertensión, enfermedad autoinmune, diabetes..." />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-red-700 mb-1 block">Medicación actual</label>
+                  <textarea value={form.medicacion||''} onChange={e => setForm({...form,medicacion:e.target.value})} rows={2}
+                    className="w-full border border-red-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-red-400 resize-none bg-white"
+                    placeholder="Ej: Bisoprolol 2.5mg, Metformina 850mg..." />
+                </div>
+              </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Notas internas</label>
                 <textarea value={form.notas} onChange={e => setForm({...form,notas:e.target.value})} rows={2}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
-                  placeholder="Lesiones, preferencias, observaciones..." />
+                  placeholder="Observaciones, preferencias..." />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
