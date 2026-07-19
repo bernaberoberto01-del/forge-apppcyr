@@ -497,7 +497,7 @@ export default function PortalCliente() {
                               const clave = ej.agrupacion.replace(/\d+$/,'') // A1,A2 → A
                               if (vistos.has(clave)) return
                               vistos.add(clave)
-                              const miembros = ejercicios.filter((e:any) => e.agrupacion?.startsWith(clave))
+                              const miembros = ejercicios.filter((e) => e.agrupacion?.startsWith(clave))
                               const tipo = miembros.length === 2 ? 'biserie' : miembros.length === 3 ? 'triserie' : 'circuito'
                               grupos.push({ tipo, clave, ejercicios: miembros })
                             })
