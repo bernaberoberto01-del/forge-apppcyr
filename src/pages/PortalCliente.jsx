@@ -100,6 +100,12 @@ export default function PortalCliente() {
   const [formMarca, setFormMarca] = useState({ ejercicio:'', peso_kg:'', reps:'', notas:'' })
   const [formPerfil, setFormPerfil] = useState(null)
   const [guardandoPerfil, setGuardandoPerfil] = useState(false)
+  const [toastPortal, setToastPortal] = useState('')
+
+  function mostrarToast(msg) {
+    setToastPortal(msg)
+    setTimeout(() => setToastPortal(''), 3500)
+  }
   const mensajesEndRef = useRef(null)
 
   useEffect(()=>{
@@ -215,6 +221,13 @@ export default function PortalCliente() {
   // ── Layout ──────────────────────────────────────────────────────────────────
   return(
     <div className="min-h-screen" style={{background:'#F7F6F3'}}>
+
+      {/* Toast portal */}
+      {toastPortal && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-xl">
+          {toastPortal}
+        </div>
+      )}
 
       {/* ── Sidebar desktop / Header mobile ── */}
       {/* Mobile: header top */}
@@ -1073,8 +1086,12 @@ export default function PortalCliente() {
                   </div>
                   <div className="divide-y divide-black/5">
                     <button onClick={async()=>{
-                      const {error}=await supabase.auth.resetPasswordForEmail(clienteSession?.email||'')
-                      if(!error) alert('Te hemos enviado un email para cambiar tu contraseña.')
+                      const {error}=await supabase.auth.resetPasswordForEmail(
+                        clienteSession?.email||'',
+                        { redirectTo: `${window.location.origin}/reset-password` }
+                      )
+                      if(!error) mostrarToast('✓ Email enviado — revisa tu bandeja de entrada')
+                      else mostrarToast('Error al enviar el email. Inténtalo de nuevo.')
                     }} className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#F7F6F3] transition-all text-left">
                       <div className="flex items-center gap-3">
                         <span className="w-9 h-9 bg-[#F7F6F3] rounded-xl flex items-center justify-center text-base">🔑</span>
@@ -1122,7 +1139,7 @@ export default function PortalCliente() {
                       await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{
                         contenido:'Solicito una copia de todos mis datos personales almacenados en el sistema (derecho de acceso RGPD).'
                       }}}).catch(()=>{})
-                      alert('Tu solicitud ha sido enviada a tu entrenador. Te responderemos en un plazo máximo de 30 días.')
+                      mostrarToast('✓ Solicitud enviada — recibirás tus datos en 30 días')
                     }} className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#F7F6F3] transition-all text-left">
                       <div className="flex items-center gap-3">
                         <span className="w-9 h-9 bg-[#F7F6F3] rounded-xl flex items-center justify-center text-base">📂</span>
@@ -1131,11 +1148,11 @@ export default function PortalCliente() {
                       <span className="text-[#6B6B6B]">→</span>
                     </button>
                     <button onClick={async()=>{
-                      if(!confirm('¿Seguro que quieres solicitar la eliminación de tu cuenta y todos tus datos? Esta acción no se puede deshacer.')) return
+                      if(!window.confirm('¿Seguro que quieres solicitar la eliminación de tu cuenta y todos tus datos? Esta acción no se puede deshacer.')) return
                       await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{
                         contenido:'Solicito la eliminación de mi cuenta y todos mis datos personales (derecho al olvido RGPD).'
                       }}}).catch(()=>{})
-                      alert('Tu solicitud ha sido enviada a tu entrenador. Procesaremos la eliminación en un plazo máximo de 30 días.')
+                      mostrarToast('✓ Solicitud enviada — procesaremos la eliminación en 30 días')
                     }} className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#F7F6F3] transition-all text-left">
                       <div className="flex items-center gap-3">
                         <span className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center text-base">🗑</span>
