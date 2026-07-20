@@ -125,6 +125,8 @@ export default function Rutinas({ session }) {
     }
     setGenerando(null)
   }
+
+  async function generarRutina(clienteId, contextoExtra = '') {
     setGenerando(clienteId)
     const { data } = await supabase.functions.invoke('generar-rutina', {
       body: { cliente_id: clienteId, contexto_extra: contextoExtra }
