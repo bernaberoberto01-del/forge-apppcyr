@@ -79,16 +79,12 @@ export default function Seguimiento({ session }) {
   async function lanzarMensual() {
     setLanzandoMensual(true)
     try {
-      const res = await fetch('https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/actualizar-rutina-mensual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-secret': 'forge-admin-2024' }
-      })
-      const data = await res.json()
-      if (data.ok) {
+      const { data, error } = await supabase.functions.invoke('actualizar-rutina-mensual', { body: {} })
+      if (!error && data?.ok) {
         setToast(`✓ ${data.procesados} rutinas generadas para revisión`)
         cargar()
       } else {
-        setToast('Error: ' + (data.error || 'inténtalo de nuevo'))
+        setToast('Error: ' + (data?.error || error?.message || 'inténtalo de nuevo'))
       }
     } catch (e) {
       setToast('Error de conexión')

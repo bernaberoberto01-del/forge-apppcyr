@@ -2,16 +2,29 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-secret' };
 Deno.serve(async (req)=>{
-  if (!ADMIN_SECRET || req.headers.get('x-admin-secret') !== ADMIN_SECRET) {
-    return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+
+  // Modo 1: cron o admin → x-admin-secret (procesa todos los entrenadores)
+  // Modo 2: entrenador autenticado → JWT (procesa solo sus clientes)
+  const adminOk = ADMIN_SECRET && req.headers.get('x-admin-secret') === ADMIN_SECRET;
+  let entrenadorId: string | null = null;
+
+  if (!adminOk) {
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: CORS });
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return new Response(JSON.stringify({ error: 'Token inválido' }), { status: 401, headers: CORS });
+    entrenadorId = user.id;
   }
-  const headers = {
-    'Content-Type': 'application/json'
-  };
+
+  const headers = CORS;
   try {
     const hace30 = new Date(Date.now() - 30 * 86400000).toISOString();
-    const { data: clientes } = await supabase.from('clientes').select('*').eq('estado', 'activo');
+    let query = supabase.from('clientes').select('*').eq('estado', 'activo');
+    if (entrenadorId) query = query.eq('entrenador_id', entrenadorId);
+    const { data: clientes } = await query;
     const resultados = [];
     for (const cliente of clientes || []){
       const { data: checkins } = await supabase.from('checkins').select('*').eq('cliente_id', cliente.id).gte('fecha', hace30).order('fecha', {
