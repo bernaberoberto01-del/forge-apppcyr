@@ -111,7 +111,20 @@ export default function Rutinas({ session }) {
   }
 
   // ===== RUTINAS =====
-  async function generarRutina(clienteId, contextoExtra = '') {
+  async function generarEvaluacion(clienteId) {
+    setGenerando(clienteId)
+    const { data, error } = await supabase.functions.invoke('generar-evaluacion', {
+      body: { cliente_id: clienteId }
+    })
+    if (error || !data?.ok) {
+      alert('Error al generar la evaluación')
+    } else {
+      const tipo = data.es_inicial ? 'inicial' : `nº ${data.numero}`
+      alert(`✓ Evaluación ${tipo} generada — revísala en la lista de borradores y publícala`)
+      cargar()
+    }
+    setGenerando(null)
+  }
     setGenerando(clienteId)
     const { data } = await supabase.functions.invoke('generar-rutina', {
       body: { cliente_id: clienteId, contexto_extra: contextoExtra }
@@ -389,6 +402,11 @@ export default function Rutinas({ session }) {
                       <button onClick={() => generarRutina(c.id)} disabled={generando === c.id}
                         className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
                         {generando === c.id ? '⏳' : '✨ IA'}
+                      </button>
+                      <button onClick={() => generarEvaluacion(c.id)} disabled={generando === c.id}
+                        title="Generar sesión de evaluación"
+                        className="border border-[#6366f1] text-[#6366f1] text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-50">
+                        📋
                       </button>
                       <button onClick={() => { setManualClienteId(c.id); setModalManual(true) }}
                         className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-3 py-1.5 rounded-lg hover:border-[#111]">✍️</button>

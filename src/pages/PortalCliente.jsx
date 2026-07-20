@@ -477,9 +477,19 @@ export default function PortalCliente() {
                   </div>
                 ):(
                   <>
-                    <div className="rounded-2xl p-5 text-white" style={{background:color}}>
+                    <div className="rounded-2xl p-5 text-white" style={{background: rutina.tipo==='evaluacion' ? '#6366f1' : color}}>
+                      {rutina.tipo==='evaluacion' && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">📋 SESIÓN DE EVALUACIÓN</span>
+                        </div>
+                      )}
                       <p className="font-bold text-lg">{rutina.nombre||'Tu rutina personalizada'}</p>
-                      <p className="text-white/70 text-sm mt-1">{(rutina.borrador?.dias||rutina.contenido?.dias||[]).length} días · {rutina.semanas||4} semanas</p>
+                      <p className="text-white/70 text-sm mt-1">
+                        {rutina.tipo==='evaluacion'
+                          ? 'Completa los tests y registra tus marcas — esto personaliza tu programa'
+                          : `${(rutina.borrador?.dias||rutina.contenido?.dias||[]).length} días · ${rutina.semanas||4} semanas`
+                        }
+                      </p>
                     </div>
                     {(rutina.borrador?.dias||rutina.contenido?.dias||[]).map((dia,di)=>(
                       <div key={di} className="bg-white rounded-2xl border border-black/6 overflow-hidden">
