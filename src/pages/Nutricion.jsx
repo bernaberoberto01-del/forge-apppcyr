@@ -28,6 +28,7 @@ export default function Nutricion({ session }) {
   const [detalle, setDetalle] = useState(null)
   const [diaActivo, setDiaActivo] = useState(0)
   const [notasEdit, setNotasEdit] = useState('')
+  const [instruccionesIA, setInstruccionesIA] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [filtro, setFiltro] = useState('activos')
   const [toast, setToast] = useState(null)
@@ -59,11 +60,11 @@ export default function Nutricion({ session }) {
     await cargar()
   }
 
-  async function generarPlan(clienteId) {
+  async function generarPlan(clienteId, instrucciones) {
     setGenerando(clienteId)
     try {
       const { data, error } = await supabase.functions.invoke('generar-nutricion', {
-        body: { cliente_id: clienteId }
+        body: { cliente_id: clienteId, ...(instrucciones ? { instrucciones_extra: instrucciones } : {}) }
       })
       if (error) throw error
       if (data?.ok) { setToast({ msg: '✓ Plan nutricional generado — revísalo y publícalo' }); await cargar() }
@@ -226,7 +227,7 @@ export default function Nutricion({ session }) {
           const hoy = new Date().toLocaleDateString('es-ES',{weekday:'long'}).replace(/^\w/,c=>c.toUpperCase())
           const diaHoy = menu.find(d => d.dia === hoy) || menu[0]
           return (
-          <div key={p.id} onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setDiaActivo(0) }}
+          <div key={p.id} onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(''); setDiaActivo(0) }}
             className="bg-white rounded-2xl border border-black/5 shadow-sm hover:shadow-md hover:border-[#FF5C00]/20 transition-all cursor-pointer">
             {/* Header con objetivo */}
             <div className="px-4 pt-4 pb-3 border-b border-black/5">
@@ -288,7 +289,7 @@ export default function Nutricion({ session }) {
             {/* Acciones */}
             <div className="px-4 pb-3 flex gap-2" onClick={e=>e.stopPropagation()}>
               {p.estado==='borrador' && (
-                <button onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setDiaActivo(0) }}
+                <button onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(''); setDiaActivo(0) }}
                   className="flex-1 bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl">
                   Revisar y publicar →
                 </button>
@@ -414,6 +415,15 @@ export default function Nutricion({ session }) {
                 </div>
               )}
 
+              {/* Instrucciones para la IA al regenerar */}
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Instrucciones para la IA (al regenerar)</label>
+                <textarea value={instruccionesIA} onChange={e => setInstruccionesIA(e.target.value)} rows={2}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  placeholder="Ej: desayunos rápidos tipo tostadas o bocadillos, nada de avena ni huevo por las mañanas..." />
+                <p className="text-xs text-[#6B6B6B] mt-1">Se aplica solo al pulsar 🔄 Regenerar, con prioridad máxima sobre el resto de preferencias.</p>
+              </div>
+
               {/* Notas entrenador */}
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas para el cliente</label>
@@ -429,7 +439,7 @@ export default function Nutricion({ session }) {
                     ✅ Publicar para el cliente
                   </button>
                 )}
-                <button onClick={() => generarPlan(detalle.cliente_id)} disabled={generando===detalle.cliente_id}
+                <button onClick={() => generarPlan(detalle.cliente_id, instruccionesIA)} disabled={generando===detalle.cliente_id}
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-4 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
                   {generando===detalle.cliente_id ? <span className='flex items-center gap-1.5'><span className='w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin'/> Generando...</span> : '🔄 Regenerar'}
                 </button>
