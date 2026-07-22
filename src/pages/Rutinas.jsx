@@ -183,7 +183,7 @@ export default function Rutinas({ session }) {
   const addDia = () => setManualDias(prev => [...prev, initDia(prev.length+1)])
   const removeDia = (di) => setManualDias(prev => prev.filter((_,i)=>i!==di))
 
-  const clientesSinRutina = clientes.filter(c => !rutinas.find(r => r.cliente_id === c.id && r.estado !== 'archivada'))
+  const clientesSinRutina = clientes.filter(c => c.tipo === 'online' && !rutinas.find(r => r.cliente_id === c.id && r.estado !== 'archivada'))
 
   const rutinasFiltradas = useMemo(() => {
     let r = rutinas.filter(x => x.estado !== 'archivada')
@@ -391,7 +391,7 @@ export default function Rutinas({ session }) {
           {/* Clientes sin rutina */}
           {clientesSinRutina.length > 0 && !busqueda && filtroEstado === 'activas' && (
             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-4">
-              <p className="text-xs font-semibold text-amber-700 mb-3">⚠ Sin rutina ({clientesSinRutina.length})</p>
+              <p className="text-xs font-semibold text-amber-700 mb-3">⚠ Sin rutina · online ({clientesSinRutina.length})</p>
               <div className="space-y-2">
                 {clientesSinRutina.map(c => (
                   <div key={c.id} className="flex items-center gap-3">
@@ -729,7 +729,7 @@ export default function Rutinas({ session }) {
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
                   {generando===detalle.cliente_id?'⏳':'🔄'}
                 </button>
-                <button onClick={() => { if(!confirm('¿Eliminar?')) return; supabase.from('rutinas').delete().eq('id',detalle.id); setDetalle(null); cargar() }}
+                <button onClick={async () => { if(!confirm('¿Eliminar?')) return; await supabase.from('rutinas').delete().eq('id',detalle.id); setDetalle(null); await cargar() }}
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">🗑</button>
               </div>
             </div>

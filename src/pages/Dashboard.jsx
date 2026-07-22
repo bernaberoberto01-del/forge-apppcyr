@@ -197,7 +197,7 @@ export default function Dashboard({ session }) {
       {(d.alertasPagos.length > 0 || d.clientesSinCI.length > 0 || d.alertasExtra.length > 0) && (
         <div className="space-y-2">
           <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide">⚠ Requieren atención</p>
-          {d.alertasPagos.map(c => (
+          {d.alertasPagos.slice(0,3).map(c => (
             <button key={c.id} onClick={() => navigate('/pagos')}
               className="w-full bg-red-50 border border-red-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-red-100 transition-all">
               <span className="text-lg flex-shrink-0">💳</span>
@@ -208,6 +208,11 @@ export default function Dashboard({ session }) {
               <span className="text-red-400 flex-shrink-0">›</span>
             </button>
           ))}
+          {d.alertasPagos.length > 3 && (
+            <button onClick={() => navigate('/pagos')} className="w-full text-xs text-red-600 font-semibold text-center py-1.5 hover:underline">
+              +{d.alertasPagos.length - 3} pagos vencidos más →
+            </button>
+          )}
           {d.clientesSinCI.slice(0,3).map(c => (
             <button key={c.id} onClick={() => navigate('/seguimiento')}
               className="w-full bg-amber-50 border border-amber-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-amber-100 transition-all">
@@ -219,7 +224,12 @@ export default function Dashboard({ session }) {
               <span className="text-amber-400 flex-shrink-0">›</span>
             </button>
           ))}
-          {d.alertasExtra.filter(a => a.tipo === 'cancelacion_sesion').map(a => (
+          {d.clientesSinCI.length > 3 && (
+            <button onClick={() => navigate('/seguimiento')} className="w-full text-xs text-amber-600 font-semibold text-center py-1.5 hover:underline">
+              +{d.clientesSinCI.length - 3} sin check-in más →
+            </button>
+          )}
+          {d.alertasExtra.filter(a => a.tipo === 'cancelacion_sesion').slice(0,3).map(a => (
             <button key={a.id} onClick={() => navigate('/agenda')}
               className="w-full bg-orange-50 border border-orange-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-orange-100 transition-all">
               <span className="text-lg flex-shrink-0">❌</span>
@@ -231,6 +241,11 @@ export default function Dashboard({ session }) {
                 className="text-orange-300 hover:text-orange-600 text-lg flex-shrink-0">×</button>
             </button>
           ))}
+          {d.alertasExtra.filter(a => a.tipo === 'cancelacion_sesion').length > 3 && (
+            <button onClick={() => navigate('/agenda')} className="w-full text-xs text-orange-600 font-semibold text-center py-1.5 hover:underline">
+              +{d.alertasExtra.filter(a => a.tipo === 'cancelacion_sesion').length - 3} cancelaciones más →
+            </button>
+          )}
         </div>
       )}
 
