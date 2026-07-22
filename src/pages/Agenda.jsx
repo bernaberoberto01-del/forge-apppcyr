@@ -114,8 +114,8 @@ export default function Agenda({ session }) {
   const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState(null)
-  const [form, setForm] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'' })
-  const [formRec, setFormRec] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin:'', notas:'' })
+  const [form, setForm] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'' })
+  const [formRec, setFormRec] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin:'', notas:'', entrenador_id:'' })
   const [formExtra, setFormExtra] = useState({ fecha: new Date().toISOString().split('T')[0], concepto:'', horas:'1', tipo:'desplazamiento' })
   const [loading, setLoading] = useState(false)
   const [filtroEntrenador, setFiltroEntrenador] = useState('todos')
@@ -146,9 +146,13 @@ export default function Agenda({ session }) {
       centro
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
-      supabase.from('clientes').select('id,nombre,tipo,horas_semana').eq('entrenador_id', uid).eq('estado','activo'),
+      centro
+        ? supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('centro_id', centro.id).eq('estado','activo')
+        : supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('entrenador_id', uid).eq('estado','activo'),
       supabase.from('horas_extra').select('*').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha', { ascending: false }),
-      supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activa', true),
+      centro
+        ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
+        : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activa', true),
     ])
     setSesiones(se || [])
     setClientes(cl || [])
@@ -171,7 +175,7 @@ export default function Agenda({ session }) {
         if (!yaExiste) {
           resultado.push({
             id: `rec_${rec.id}_${fechaDia}`,
-            entrenador_id: uid,
+            entrenador_id: rec.entrenador_id || uid,
             cliente_id: rec.cliente_id,
             fecha: fechaDia,
             hora: rec.hora,
@@ -194,7 +198,8 @@ export default function Agenda({ session }) {
     setLoading(true)
     const fecha = diaClick || formatFecha(diasSemana[0])
     const { error } = await supabase.from('sesiones').insert({
-      entrenador_id: uid, cliente_id: form.cliente_id,
+      entrenador_id: form.entrenador_id || uid, cliente_id: form.cliente_id,
+      centro_id: centro?.id || null,
       fecha, hora: form.hora, tipo: form.tipo,
       duracion_minutos: form.duracion_minutos,
       completada: false, notas: form.notas
@@ -202,7 +207,7 @@ export default function Agenda({ session }) {
     if (error) setToast({ msg: 'Error al guardar', tipo: 'error' })
     else setToast({ msg: 'Sesión añadida' })
     setModal(false)
-    setForm({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'' })
+    setForm({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'' })
     await cargar()
     setLoading(false)
   }
@@ -211,7 +216,8 @@ export default function Agenda({ session }) {
     if (!formRec.cliente_id || !formRec.dias_semana.length) return
     setLoading(true)
     const { error } = await supabase.from('sesiones_recurrentes').insert({
-      entrenador_id: uid, cliente_id: formRec.cliente_id,
+      entrenador_id: formRec.entrenador_id || uid, cliente_id: formRec.cliente_id,
+      centro_id: centro?.id || null,
       hora: formRec.hora, duracion_minutos: formRec.duracion_minutos,
       tipo: formRec.tipo, dias_semana: formRec.dias_semana,
       fecha_inicio: formRec.fecha_inicio, fecha_fin: formRec.fecha_fin || null,
@@ -220,7 +226,7 @@ export default function Agenda({ session }) {
     if (error) setToast({ msg: 'Error', tipo: 'error' })
     else setToast({ msg: 'Sesión recurrente creada' })
     setModalRecurrente(false)
-    setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin:'', notas:'' })
+    setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin:'', notas:'', entrenador_id:'' })
     await cargar()
     setLoading(false)
   }
@@ -244,7 +250,8 @@ export default function Agenda({ session }) {
   async function confirmarSesionVirtual(sesion) {
     // Convertir sesión virtual en real
     const { error } = await supabase.from('sesiones').insert({
-      entrenador_id: uid, cliente_id: sesion.cliente_id,
+      entrenador_id: sesion.entrenador_id || uid, cliente_id: sesion.cliente_id,
+      centro_id: centro?.id || null,
       fecha: sesion.fecha, hora: sesion.hora, tipo: sesion.tipo,
       duracion_minutos: sesion.duracion_minutos, completada: true,
       notas: sesion.notas, es_recurrente: true, recurrente_id: sesion._recurrenteId
@@ -287,8 +294,12 @@ export default function Agenda({ session }) {
     setLoading(false)
   }
 
+  const sesionesFiltradas = useMemo(() =>
+    filtroEntrenador === 'todos' ? sesionesConRecurrentes : sesionesConRecurrentes.filter(s => s.entrenador_id === filtroEntrenador)
+  , [sesionesConRecurrentes, filtroEntrenador])
+
   // Stats de horas
-  const sesionesSemana = sesionesConRecurrentes.filter(s => s.fecha >= inicioSemana && s.fecha <= finSemana)
+  const sesionesSemana = sesionesFiltradas.filter(s => s.fecha >= inicioSemana && s.fecha <= finSemana)
   const sesCompletadasSemana = sesiones.filter(s => s.fecha >= inicioSemana && s.fecha <= finSemana && s.completada)
   const sesCompletadasMes = sesiones.filter(s => s.fecha >= inicioMes && s.completada)
   const horasAutoSemana = sesCompletadasSemana.reduce((s,x) => s + (x.duracion_minutos||60), 0)
@@ -373,7 +384,7 @@ export default function Agenda({ session }) {
       {vista === 'mes' && (
         <VistaMensual
           mesVista={mesVista} setMesVista={setMesVista}
-          sesiones={sesionesConRecurrentes} hoy={hoy}
+          sesiones={sesionesFiltradas} hoy={hoy}
           abrirModalEnDia={abrirModalEnDia} setSesionDetalle={setSesionDetalle}
           miembros={miembros} clienteColor={clienteColor}
         />
@@ -386,7 +397,7 @@ export default function Agenda({ session }) {
           <div className="w-12 flex-shrink-0" /> {/* espacio horas */}
           {diasSemana.map((dia, i) => {
             const esHoy = formatFecha(dia) === hoy
-            const nSes = sesionesConRecurrentes.filter(s => s.fecha === formatFecha(dia)).length
+            const nSes = sesionesFiltradas.filter(s => s.fecha === formatFecha(dia)).length
             return (
               <div key={i} className={`flex-1 text-center py-2 border-l border-black/5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoy ? 'bg-[#FF5C00]/5' : ''}`}
                 onClick={() => abrirModalEnDia(dia, '09:00')}>
@@ -415,7 +426,7 @@ export default function Agenda({ session }) {
             {diasSemana.map((dia, diaIdx) => {
               const fechaDia = formatFecha(dia)
               const esHoy = fechaDia === hoy
-              const sesionesDia = sesionesConRecurrentes.filter(s => s.fecha === fechaDia)
+              const sesionesDia = sesionesFiltradas.filter(s => s.fecha === fechaDia)
                 .sort((a,b) => (a.hora||'00:00').localeCompare(b.hora||'00:00'))
 
               return (
@@ -625,12 +636,34 @@ export default function Agenda({ session }) {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
-                <select value={form.cliente_id} onChange={e => setForm(f=>({...f,cliente_id:e.target.value}))}
+                <select value={form.cliente_id} onChange={e => {
+                    const cli = clientes.find(c => c.id === e.target.value)
+                    setForm(f => ({ ...f, cliente_id: e.target.value, entrenador_id: f.entrenador_id || cli?.entrenador_id || '' }))
+                  }}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               </div>
+              {centro && miembros?.length > 1 && (
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Asignar a</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {miembros.map(m => (
+                      <button key={m.id} type="button" onClick={() => setForm(f => ({ ...f, entrenador_id: m.user_id }))}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border"
+                        style={{
+                          color: (form.entrenador_id || uid) === m.user_id ? 'white' : (m.color || '#FF5C00'),
+                          background: (form.entrenador_id || uid) === m.user_id ? (m.color || '#FF5C00') : `${m.color || '#FF5C00'}10`,
+                          borderColor: (form.entrenador_id || uid) === m.user_id ? (m.color || '#FF5C00') : 'transparent'
+                        }}>
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: (form.entrenador_id || uid) === m.user_id ? 'white' : (m.color || '#FF5C00') }} />
+                        {(m.nombre || m.email?.split('@')[0])?.split(' ')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Hora</label>
@@ -681,12 +714,34 @@ export default function Agenda({ session }) {
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
-                <select value={formRec.cliente_id} onChange={e => setFormRec(f=>({...f,cliente_id:e.target.value}))}
+                <select value={formRec.cliente_id} onChange={e => {
+                    const cli = clientes.find(c => c.id === e.target.value)
+                    setFormRec(f => ({ ...f, cliente_id: e.target.value, entrenador_id: f.entrenador_id || cli?.entrenador_id || '' }))
+                  }}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               </div>
+              {centro && miembros?.length > 1 && (
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Asignar a</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {miembros.map(m => (
+                      <button key={m.id} type="button" onClick={() => setFormRec(f => ({ ...f, entrenador_id: m.user_id }))}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border"
+                        style={{
+                          color: (formRec.entrenador_id || uid) === m.user_id ? 'white' : (m.color || '#FF5C00'),
+                          background: (formRec.entrenador_id || uid) === m.user_id ? (m.color || '#FF5C00') : `${m.color || '#FF5C00'}10`,
+                          borderColor: (formRec.entrenador_id || uid) === m.user_id ? (m.color || '#FF5C00') : 'transparent'
+                        }}>
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: (formRec.entrenador_id || uid) === m.user_id ? 'white' : (m.color || '#FF5C00') }} />
+                        {(m.nombre || m.email?.split('@')[0])?.split(' ')[0]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Días de la semana *</label>
                 <div className="flex gap-1.5">
