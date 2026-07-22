@@ -25,7 +25,12 @@ function getLunes(fecha) {
   d.setHours(0,0,0,0)
   return d
 }
-function formatFecha(f) { return f.toISOString().split('T')[0] }
+function formatFecha(f) {
+  const y = f.getFullYear()
+  const m = String(f.getMonth()+1).padStart(2,'0')
+  const d = String(f.getDate()).padStart(2,'0')
+  return `${y}-${m}-${d}`
+}
 function horaAMin(h) { const [hh,mm] = h.split(':').map(Number); return hh*60+mm }
 function minAHora(m) { return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}` }
 function formatH(m) { const h=Math.floor(m/60),min=m%60; return min?`${h}h ${min}m`:`${h}h` }
@@ -115,8 +120,8 @@ export default function Agenda({ session }) {
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState(null)
   const [form, setForm] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'' })
-  const [formRec, setFormRec] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin:'', notas:'', entrenador_id:'' })
-  const [formExtra, setFormExtra] = useState({ fecha: new Date().toISOString().split('T')[0], concepto:'', horas:'1', tipo:'desplazamiento' })
+  const [formRec, setFormRec] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: formatFecha(new Date()), fecha_fin:'', notas:'', entrenador_id:'' })
+  const [formExtra, setFormExtra] = useState({ fecha: formatFecha(new Date()), concepto:'', horas:'1', tipo:'desplazamiento' })
   const [loading, setLoading] = useState(false)
   const [filtroEntrenador, setFiltroEntrenador] = useState('todos')
   const [mesVista, setMesVista] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -129,7 +134,7 @@ export default function Agenda({ session }) {
   const horaActual = new Date().getHours() + new Date().getMinutes()/60
   const inicioSemana = formatFecha(semanaBase)
   const finSemana = formatFecha(diasSemana[6])
-  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+  const inicioMes = formatFecha(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
   useEffect(() => { cargar() }, [uid, semanaBase])
 
@@ -141,7 +146,7 @@ export default function Agenda({ session }) {
   }, [vista])
 
   async function cargar() {
-    const hace60 = new Date(Date.now() - 60*864e5).toISOString().split('T')[0]
+    const hace60 = formatFecha(new Date(Date.now() - 60*864e5))
     const [{ data: se }, { data: cl }, { data: he }, { data: rc }] = await Promise.all([
       centro
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
@@ -226,7 +231,7 @@ export default function Agenda({ session }) {
     if (error) setToast({ msg: 'Error', tipo: 'error' })
     else setToast({ msg: 'Sesión recurrente creada' })
     setModalRecurrente(false)
-    setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: new Date().toISOString().split('T')[0], fecha_fin:'', notas:'', entrenador_id:'' })
+    setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: formatFecha(new Date()), fecha_fin:'', notas:'', entrenador_id:'' })
     await cargar()
     setLoading(false)
   }
@@ -289,7 +294,7 @@ export default function Agenda({ session }) {
     await supabase.from('horas_extra').insert({ entrenador_id: uid, ...formExtra, horas: Number(formExtra.horas) })
     setToast({ msg: 'Horas extra registradas' })
     setModalExtra(false)
-    setFormExtra({ fecha: new Date().toISOString().split('T')[0], concepto:'', horas:'1', tipo:'desplazamiento' })
+    setFormExtra({ fecha: formatFecha(new Date()), concepto:'', horas:'1', tipo:'desplazamiento' })
     await cargar()
     setLoading(false)
   }
@@ -573,7 +578,7 @@ export default function Agenda({ session }) {
                   {sesionDetalle.clientes?.nombre}
                 </button>
                 <p className="text-xs text-[#6B6B6B]">
-                  {new Date(sesionDetalle.fecha).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
+                  {new Date(sesionDetalle.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
                 </p>
               </div>
               <button onClick={() => { setSesionDetalle(null); setEditando(false) }} className="text-[#6B6B6B] text-xl">×</button>
