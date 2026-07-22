@@ -75,7 +75,12 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
     if (inv) {
       const enlace = `${window.location.origin}/unirse/${inv.token}`
       await navigator.clipboard.writeText(enlace)
-      showToast('Enlace de invitación copiado')
+      const { data, error } = await supabase.functions.invoke('invitar-miembro', { body: { invitacion_id: inv.id } })
+      if (error || !data?.ok) {
+        showToast('Enlace copiado, pero el email no se pudo enviar' + (data?.error ? ': ' + data.error : '') + '. Pásaselo tú directamente.', 'error')
+      } else {
+        showToast(`Invitación enviada a ${inv.email} — enlace también copiado por si acaso`)
+      }
     }
     setModalInvitar(false)
     setFormInvitar({ email:'', rol:'entrenador', nombre:'', color: COLORES[1] })
