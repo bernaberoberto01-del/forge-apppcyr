@@ -7,6 +7,8 @@ const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCas
 export default function EquipoTab({ centro, miembros, esAdmin, recargar, session, uid, showToast }) {
   if (!uid) return null
   const [statsEntrenadores, setStatsEntrenadores] = useState({})
+  const [pendientes, setPendientes] = useState([])
+  const [reenviando, setReenviando] = useState(null)
   const [modalInvitar, setModalInvitar] = useState(false)
   const [modalCrear, setModalCrear] = useState(false)
   const [formInvitar, setFormInvitar] = useState({ email:'', rol:'entrenador', nombre:'', color: COLORES[1] })
@@ -14,6 +16,14 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
   const [loading, setLoading] = useState(false)
 
   useEffect(() => { if (centro && miembros?.length) cargarStats() }, [centro, miembros])
+  useEffect(() => { if (centro) cargarPendientes() }, [centro])
+
+  async function cargarPendientes() {
+    if (!centro?.id) return
+    const { data } = await supabase.from('invitaciones_centro').select('*')
+      .eq('centro_id', centro.id).eq('usado', false).order('created_at', { ascending: false })
+    setPendientes(data || [])
+  }
 
   async function cargarStats() {
     if (!centro?.id) return
@@ -71,20 +81,43 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
   async function invitar() {
     if (!formInvitar.email || !centro) return
     setLoading(true)
-    const { data: inv } = await supabase.from('invitaciones_centro').insert({ centro_id: centro.id, email: formInvitar.email, rol: formInvitar.rol }).select().single()
-    if (inv) {
-      const enlace = `${window.location.origin}/unirse/${inv.token}`
-      await navigator.clipboard.writeText(enlace)
-      const { data, error } = await supabase.functions.invoke('invitar-miembro', { body: { invitacion_id: inv.id } })
-      if (error || !data?.ok) {
-        showToast('Enlace copiado, pero el email no se pudo enviar' + (data?.error ? ': ' + data.error : '') + '. Pásaselo tú directamente.', 'error')
-      } else {
-        showToast(`Invitación enviada a ${inv.email} — enlace también copiado por si acaso`)
-      }
+    const { data: inv, error: insErr } = await supabase.from('invitaciones_centro').insert({ centro_id: centro.id, email: formInvitar.email, rol: formInvitar.rol }).select().single()
+    if (insErr || !inv) {
+      showToast('No se pudo crear la invitación: ' + (insErr?.message || 'error desconocido'), 'error')
+      setLoading(false)
+      return
+    }
+    const enlace = `${window.location.origin}/unirse/${inv.token}`
+    try { await navigator.clipboard.writeText(enlace) } catch (_) {}
+    const { data, error } = await supabase.functions.invoke('invitar-miembro', { body: { invitacion_id: inv.id } })
+    if (error || !data?.ok) {
+      showToast('Invitación creada, pero el email no se pudo enviar' + (data?.error ? ': ' + data.error : '') + '. Usa "Reenviar" en Pendientes o pásale el enlace (copiado).', 'error')
+    } else {
+      showToast(`Invitación enviada a ${inv.email} — enlace también copiado por si acaso`)
     }
     setModalInvitar(false)
     setFormInvitar({ email:'', rol:'entrenador', nombre:'', color: COLORES[1] })
     setLoading(false)
+    await cargarPendientes()
+  }
+
+  async function reenviar(inv) {
+    setReenviando(inv.id)
+    try {
+      const enlace = `${window.location.origin}/unirse/${inv.token}`
+      try { await navigator.clipboard.writeText(enlace) } catch (_) {}
+      const { data, error } = await supabase.functions.invoke('invitar-miembro', { body: { invitacion_id: inv.id } })
+      if (error || !data?.ok) showToast('No se pudo reenviar' + (data?.error ? ': ' + data.error : '') + '. Enlace copiado igualmente.', 'error')
+      else showToast(`Reenviado a ${inv.email}`)
+    } catch (e) { showToast('Error al reenviar: ' + e.message, 'error') }
+    setReenviando(null)
+  }
+
+  async function cancelarInvitacion(inv) {
+    if (!confirm(`¿Cancelar la invitación a ${inv.email}?`)) return
+    await supabase.from('invitaciones_centro').delete().eq('id', inv.id)
+    showToast('Invitación cancelada')
+    await cargarPendientes()
   }
 
   async function cambiarColor(miembroId, color) {
@@ -159,6 +192,32 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
           </button>
         )}
       </div>
+
+      {/* Invitaciones pendientes */}
+      {esAdmin && pendientes.length > 0 && (
+        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+          <p className="text-xs font-semibold text-amber-700 mb-3">⏳ Pendientes de aceptar ({pendientes.length})</p>
+          <div className="space-y-2">
+            {pendientes.map(inv => (
+              <div key={inv.id} className="flex items-center gap-3 bg-white rounded-xl p-3">
+                <div className="w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{ini(inv.email)}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#0A0A0A] truncate">{inv.email}</p>
+                  <p className="text-xs text-[#6B6B6B]">{inv.rol === 'admin' ? 'Administrador/a' : 'Entrenador/a'} · invitado el {new Date(inv.created_at).toLocaleDateString('es-ES')}</p>
+                </div>
+                <div className="flex gap-1.5 flex-shrink-0">
+                  <button onClick={() => reenviar(inv)} disabled={reenviando === inv.id}
+                    className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:border-[#FF5C00] disabled:opacity-50">
+                    {reenviando === inv.id ? '⏳' : '📧 Reenviar'}
+                  </button>
+                  <button onClick={() => cancelarInvitacion(inv)}
+                    className="border border-black/15 text-[#6B6B6B] hover:text-red-500 hover:border-red-200 text-xs font-medium px-2.5 py-1.5 rounded-lg">×</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Lista entrenadores con horas */}
       <div className="space-y-2">
