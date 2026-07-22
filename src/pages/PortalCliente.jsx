@@ -86,6 +86,7 @@ export default function PortalCliente() {
   const [cancelando, setCancelando] = useState(null)
   const [motivoCancel, setMotivoCancel] = useState('')
   const [sesionesPortal, setSesionesPortal] = useState([])
+  const [entrenadoresSesion, setEntrenadoresSesion] = useState({})
   const [textoMsg, setTextoMsg] = useState('')
   const [enviandoMsg, setEnviandoMsg] = useState(false)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
@@ -141,6 +142,13 @@ export default function PortalCliente() {
       const hoy=new Date().toISOString().split('T')[0]
       const {data:sesFut}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).gte('fecha',hoy).eq('cancelada',false).order('fecha').order('hora').limit(8)
       setSesionesPortal(sesFut||[])
+      const idsEntrenadores=[...new Set((sesFut||[]).map(s=>s.entrenador_id).filter(id=>id&&id!==cl.entrenador_id))]
+      if(idsEntrenadores.length){
+        const {data:otrosCfg}=await supabase.from('configuracion').select('entrenador_id,nombre_entrenador,color_acento').in('entrenador_id',idsEntrenadores)
+        const mapa={}
+        ;(otrosCfg||[]).forEach(c=>{mapa[c.entrenador_id]=c})
+        setEntrenadoresSesion(mapa)
+      }
       setLoading(false)
     }
     cargar()
@@ -321,11 +329,18 @@ export default function PortalCliente() {
                         const esHoy=s.fecha===new Date().toISOString().split('T')[0]
                         const esMañana=s.fecha===new Date(Date.now()+864e5).toISOString().split('T')[0]
                         const label=esHoy?'Hoy':esMañana?'Mañana':new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
+                        const otroEntrenador=s.entrenador_id&&s.entrenador_id!==cliente?.entrenador_id?entrenadoresSesion[s.entrenador_id]:null
                         return(
                           <div key={s.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${esHoy?'bg-orange-50 border-orange-200':'bg-[#F7F6F3] border-transparent'}`}>
                             <div className="flex-1">
                               <p className={`text-sm font-semibold ${esHoy?'':'text-[#0A0A0A]'}`} style={esHoy?{color}:{}}>{label}</p>
                               <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos||60}min</p>
+                              {otroEntrenador&&(
+                                <p className="text-xs font-medium mt-0.5 flex items-center gap-1.5" style={{color:otroEntrenador.color_acento||'#FF5C00'}}>
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{background:otroEntrenador.color_acento||'#FF5C00'}} />
+                                  Con {otroEntrenador.nombre_entrenador||'tu entrenador'}
+                                </p>
+                              )}
                             </div>
                             <button onClick={()=>setCancelando(s)} className="text-xs text-[#6B6B6B] border border-black/10 px-3 py-1.5 rounded-lg hover:border-red-300 hover:text-red-500 transition-all bg-white">Cancelar</button>
                           </div>
