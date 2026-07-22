@@ -9,6 +9,8 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
   const [statsEntrenadores, setStatsEntrenadores] = useState({})
   const [pendientes, setPendientes] = useState([])
   const [reenviando, setReenviando] = useState(null)
+  const [modalNombre, setModalNombre] = useState(false)
+  const [nombreCentro, setNombreCentro] = useState('')
   const [modalInvitar, setModalInvitar] = useState(false)
   const [modalCrear, setModalCrear] = useState(false)
   const [formInvitar, setFormInvitar] = useState({ email:'', rol:'entrenador', nombre:'', color: COLORES[1] })
@@ -120,6 +122,17 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
     await cargarPendientes()
   }
 
+  async function guardarNombreCentro() {
+    if (!nombreCentro.trim() || !centro) return
+    setLoading(true)
+    const { error } = await supabase.from('centros').update({ nombre: nombreCentro.trim() }).eq('id', centro.id)
+    setLoading(false)
+    if (error) { showToast('No se pudo cambiar el nombre: ' + error.message, 'error'); return }
+    setModalNombre(false)
+    showToast('Nombre del centro actualizado')
+    recargar?.()
+  }
+
   async function cambiarColor(miembroId, color) {
     await supabase.from('miembros_centro').update({ color }).eq('id', miembroId)
     recargar?.()
@@ -181,9 +194,15 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
     <div className="space-y-4">
       {/* Header del centro */}
       <div className="bg-[#111] rounded-xl p-4 flex items-center justify-between">
-        <div>
-          <p className="text-white font-bold">{centro.nombre}</p>
-          <p className="text-white/40 text-xs">{(miembros||[]).length} entrenadores</p>
+        <div className="flex items-center gap-2">
+          <div>
+            <p className="text-white font-bold">{centro.nombre}</p>
+            <p className="text-white/40 text-xs">{(miembros||[]).length} entrenadores</p>
+          </div>
+          {esAdmin && (
+            <button onClick={() => { setNombreCentro(centro.nombre); setModalNombre(true) }}
+              className="text-white/40 hover:text-white text-sm p-1" title="Editar nombre del centro">✏️</button>
+          )}
         </div>
         {esAdmin && (
           <button onClick={()=>setModalInvitar(true)}
@@ -192,6 +211,25 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
           </button>
         )}
       </div>
+
+      {/* Modal editar nombre del centro */}
+      {modalNombre && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalNombre(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <h2 className="font-bold text-[#0A0A0A] mb-4">Editar nombre del centro</h2>
+            <input value={nombreCentro} onChange={e => setNombreCentro(e.target.value)} autoFocus
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+              placeholder="Nombre del centro" />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setModalNombre(false)} className="flex-1 border border-black/10 text-sm py-2.5 rounded-xl">Cancelar</button>
+              <button onClick={guardarNombreCentro} disabled={!nombreCentro.trim()||loading}
+                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                {loading?'Guardando...':'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Invitaciones pendientes */}
       {esAdmin && pendientes.length > 0 && (
