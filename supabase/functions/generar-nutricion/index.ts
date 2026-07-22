@@ -12,144 +12,155 @@ function parseJSON(raw: string): any {
   return null
 }
 
-const DIST: Record<number, {nombre:string;hora:string;pct:number}[]> = {
-  2: [{nombre:'Comida principal',hora:'13:00',pct:0.55},{nombre:'Cena',hora:'20:00',pct:0.45}],
-  3: [{nombre:'Desayuno',hora:'08:00',pct:0.30},{nombre:'Comida',hora:'14:00',pct:0.40},{nombre:'Cena',hora:'21:00',pct:0.30}],
-  4: [{nombre:'Desayuno',hora:'08:00',pct:0.25},{nombre:'Media manana',hora:'11:00',pct:0.15},{nombre:'Comida',hora:'14:00',pct:0.35},{nombre:'Cena',hora:'21:00',pct:0.25}],
-  5: [{nombre:'Desayuno',hora:'08:00',pct:0.20},{nombre:'Media manana',hora:'11:00',pct:0.15},{nombre:'Comida',hora:'14:00',pct:0.30},{nombre:'Merienda',hora:'17:30',pct:0.15},{nombre:'Cena',hora:'21:00',pct:0.20}],
-  6: [{nombre:'Desayuno',hora:'08:00',pct:0.18},{nombre:'Media manana',hora:'10:30',pct:0.12},{nombre:'Comida',hora:'13:30',pct:0.28},{nombre:'Merienda',hora:'17:00',pct:0.12},{nombre:'Pre-cena',hora:'19:30',pct:0.10},{nombre:'Cena',hora:'21:30',pct:0.20}],
+const DIST: Record<number,{nombre:string;hora:string;pct:number}[]> = {
+  2:[{nombre:'Comida principal',hora:'13:00',pct:0.55},{nombre:'Cena',hora:'20:00',pct:0.45}],
+  3:[{nombre:'Desayuno',hora:'08:00',pct:0.30},{nombre:'Comida',hora:'14:00',pct:0.40},{nombre:'Cena',hora:'21:00',pct:0.30}],
+  4:[{nombre:'Desayuno',hora:'08:00',pct:0.25},{nombre:'Media ma\u00f1ana',hora:'11:00',pct:0.15},{nombre:'Comida',hora:'14:00',pct:0.35},{nombre:'Cena',hora:'21:00',pct:0.25}],
+  5:[{nombre:'Desayuno',hora:'08:00',pct:0.20},{nombre:'Media ma\u00f1ana',hora:'11:00',pct:0.15},{nombre:'Comida',hora:'14:00',pct:0.30},{nombre:'Merienda',hora:'17:30',pct:0.15},{nombre:'Cena',hora:'21:00',pct:0.20}],
+  6:[{nombre:'Desayuno',hora:'08:00',pct:0.18},{nombre:'Media ma\u00f1ana',hora:'10:30',pct:0.12},{nombre:'Comida',hora:'13:30',pct:0.28},{nombre:'Merienda',hora:'17:00',pct:0.12},{nombre:'Pre-cena',hora:'19:30',pct:0.10},{nombre:'Cena',hora:'21:30',pct:0.20}],
 }
-const AYUNO = [{nombre:'Rotura del ayuno',hora:'12:00',pct:0.30},{nombre:'Comida principal',hora:'15:30',pct:0.40},{nombre:'Ultima comida',hora:'19:30',pct:0.30}]
+const AYUNO=[{nombre:'Rotura del ayuno',hora:'12:00',pct:0.30},{nombre:'Comida principal',hora:'15:30',pct:0.40},{nombre:'Ultima comida',hora:'19:30',pct:0.30}]
+
+function strOrDefault(v: any, def: string): string {
+  if (!v || String(v).trim() === '') return def
+  return String(v).trim()
+}
+function numOrDefault(v: any, def: number): number {
+  const n = Number(v)
+  return isNaN(n) || n <= 0 ? def : n
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   try {
-    // ── Autenticación: exigir JWT de usuario válido ──
     const token = (req.headers.get('Authorization') || '').replace('Bearer ', '')
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
-    if (authErr || !user) {
-      return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401, headers: CORS })
-    }
+    const { data:{ user }, error: authErr } = await supabase.auth.getUser(token)
+    if (authErr || !user) return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401, headers: CORS })
 
     const body = await req.json().catch(() => null)
-    const { cliente_id } = body || {}
+    const { cliente_id, instrucciones_extra } = body || {}
     if (!cliente_id) return new Response(JSON.stringify({ error: 'cliente_id requerido' }), { status: 400, headers: CORS })
     const key = Deno.env.get('ANTHROPIC_API_KEY')
-    if (!key) return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY no configurada' }), { status: 500, headers: CORS })
+    if (!key) return new Response(JSON.stringify({ error: 'Sin API key' }), { status: 500, headers: CORS })
 
-    const { data: cliente, error: clienteErr } = await supabase
-      .from('clientes').select('*').eq('id', cliente_id).single()
-    if (clienteErr || !cliente) return new Response(JSON.stringify({ error: 'Cliente no encontrado' }), { status: 404, headers: CORS })
-
-    // Autorización: el entrenador que llama debe ser dueño del cliente
-    if (cliente.entrenador_id !== user.id) {
-      return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
-    }
+    const { data: cliente } = await supabase.from('clientes').select('*').eq('id', cliente_id).single()
+    if (!cliente) return new Response(JSON.stringify({ error: 'Cliente no encontrado' }), { status: 404, headers: CORS })
+    if (cliente.entrenador_id !== user.id) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
 
     let q: any = {}
     try {
-      const { data: cuest } = await supabase
-        .from('cuestionarios_nutricion').select('*')
-        .eq('cliente_id', cliente_id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
+      const { data: cuest } = await supabase.from('cuestionarios_nutricion').select('*')
+        .eq('cliente_id', cliente_id).order('created_at', { ascending: false }).limit(1).single()
       if (cuest) q = cuest
     } catch (_) {}
 
-    const peso      = Number(q.peso || cliente.peso_actual || 75)
-    const altura    = Number(q.altura || 170)
-    const edad      = Number(q.edad || 30)
-    const sexo      = q.sexo || 'hombre'
-    const actividad = q.nivel_actividad || 'moderado'
-    const objetivo  = String(q.objetivo || cliente.objetivo || 'perdida_grasa').replace(/_/g,' ')
-    const dieta     = String(q.tipo_dieta || 'omnivora')
-    const alergias  = q.alergias || 'ninguna'
-    const noGusta   = q.alimentos_no_gustan || 'ninguno'
-    const favoritos = q.alimentos_favoritos || 'variado'
-    const suplementos  = q.suplementos || 'ninguno'
-    const entrenaWhen  = q.entrena_cuando || 'manana'
-    const comidasNum   = q.comidas_dia ? Number(q.comidas_dia) : 4
-    const tiempoCocina = q.tiempo_cocina || '30 minutos'
-    const esAyuno = dieta.includes('ayuno') || comidasNum === 0
+    // Valores seguros con defaults — nunca NaN ni null
+    const peso      = numOrDefault(q.peso || cliente.peso_actual, 75)
+    const altura    = numOrDefault(q.altura, 170)
+    const edad      = numOrDefault(q.edad, 30)
+    const sexo      = strOrDefault(q.sexo, 'hombre')
+    const actividad = strOrDefault(q.nivel_actividad, 'moderado')
+    const objetivoRaw = strOrDefault(q.objetivo || cliente.objetivo, 'perdida_grasa')
+    const objetivo  = objetivoRaw.replace(/_/g,' ')
+    const dieta     = strOrDefault(q.tipo_dieta, 'omnivora')
+    const alergias  = strOrDefault(q.alergias, 'ninguna')
+    const intolerancias = strOrDefault(q.intolerancias, 'ninguna')
+    const noGusta   = strOrDefault(q.alimentos_no_gustan, 'ninguno')
+    const favoritos = strOrDefault(q.alimentos_favoritos, 'variado')
+    const suplementos = strOrDefault(q.suplementos, 'ninguno').toLowerCase()
+    const tomaSuplementos = !['ninguno','no',''].includes(suplementos)
+    const entrenaWhen = strOrDefault(q.entrena_cuando, 'manana')
+    const comidasNum  = numOrDefault(q.comidas_dia, 4)
+    const tiempoCocina = strOrDefault(q.tiempo_cocina, '30 minutos')
+    const horarioComidas = strOrDefault(q.horario_comidas, '')
+    const notasCliente = strOrDefault(q.notas, '')
+    const notasEntrenador = strOrDefault(instrucciones_extra, '')
+    const esAyuno = dieta.includes('ayuno')
 
-    const TMB = sexo === 'mujer' ? 10*peso + 6.25*altura - 5*edad - 161 : 10*peso + 6.25*altura - 5*edad + 5
+    const esPerdida  = /grasa|perdida/.test(objetivoRaw)
+    const esGanancia = /muscular|ganancia/.test(objetivoRaw)
+
+    const TMB = sexo === 'mujer'
+      ? 10*peso + 6.25*altura - 5*edad - 161
+      : 10*peso + 6.25*altura - 5*edad + 5
     const factAct: Record<string,number> = { sedentario:1.2, ligero:1.375, moderado:1.55, activo:1.725, muy_activo:1.9 }
     const TDEE = Math.round(TMB * (factAct[actividad] || 1.55))
-    const ajuste = objetivo.includes('grasa') || objetivo.includes('perdida') ? -400
-                 : objetivo.includes('muscular') || objetivo.includes('ganancia') ? 300 : 0
-    const kcal = TDEE + ajuste
-    const prot = Math.round(peso * (objetivo.includes('muscular') ? 2.0 : 1.7))
+    const ajuste = esPerdida ? -400 : esGanancia ? 300 : 0
+    const kcal = Math.max(TDEE + ajuste, 1200) // nunca bajar de 1200
+    const prot = Math.round(peso * (esGanancia ? 2.2 : esPerdida ? 2.0 : 1.8))
     const gras = Math.round((kcal * 0.28) / 9)
-    const carb = Math.round((kcal - prot*4 - gras*9) / 4)
+    const carb = Math.max(Math.round((kcal - prot*4 - gras*9) / 4), 50)
     const hidratacion = Number((peso * 0.035).toFixed(1))
 
     const comidasDia = esAyuno ? 3 : Math.min(Math.max(comidasNum, 2), 6)
     const slots = esAyuno ? AYUNO : (DIST[comidasDia] || DIST[4])
     const estructura = slots.map(s => ({ ...s, kcal: Math.round(kcal * s.pct) }))
     const dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo']
-    const structureStr = estructura.map(s => s.nombre + ' (' + s.hora + '): ' + s.kcal + ' kcal').join(' | ')
+    const structureStr = estructura.map(s => `${s.nombre}(${s.hora}):${s.kcal}kcal`).join('|')
 
-    const system = 'Eres nutricionista deportivo. Responde SOLO con array JSON de 7 objetos. Sin texto adicional.'
-    const lines = [
-      'Menu semanal para: ' + sexo + ' ' + edad + 'a ' + peso + 'kg ' + altura + 'cm.',
-      'Objetivo: ' + objetivo + ' | Dieta: ' + dieta + ' | Actividad: ' + actividad,
-      kcal + ' kcal/dia | ' + prot + 'g prot | ' + carb + 'g carb | ' + gras + 'g gras',
-      'Sin: ' + alergias + ' | Evitar: ' + noGusta + ' | Incluir: ' + favoritos,
-      'Suplementos: ' + suplementos + ' | Cocina: ' + tiempoCocina,
-      esAyuno ? 'AYUNO 16:8: ventana 12:00-20:00. Nada antes de las 12h.' : '',
-      'Entrena: ' + entrenaWhen + '. Carbohidratos pre-entreno, proteina post-entreno.',
-      'Estructura FIJA ' + comidasDia + ' comidas/dia: ' + structureStr,
-      'Genera 7 dias variando alimentos. Mismos nombres/horas exactos. kcal exactas. Cantidades en gramos.',
-      'JSON: [{"dia":"Lunes","comidas":[{"nombre":"' + slots[0].nombre + '","hora":"' + slots[0].hora + '","kcal":' + estructura[0].kcal + ',"proteinas_g":40,"carbohidratos_g":50,"grasas_g":15,"alimentos":[{"nombre":"ejemplo","cantidad":"150g"}],"prep":"breve"}]}]'
-    ]
-    const prompt = lines.filter(Boolean).join('\n')
+    const prompt = [
+      `Menu semanal: ${sexo} ${edad}a ${peso}kg ${altura}cm. Objetivo:${objetivo}. Dieta:${dieta}. Act:${actividad}.`,
+      `${kcal}kcal ${esPerdida?'DEFICIT-400':''}${esGanancia?'SUPERAVIT+300':''} | ${prot}g prot | ${carb}g carb | ${gras}g gras.`,
+      `Alergias:${alergias}. Intolerancias:${intolerancias}. Evitar:${noGusta}. Incluir:${favoritos}. Cocina:${tiempoCocina}.`,
+      horarioComidas ? `Horario preferido de comidas:${horarioComidas}.` : '',
+      tomaSuplementos ? `Suplementos:${suplementos}.` : 'SIN suplementos.',
+      esAyuno ? 'AYUNO16:8 ventana 12-20h.' : '',
+      `Entrena:${entrenaWhen}. Carbs pre-entreno, proteina post.`,
+      `${comidasDia} comidas/dia FIJAS: ${structureStr}.`,
+      notasCliente ? `IMPORTANTE - Notas del cliente (prioridad alta, tenlas en cuenta siempre): ${notasCliente}.` : '',
+      notasEntrenador ? `IMPORTANTE - Instrucciones del entrenador para este plan (prioridad maxima, aplicar estrictamente): ${notasEntrenador}.` : '',
+      'Genera 7 dias variando alimentos. Cantidades en gramos. Preparacion breve (max 8 palabras).',
+      `JSON:[{"dia":"Lunes","comidas":[{"nombre":"${slots[0].nombre}","hora":"${slots[0].hora}","kcal":${estructura[0].kcal},"proteinas_g":30,"carbohidratos_g":40,"grasas_g":10,"alimentos":[{"nombre":"Ejemplo","cantidad":"150g"}],"prep":"Descripcion breve"}]}]`
+    ].filter(Boolean).join('\n')
 
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 4000, system, messages: [{ role: 'user', content: prompt }] })
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 8000,
+        system: 'Eres nutricionista deportivo. Responde SOLO con array JSON de 7 objetos. Sin texto adicional ni markdown. Se conciso en el campo prep (max 8 palabras). Las notas del cliente y las instrucciones del entrenador tienen prioridad sobre las preferencias por defecto.',
+        messages: [{ role: 'user', content: prompt }]
+      })
     })
+
     const aiData = await aiRes.json()
     if (!aiRes.ok) return new Response(JSON.stringify({ error: 'Anthropic: ' + (aiData.error?.message || aiRes.status) }), { status: 500, headers: CORS })
 
     const rawText = aiData.content?.[0]?.text || ''
     const menu = parseJSON(rawText)
     if (!menu || !Array.isArray(menu)) {
-      return new Response(JSON.stringify({ error: 'La IA no devolvio JSON valido', preview: rawText.slice(0,200) }), { status: 500, headers: CORS })
+      const truncado = aiData.stop_reason === 'max_tokens'
+      return new Response(JSON.stringify({ error: truncado ? 'Respuesta de IA cortada por limite de tokens' : 'JSON invalido de la IA', raw: rawText.slice(0,500), stop_reason: aiData.stop_reason }), { status: 500, headers: CORS })
     }
 
     const menuFinal = menu.slice(0,7).map((d: any, i: number) => ({ ...d, dia: dias[i] }))
 
     const recomendaciones = [
-      'Bebe ' + hidratacion + 'L de agua al dia (' + Math.round(hidratacion*1000/comidasDia) + 'ml por comida aproximadamente)',
-      esAyuno ? 'Durante el ayuno (20:00-12:00) solo agua, cafe o te sin azucar' : 'Come siempre a las mismas horas para regular el metabolismo',
-      objetivo.includes('grasa') || objetivo.includes('perdida') ? 'Prioriza proteina en cada comida para preservar musculo en deficit' : 'Mantén el superavit calorico constante y entrena con progresion de cargas',
-      'Duerme 7-9 horas: el descanso es parte fundamental del proceso de cambio corporal',
-      suplementos !== 'ninguno' ? 'Toma ' + suplementos + ' preferiblemente despues del entreno' : 'Prioriza alimentos reales sobre suplementos',
+      `Bebe ${hidratacion}L de agua al dia`,
+      esAyuno ? 'Ayuno 16:8: solo agua, cafe o te sin azucar fuera de la ventana' : 'Come siempre a las mismas horas',
+      esPerdida ? `Deficit de ${Math.abs(ajuste)}kcal/dia. Prioriza proteina en cada comida` : esGanancia ? `Superavit de ${ajuste}kcal/dia. Entrena con progresion de cargas` : 'Mantenimiento. Consistencia en ingesta y entrenamiento',
+      'Duerme 7-9 horas: fundamental para la recuperacion',
+      tomaSuplementos ? `${suplementos} preferiblemente post-entreno` : 'Plan sin suplementos. Prioriza alimentos reales',
     ]
 
-    const nombre = 'Plan ' + objetivo + ' - ' + peso + 'kg'
+    const nombre = `Plan ${objetivo} - ${peso}kg`
     const contenido = {
       nombre,
-      macros: { calorias_dia: kcal, proteinas_g: prot, carbohidratos_g: carb, grasas_g: gras, hidratacion_litros: hidratacion },
-      menu: menuFinal,
-      hidratacion,
-      recomendaciones,
-      notas: kcal + ' kcal/dia - ' + prot + 'g proteina - ' + comidasDia + ' comidas' + (esAyuno ? ' - Ayuno 16:8' : ''),
-      datos_calculo: { peso, altura, edad, sexo, actividad, TMB: Math.round(TMB), TDEE, ajuste }
+      macros: { calorias_dia:kcal, proteinas_g:prot, carbohidratos_g:carb, grasas_g:gras, hidratacion_litros:hidratacion },
+      menu: menuFinal, hidratacion, recomendaciones,
+      notas: `${kcal}kcal/dia - ${prot}g proteina - ${comidasDia} comidas${esAyuno?' - Ayuno 16:8':''}`,
+      datos_calculo: { peso, altura, edad, sexo, actividad, TMB:Math.round(TMB), TDEE, ajuste, objetivo:objetivoRaw }
     }
 
-    // Borrar TODOS los planes del cliente antes de crear el nuevo
     await supabase.from('planes_nutricion').delete().eq('cliente_id', cliente_id)
-
     const { data: saved, error: saveErr } = await supabase.from('planes_nutricion').insert({
       cliente_id, entrenador_id: cliente.entrenador_id, nombre, objetivo: cliente.objetivo,
-      calorias_dia: kcal, proteinas_g: prot, carbohidratos_g: carb, grasas_g: gras,
+      calorias_dia:kcal, proteinas_g:prot, carbohidratos_g:carb, grasas_g:gras,
       borrador: contenido, estado: 'borrador'
     }).select().single()
 
-    if (saveErr) return new Response(JSON.stringify({ error: 'Error guardando: ' + saveErr.message }), { status: 500, headers: CORS })
+    if (saveErr) return new Response(JSON.stringify({ error: 'Error guardando: '+saveErr.message }), { status: 500, headers: CORS })
     return new Response(JSON.stringify({ ok: true, plan: saved }), { headers: CORS })
 
   } catch (err: any) {
