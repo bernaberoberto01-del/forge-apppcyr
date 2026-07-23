@@ -230,6 +230,7 @@ export default function SesionCliente() {
   const [clienteSession, setClienteSession] = useState(undefined) // undefined=cargando, null=sin sesión, objeto=usuario
   const [clienteId, setClienteId] = useState(null) // derivado de la sesión
   const [cliente, setCliente] = useState(null)
+  const [marcasCliente, setMarcasCliente] = useState([])
   const [rutina, setRutina] = useState(null)
   const [loading, setLoading] = useState(true)
   const [enviado, setEnviado] = useState(false)
@@ -323,6 +324,7 @@ export default function SesionCliente() {
       ])
       if (ru?.[0]) {
         setRutina(ru[0])
+        setMarcasCliente(marcas || [])
         cargarDia(ru[0], 1, cl, marcas || [])
       }
       setLoading(false)
@@ -527,7 +529,7 @@ export default function SesionCliente() {
             <p className="text-sm font-bold text-[#0A0A0A] mb-3">¿Qué día de rutina es hoy?</p>
             <div className="space-y-2">
               {dias.map(dia => (
-                <button key={dia.dia} type="button" onClick={() => { setDiaSeleccionado(dia.dia); cargarDia(rutina, dia.dia) }}
+                <button key={dia.dia} type="button" onClick={() => { setDiaSeleccionado(dia.dia); cargarDia(rutina, dia.dia, cliente, marcasCliente) }}
                   className={`w-full p-3.5 rounded-xl border text-left transition-all ${diaSeleccionado === dia.dia ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/8 hover:border-black/20'}`}>
                   <p className={`text-sm font-semibold ${diaSeleccionado === dia.dia ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>{dia.nombre}</p>
                   <p className="text-xs text-[#6B6B6B] mt-0.5">{dia.ejercicios?.length} ejercicios · {dia.patron_principal}</p>
