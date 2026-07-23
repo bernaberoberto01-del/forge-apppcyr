@@ -363,6 +363,20 @@ export default function PortalCliente() {
                   </button>
                 ))}
 
+                {/* Aviso fotos de progreso desactualizadas */}
+                {(() => {
+                  const ultimaFoto = fotos[0]?.fecha
+                  const diasSinFoto = ultimaFoto ? Math.floor((Date.now()-new Date(ultimaFoto+'T12:00').getTime())/864e5) : 999
+                  if (diasSinFoto < 30) return null
+                  return (
+                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                      <span className="text-lg flex-shrink-0">📸</span>
+                      <p className="text-xs text-amber-700 flex-1">{diasSinFoto>900?'Aún no has subido ninguna foto de progreso':`Llevas ${diasSinFoto} días sin subir una foto de progreso`} — ayuda a ver los cambios reales.</p>
+                      <button onClick={()=>{setTab('progreso');setSubTabProgreso('fotos')}} className="text-xs font-semibold text-amber-700 flex-shrink-0">Subir →</button>
+                    </div>
+                  )
+                })()}
+
                 {/* Trabajo extra (presencial) */}
                 {cliente?.tipo==='presencial'&&tareasExtra.length>0&&(
                   <div className="bg-white rounded-2xl border border-black/6 p-5">
@@ -477,14 +491,17 @@ export default function PortalCliente() {
                 </button>
 
                 {/* Acciones online */}
-                {cliente?.tipo==='online'&&(
+                {cliente?.tipo==='online'&&(() => {
+                  const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
+                  const urgente = diasSin >= 7
+                  return (
                   <div className="grid grid-cols-2 gap-3">
                     <a href="/seguimiento"
-                      className="rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all"
-                      style={{background:color}}>
-                      <span className="text-2xl mb-2">📋</span>
+                      className={`rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
+                      style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
+                      <span className="text-2xl mb-2">{urgente?'⏰':'📋'}</span>
                       <p className="text-sm font-bold text-white">Check-in semanal</p>
-                      <p className="text-xs text-white/70 mt-0.5">Cómo te encuentras</p>
+                      <p className="text-xs text-white/70 mt-0.5">{urgente ? (diasSin>900?'Aún no has hecho ninguno':`${diasSin} días sin registrar`) : 'Cómo te encuentras'}</p>
                     </a>
                     <a href="/sesion"
                       className="bg-[#111] rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all">
@@ -493,21 +510,26 @@ export default function PortalCliente() {
                       <p className="text-xs text-white/50 mt-0.5">Apunta el entreno de hoy</p>
                     </a>
                   </div>
-                )}
+                  )
+                })()}
 
                 {/* Check-in presencial */}
-                {cliente?.tipo==='presencial'&&(
+                {cliente?.tipo==='presencial'&&(() => {
+                  const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
+                  const urgente = diasSin >= 7
+                  return (
                   <a href="/seguimiento"
-                    className="flex items-center gap-4 rounded-2xl p-5 active:scale-95 transition-all"
-                    style={{background:color}}>
-                    <span className="text-3xl">📋</span>
+                    className={`flex items-center gap-4 rounded-2xl p-5 active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
+                    style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
+                    <span className="text-3xl">{urgente?'⏰':'📋'}</span>
                     <div>
                       <p className="text-sm font-bold text-white">Check-in semanal</p>
-                      <p className="text-xs text-white/70">Cuéntame cómo va la semana</p>
+                      <p className="text-xs text-white/70">{urgente ? (diasSin>900?'Aún no has hecho ninguno — ¡empecemos!':`Llevas ${diasSin} días sin contarme cómo vas`) : 'Cuéntame cómo va la semana'}</p>
                     </div>
                     <span className="ml-auto text-white/70">→</span>
                   </a>
-                )}
+                  )
+                })()}
 
                 {/* Último check-in */}
                 {checkins[0]&&(
