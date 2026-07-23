@@ -86,6 +86,12 @@ export default function PortalCliente() {
   const [cancelando, setCancelando] = useState(null)
   const [motivoCancel, setMotivoCancel] = useState('')
   const [sesionesPortal, setSesionesPortal] = useState([])
+  const [pendientesValorar, setPendientesValorar] = useState([])
+  const [valorando, setValorando] = useState(null)
+  const [rpeVal, setRpeVal] = useState(7)
+  const [fatigaVal, setFatigaVal] = useState(2)
+  const [sensacionesVal, setSensacionesVal] = useState('')
+  const [guardandoValoracion, setGuardandoValoracion] = useState(false)
   const [entrenadoresSesion, setEntrenadoresSesion] = useState({})
   const [textoMsg, setTextoMsg] = useState('')
   const [enviandoMsg, setEnviandoMsg] = useState(false)
@@ -139,9 +145,13 @@ export default function PortalCliente() {
       setMensajes(ms.map(m => m.tipo === 'entrenador' ? {...m, leido: true} : m))
       setFotos(ft); setPlanNutricion(pn); if(cfg)setConfigEntrenador(cfg)
       setMarcas(mc); setHistorialMedidas(meds); setTieneCuestNutricion(tieneCuest)
-      const hoy=new Date().toISOString().split('T')[0]
+      const now=new Date(); const hoy=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
       const {data:sesFut}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).gte('fecha',hoy).eq('cancelada',false).order('fecha').order('hora').limit(8)
       setSesionesPortal(sesFut||[])
+      const hace7=new Date(now.getTime()-7*864e5); const hace7Str=`${hace7.getFullYear()}-${String(hace7.getMonth()+1).padStart(2,'0')}-${String(hace7.getDate()).padStart(2,'0')}`
+      const {data:sesPend}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).eq('tipo','presencial')
+        .gte('fecha',hace7Str).lte('fecha',hoy).eq('cancelada',false).is('rpe',null).order('fecha',{ascending:false}).limit(3)
+      setPendientesValorar(sesPend||[])
       const idsEntrenadores=[...new Set((sesFut||[]).map(s=>s.entrenador_id).filter(id=>id&&id!==cl.entrenador_id))]
       if(idsEntrenadores.length){
         const {data:otrosCfg}=await supabase.from('configuracion').select('entrenador_id,nombre_entrenador,color_acento').in('entrenador_id',idsEntrenadores)
@@ -165,6 +175,19 @@ export default function PortalCliente() {
 
   const color = configEntrenador?.color_acento||'#FF5C00'
   const mensajesNoLeidos = mensajes.filter(m=>!m.leido&&m.tipo==='entrenador').length
+
+  async function guardarValoracion(){
+    if(!valorando) return
+    setGuardandoValoracion(true)
+    const { error } = await supabase.from('sesiones').update({
+      rpe: rpeVal, fatiga_post: fatigaVal, sensaciones: sensacionesVal||null, completada: true
+    }).eq('id', valorando.id)
+    setGuardandoValoracion(false)
+    if(!error){
+      setPendientesValorar(prev => prev.filter(s => s.id !== valorando.id))
+      setValorando(null); setRpeVal(7); setFatigaVal(2); setSensacionesVal('')
+    }
+  }
 
   async function enviarMensaje(){
     if(!textoMsg.trim()||enviandoMsg) return
@@ -320,6 +343,21 @@ export default function PortalCliente() {
                   <p className="text-white/70 text-sm mt-2">{OBJ[cliente?.objetivo]||'Tu plan personalizado te espera'}</p>
                 </div>
 
+                {/* Sesiones presenciales pendientes de valorar */}
+                {cliente?.tipo==='presencial'&&pendientesValorar.map(s=>(
+                  <button key={s.id} onClick={()=>setValorando(s)}
+                    className="w-full bg-white rounded-2xl border-2 p-5 text-left transition-all hover:shadow-sm" style={{borderColor:color}}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{background:`${color}15`}}>💪</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-[#0A0A0A]">¿Cómo fue tu entreno del {new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}?</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5">Cuéntanos el esfuerzo y la fatiga · 20 segundos</p>
+                      </div>
+                      <span className="text-sm font-semibold flex-shrink-0" style={{color}}>Valorar →</span>
+                    </div>
+                  </button>
+                ))}
+
                 {/* Próximas sesiones presencial */}
                 {cliente?.tipo==='presencial'&&sesionesPortal.length>0&&(
                   <div className="bg-white rounded-2xl border border-black/6 p-5">
@@ -474,6 +512,47 @@ export default function PortalCliente() {
                           setSesionesPortal(prev=>prev.filter(s=>s.id!==cancelando.id))
                           setCancelando(null);setMotivoCancel('')
                         }} className="flex-1 text-white text-sm font-semibold py-3 rounded-xl" style={{background:'#ef4444'}}>Confirmar</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {valorando&&(
+                  <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>setValorando(null)}>
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+                      <h3 className="font-bold text-[#0A0A0A] text-lg mb-1">¿Cómo fue tu entreno?</h3>
+                      <p className="text-sm text-[#6B6B6B] mb-5">{new Date(valorando.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</p>
+
+                      <p className="text-sm font-bold text-[#0A0A0A] mb-1">Esfuerzo percibido (RPE): <span style={{color}}>{rpeVal}/10</span></p>
+                      <p className="text-xs text-[#6B6B6B] mb-3">1 = Muy suave · 10 = Al máximo</p>
+                      <div className="flex gap-1.5 flex-wrap mb-5">
+                        {[1,2,3,4,5,6,7,8,9,10].map(v=>(
+                          <button key={v} type="button" onClick={()=>setRpeVal(v)}
+                            className="w-8 h-8 rounded-lg text-xs font-bold transition-all"
+                            style={rpeVal===v?{background:color,color:'white'}:{background:'#F5F5F0',color:'#6B6B6B'}}>{v}</button>
+                        ))}
+                      </div>
+
+                      <p className="text-sm font-bold text-[#0A0A0A] mb-1">Fatiga muscular: <span style={{color}}>{fatigaVal}/5</span></p>
+                      <p className="text-xs text-[#6B6B6B] mb-3">1 = Fresco · 5 = Muy fatigado</p>
+                      <div className="flex gap-1.5 mb-5">
+                        {[1,2,3,4,5].map(v=>(
+                          <button key={v} type="button" onClick={()=>setFatigaVal(v)}
+                            className="flex-1 h-10 rounded-lg text-sm font-bold transition-all"
+                            style={fatigaVal===v?{background: v>=4?'#ef4444':color,color:'white'}:{background:'#F5F5F0',color:'#6B6B6B'}}>{v}</button>
+                        ))}
+                      </div>
+
+                      <textarea value={sensacionesVal} onChange={e=>setSensacionesVal(e.target.value)} rows={2}
+                        placeholder="¿Alguna sensación o molestia que contar? (opcional)"
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-5 resize-none"/>
+
+                      <div className="flex gap-2">
+                        <button onClick={()=>setValorando(null)} className="flex-1 border border-black/10 text-sm py-3 rounded-xl text-[#6B6B6B] font-medium">Ahora no</button>
+                        <button onClick={guardarValoracion} disabled={guardandoValoracion}
+                          className="flex-1 text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-50" style={{background:color}}>
+                          {guardandoValoracion?'Guardando...':'Guardar'}
+                        </button>
                       </div>
                     </div>
                   </div>

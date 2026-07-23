@@ -109,6 +109,7 @@ export default function Agenda({ session }) {
   const [vista, setVista] = useState('timeline') // timeline | mes
   const [modal, setModal] = useState(false)
   const [modalRecurrente, setModalRecurrente] = useState(false)
+  const [editandoRecId, setEditandoRecId] = useState(null)
   const [modalExtra, setModalExtra] = useState(false)
   const [modalResumen, setModalResumen] = useState(false)
   const [modalGestionRec, setModalGestionRec] = useState(false)
@@ -220,20 +221,35 @@ export default function Agenda({ session }) {
   async function guardarRecurrente() {
     if (!formRec.cliente_id || !formRec.dias_semana.length) return
     setLoading(true)
-    const { error } = await supabase.from('sesiones_recurrentes').insert({
+    const payload = {
       entrenador_id: formRec.entrenador_id || uid, cliente_id: formRec.cliente_id,
       centro_id: centro?.id || null,
       hora: formRec.hora, duracion_minutos: formRec.duracion_minutos,
       tipo: formRec.tipo, dias_semana: formRec.dias_semana,
       fecha_inicio: formRec.fecha_inicio, fecha_fin: formRec.fecha_fin || null,
-      notas: formRec.notas, activa: true
-    })
+      notas: formRec.notas
+    }
+    const { error } = editandoRecId
+      ? await supabase.from('sesiones_recurrentes').update(payload).eq('id', editandoRecId)
+      : await supabase.from('sesiones_recurrentes').insert({ ...payload, activa: true })
     if (error) setToast({ msg: 'Error', tipo: 'error' })
-    else setToast({ msg: 'Sesión recurrente creada' })
+    else setToast({ msg: editandoRecId ? 'Regla actualizada' : 'Sesión recurrente creada' })
     setModalRecurrente(false)
+    setEditandoRecId(null)
     setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: formatFecha(new Date()), fecha_fin:'', notas:'', entrenador_id:'' })
     await cargar()
     setLoading(false)
+  }
+
+  function editarRecurrente(r) {
+    setFormRec({
+      cliente_id: r.cliente_id, hora: r.hora, duracion_minutos: r.duracion_minutos,
+      tipo: r.tipo, dias_semana: r.dias_semana, fecha_inicio: r.fecha_inicio,
+      fecha_fin: r.fecha_fin || '', notas: r.notas || '', entrenador_id: r.entrenador_id || ''
+    })
+    setEditandoRecId(r.id)
+    setModalGestionRec(false)
+    setModalRecurrente(true)
   }
 
   async function guardarEdicion() {
@@ -378,7 +394,7 @@ export default function Agenda({ session }) {
             className="border border-[#6366f1]/30 text-[#6366f1] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-[#6366f1]/5">
             🔄 Recurrentes {recurrentes.length > 0 ? `(${recurrentes.length})` : ''}
           </button>
-          <button onClick={() => setModalRecurrente(true)}
+          <button onClick={() => { setEditandoRecId(null); setModalRecurrente(true) }}
             className="border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-[#FF5C00]/5">↻ Nueva regla</button>
         </div>
         <button onClick={() => { setDiaClick(hoy); setModal(true) }}
@@ -712,9 +728,9 @@ export default function Agenda({ session }) {
 
       {/* Modal sesión recurrente */}
       {modalRecurrente && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalRecurrente(false)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => { setModalRecurrente(false); setEditandoRecId(null) }}>
           <div className="bg-white rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h2 className="font-bold text-[#0A0A0A] mb-1">Nueva sesión recurrente</h2>
+            <h2 className="font-bold text-[#0A0A0A] mb-1">{editandoRecId ? 'Editar regla' : 'Nueva sesión recurrente'}</h2>
             <p className="text-xs text-[#6B6B6B] mb-4">Se repite automáticamente cada semana los días que selecciones</p>
             <div className="space-y-3">
               <div>
@@ -805,10 +821,10 @@ export default function Agenda({ session }) {
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setModalRecurrente(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
+              <button onClick={() => { setModalRecurrente(false); setEditandoRecId(null) }} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={guardarRecurrente} disabled={!formRec.cliente_id || !formRec.dias_semana.length || loading}
                 className="flex-1 bg-[#6366f1] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
-                {loading ? 'Guardando...' : '↻ Crear regla'}
+                {loading ? 'Guardando...' : editandoRecId ? '✓ Guardar cambios' : '↻ Crear regla'}
               </button>
             </div>
           </div>
@@ -835,6 +851,7 @@ export default function Agenda({ session }) {
                 </div>
               ) : recurrentes.map(r => {
                 const diasLabel = ['','Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+                const miem = miembros?.find(m => m.user_id === r.entrenador_id)
                 return (
                   <div key={r.id} className={`border rounded-xl p-3.5 ${r.activa ? 'border-[#6366f1]/20 bg-[#6366f1]/3' : 'border-black/5 bg-[#F5F5F0]'}`}>
                     <div className="flex items-start gap-2 mb-2">
@@ -844,12 +861,20 @@ export default function Agenda({ session }) {
                           {r.dias_semana.map(d=>diasLabel[d]).join('/')} · {r.hora} · {r.duracion_minutos}min
                         </p>
                         <p className="text-xs text-[#6B6B6B]">Desde {new Date(r.fecha_inicio+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}{r.fecha_fin ? ` hasta ${new Date(r.fecha_fin+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}` : ''}</p>
+                        {miem && (
+                          <p className="text-xs font-medium mt-1 flex items-center gap-1.5" style={{color: miem.color || '#FF5C00'}}>
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{background: miem.color || '#FF5C00'}} />
+                            {(miem.nombre || miem.email?.split('@')[0])?.split(' ')[0]}
+                          </p>
+                        )}
                       </div>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${r.activa?'bg-emerald-50 text-emerald-700':'bg-gray-100 text-gray-500'}`}>
                         {r.activa ? 'Activa' : 'Pausada'}
                       </span>
                     </div>
                     <div className="flex gap-2">
+                      <button onClick={() => editarRecurrente(r)}
+                        className="border border-black/10 text-xs px-3 py-1.5 rounded-lg text-[#6B6B6B] hover:bg-black/5">✏️ Editar</button>
                       <button onClick={() => pausarRecurrente(r.id, r.activa)}
                         className="flex-1 border border-black/10 text-xs font-medium py-1.5 rounded-lg text-[#6B6B6B] hover:bg-black/5">
                         {r.activa ? '⏸ Pausar' : '▶ Activar'}
