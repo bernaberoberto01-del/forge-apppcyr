@@ -45,6 +45,8 @@ export default function Clientes({ session }) {
   const [form, setForm] = useState(initForm)
   const [editId, setEditId] = useState(null)
   const [detalle, setDetalle] = useState(null)
+  const [tareasExtra, setTareasExtra] = useState([])
+  const [nuevaTarea, setNuevaTarea] = useState({ texto: '', frecuencia: '' })
   const [dTab, setDTab] = useState('resumen')
   const [dData, setDData] = useState({})
   const [loading, setLoading] = useState(false)
@@ -216,13 +218,34 @@ export default function Clientes({ session }) {
 
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen')
-    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }] = await Promise.all([
+    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('fotos_progreso').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
+      supabase.from('tareas_extra').select('*').eq('cliente_id', c.id).order('orden'),
     ])
     setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[] })
+    setTareasExtra(te||[])
+  }
+
+  async function anadirTarea() {
+    if (!nuevaTarea.texto.trim() || !detalle) return
+    const { data, error } = await supabase.from('tareas_extra').insert({
+      cliente_id: detalle.id, entrenador_id: uid, texto: nuevaTarea.texto.trim(),
+      frecuencia: nuevaTarea.frecuencia.trim() || null, orden: tareasExtra.length
+    }).select().single()
+    if (!error && data) { setTareasExtra(prev => [...prev, data]); setNuevaTarea({ texto:'', frecuencia:'' }) }
+  }
+
+  async function toggleTarea(t) {
+    setTareasExtra(prev => prev.map(x => x.id === t.id ? { ...x, activa: !x.activa } : x))
+    await supabase.from('tareas_extra').update({ activa: !t.activa }).eq('id', t.id)
+  }
+
+  async function borrarTarea(id) {
+    setTareasExtra(prev => prev.filter(x => x.id !== id))
+    await supabase.from('tareas_extra').delete().eq('id', id)
   }
 
   function abrirEditar(c) {
@@ -655,7 +678,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos']].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -916,6 +939,42 @@ export default function Clientes({ session }) {
                         {s.sensaciones && <p className="text-xs text-[#6B6B6B] mt-1.5 italic">"{s.sensaciones}"</p>}
                       </div>
                     ))}
+                </div>
+              )}
+              {dTab==='extra' && (
+                <div className="space-y-4">
+                  <div className="bg-[#F7F6F3] rounded-xl p-3.5">
+                    <p className="text-xs text-[#6B6B6B] mb-3">Tareas ligeras para complementar sus sesiones presenciales: paseos, movilidad, ejercicios en casa. Le aparecerán en su portal.</p>
+                    <div className="flex gap-2">
+                      <input value={nuevaTarea.texto} onChange={e=>setNuevaTarea(t=>({...t,texto:e.target.value}))}
+                        placeholder="Ej: Caminar 30 min"
+                        className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white" />
+                      <input value={nuevaTarea.frecuencia} onChange={e=>setNuevaTarea(t=>({...t,frecuencia:e.target.value}))}
+                        placeholder="Frecuencia (ej: 3x/sem)"
+                        className="w-32 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white" />
+                      <button onClick={anadirTarea} disabled={!nuevaTarea.texto.trim()}
+                        className="bg-[#FF5C00] text-white text-sm font-semibold px-4 rounded-xl disabled:opacity-40">+</button>
+                    </div>
+                  </div>
+                  {tareasExtra.length === 0 ? (
+                    <p className="text-sm text-[#6B6B6B] text-center py-6">Sin tareas asignadas todavía</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {tareasExtra.map(t => (
+                        <div key={t.id} className={`flex items-center gap-3 border rounded-xl p-3 ${t.activa?'border-black/6 bg-white':'border-black/5 bg-[#F5F5F0] opacity-60'}`}>
+                          <button onClick={()=>toggleTarea(t)}
+                            className={`w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center ${t.activa?'border-[#FF5C00] bg-[#FF5C00]':'border-black/20'}`}>
+                            {t.activa && <span className="text-white text-xs">✓</span>}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#0A0A0A]">{t.texto}</p>
+                            {t.frecuencia && <p className="text-xs text-[#6B6B6B]">{t.frecuencia}</p>}
+                          </div>
+                          <button onClick={()=>borrarTarea(t.id)} className="text-[#6B6B6B] hover:text-red-500 text-lg flex-shrink-0">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               {dTab==='pagos' && (

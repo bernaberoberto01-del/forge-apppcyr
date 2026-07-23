@@ -82,6 +82,7 @@ export default function PortalCliente() {
   const [configEntrenador, setConfigEntrenador] = useState(null)
   const [planNutricion, setPlanNutricion] = useState(null)
   const [tieneCuestNutricion, setTieneCuestNutricion] = useState(false)
+  const [tareasExtra, setTareasExtra] = useState([])
   const [diaActivoNutr, setDiaActivoNutr] = useState(0)
   const [cancelando, setCancelando] = useState(null)
   const [motivoCancel, setMotivoCancel] = useState('')
@@ -152,6 +153,10 @@ export default function PortalCliente() {
       const {data:sesPend}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).eq('tipo','presencial')
         .gte('fecha',hace7Str).lte('fecha',hoy).eq('cancelada',false).is('rpe',null).order('fecha',{ascending:false}).limit(3)
       setPendientesValorar(sesPend||[])
+      if (cl.tipo === 'presencial') {
+        const { data: tareas } = await supabase.from('tareas_extra').select('*').eq('cliente_id', cid).eq('activa', true).order('orden')
+        setTareasExtra(tareas||[])
+      }
       const idsEntrenadores=[...new Set((sesFut||[]).map(s=>s.entrenador_id).filter(id=>id&&id!==cl.entrenador_id))]
       if(idsEntrenadores.length){
         const {data:otrosCfg}=await supabase.from('configuracion').select('entrenador_id,nombre_entrenador,color_acento').in('entrenador_id',idsEntrenadores)
@@ -357,6 +362,25 @@ export default function PortalCliente() {
                     </div>
                   </button>
                 ))}
+
+                {/* Trabajo extra (presencial) */}
+                {cliente?.tipo==='presencial'&&tareasExtra.length>0&&(
+                  <div className="bg-white rounded-2xl border border-black/6 p-5">
+                    <p className="text-sm font-bold text-[#0A0A0A] mb-1">💡 Tu trabajo extra</p>
+                    <p className="text-xs text-[#6B6B6B] mb-3">Para complementar tus sesiones presenciales</p>
+                    <div className="space-y-2">
+                      {tareasExtra.map(t=>(
+                        <div key={t.id} className="flex items-center gap-3 bg-[#F7F6F3] rounded-xl px-3.5 py-2.5">
+                          <span className="text-lg flex-shrink-0">✓</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#0A0A0A]">{t.texto}</p>
+                            {t.frecuencia&&<p className="text-xs text-[#6B6B6B]">{t.frecuencia}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Próximas sesiones presencial */}
                 {cliente?.tipo==='presencial'&&sesionesPortal.length>0&&(
