@@ -545,8 +545,8 @@ export default function Rutinas({ session }) {
 
       {/* Modal detalle rutina — overlay móvil + panel fijo derecho escritorio */}
       {detalle && (
-        <div className="fixed inset-0 bg-black/50 z-50 md:bg-transparent md:inset-auto md:right-6 md:top-6 md:bottom-6 md:w-[440px]" onClick={() => setDetalle(null)}>
-          <div className="absolute inset-x-0 bottom-0 md:inset-0 bg-white rounded-t-2xl md:rounded-2xl md:shadow-2xl md:border md:border-black/8 overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/50 z-50 md:bg-transparent md:inset-auto md:right-0 md:top-0 md:bottom-0 md:w-[480px]" onClick={() => setDetalle(null)}>
+          <div className="absolute inset-x-0 bottom-0 md:inset-0 bg-white rounded-t-2xl md:rounded-none md:shadow-2xl md:border-l md:border-black/8 overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white z-10">
               <div>
                 <h2 className="font-bold text-[#0A0A0A] text-sm">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2>
