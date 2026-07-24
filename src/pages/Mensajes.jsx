@@ -76,6 +76,10 @@ export default function Mensajes({ session }) {
       setTexto('')
       setShowPlantillas(false)
       await cargarMensajes(seleccionado.id)
+      // Notificar al cliente por email (fire & forget — no bloquea el envío)
+      supabase.functions.invoke('notificar-mensaje', {
+        body: { cliente_id: seleccionado.id, tipo: 'mensaje_entrenador', preview: msg.slice(0, 200) }
+      }).catch(() => {})
     }
     setEnviando(false)
   }
