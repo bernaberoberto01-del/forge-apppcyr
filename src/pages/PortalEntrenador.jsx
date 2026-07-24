@@ -17,6 +17,7 @@ const TABS = [
   { id: 'semana', label: 'Semana', icon: '🗓' },
   { id: 'clientes', label: 'Clientes', icon: '👥' },
   { id: 'mensajes', label: 'Mensajes', icon: '✉️' },
+  { id: 'agenda', label: 'Agenda', icon: '⏱' },
 ]
 
 export default function PortalEntrenador({ session }) {
@@ -61,7 +62,20 @@ export default function PortalEntrenador({ session }) {
     const nlMsgs = (msgs||[]).filter(m => !m.leido && m.tipo !== 'entrenador').length
     setMensajesNL(nlMsgs)
 
-    setDatos({ sesHoy: sesHoy||[], sesSem: sesSem||[], clientes: clientes||[], msgs: msgs||[], horasSem: Math.round(horasSem*10)/10, sinCI, miembro })
+    // Alertas pendientes
+    const { data: alertas } = await supabase.from('alertas')
+      .select('id, tipo, mensaje, cliente_id')
+      .eq('entrenador_id', uid).eq('leida', false)
+      .order('created_at', { ascending: false }).limit(5)
+
+    // Ingresos del mes
+    const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0,0,0,0)
+    const { data: pagosHoy } = await supabase.from('pagos')
+      .select('importe').eq('entrenador_id', uid).gte('fecha', inicioMes.toISOString())
+
+    const ingresosMes = (pagosHoy||[]).reduce((s,p) => s + (p.importe||0), 0)
+
+    setDatos({ sesHoy: sesHoy||[], sesSem: sesSem||[], clientes: clientes||[], msgs: msgs||[], horasSem: Math.round(horasSem*10)/10, sinCI, miembro, alertas: alertas||[], ingresosMes })
     setLoading(false)
   }
 
@@ -112,21 +126,37 @@ export default function PortalEntrenador({ session }) {
         </div>
 
         {/* Stats rápidas */}
-        <div className="grid grid-cols-3 gap-2 mt-4">
+        <div className="grid grid-cols-4 gap-2 mt-4">
           {[
             [d.sesHoy.length, 'Hoy', acento],
-            [`${d.horasSem}h`, 'Esta semana', '#6366f1'],
+            [`${d.horasSem}h`, 'Semana', '#6366f1'],
             [d.clientes.length, 'Clientes', '#10b981'],
+            [`${d.ingresosMes||0}€`, 'Mes', '#f59e0b'],
           ].map(([v,l,c]) => (
             <div key={l} className="bg-white/5 rounded-2xl p-3 text-center">
-              <p className="text-xl font-bold text-white">{v}</p>
+              <p className="text-lg font-bold text-white">{v}</p>
               <p className="text-xs text-white/40 mt-0.5">{l}</p>
             </div>
           ))}
         </div>
 
+        {/* Alertas pendientes */}
+        {d.alertas?.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {d.alertas.slice(0,3).map(a => (
+              <div key={a.id} className="bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3 flex items-start gap-2">
+                <span className="text-sm flex-shrink-0 mt-0.5">⚠️</span>
+                <p className="text-xs text-amber-300 leading-relaxed">{a.mensaje}</p>
+              </div>
+            ))}
+            {d.alertas.length > 3 && (
+              <p className="text-xs text-white/30 text-center">+{d.alertas.length - 3} alertas más</p>
+            )}
+          </div>
+        )}
+
         {/* Alerta check-ins pendientes */}
-        {d.sinCI.length > 0 && (
+        {d.sinCI.length > 0 && !d.alertas?.length && (
           <div className="mt-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl px-4 py-3 flex items-center gap-3">
             <span className="text-lg flex-shrink-0">⚠️</span>
             <p className="text-xs text-amber-400 leading-relaxed">
@@ -364,6 +394,44 @@ function MiniChat({ clienteId, conv, uid, acento, onSend }) {
           </div>
         </div>
       )}
+
+        {/* AGENDA */}
+        {tab === 'agenda' && (
+          <div className="space-y-3">
+            <a href="/agenda"
+              className="flex items-center gap-4 rounded-2xl p-4 text-white border border-white/10 hover:bg-white/5 transition-all"
+              style={{background: `${acento}20`, borderColor: `${acento}40`}}>
+              <span className="text-3xl">📅</span>
+              <div>
+                <p className="font-bold">Abrir agenda completa</p>
+                <p className="text-xs text-white/40 mt-0.5">Vista semanal con timeline</p>
+              </div>
+              <span className="ml-auto text-white/40">→</span>
+            </a>
+            {/* Próximas sesiones */}
+            <p className="text-xs font-bold text-white/40 uppercase tracking-wide mt-4 mb-2">Esta semana</p>
+            {d.sesSem.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-white/30 text-sm">Sin sesiones esta semana</p>
+              </div>
+            ) : (
+              d.sesSem.map(s => (
+                <div key={s.id} className={`rounded-2xl p-3.5 border flex items-center gap-3 ${s.completada ? 'bg-white/3 border-white/5 opacity-60' : 'bg-white/8 border-white/10'}`}>
+                  <div className="text-center flex-shrink-0 w-10">
+                    <p className="text-xs text-white/40">{['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][new Date(s.fecha+'T12:00').getDay()]}</p>
+                    <p className="text-lg font-bold text-white">{new Date(s.fecha+'T12:00').getDate()}</p>
+                  </div>
+                  <div className="w-px h-8 bg-white/10 flex-shrink-0"/>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-semibold truncate ${s.completada ? 'text-white/40 line-through' : 'text-white'}`}>{s.clientes?.nombre}</p>
+                    <p className="text-xs text-white/40">{s.hora} · {s.duracion_minutos||60}min</p>
+                  </div>
+                  {s.completada && <span className="text-emerald-400 text-sm flex-shrink-0">✓</span>}
+                </div>
+              ))
+            )}
+          </div>
+        )}
     </div>
   )
 }
