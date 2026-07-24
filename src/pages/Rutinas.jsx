@@ -316,6 +316,8 @@ export default function Rutinas({ session }) {
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       {videoActivo && <VideoModal ejercicio={videoActivo} onClose={() => setVideoActivo(null)} />}
 
+      <div>
+
       {/* Cabecera con tabs principales */}
       <div className="flex items-start justify-between mb-5">
         <div>
@@ -540,17 +542,17 @@ export default function Rutinas({ session }) {
         </>
       )}
 
-      {/* ===== MODALES ===== */}
 
-      {/* Modal detalle rutina */}
+      {/* Modal detalle rutina — overlay móvil + panel fijo derecho escritorio */}
       {detalle && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setDetalle(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}><div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
+        <div className="fixed inset-0 bg-black/50 z-50 md:bg-transparent md:inset-auto md:right-6 md:top-6 md:bottom-6 md:w-[440px]" onClick={() => setDetalle(null)}>
+          <div className="absolute inset-x-0 bottom-0 md:inset-0 bg-white rounded-t-2xl md:rounded-2xl md:shadow-2xl md:border md:border-black/8 overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white z-10">
               <div>
-                <h2 className="font-bold text-[#0A0A0A]">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2>
+                <h2 className="font-bold text-[#0A0A0A] text-sm">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2>
                 <button onClick={() => setQuickView(detalle.cliente_id)} className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">{detalle.clientes?.nombre} →</button>
               </div>
-              <button onClick={() => { setDetalle(null); setModoEdicion(false); setRutinaBorrador(null) }} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
+              <button onClick={() => { setDetalle(null); setModoEdicion(false); setRutinaBorrador(null) }} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-xl">×</button>
             </div>
             <div className="p-4 space-y-3">
               {/* Barra modo edición */}
@@ -736,6 +738,9 @@ export default function Rutinas({ session }) {
           </div>
         </div>
       )}
+      </div>
+
+      {/* ===== MODALES ===== */}
 
       {/* Modal rutina manual */}
       {modalManual && (
