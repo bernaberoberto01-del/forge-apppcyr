@@ -129,6 +129,17 @@ export default function Agenda({ session }) {
   const { centro, miembros, esAdmin } = useCentro() || {}
   const timelineRef = useRef()
   const uid = session.user.id
+  const [pxH, setPxH] = useState(PIXELS_POR_HORA)
+
+  useEffect(() => {
+    function calcular() {
+      const disponible = Math.max(window.innerHeight - 220, HORAS.length * 40)
+      setPxH(Math.max(Math.floor(disponible / HORAS.length), 40))
+    }
+    calcular()
+    window.addEventListener('resize', calcular)
+    return () => window.removeEventListener('resize', calcular)
+  }, [])
 
   const diasSemana = useMemo(() => Array.from({length:7},(_,i)=>{ const d=new Date(semanaBase); d.setDate(d.getDate()+i); return d }), [semanaBase])
   const hoy = formatFecha(new Date())
@@ -484,15 +495,15 @@ export default function Agenda({ session }) {
           })}
         </div>
 
-        {/* Grid timeline - adapta al viewport, scroll solo si no cabe */}
-        <div ref={timelineRef} className="overflow-y-auto overflow-x-hidden relative"
-          style={{ height: 'calc(100vh - 220px)', minHeight: `${HORAS.length * PIXELS_POR_HORA}px` }}>
-          <div className="flex" style={{ height: HORAS.length * PIXELS_POR_HORA }}>
+        {/* Grid timeline - sin scroll en escritorio, scroll solo si no cabe */}
+        <div ref={timelineRef} className="overflow-y-auto overflow-x-hidden relative flex-1"
+          style={{ height: 'calc(100vh - 220px)' }}>
+          <div className="flex" style={{ height: HORAS.length * pxH }}>
             {/* Columna horas */}
             <div className="w-12 flex-shrink-0 relative">
               {HORAS.map(h => (
                 <div key={h} className="absolute flex items-start justify-end pr-2 w-full"
-                  style={{ top: (h - HORA_INICIO) * PIXELS_POR_HORA, height: PIXELS_POR_HORA }}>
+                  style={{ top: (h - HORA_INICIO) * pxH, height: pxH }}>
                   <span className="text-xs text-[#6B6B6B] -mt-2">{h}:00</span>
                 </div>
               ))}
@@ -507,18 +518,18 @@ export default function Agenda({ session }) {
 
               return (
                 <div key={diaIdx} className={`flex-1 border-l border-black/5 relative ${esHoy ? 'bg-[#FF5C00]/2' : ''}`}
-                  style={{ height: HORAS.length * PIXELS_POR_HORA }}>
+                  style={{ height: HORAS.length * pxH }}>
                   {/* Líneas de hora */}
                   {HORAS.map(h => (
                     <div key={h} className="absolute w-full border-t border-black/5 cursor-pointer hover:bg-black/3 transition-colors"
-                      style={{ top: (h - HORA_INICIO) * PIXELS_POR_HORA, height: PIXELS_POR_HORA }}
+                      style={{ top: (h - HORA_INICIO) * pxH, height: pxH }}
                       onClick={() => abrirModalEnDia(dia, `${String(h).padStart(2,'0')}:00`)} />
                   ))}
 
                   {/* Línea hora actual */}
                   {esHoy && horaActual >= HORA_INICIO && horaActual <= HORA_INICIO + HORAS.length && (
                     <div className="absolute w-full z-20 pointer-events-none"
-                      style={{ top: (horaActual - HORA_INICIO) * PIXELS_POR_HORA }}>
+                      style={{ top: (horaActual - HORA_INICIO) * pxH }}>
                       <div className="flex items-center">
                         <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 -ml-1" />
                         <div className="flex-1 h-px bg-red-500" />
@@ -568,9 +579,9 @@ export default function Agenda({ session }) {
 
                     return sesionesDia.map((s, idx) => {
                       const horaMin = horaAMin(s.hora || '09:00')
-                      const top = (horaMin / 60 - HORA_INICIO) * PIXELS_POR_HORA
+                      const top = (horaMin / 60 - HORA_INICIO) * pxH
                       const durMin = s.duracion_minutos || 60
-                      const height = Math.max((durMin / 60) * PIXELS_POR_HORA - 4, 36)
+                      const height = Math.max((durMin / 60) * pxH - 4, 24)
                       const entrenadorMiembro = miembros?.find(m => m.user_id === s.entrenador_id)
                       const color = entrenadorMiembro ? (entrenadorMiembro.color || clienteColor(s.cliente_id)) : clienteColor(s.cliente_id)
                       const esVirtual = s._esVirtual
