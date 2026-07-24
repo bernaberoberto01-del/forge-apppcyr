@@ -151,6 +151,12 @@ export default function Dashboard({ session }) {
         ))}
       </div>
 
+      {/* Layout 2 columnas en escritorio */}
+      <div className="md:grid md:grid-cols-3 md:gap-4 space-y-4 md:space-y-0">
+
+        {/* Columna izquierda — 2/3 */}
+        <div className="md:col-span-2 space-y-4">
+
       {/* Sesiones de hoy */}
       {sesionesHoy.length > 0 && (
         <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
@@ -181,7 +187,12 @@ export default function Dashboard({ session }) {
         </div>
       )}
 
-      {/* Gráfica ingresos */}
+        </div>{/* fin col-span-2 */}
+
+        {/* Columna derecha — 1/3 */}
+        <div className="space-y-4">
+
+        {/* Gráfica ingresos */}
       <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -324,6 +335,9 @@ export default function Dashboard({ session }) {
           </div>
         </div>
       )}
+
+        </div>{/* fin col derecha */}
+      </div>{/* fin grid 2 columnas */}
     </div>
   )
 }
