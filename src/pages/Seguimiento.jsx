@@ -38,6 +38,7 @@ export default function Seguimiento({ session }) {
   const [lanzandoMensual, setLanzandoMensual] = useState(false)
   const [borradores, setBorradores] = useState([])
   const [publicandoBorrador, setPublicandoBorrador] = useState(null)
+  const [rutinaBorradorExpandida, setRutinaBorradorExpandida] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [filtroAlerta, setFiltroAlerta] = useState('todos')
   const [detalleCI, setDetalleCI] = useState(null)
@@ -68,7 +69,7 @@ export default function Seguimiento({ session }) {
       supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(200),
       supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(300),
-      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'borrador').order('created_at', { ascending: false }),
+      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'borrador').order('created_at', { ascending: false }),
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
@@ -723,7 +724,10 @@ export default function Seguimiento({ session }) {
           ) : (
             <>
               <p className="text-sm font-bold text-[#0A0A0A]">{borradores.length} rutina{borradores.length > 1 ? 's' : ''} pendiente{borradores.length > 1 ? 's' : ''} de revisión</p>
-              {borradores.map(b => (
+              {borradores.map(b => {
+                const diasRutina = b.borrador?.dias || b.contenido?.dias || []
+                const expandida = rutinaBorradorExpandida === b.id
+                return (
                 <div key={b.id} className="bg-white rounded-2xl border border-black/6 p-4">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
@@ -738,6 +742,41 @@ export default function Seguimiento({ session }) {
                       <p className="text-sm text-[#0A0A0A] leading-relaxed">{b.notas_entrenador}</p>
                     </div>
                   )}
+
+                  {/* Vista previa de la rutina */}
+                  {diasRutina.length > 0 && (
+                    <div className="mb-3">
+                      <button onClick={() => setRutinaBorradorExpandida(expandida ? null : b.id)}
+                        className="w-full flex items-center justify-between text-xs font-semibold text-[#6B6B6B] bg-[#F7F6F3] px-3 py-2 rounded-xl hover:bg-black/5 transition-all">
+                        <span>👁 Ver rutina ({diasRutina.length} días)</span>
+                        <span>{expandida ? '▲' : '▼'}</span>
+                      </button>
+                      {expandida && (
+                        <div className="mt-2 space-y-2 max-h-80 overflow-y-auto">
+                          {diasRutina.map((dia, di) => (
+                            <div key={di} className="border border-black/6 rounded-xl overflow-hidden">
+                              <div className="bg-[#0A0A0A] px-3 py-2 flex items-center justify-between">
+                                <p className="text-white text-xs font-bold">{dia.nombre || `Día ${dia.dia}`}</p>
+                                <p className="text-white/40 text-xs">{dia.patron_principal}</p>
+                              </div>
+                              <div className="divide-y divide-black/5">
+                                {(dia.ejercicios || []).filter((e) => e.patron !== 'calentamiento' && e.patron !== 'movilidad').map((ej, ei) => (
+                                  <div key={ei} className="px-3 py-2 flex items-center justify-between">
+                                    <div>
+                                      <p className="text-xs font-medium text-[#0A0A0A]">{ej.nombre}</p>
+                                      {ej.notas && <p className="text-xs text-[#9B9B9B]">{ej.notas}</p>}
+                                    </div>
+                                    <p className="text-xs font-bold text-[#FF5C00] flex-shrink-0 ml-2">{ej.series}×{ej.reps}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <button onClick={() => setQuickView(b.cliente_id)}
                       className="flex-1 border border-black/10 text-[#6B6B6B] text-sm py-2.5 rounded-xl hover:bg-[#F7F6F3]">
@@ -745,10 +784,8 @@ export default function Seguimiento({ session }) {
                     </button>
                     <button onClick={async () => {
                       setPublicandoBorrador(b.id)
-                      // Archivar rutina publicada actual
                       await supabase.from('rutinas').update({ estado: 'archivada' })
                         .eq('cliente_id', b.cliente_id).eq('estado', 'publicada')
-                      // Publicar el borrador
                       await supabase.from('rutinas').update({ estado: 'publicada' }).eq('id', b.id)
                       setToast(`✓ Rutina de ${b.clientes?.nombre} publicada`)
                       setTimeout(() => setToast(''), 3000)
@@ -768,7 +805,8 @@ export default function Seguimiento({ session }) {
                     </button>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </>
           )}
         </div>
