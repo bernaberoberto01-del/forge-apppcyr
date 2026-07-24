@@ -106,7 +106,7 @@ export default function Agenda({ session }) {
   const [recurrentes, setRecurrentes] = useState([])
   const [clientes, setClientes] = useState([])
   const [horasExtra, setHorasExtra] = useState([])
-  const [vista, setVista] = useState('timeline') // timeline | mes
+  const [vista, setVista] = useState(() => window.innerWidth < 768 ? 'lista' : 'timeline')
   const [modal, setModal] = useState(false)
   const [modalRecurrente, setModalRecurrente] = useState(false)
   const [editandoRecId, setEditandoRecId] = useState(null)
@@ -140,6 +140,16 @@ export default function Agenda({ session }) {
     window.addEventListener('resize', calcular)
     return () => window.removeEventListener('resize', calcular)
   }, [])
+
+  // Scroll al día de hoy en vista lista
+  useEffect(() => {
+    if (vista === 'lista') {
+      setTimeout(() => {
+        const el = document.getElementById('dia-hoy')
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [vista])
 
   const diasSemana = useMemo(() => Array.from({length:7},(_,i)=>{ const d=new Date(semanaBase); d.setDate(d.getDate()+i); return d }), [semanaBase])
   const hoy = formatFecha(new Date())
@@ -424,48 +434,70 @@ export default function Agenda({ session }) {
 
       {/* VISTA LISTA — ideal para móvil */}
       {vista === 'lista' && (
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3">
           {diasSemana.map((dia, i) => {
             const fechaDia = formatFecha(dia)
             const esHoy = fechaDia === hoy
             const sesionesDia = sesionesFiltradas
               .filter(s => s.fecha === fechaDia)
               .sort((a,b) => (a.hora||'').localeCompare(b.hora||''))
+            const totalMin = sesionesDia.reduce((s, ses) => s + (ses.duracion_minutos || 60), 0)
             return (
-              <div key={i}>
-                <div className={`flex items-center justify-between mb-2 px-1 ${esHoy ? '' : ''}`}>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${esHoy ? 'bg-[#FF5C00] text-white' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+              <div key={i} id={esHoy ? 'dia-hoy' : undefined}>
+                {/* Cabecera del día */}
+                <div className={`flex items-center justify-between mb-2 px-1`}>
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${esHoy ? 'text-white' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}
+                      style={esHoy ? {background:'var(--acento,#FF5C00)'} : {}}>
                       {dia.getDate()}
                     </div>
-                    <p className={`text-sm font-semibold ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>
-                      {DIAS_LABEL[i]} {esHoy && '— Hoy'}
-                    </p>
+                    <div>
+                      <p className={`text-sm font-bold ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>
+                        {DIAS_LABEL[i]}{esHoy ? ' — Hoy' : ''}
+                      </p>
+                      {sesionesDia.length > 0 && (
+                        <p className="text-xs text-[#9B9B9B]">{sesionesDia.length} sesión{sesionesDia.length > 1 ? 'es' : ''} · {totalMin}min</p>
+                      )}
+                    </div>
                   </div>
                   <button onClick={() => abrirModalEnDia(dia, '09:00')}
-                    className="text-xs text-[#FF5C00] font-semibold border border-[#FF5C00]/30 px-2.5 py-1 rounded-lg">
-                    + Añadir
+                    className="w-8 h-8 flex items-center justify-center border border-black/10 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0] text-lg font-light">
+                    +
                   </button>
                 </div>
+
+                {/* Sesiones */}
                 {sesionesDia.length === 0 ? (
-                  <div className="bg-white border border-black/5 rounded-xl px-4 py-3">
-                    <p className="text-xs text-[#9B9B9B]">Sin sesiones</p>
+                  <div className="bg-white border border-dashed border-black/10 rounded-xl px-4 py-3 ml-11">
+                    <p className="text-xs text-[#C0C0C0]">Sin sesiones</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 ml-11">
                     {sesionesDia.map((s, si) => {
-                      const color = miembros?.find(m => m.id === s.entrenador_id)?.color || clienteColor(s.cliente_id)
+                      const color = miembros?.find(m => m.user_id === s.entrenador_id)?.color || clienteColor(s.cliente_id)
+                      const completada = s.completada
+                      const cancelada = s.cancelada
                       return (
                         <div key={si} onClick={() => setSesionDetalle(s)}
-                          className="bg-white border border-black/6 rounded-xl p-3.5 flex items-center gap-3 cursor-pointer hover:shadow-sm transition-all active:scale-[0.99]">
+                          className={`bg-white border rounded-xl p-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all ${completada ? 'border-emerald-100' : cancelada ? 'border-red-100 opacity-60' : 'border-black/6 hover:shadow-sm'}`}>
                           <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{background: color}} />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre || 'Cliente'}</p>
-                            <p className="text-xs text-[#6B6B6B] mt-0.5">{s.hora} · {s.duracion_min || 60} min</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos || 60}min</p>
+                              {s.tipo && s.tipo !== 'presencial' && (
+                                <span className="text-xs bg-[#6366f1]/10 text-[#6366f1] px-1.5 py-0.5 rounded-md font-medium">{s.tipo}</span>
+                              )}
+                            </div>
                           </div>
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.estado === 'completada' ? 'bg-emerald-50 text-emerald-700' : s.estado === 'cancelada' ? 'bg-red-50 text-red-500' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
-                            {s.estado === 'completada' ? '✓' : s.estado === 'cancelada' ? '✕' : s.hora}
-                          </span>
+                          <div className="flex-shrink-0">
+                            {completada
+                              ? <span className="w-7 h-7 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center text-sm">✓</span>
+                              : cancelada
+                              ? <span className="w-7 h-7 bg-red-50 text-red-400 rounded-lg flex items-center justify-center text-sm">✕</span>
+                              : <span className="text-xs font-bold text-[#6B6B6B] bg-[#F5F5F0] px-2 py-1 rounded-lg">{s.hora}</span>
+                            }
+                          </div>
                         </div>
                       )
                     })}
