@@ -6,7 +6,7 @@ import { useCentro } from '../hooks/useCentro.jsx'
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
 const HORA_INICIO = 6
-const PIXELS_POR_HORA = 108
+const PIXELS_POR_HORA = 64
 const TIPOS_EXTRA = [
   { id: 'desplazamiento', label: 'Desplazamiento', icon: '🚗' },
   { id: 'reunion', label: 'Reunión', icon: '🤝' },
@@ -142,7 +142,7 @@ export default function Agenda({ session }) {
   // Scroll al inicio del día laboral al montar
   useEffect(() => {
     if (timelineRef.current && vista === 'timeline') {
-      setTimeout(() => { timelineRef.current.scrollTop = (7-HORA_INICIO) * PIXELS_POR_HORA }, 100)
+      setTimeout(() => { timelineRef.current.scrollTop = 0 }, 100)
     }
   }, [vista])
 
@@ -343,7 +343,7 @@ export default function Agenda({ session }) {
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
 
       {/* Header fijo */}
-      <div className="bg-white border-b border-black/5 px-4 py-3 flex items-center gap-3 flex-shrink-0">
+      <div className="bg-white border-b border-black/5 px-4 py-2 flex items-center gap-3 flex-shrink-0">
         {/* Navegación semana */}
         <button onClick={() => setSemanaBase(d => { const n=new Date(d); n.setDate(n.getDate()-7); return n })}
           className="w-8 h-8 flex items-center justify-center border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">‹</button>
@@ -376,7 +376,7 @@ export default function Agenda({ session }) {
         <button onClick={() => setSemanaBase(getLunes(new Date()))}
           className="px-2 py-1 text-xs border border-black/10 rounded-lg text-[#6B6B6B] hover:bg-[#F5F5F0]">Hoy</button>
         <div className="flex gap-1 bg-black/5 p-0.5 rounded-lg">
-          {[['timeline','⏱'],['mes','📅']].map(([v,ic]) => (
+          {[['lista','☰'],['timeline','⏱'],['mes','📅']].map(([v,ic]) => (
             <button key={v} onClick={() => setVista(v)}
               className={`px-2 py-1 text-xs rounded-md transition-all ${vista===v?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
               {ic}
@@ -411,8 +411,62 @@ export default function Agenda({ session }) {
         />
       )}
 
-      {/* TIMELINE */}
-      <div className={`flex-1 overflow-hidden flex flex-col ${vista === 'mes' ? 'hidden' : ''}`}>
+      {/* VISTA LISTA — ideal para móvil */}
+      {vista === 'lista' && (
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {diasSemana.map((dia, i) => {
+            const fechaDia = formatFecha(dia)
+            const esHoy = fechaDia === hoy
+            const sesionesDia = sesionesFiltradas
+              .filter(s => s.fecha === fechaDia)
+              .sort((a,b) => (a.hora||'').localeCompare(b.hora||''))
+            return (
+              <div key={i}>
+                <div className={`flex items-center justify-between mb-2 px-1 ${esHoy ? '' : ''}`}>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${esHoy ? 'bg-[#FF5C00] text-white' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                      {dia.getDate()}
+                    </div>
+                    <p className={`text-sm font-semibold ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>
+                      {DIAS_LABEL[i]} {esHoy && '— Hoy'}
+                    </p>
+                  </div>
+                  <button onClick={() => abrirModalEnDia(dia, '09:00')}
+                    className="text-xs text-[#FF5C00] font-semibold border border-[#FF5C00]/30 px-2.5 py-1 rounded-lg">
+                    + Añadir
+                  </button>
+                </div>
+                {sesionesDia.length === 0 ? (
+                  <div className="bg-white border border-black/5 rounded-xl px-4 py-3">
+                    <p className="text-xs text-[#9B9B9B]">Sin sesiones</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {sesionesDia.map((s, si) => {
+                      const color = miembros?.find(m => m.id === s.entrenador_id)?.color || clienteColor(s.cliente_id)
+                      return (
+                        <div key={si} onClick={() => setSesionDetalle(s)}
+                          className="bg-white border border-black/6 rounded-xl p-3.5 flex items-center gap-3 cursor-pointer hover:shadow-sm transition-all active:scale-[0.99]">
+                          <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{background: color}} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre || 'Cliente'}</p>
+                            <p className="text-xs text-[#6B6B6B] mt-0.5">{s.hora} · {s.duracion_min || 60} min</p>
+                          </div>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.estado === 'completada' ? 'bg-emerald-50 text-emerald-700' : s.estado === 'cancelada' ? 'bg-red-50 text-red-500' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                            {s.estado === 'completada' ? '✓' : s.estado === 'cancelada' ? '✕' : s.hora}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {/* VISTA TIMELINE */}
+      {vista === 'timeline' && (<>
         {/* Cabecera días */}
         <div className="bg-white border-b border-black/5 flex flex-shrink-0">
           <div className="w-12 flex-shrink-0" /> {/* espacio horas */}
@@ -420,18 +474,19 @@ export default function Agenda({ session }) {
             const esHoy = formatFecha(dia) === hoy
             const nSes = sesionesFiltradas.filter(s => s.fecha === formatFecha(dia)).length
             return (
-              <div key={i} className={`flex-1 text-center py-2 border-l border-black/5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoy ? 'bg-[#FF5C00]/5' : ''}`}
+              <div key={i} className={`flex-1 text-center py-1.5 border-l border-black/5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoy ? 'bg-[#FF5C00]/5' : ''}`}
                 onClick={() => abrirModalEnDia(dia, '09:00')}>
                 <p className={`text-xs font-medium ${esHoy ? 'text-[#FF5C00]' : 'text-[#6B6B6B]'}`}>{DIAS_LABEL[i]}</p>
-                <p className={`text-sm font-bold ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>{dia.getDate()}</p>
-                {nSes > 0 && <div className={`w-1.5 h-1.5 rounded-full mx-auto mt-0.5 ${esHoy ? 'bg-[#FF5C00]' : 'bg-black/30'}`} />}
+                <p className={`text-sm font-bold leading-tight ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>{dia.getDate()}</p>
+                {nSes > 0 && <div className={`w-1 h-1 rounded-full mx-auto mt-0.5 ${esHoy ? 'bg-[#FF5C00]' : 'bg-black/30'}`} />}
               </div>
             )
           })}
         </div>
 
-        {/* Grid timeline scrollable */}
-        <div ref={timelineRef} className="flex-1 overflow-y-auto overflow-x-hidden relative">
+        {/* Grid timeline - adapta al viewport, scroll solo si no cabe */}
+        <div ref={timelineRef} className="overflow-y-auto overflow-x-hidden relative"
+          style={{ height: 'calc(100vh - 220px)', minHeight: `${HORAS.length * PIXELS_POR_HORA}px` }}>
           <div className="flex" style={{ height: HORAS.length * PIXELS_POR_HORA }}>
             {/* Columna horas */}
             <div className="w-12 flex-shrink-0 relative">
@@ -577,7 +632,7 @@ export default function Agenda({ session }) {
             })}
           </div>
         </div>
-      </div>
+      </>)}
 
       {/* Modal detalle sesión */}
       {sesionDetalle && (
