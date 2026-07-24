@@ -26,6 +26,8 @@ export default function Nutricion({ session }) {
   const [cuests, setCuests] = useState([])
   const [generando, setGenerando] = useState(null)
   const [detalle, setDetalle] = useState(null)
+  const [editandoComida, setEditandoComida] = useState(null) // { diaIdx, comidaIdx }
+  const [editComidaData, setEditComidaData] = useState(null) // copia editable de la comida
   const [diaActivo, setDiaActivo] = useState(0)
   const [notasEdit, setNotasEdit] = useState('')
   const [instruccionesIA, setInstruccionesIA] = useState('')
@@ -227,7 +229,7 @@ export default function Nutricion({ session }) {
           const hoy = new Date().toLocaleDateString('es-ES',{weekday:'long'}).replace(/^\w/,c=>c.toUpperCase())
           const diaHoy = menu.find(d => d.dia === hoy) || menu[0]
           return (
-          <div key={p.id} onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(''); setDiaActivo(0) }}
+          <div key={p.id} onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(p.borrador?.instrucciones_guardadas||p.contenido?.instrucciones_guardadas||''); setDiaActivo(0) }}
             className="bg-white rounded-2xl border border-black/5 shadow-sm hover:shadow-md hover:border-[#FF5C00]/20 transition-all cursor-pointer">
             {/* Header con objetivo */}
             <div className="px-4 pt-4 pb-3 border-b border-black/5">
@@ -289,7 +291,7 @@ export default function Nutricion({ session }) {
             {/* Acciones */}
             <div className="px-4 pb-3 flex gap-2" onClick={e=>e.stopPropagation()}>
               {p.estado==='borrador' && (
-                <button onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(''); setDiaActivo(0) }}
+                <button onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(p.borrador?.instrucciones_guardadas||p.contenido?.instrucciones_guardadas||''); setDiaActivo(0) }}
                   className="flex-1 bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl">
                   Revisar y publicar →
                 </button>
@@ -352,33 +354,96 @@ export default function Nutricion({ session }) {
                 if (!diaData) return <p className="text-sm text-[#6B6B6B] text-center py-4">Sin datos para este día</p>
                 return (
                   <div className="space-y-2">
-                    {(diaData.comidas || []).map((comida, i) => (
+                    {(diaData.comidas || []).map((comida, i) => {
+                      const estaEditando = editandoComida?.diaIdx === diaActivo && editandoComida?.comidaIdx === i
+                      return (
                       <div key={i} className="border border-black/8 rounded-xl overflow-hidden">
                         <div className="bg-[#0A0A0A] px-4 py-2.5 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <span className="text-white font-semibold text-sm">{comida.nombre}</span>
                             <span className="text-white/40 text-xs">{comida.hora}</span>
                           </div>
-                          <div className="flex gap-2 text-xs text-white/60">
-                            <span>{comida.calorias}kcal</span>
-                            <span>P:{comida.proteinas_g}g</span>
+                          <div className="flex items-center gap-3">
+                            <div className="flex gap-2 text-xs text-white/60">
+                              <span>{comida.kcal||comida.calorias||0}kcal</span>
+                              <span>P:{comida.proteinas_g||0}g</span>
+                            </div>
+                            <button onClick={() => {
+                              if (estaEditando) { setEditandoComida(null); setEditComidaData(null) }
+                              else { setEditandoComida({ diaIdx: diaActivo, comidaIdx: i }); setEditComidaData(JSON.parse(JSON.stringify(comida))) }
+                            }} className="text-white/50 hover:text-white text-xs px-1.5 py-0.5 rounded border border-white/20 hover:border-white/40 transition-all">
+                              {estaEditando ? '✕' : '✏️'}
+                            </button>
                           </div>
                         </div>
-                        <div className="p-3 space-y-1.5">
-                          {(comida.alimentos || []).map((al, j) => (
-                            <div key={j} className="flex items-center justify-between text-sm">
-                              <span className="text-[#0A0A0A]">{al.nombre}</span>
-                              <span className="text-[#6B6B6B] text-xs font-medium">{al.cantidad}</span>
+
+                        {estaEditando && editComidaData ? (
+                          <div className="p-3 space-y-2 bg-amber-50">
+                            <p className="text-xs font-semibold text-amber-700 mb-2">✏️ Editando {comida.nombre}</p>
+                            {(editComidaData.alimentos || []).map((al, j) => (
+                              <div key={j} className="flex gap-2 items-center">
+                                <input value={al.nombre} onChange={e => {
+                                  const copy = JSON.parse(JSON.stringify(editComidaData))
+                                  copy.alimentos[j].nombre = e.target.value
+                                  setEditComidaData(copy)
+                                }} className="flex-1 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="Alimento"/>
+                                <input value={al.cantidad} onChange={e => {
+                                  const copy = JSON.parse(JSON.stringify(editComidaData))
+                                  copy.alimentos[j].cantidad = e.target.value
+                                  setEditComidaData(copy)
+                                }} className="w-24 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="150g"/>
+                                <button onClick={() => {
+                                  const copy = JSON.parse(JSON.stringify(editComidaData))
+                                  copy.alimentos.splice(j, 1)
+                                  setEditComidaData(copy)
+                                }} className="text-red-400 hover:text-red-600 text-sm px-1">×</button>
+                              </div>
+                            ))}
+                            <button onClick={() => {
+                              const copy = JSON.parse(JSON.stringify(editComidaData))
+                              copy.alimentos.push({ nombre: '', cantidad: '' })
+                              setEditComidaData(copy)
+                            }} className="text-xs text-[#FF5C00] font-semibold">+ Añadir alimento</button>
+                            <div>
+                              <label className="text-xs text-amber-700 font-medium block mb-1">Preparación</label>
+                              <input value={editComidaData.prep||''} onChange={e => setEditComidaData({...editComidaData, prep: e.target.value})}
+                                className="w-full border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="Breve descripción..."/>
                             </div>
-                          ))}
-                          {comida.prep && (
-                            <p className="text-xs text-[#6B6B6B] border-t border-black/5 pt-2 mt-2 leading-relaxed">
-                              🍳 {comida.prep}
-                            </p>
-                          )}
-                        </div>
+                            <div className="flex gap-2 pt-1">
+                              <button onClick={async () => {
+                                // Guardar cambios en el borrador
+                                const planActual = JSON.parse(JSON.stringify(detalle.borrador || detalle.contenido))
+                                planActual.menu[diaActivo].comidas[i] = editComidaData
+                                const { error } = await supabase.from('planes_nutricion').update({ borrador: planActual }).eq('id', detalle.id)
+                                if (!error) {
+                                  setDetalle({ ...detalle, borrador: planActual })
+                                  setEditandoComida(null); setEditComidaData(null)
+                                  setToast('✓ Comida actualizada')
+                                  setTimeout(() => setToast(''), 2500)
+                                  cargar()
+                                }
+                              }} className="flex-1 bg-[#FF5C00] text-white text-xs font-bold py-2 rounded-lg">Guardar cambios</button>
+                              <button onClick={() => { setEditandoComida(null); setEditComidaData(null) }}
+                                className="border border-black/10 text-[#6B6B6B] text-xs px-3 py-2 rounded-lg">Cancelar</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 space-y-1.5">
+                            {(comida.alimentos || []).map((al, j) => (
+                              <div key={j} className="flex items-center justify-between text-sm">
+                                <span className="text-[#0A0A0A]">{al.nombre}</span>
+                                <span className="text-[#6B6B6B] text-xs font-medium">{al.cantidad}</span>
+                              </div>
+                            ))}
+                            {comida.prep && (
+                              <p className="text-xs text-[#6B6B6B] border-t border-black/5 pt-2 mt-2 leading-relaxed">
+                                🍳 {comida.prep}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )})}
                   </div>
                 )
               })()}
