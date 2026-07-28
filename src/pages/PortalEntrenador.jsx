@@ -39,43 +39,55 @@ export default function PortalEntrenador({ session }) {
     const [
       { data: sesHoy },
       { data: sesSem },
-      { data: clientes },
+      { data: clientesPropios },
       { data: msgs },
       { data: miembro },
     ] = await Promise.all([
-      supabase.from('sesiones').select('*, clientes(nombre,objetivo,tipo)').eq('entrenador_id', uid).eq('fecha', hoy).eq('cancelada', false).order('hora'),
-      supabase.from('sesiones').select('*, clientes(nombre)').eq('entrenador_id', uid).gte('fecha', lunes).lte('fecha', domingo).eq('cancelada', false).order('fecha').order('hora'),
+      supabase.from('sesiones').select('*, clientes(id,nombre,objetivo,tipo)').eq('entrenador_id', uid).eq('fecha', hoy).eq('cancelada', false).order('hora'),
+      supabase.from('sesiones').select('*, clientes(id,nombre,objetivo,tipo)').eq('entrenador_id', uid).gte('fecha', lunes).lte('fecha', domingo).eq('cancelada', false).order('fecha').order('hora'),
       supabase.from('clientes').select('id,nombre,objetivo,estado,peso_actual,peso_objetivo,tipo,nivel').eq('entrenador_id', uid).eq('estado', 'activo').order('nombre'),
       supabase.from('mensajes_cliente').select('*, clientes(nombre)').eq('entrenador_id', uid).order('created_at', { ascending: false }).limit(30),
       supabase.from('miembros_centro').select('*, centros(nombre,color_acento)').eq('user_id', uid).eq('activo', true).limit(1).maybeSingle(),
     ])
 
-    // Horas semana
+    // Incluir clientes del centro asignados en sesiones aunque no sean propios
+    const idsEnSesiones = new Set([...(sesHoy||[]), ...(sesSem||[])].map(s => s.cliente_id).filter(Boolean))
+    const idsPropios = new Set((clientesPropios||[]).map(c => c.id))
+    const idsExtra = [...idsEnSesiones].filter(id => !idsPropios.has(id))
+
+    let clientesExtra = []
+    if (idsExtra.length > 0) {
+      const { data: extra } = await supabase.from('clientes')
+        .select('id,nombre,objetivo,estado,peso_actual,peso_objetivo,tipo,nivel')
+        .in('id', idsExtra).eq('estado', 'activo')
+      clientesExtra = extra || []
+    }
+
+    const clientes = [...(clientesPropios||[]), ...clientesExtra]
     const horasSem = (sesSem||[]).filter(s=>s.completada).reduce((s,x)=>s+(x.duracion_minutos||60),0)/60
 
-    // Checkins pendientes
     const hace7 = new Date(Date.now()-7*864e5).toISOString().split('T')[0]
-    const { data: checkins } = await supabase.from('checkins').select('cliente_id').eq('entrenador_id', uid).gte('fecha', hace7)
+    const todosIds = clientes.map(c=>c.id)
+    const { data: checkins } = todosIds.length > 0
+      ? await supabase.from('checkins').select('cliente_id').in('cliente_id', todosIds).gte('fecha', hace7)
+      : { data: [] }
     const conCI = new Set((checkins||[]).map(c=>c.cliente_id))
-    const sinCI = (clientes||[]).filter(c => !conCI.has(c.id))
+    const sinCI = clientes.filter(c => !conCI.has(c.id))
 
     const nlMsgs = (msgs||[]).filter(m => !m.leido && m.tipo !== 'entrenador').length
     setMensajesNL(nlMsgs)
 
-    // Alertas pendientes
     const { data: alertas } = await supabase.from('alertas')
       .select('id, tipo, mensaje, cliente_id')
       .eq('entrenador_id', uid).eq('leida', false)
       .order('created_at', { ascending: false }).limit(5)
 
-    // Ingresos del mes
     const inicioMes = new Date(); inicioMes.setDate(1); inicioMes.setHours(0,0,0,0)
     const { data: pagosHoy } = await supabase.from('pagos')
       .select('importe').eq('entrenador_id', uid).gte('fecha', inicioMes.toISOString())
-
     const ingresosMes = (pagosHoy||[]).reduce((s,p) => s + (p.importe||0), 0)
 
-    setDatos({ sesHoy: sesHoy||[], sesSem: sesSem||[], clientes: clientes||[], msgs: msgs||[], horasSem: Math.round(horasSem*10)/10, sinCI, miembro, alertas: alertas||[], ingresosMes })
+    setDatos({ sesHoy: sesHoy||[], sesSem: sesSem||[], clientes, msgs: msgs||[], horasSem: Math.round(horasSem*10)/10, sinCI, miembro, alertas: alertas||[], ingresosMes })
     setLoading(false)
   }
 
@@ -110,11 +122,40 @@ export default function PortalEntrenador({ session }) {
   const nombre = session.user?.user_metadata?.nombre || d.miembro?.nombre || session.user?.email?.split('@')[0]
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex flex-col max-w-lg mx-auto">
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col md:flex-row md:max-w-none">
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
-      {/* Header */}
-      <div className="px-5 pt-12 pb-4">
+      {/* Nav lateral escritorio */}
+      <div className="hidden md:flex md:flex-col md:w-60 md:border-r md:border-white/8 md:shrink-0">
+        <div className="px-5 pt-8 pb-6 border-b border-white/8">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shrink-0" style={{background:acento}}>{ini(nombre)}</div>
+            <div><p className="text-white font-semibold text-sm">{nombre.split(' ')[0]}</p><p className="text-white/40 text-xs">{d.miembro?.centros?.nombre||'Mi centro'}</p></div>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {[[d.sesHoy.length,'Hoy',acento],[`${d.horasSem}h`,'Sem','#6366f1'],[d.clientes.length,'Cli','#10b981'],[`${d.ingresosMes||0}€`,'Mes','#f59e0b']].map(([v,l,c])=>(
+              <div key={l} className="bg-white/5 rounded-lg p-2.5 text-center"><p className="text-base font-bold text-white">{v}</p><p className="text-xs text-white/40">{l}</p></div>
+            ))}
+          </div>
+        </div>
+        <nav className="px-2 py-3 flex-1">
+          {TABS.map(t=>(
+            <button key={t.id} onClick={()=>setTab(t.id)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-0.5 text-sm font-medium transition-all relative text-left ${tab===t.id?'bg-white/10 text-white':'text-white/40 hover:text-white hover:bg-white/5'}`}>
+              {t.icon} {t.label}
+              {t.id==='mensajes'&&mensajesNL>0&&<span className="ml-auto w-5 h-5 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center">{mensajesNL}</span>}
+            </button>
+          ))}
+        </nav>
+        {d.alertas?.length>0&&(
+          <div className="px-2 pb-4 space-y-1.5">
+            {d.alertas.slice(0,2).map(a=>(<div key={a.id} className="bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2"><p className="text-xs text-amber-300 leading-relaxed">{a.mensaje}</p></div>))}
+          </div>
+        )}
+      </div>
+
+      {/* Columna principal */}
+      <div className="flex-1 flex flex-col min-w-0">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-white/40 text-xs">{d.miembro?.centros?.nombre || 'Mi centro'}</p>
@@ -336,7 +377,7 @@ export default function PortalEntrenador({ session }) {
       </div>
 
       {/* Cerrar sesión */}
-      <div className="px-5 py-4 border-t border-white/5">
+      <div className="md:hidden px-5 py-4 border-t border-white/5">
         <button onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login' }}
           className="w-full text-xs text-white/20 hover:text-white/40 transition-colors py-2">
           Cerrar sesión
