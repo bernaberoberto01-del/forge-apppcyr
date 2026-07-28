@@ -14,6 +14,11 @@ export default function PortalEntrenador({ session }) {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState(null)
   const [diaActivo, setDiaActivo] = useState(new Date().getDay() === 0 ? 1 : new Date().getDay())
+  const [vistaRight, setVistaRight] = useState('clientes') // clientes | mensajes
+  const [clienteMsg, setClienteMsg] = useState(null) // cliente seleccionado en mensajería
+  const [mensajes, setMensajes] = useState([])
+  const [textoMsg, setTextoMsg] = useState('')
+  const [enviando, setEnviando] = useState(false)
   const uid = session?.user?.id
 
   useEffect(() => { if (uid) cargar() }, [uid])
@@ -82,6 +87,40 @@ export default function PortalEntrenador({ session }) {
 
     setDatos({ miembro, semanaSesiones, clientes, clienteMap, alertas: alertas||[], msgs: msgs||[], horasSemana: Math.round(horasSemana*10)/10, clientesConSesion: clientesConSesion.size })
     setLoading(false)
+  }
+
+  async function cargarMensajes(clienteId) {
+    const { data } = await supabase.from('mensajes_cliente')
+      .select('*').eq('entrenador_id', uid).eq('cliente_id', clienteId)
+      .order('created_at', { ascending: true }).limit(50)
+    setMensajes(data || [])
+    // Marcar como leídos
+    await supabase.from('mensajes_cliente').update({ leido_entrenador: true })
+      .eq('entrenador_id', uid).eq('cliente_id', clienteId).eq('tipo', 'cliente')
+  }
+
+  async function seleccionarCliente(cliente) {
+    setClienteMsg(cliente)
+    setVistaRight('mensajes')
+    await cargarMensajes(cliente.id)
+  }
+
+  async function enviarMensaje() {
+    if (!textoMsg.trim() || !clienteMsg) return
+    setEnviando(true)
+    const { error } = await supabase.from('mensajes_cliente').insert({
+      entrenador_id: uid, cliente_id: clienteMsg.id,
+      contenido: textoMsg.trim(), tipo: 'entrenador',
+      leido: false, leido_entrenador: true
+    })
+    if (!error) {
+      setTextoMsg('')
+      await cargarMensajes(clienteMsg.id)
+      supabase.functions.invoke('notificar-mensaje', {
+        body: { cliente_id: clienteMsg.id, tipo: 'mensaje_entrenador', preview: textoMsg.trim().slice(0,200) }
+      }).catch(() => {})
+    }
+    setEnviando(false)
   }
 
   async function marcarCompletada(sesId) {
@@ -236,73 +275,134 @@ export default function PortalEntrenador({ session }) {
         {/* ── COLUMNA DERECHA: Clientes + Mensajes ── */}
         <div className="flex-1 flex flex-col overflow-hidden">
 
-          {/* Clientes */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <p className="text-xs text-white/40 font-bold uppercase tracking-wide mb-4">Mis clientes ({d.clientes.length})</p>
-            {d.clientes.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-3xl mb-3">👥</p>
-                <p className="text-white/40">Sin clientes asignados aún</p>
-                <p className="text-white/20 text-sm mt-1">El admin del centro te asignará clientes desde la agenda</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-                {d.clientes.map(c => {
-                  const sesionesSem = Object.values(d.semanaSesiones).flat().filter(s => s.cliente_id === c.id).length
-                  const alerta = d.alertas.find(a => a.cliente_id === c.id)
-                  return (
-                    <div key={c.id} className={`rounded-2xl p-4 border ${alerta ? 'bg-amber-500/5 border-amber-500/20' : 'bg-white/5 border-white/8'} hover:bg-white/8 transition-all`}>
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style={{background:acento}}>
-                            {ini(c.nombre)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-white">{c.nombre}</p>
-                            <p className="text-xs text-white/40">{c.nivel} · {c.tipo}</p>
-                          </div>
-                        </div>
-                        {sesionesSem > 0 && (
-                          <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{background:`${acento}20`,color:acento}}>
-                            {sesionesSem}× sem
-                          </span>
-                        )}
-                      </div>
-                      {c.objetivo && <p className="text-xs text-white/40 mb-2">{c.objetivo.replace(/_/g,' ')}</p>}
-                      {c.lesiones && c.lesiones !== 'ninguna' && c.lesiones !== '' && (
-                        <div className="bg-amber-500/10 rounded-lg px-2.5 py-2 mb-2">
-                          <p className="text-xs text-amber-400 font-semibold mb-0.5">⚡ Limitaciones</p>
-                          <p className="text-xs text-amber-300/80">{c.lesiones}</p>
-                        </div>
-                      )}
-                      {alerta && (
-                        <div className="bg-amber-500/10 rounded-lg px-2.5 py-2">
-                          <p className="text-xs text-amber-400 leading-relaxed">{alerta.mensaje}</p>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+          {/* Selector vista */}
+          <div className="flex border-b border-white/8 flex-shrink-0">
+            <button onClick={() => setVistaRight('clientes')}
+              className={`flex-1 py-3 text-sm font-semibold transition-all ${vistaRight==='clientes' ? 'text-white border-b-2' : 'text-white/40 hover:text-white/70'}`}
+              style={vistaRight==='clientes' ? {borderColor:acento} : {}}>
+              👥 Clientes ({d.clientes.length})
+            </button>
+            <button onClick={() => setVistaRight('mensajes')}
+              className={`flex-1 py-3 text-sm font-semibold transition-all relative ${vistaRight==='mensajes' ? 'text-white border-b-2' : 'text-white/40 hover:text-white/70'}`}
+              style={vistaRight==='mensajes' ? {borderColor:acento} : {}}>
+              ✉️ Mensajes
+              {d.msgs.length > 0 && <span className="absolute top-2 right-8 w-4 h-4 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center">{d.msgs.length}</span>}
+            </button>
           </div>
 
-          {/* Mensajes recientes */}
-          {d.msgs.length > 0 && (
-            <div className="border-t border-white/8 px-6 py-4">
-              <p className="text-xs text-white/40 font-bold uppercase tracking-wide mb-3">Mensajes nuevos</p>
-              <div className="space-y-2">
-                {d.msgs.slice(0,3).map(m => (
-                  <div key={m.id} className="flex items-start gap-3 bg-[#6366f1]/10 border border-[#6366f1]/20 rounded-xl px-3 py-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-[#6366f1]/20 flex items-center justify-center text-xs font-bold text-[#6366f1] flex-shrink-0">{ini(m.clientes?.nombre)}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-white">{m.clientes?.nombre}</p>
-                      <p className="text-xs text-white/50 truncate mt-0.5">{m.contenido}</p>
-                    </div>
-                    <a href="/mensajes" className="text-xs text-[#6366f1] hover:text-[#6366f1]/80 flex-shrink-0">Ver →</a>
-                  </div>
-                ))}
+          {/* Vista clientes */}
+          {vistaRight === 'clientes' && (
+            <div className="flex-1 overflow-y-auto p-5">
+              {d.clientes.length === 0 ? (
+                <div className="text-center py-16">
+                  <p className="text-3xl mb-3">👥</p>
+                  <p className="text-white/40">Sin clientes asignados aún</p>
+                  <p className="text-white/20 text-sm mt-1">El admin del centro te asignará clientes desde la agenda</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {d.clientes.map(c => {
+                    const sesionesSem = Object.values(d.semanaSesiones).flat().filter(s => s.cliente_id === c.id).length
+                    const alerta = d.alertas.find(a => a.cliente_id === c.id)
+                    const msgNL = d.msgs.filter(m => m.cliente_id === c.id).length
+                    return (
+                      <div key={c.id} className={`rounded-2xl p-4 border ${alerta ? 'bg-amber-500/5 border-amber-500/20' : 'bg-white/5 border-white/8'} hover:bg-white/8 transition-all`}>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs flex-shrink-0" style={{background:acento}}>
+                              {ini(c.nombre)}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-white">{c.nombre}</p>
+                              <p className="text-xs text-white/40">{c.nivel} · {c.tipo}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-1.5 items-center">
+                            {sesionesSem > 0 && <span className="text-xs font-bold px-2 py-1 rounded-lg" style={{background:`${acento}20`,color:acento}}>{sesionesSem}×</span>}
+                            <button onClick={() => seleccionarCliente(c)}
+                              className="relative text-xs px-2 py-1 rounded-lg bg-white/8 hover:bg-white/15 text-white/50 hover:text-white transition-all">
+                              ✉️
+                              {msgNL > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full text-white flex items-center justify-center" style={{fontSize:'8px'}}>{msgNL}</span>}
+                            </button>
+                          </div>
+                        </div>
+                        {c.objetivo && <p className="text-xs text-white/40 mb-2">{c.objetivo.replace(/_/g,' ')}</p>}
+                        {c.lesiones && c.lesiones !== 'ninguna' && c.lesiones !== '' && (
+                          <div className="bg-amber-500/10 rounded-lg px-2.5 py-2 mb-2">
+                            <p className="text-xs text-amber-400 font-semibold mb-0.5">⚡ Limitaciones</p>
+                            <p className="text-xs text-amber-300/80">{c.lesiones}</p>
+                          </div>
+                        )}
+                        {alerta && (
+                          <div className="bg-amber-500/10 rounded-lg px-2.5 py-2">
+                            <p className="text-xs text-amber-400 leading-relaxed">{alerta.mensaje}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Vista mensajes */}
+          {vistaRight === 'mensajes' && (
+            <div className="flex-1 flex overflow-hidden">
+              {/* Lista clientes */}
+              <div className="w-52 border-r border-white/8 overflow-y-auto flex-shrink-0">
+                {d.clientes.map(c => {
+                  const msgNL = d.msgs.filter(m => m.cliente_id === c.id).length
+                  const activo = clienteMsg?.id === c.id
+                  return (
+                    <button key={c.id} onClick={() => seleccionarCliente(c)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-3 border-b border-white/5 text-left transition-all ${activo ? 'bg-white/10' : 'hover:bg-white/5'}`}>
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs flex-shrink-0 relative" style={{background:acento}}>
+                        {ini(c.nombre)}
+                        {msgNL > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-white flex items-center justify-center" style={{fontSize:'9px'}}>{msgNL}</span>}
+                      </div>
+                      <p className="text-sm font-medium text-white truncate">{c.nombre.split(' ')[0]}</p>
+                    </button>
+                  )
+                })}
+                {d.clientes.length === 0 && (
+                  <p className="text-xs text-white/30 text-center p-4">Sin clientes</p>
+                )}
               </div>
+
+              {/* Chat */}
+              {clienteMsg ? (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/8 flex-shrink-0">
+                    <p className="text-sm font-bold text-white">{clienteMsg.nombre}</p>
+                    <p className="text-xs text-white/40">{clienteMsg.nivel} · {clienteMsg.objetivo?.replace(/_/g,' ')}</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+                    {mensajes.length === 0 && <p className="text-center text-white/30 text-sm py-8">Sin mensajes aún</p>}
+                    {mensajes.map(m => (
+                      <div key={m.id} className={`flex ${m.tipo==='entrenador' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-xs px-3 py-2 rounded-xl text-sm ${m.tipo==='entrenador' ? 'text-white' : 'bg-white/10 text-white/80'}`}
+                          style={m.tipo==='entrenador' ? {background:acento} : {}}>
+                          {m.contenido}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-4 py-3 border-t border-white/8 flex gap-2 flex-shrink-0">
+                    <input value={textoMsg} onChange={e=>setTextoMsg(e.target.value)}
+                      onKeyDown={e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); enviarMensaje() }}}
+                      placeholder="Escribe un mensaje..."
+                      className="flex-1 bg-white/8 text-white text-sm placeholder:text-white/30 px-3 py-2 rounded-xl focus:outline-none focus:bg-white/12"/>
+                    <button onClick={enviarMensaje} disabled={!textoMsg.trim()||enviando}
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0"
+                      style={{background:acento}}>↑</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-white/30 text-sm">Selecciona un cliente</p>
+                </div>
+              )}
             </div>
           )}
         </div>
