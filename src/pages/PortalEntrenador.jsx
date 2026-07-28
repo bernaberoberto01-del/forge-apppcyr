@@ -37,21 +37,62 @@ export default function PortalEntrenador({ session }) {
     const domingo = (() => { const d = new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)+6); return d.toISOString().split('T')[0] })()
 
     const [
-      { data: sesHoy },
-      { data: sesSem },
+      { data: sesHoyDB },
+      { data: sesSemDB },
       { data: clientesPropios },
       { data: msgs },
       { data: miembro },
+      { data: recurrentes },
     ] = await Promise.all([
       supabase.from('sesiones').select('*, clientes(id,nombre,objetivo,tipo)').eq('entrenador_id', uid).eq('fecha', hoy).eq('cancelada', false).order('hora'),
       supabase.from('sesiones').select('*, clientes(id,nombre,objetivo,tipo)').eq('entrenador_id', uid).gte('fecha', lunes).lte('fecha', domingo).eq('cancelada', false).order('fecha').order('hora'),
       supabase.from('clientes').select('id,nombre,objetivo,estado,peso_actual,peso_objetivo,tipo,nivel').eq('entrenador_id', uid).eq('estado', 'activo').order('nombre'),
       supabase.from('mensajes_cliente').select('*, clientes(nombre)').eq('entrenador_id', uid).order('created_at', { ascending: false }).limit(30),
       supabase.from('miembros_centro').select('*, centros(nombre,color_acento)').eq('user_id', uid).eq('activo', true).limit(1).maybeSingle(),
+      supabase.from('sesiones_recurrentes').select('*, clientes(id,nombre,objetivo,tipo)').eq('entrenador_id', uid).eq('activa', true),
     ])
 
-    // Incluir clientes del centro asignados en sesiones aunque no sean propios
-    const idsEnSesiones = new Set([...(sesHoy||[]), ...(sesSem||[])].map(s => s.cliente_id).filter(Boolean))
+    // Expandir recurrentes a sesiones de hoy y esta semana
+    const diasMap = [0,1,2,3,4,5,6] // domingo=0
+    const sesRecHoy = []
+    const sesRecSem = []
+
+    for (const rec of recurrentes || []) {
+      const diasSemana = rec.dias_semana || [] // 1=lun...7=dom
+      // Generar fechas de la semana
+      const lunesDate = new Date(lunes + 'T12:00')
+      for (let i = 0; i < 7; i++) {
+        const fecha = new Date(lunesDate)
+        fecha.setDate(fecha.getDate() + i)
+        const fechaStr = fecha.toISOString().split('T')[0]
+        const diaSemana = fecha.getDay() === 0 ? 7 : fecha.getDay() // 1=lun...7=dom
+        if (!diasSemana.includes(diaSemana)) continue
+        const sesion = {
+          id: `rec_${rec.id}_${fechaStr}`,
+          cliente_id: rec.cliente_id,
+          entrenador_id: rec.entrenador_id,
+          fecha: fechaStr,
+          hora: rec.hora,
+          duracion_minutos: rec.duracion_minutos,
+          tipo: rec.tipo,
+          completada: false,
+          cancelada: false,
+          clientes: rec.clientes,
+          es_recurrente: true
+        }
+        if (fechaStr === hoy) sesRecHoy.push(sesion)
+        sesRecSem.push(sesion)
+      }
+    }
+
+    // Merge sesiones BD + recurrentes (evitar duplicados por fecha+hora+cliente)
+    const keyDB = (s) => `${s.fecha}_${s.hora}_${s.cliente_id}`
+    const keysDB = new Set([...(sesHoyDB||[]), ...(sesSemDB||[])].map(keyDB))
+    const sesHoy = [...(sesHoyDB||[]), ...sesRecHoy.filter(s => !keysDB.has(keyDB(s)))].sort((a,b) => a.hora.localeCompare(b.hora))
+    const sesSem = [...(sesSemDB||[]), ...sesRecSem.filter(s => !keysDB.has(keyDB(s)))].sort((a,b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora))
+
+    // Clientes de las sesiones asignadas (pueden ser del admin del centro)
+    const idsEnSesiones = new Set([...sesHoy, ...sesSem].map(s => s.cliente_id).filter(Boolean))
     const idsPropios = new Set((clientesPropios||[]).map(c => c.id))
     const idsExtra = [...idsEnSesiones].filter(id => !idsPropios.has(id))
 
@@ -64,7 +105,7 @@ export default function PortalEntrenador({ session }) {
     }
 
     const clientes = [...(clientesPropios||[]), ...clientesExtra]
-    const horasSem = (sesSem||[]).filter(s=>s.completada).reduce((s,x)=>s+(x.duracion_minutos||60),0)/60
+    const horasSem = sesSem.filter(s=>s.completada).reduce((s,x)=>s+(x.duracion_minutos||60),0)/60
 
     const hace7 = new Date(Date.now()-7*864e5).toISOString().split('T')[0]
     const todosIds = clientes.map(c=>c.id)
@@ -87,7 +128,7 @@ export default function PortalEntrenador({ session }) {
       .select('importe').eq('entrenador_id', uid).gte('fecha', inicioMes.toISOString())
     const ingresosMes = (pagosHoy||[]).reduce((s,p) => s + (p.importe||0), 0)
 
-    setDatos({ sesHoy: sesHoy||[], sesSem: sesSem||[], clientes, msgs: msgs||[], horasSem: Math.round(horasSem*10)/10, sinCI, miembro, alertas: alertas||[], ingresosMes })
+    setDatos({ sesHoy, sesSem, clientes, msgs: msgs||[], horasSem: Math.round(horasSem*10)/10, sinCI, miembro, alertas: alertas||[], ingresosMes })
     setLoading(false)
   }
 
