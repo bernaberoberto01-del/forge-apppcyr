@@ -119,7 +119,7 @@ export default function RegistroCliente() {
         edad: form.edad ? Number(form.edad) : null,
         sexo: form.sexo || null,
         peso_actual: form.peso_actual ? Number(form.peso_actual) : null,
-        altura: form.altura ? Number(form.altura) : null,
+        altura: form.altura ? (Number(form.altura) < 3 ? Math.round(Number(form.altura) * 100) : Math.round(Number(form.altura))) : null,
         objetivo: form.objetivo || null,
         objetivo_detalle: form.objetivo_detalle || null,
         plazo: form.plazo || null,
