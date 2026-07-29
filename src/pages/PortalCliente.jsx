@@ -522,8 +522,9 @@ export default function PortalCliente() {
                     </div>
                     <span className="ml-auto text-[#6B6B6B]">+</span>
                   </button>
-                  )
-                })()}
+                </div>
+                )
+              })()}
 
                 {/* Check-in presencial */}
                 {cliente?.tipo==='presencial'&&(() => {
