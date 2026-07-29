@@ -498,7 +498,8 @@ export default function PortalCliente() {
                   const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
                   const urgente = diasSin >= 7
                   return (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
                     <a href="/seguimiento"
                       className={`rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
                       style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
@@ -512,19 +513,19 @@ export default function PortalCliente() {
                       <p className="text-sm font-bold text-white">Registrar entreno</p>
                       <p className="text-xs text-white/50 mt-0.5">Apunta el entreno de hoy</p>
                     </a>
-                  </div>
-                  <button onClick={() => setModalActividad(true)}
-                    className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
-                    <span className="text-2xl">🚶</span>
-                    <div>
-                      <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
-                      <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
                     </div>
-                    <span className="ml-auto text-[#6B6B6B]">+</span>
-                  </button>
-                </div>
-                )
-              })()}
+                    <button onClick={() => setModalActividad(true)}
+                      className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
+                      <span className="text-2xl">🚶</span>
+                      <div>
+                        <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
+                      </div>
+                      <span className="ml-auto text-[#6B6B6B]">+</span>
+                    </button>
+                  </div>
+                  )
+                })()}
 
                 {/* Check-in presencial */}
                 {cliente?.tipo==='presencial'&&(() => {
