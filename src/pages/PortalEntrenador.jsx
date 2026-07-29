@@ -51,7 +51,7 @@ export default function PortalEntrenador({ session }) {
       .select('id,nombre,tipo,nivel,lesiones,objetivo,peso_actual,peso_objetivo')
       .eq('entrenador_id', uid).eq('estado', 'activo')
 
-    const idsYa = new Set(todosClientes.map((c: any) => c.id))
+    const idsYa = new Set(todosClientes.map((c) => c.id))
     const clientesExtra = (clientesPropios || []).filter((c) => !idsYa.has(c.id))
     const todosClientesCombinados = [...todosClientes, ...clientesExtra]
 
