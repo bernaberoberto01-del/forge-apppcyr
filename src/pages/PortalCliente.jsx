@@ -109,6 +109,9 @@ export default function PortalCliente() {
   const [formPerfil, setFormPerfil] = useState(null)
   const [guardandoPerfil, setGuardandoPerfil] = useState(false)
   const [toastPortal, setToastPortal] = useState('')
+  const [modalActividad, setModalActividad] = useState(false)
+  const [formActividad, setFormActividad] = useState({ tipo:'caminata', descripcion:'', duracion:'', distancia:'', notas:'' })
+  const [guardandoActividad, setGuardandoActividad] = useState(false)
 
   function mostrarToast(msg) {
     setToastPortal(msg)
@@ -510,6 +513,15 @@ export default function PortalCliente() {
                       <p className="text-xs text-white/50 mt-0.5">Apunta el entreno de hoy</p>
                     </a>
                   </div>
+                  <button onClick={() => setModalActividad(true)}
+                    className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
+                    <span className="text-2xl">🚶</span>
+                    <div>
+                      <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
+                    </div>
+                    <span className="ml-auto text-[#6B6B6B]">+</span>
+                  </button>
                   )
                 })()}
 
@@ -924,8 +936,8 @@ export default function PortalCliente() {
                         className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm mb-3 focus:outline-none"/>
                       {errorFoto&&<p className="text-red-500 text-xs mb-2">{errorFoto}</p>}
                       <label className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-white text-sm font-semibold cursor-pointer transition-all ${subiendoFoto?'opacity-50':''}`} style={{background:color}}>
-                        {subiendoFoto?<><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Subiendo...</>:<>📷 Seleccionar foto</>}
-                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={subirFoto} disabled={subiendoFoto}/>
+                        {subiendoFoto?<><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Subiendo...</>:<>📷 Subir foto</>}
+                        <input type="file" accept="image/*" className="hidden" onChange={subirFoto} disabled={subiendoFoto}/>
                       </label>
                     </div>
                     {fotos.length===0?(
@@ -1353,6 +1365,76 @@ export default function PortalCliente() {
           </div>
         </main>
       </div>
+
+      {/* MODAL ACTIVIDAD LIBRE */}
+      {modalActividad && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalActividad(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="font-bold text-[#0A0A0A]">🚶 Actividad libre</p>
+              <button onClick={() => setModalActividad(false)} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Tipo de actividad</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[['caminata','🚶 Caminata'],['carrera','🏃 Carrera'],['bici','🚴 Bici'],['natacion','🏊 Natación'],['deporte','⚽ Deporte'],['otro','💪 Otro']].map(([v,l])=>(
+                    <button key={v} type="button" onClick={() => setFormActividad(f=>({...f,tipo:v}))}
+                      className={`py-2 px-1 rounded-xl text-xs font-semibold transition-all text-center ${formActividad.tipo===v?'text-white':'bg-[#F7F6F3] text-[#6B6B6B]'}`}
+                      style={formActividad.tipo===v?{background:color}:{}}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Duración (min)</label>
+                  <input type="number" value={formActividad.duracion} onChange={e=>setFormActividad(f=>({...f,duracion:e.target.value}))}
+                    placeholder="30" className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Distancia (km)</label>
+                  <input type="number" step="0.1" value={formActividad.distancia} onChange={e=>setFormActividad(f=>({...f,distancia:e.target.value}))}
+                    placeholder="3.5" className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Notas (opcional)</label>
+                <input type="text" value={formActividad.notas} onChange={e=>setFormActividad(f=>({...f,notas:e.target.value}))}
+                  placeholder="Cómo fue, cómo te sentiste..." className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+              </div>
+              <button onClick={async () => {
+                setGuardandoActividad(true)
+                const desc = [
+                  formActividad.tipo.charAt(0).toUpperCase() + formActividad.tipo.slice(1),
+                  formActividad.duracion ? `${formActividad.duracion} min` : null,
+                  formActividad.distancia ? `${formActividad.distancia} km` : null,
+                  formActividad.notas || null,
+                ].filter(Boolean).join(' · ')
+                await supabase.from('sesiones').insert({
+                  cliente_id: cliente.id,
+                  entrenador_id: cliente.entrenador_id,
+                  fecha: new Date().toISOString().split('T')[0],
+                  hora: new Date().toTimeString().slice(0,5),
+                  duracion_minutos: formActividad.duracion ? Number(formActividad.duracion) : 30,
+                  tipo: 'libre',
+                  completada: true,
+                  notas: desc,
+                })
+                setGuardandoActividad(false)
+                setModalActividad(false)
+                setFormActividad({ tipo:'caminata', descripcion:'', duracion:'', distancia:'', notas:'' })
+                mostrarToast('✓ Actividad registrada')
+              }} disabled={guardandoActividad}
+                className="w-full py-3 rounded-xl text-white font-bold text-sm disabled:opacity-40"
+                style={{background:color}}>
+                {guardandoActividad ? 'Guardando...' : 'Registrar actividad'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
