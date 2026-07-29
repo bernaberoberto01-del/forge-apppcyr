@@ -32,32 +32,31 @@ export default function PortalEntrenador({ session }) {
       { data: miembro },
       { data: recurrentes },
       { data: sesIndividuales },
-      { data: clientesPropios },
       { data: alertas },
       { data: msgs },
     ] = await Promise.all([
       supabase.from('miembros_centro').select('*, centros(nombre,color_acento)').eq('user_id', uid).eq('activo', true).limit(1).maybeSingle(),
       supabase.from('sesiones_recurrentes').select('id,hora,duracion_minutos,tipo,dias_semana,cliente_id,entrenador_id').eq('entrenador_id', uid).eq('activa', true),
       supabase.from('sesiones').select('id,fecha,hora,duracion_minutos,tipo,completada,cancelada,cliente_id,entrenador_id').eq('entrenador_id', uid).gte('fecha', lunes).eq('cancelada', false).order('fecha').order('hora'),
-      supabase.from('clientes').select('id,nombre,tipo,nivel,lesiones,objetivo,peso_actual,peso_objetivo').eq('entrenador_id', uid).eq('estado', 'activo'),
       supabase.from('alertas').select('*').eq('entrenador_id', uid).eq('leida', false).order('created_at',{ascending:false}).limit(10),
       supabase.from('mensajes_cliente').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('leido_entrenador', false).eq('tipo','cliente').order('created_at',{ascending:false}).limit(5),
     ])
 
-    // Recopilar todos los cliente_ids de las recurrentes
-    const todosClienteIds = [...new Set([
-      ...(clientesPropios||[]).map(c => c.id),
-      ...(recurrentes||[]).map(r => r.cliente_id),
-      ...(sesIndividuales||[]).map(s => s.cliente_id),
-    ].filter(Boolean))]
+    // Cargar clientes via Edge Function con service_role (evita bloqueo RLS)
+    const { data: clientesData } = await supabase.functions.invoke('clientes-entrenador')
+    const todosClientes = clientesData?.clientes || []
 
-    // Cargar todos los clientes necesarios en una sola query
-    const { data: todosClientes } = todosClienteIds.length > 0
-      ? await supabase.from('clientes').select('id,nombre,tipo,nivel,lesiones,objetivo,peso_actual,peso_objetivo').in('id', todosClienteIds).eq('estado', 'activo')
-      : { data: [] }
+    // También incluir clientes propios del entrenador si los tiene
+    const { data: clientesPropios } = await supabase.from('clientes')
+      .select('id,nombre,tipo,nivel,lesiones,objetivo,peso_actual,peso_objetivo')
+      .eq('entrenador_id', uid).eq('estado', 'activo')
+
+    const idsYa = new Set(todosClientes.map((c: any) => c.id))
+    const clientesExtra = (clientesPropios || []).filter((c) => !idsYa.has(c.id))
+    const todosClientesCombinados = [...todosClientes, ...clientesExtra]
 
     const clienteMap = {}
-    ;(todosClientes||[]).forEach(c => { clienteMap[c.id] = c })
+    todosClientesCombinados.forEach((c) => { clienteMap[c.id] = c })
 
     // Expandir recurrentes para toda la semana
     const semanaSesiones = {}
@@ -81,7 +80,7 @@ export default function PortalEntrenador({ session }) {
     }
 
     // Clientes únicos con sesión esta semana
-    const clientes = todosClientes || []
+    const clientes = todosClientesCombinados
     const clientesConSesion = new Set(Object.values(semanaSesiones).flat().map(s => s.cliente_id))
     const horasSemana = Object.values(semanaSesiones).flat().reduce((s,x) => s + (x.duracion_minutos||60), 0) / 60
 
