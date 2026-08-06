@@ -642,24 +642,42 @@ export default function Clientes({ session }) {
                     </div>
                   )
                 })()}
-                {/* Selector de grupo */}
-                {form.modalidad !== 'individual' && (
-                  <div>
-                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Asignar a grupo (opcional)</label>
-                    <select value={form.grupo_id} onChange={e=>setForm({...form,grupo_id:e.target.value})}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#FF5C00]">
-                      <option value="">— Sin grupo asignado —</option>
-                      {grupos.filter(g=>g.tipo===form.modalidad||(form.modalidad==='grupo'&&g.tipo==='grupo')).map(g=>{
-                        const nMiembros = (g.grupo_clientes||[]).filter(m=>m.activo).length
-                        const max = g.tipo==='pareja'?2:6
-                        return <option key={g.id} value={g.id} disabled={nMiembros>=max}>{g.nombre} ({nMiembros}/{max})</option>
-                      })}
-                    </select>
-                    {grupos.filter(g=>g.tipo===(form.modalidad==='pareja'?'pareja':'grupo')).length===0&&(
-                      <p className="text-xs text-[#9B9B9B] mt-1.5">Crea primero un grupo en la sección Grupos o déjalo vacío y asígnalo después</p>
-                    )}
-                  </div>
-                )}
+                {/* Selector de grupo + creación inline */}
+                {form.modalidad !== 'individual' && (() => {
+                  const gruposFiltrados = grupos.filter(g => g.tipo === form.modalidad)
+                  const [creandoGrupo, setCreandoGrupo] = window._grupoState || [false, ()=>{}]
+                  // Usamos un input controlado local
+                  return (
+                    <div>
+                      <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">
+                        {form.modalidad === 'pareja' ? '👫 Pareja' : '👥 Grupo'} — asignar a
+                      </label>
+                      {gruposFiltrados.length > 0 && (
+                        <select value={form.grupo_id} onChange={e=>setForm({...form,grupo_id:e.target.value})}
+                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#FF5C00] mb-2">
+                          <option value="">— Crear nuevo o sin grupo —</option>
+                          {gruposFiltrados.map(g=>{
+                            const nMiembros = (g.grupo_clientes||[]).filter(m=>m.activo).length
+                            const max = g.tipo==='pareja'?2:6
+                            return <option key={g.id} value={g.id} disabled={nMiembros>=max}>{g.nombre} · {nMiembros}/{max} personas</option>
+                          })}
+                        </select>
+                      )}
+                      {!form.grupo_id && (
+                        <NuevoGrupoInline
+                          modalidad={form.modalidad}
+                          diasSemana={form.dias_semana}
+                          hora={'09:00'}
+                          uid={uid}
+                          onCreado={async (grupoId) => {
+                            await cargar()
+                            setForm(f => ({...f, grupo_id: grupoId}))
+                          }}
+                        />
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Precio mensual (€)</label>
@@ -1079,6 +1097,81 @@ export default function Clientes({ session }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Componente inline para crear un grupo desde la ficha del cliente
+function NuevoGrupoInline({ modalidad, diasSemana, hora, uid, onCreado }) {
+  const [nombre, setNombre] = useState('')
+  const [horaGrupo, setHoraGrupo] = useState(hora || '09:00')
+  const [creando, setCreando] = useState(false)
+  const [expandido, setExpandido] = useState(false)
+
+  const TARIFAS = {
+    individual: { 2:220, 3:330, 4:440 },
+    pareja:     { 2:175, 3:260, 4:340 },
+    grupo:      { 3:160 },
+  }
+  const tarifa = TARIFAS[modalidad]?.[diasSemana] || null
+
+  async function crear() {
+    if (!nombre.trim()) return
+    setCreando(true)
+    const { data } = await supabase.from('grupos').insert({
+      entrenador_id: uid,
+      nombre: nombre.trim(),
+      tipo: modalidad,
+      dias_semana: typeof diasSemana === 'number'
+        ? (diasSemana === 2 ? [1,4] : diasSemana === 3 ? [1,3,5] : [1,2,4,5])
+        : diasSemana,
+      hora: horaGrupo,
+      duracion_minutos: 60,
+      precio_por_persona: tarifa || 0,
+      precio_total: modalidad === 'pareja' ? (tarifa ? tarifa * 2 : 0) : 0,
+    }).select('id').single()
+    setCreando(false)
+    if (data?.id) onCreado(data.id)
+  }
+
+  if (!expandido) return (
+    <button type="button" onClick={() => setExpandido(true)}
+      className="w-full border border-dashed border-black/20 rounded-xl px-3 py-3 text-sm text-[#6B6B6B] hover:border-[#FF5C00] hover:text-[#FF5C00] transition-all text-left flex items-center gap-2">
+      <span className="text-base">{modalidad === 'pareja' ? '👫' : '👥'}</span>
+      <span>Crear nueva {modalidad === 'pareja' ? 'pareja' : 'grupo'}</span>
+      <span className="ml-auto font-bold text-lg leading-none">+</span>
+    </button>
+  )
+
+  return (
+    <div className="border border-[#FF5C00]/30 bg-[#FF5C00]/3 rounded-xl p-3 space-y-2">
+      <p className="text-xs font-semibold text-[#FF5C00]">Nueva {modalidad === 'pareja' ? 'pareja' : 'grupo'}</p>
+      <input value={nombre} onChange={e => setNombre(e.target.value)}
+        placeholder={modalidad === 'pareja' ? 'Ej: Ana y Carlos — L/X' : 'Ej: Grupo mañanas jueves'}
+        className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white"/>
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <label className="text-xs text-[#9B9B9B] mb-1 block">Hora de entrenamiento</label>
+          <input type="time" value={horaGrupo} onChange={e => setHoraGrupo(e.target.value)}
+            className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white"/>
+        </div>
+        {tarifa && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center flex-shrink-0">
+            <p className="text-sm font-bold text-emerald-700">{tarifa}€/p</p>
+            <p className="text-xs text-emerald-600">{diasSemana} días</p>
+          </div>
+        )}
+      </div>
+      <div className="flex gap-2">
+        <button type="button" onClick={() => setExpandido(false)}
+          className="flex-1 border border-black/10 text-[#6B6B6B] text-xs font-medium py-2 rounded-xl hover:bg-[#F5F5F0]">
+          Cancelar
+        </button>
+        <button type="button" onClick={crear} disabled={!nombre.trim() || creando}
+          className="flex-1 bg-[#0A0A0A] text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40">
+          {creando ? 'Creando...' : 'Crear y asignar'}
+        </button>
+      </div>
     </div>
   )
 }
