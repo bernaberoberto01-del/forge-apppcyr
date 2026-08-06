@@ -23,7 +23,17 @@ const OBJ = {
   cambio_rapido_30dias: { label: 'Cambio 30 días', color: 'bg-red-50 text-red-700' },
 }
 const OBJETIVOS_LIST = Object.entries(OBJ)
-const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'' }
+const TARIFAS_GRUPO = {
+  individual: { 2:220, 3:330, 4:440 },
+  pareja:     { 2:175, 3:260, 4:340 },
+  grupo:      { 3:160 },
+}
+
+function calcTarifa(modalidad, dias) {
+  return TARIFAS_GRUPO[modalidad]?.[dias] || null
+}
+
+const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'',modalidad:'individual',grupo_id:'' }
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const AVATAR_COLORS = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
 const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
@@ -31,6 +41,7 @@ const PER_PAGE = 20
 
 export default function Clientes({ session }) {
   const [clientes, setClientes] = useState([])
+  const [grupos, setGrupos] = useState([])
   const [cuestionarios, setCuestionarios] = useState([])
   const [checkins, setCheckins] = useState([])
   const [pagos, setPagos] = useState([])
@@ -59,13 +70,15 @@ export default function Clientes({ session }) {
 
   async function cargar() {
     const hace10 = new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0]
-    const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }] = await Promise.all([
+    const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }] = await Promise.all([
       supabase.from('clientes').select('*').eq('entrenador_id', uid).order('created_at', { ascending: false }),
       supabase.from('cuestionarios').select('*').eq('entrenador_id', uid).eq('procesado', false).order('created_at', { ascending: false }),
       supabase.from('checkins').select('cliente_id,fecha').eq('entrenador_id', uid).gte('fecha', hace10),
       supabase.from('pagos').select('cliente_id,valido_hasta').eq('entrenador_id', uid),
+      supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').eq('entrenador_id', uid).eq('activo', true),
     ])
     setClientes(cl || [])
+    setGrupos(gs || [])
     setCuestionarios(cu || [])
     setCheckins(ci || [])
     setPagos(pg || [])
@@ -115,9 +128,21 @@ export default function Clientes({ session }) {
 
   async function guardar() {
     setLoading(true)
-    const p = { ...form, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, precio_mensual: Number(form.precio_mensual) || 0 }
-    if (editId) await supabase.from('clientes').update(p).eq('id', editId)
-    else await supabase.from('clientes').insert(p)
+    const p = { ...form, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, precio_mensual: Number(form.precio_mensual) || 0, modalidad: form.modalidad || 'individual', grupo_id: form.grupo_id || null }
+    let clienteId = editId
+    if (editId) {
+      await supabase.from('clientes').update(p).eq('id', editId)
+    } else {
+      const { data: nuevo } = await supabase.from('clientes').insert(p).select('id').single()
+      clienteId = nuevo?.id
+    }
+    // Vincular al grupo si se seleccionó uno
+    if (clienteId && form.grupo_id) {
+      await supabase.from('grupo_clientes').upsert(
+        { grupo_id: form.grupo_id, cliente_id: clienteId, activo: true },
+        { onConflict: 'grupo_id,cliente_id' }
+      )
+    }
     setModal(false); setEditId(null); setForm(initForm)
     await cargar(); setLoading(false)
   }
@@ -249,7 +274,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'' })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', modalidad:c.modalidad||'individual', grupo_id:c.grupo_id||'' })
     setEditId(c.id); setModal(true); setDetalle(null)
   }
 
@@ -389,6 +414,9 @@ export default function Clientes({ session }) {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoBadge.cls}`}>{estadoBadge.label}</span>
+                      {c.modalidad && c.modalidad !== 'individual' && (
+                        <span className="text-xs text-[#6B6B6B]">{c.modalidad === 'pareja' ? '👫' : '👥'}</span>
+                      )}
                       {c.precio_mensual > 0 && <span className="text-xs font-bold text-[#FF5C00]">{c.precio_mensual}€</span>}
                     </div>
                   </div>
@@ -588,6 +616,50 @@ export default function Clientes({ session }) {
                   <input type="number" step="0.1" value={form.peso_objetivo} onChange={e => setForm({...form,peso_objetivo:e.target.value})}
                     className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
                 </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Modalidad de entrenamiento</label>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {[['individual','👤','Individual'],['pareja','👫','Pareja'],['grupo','👥','Grupo']].map(([v,ic,l])=>(
+                    <button key={v} type="button" onClick={()=>setForm({...form,modalidad:v,grupo_id:'',precio_mensual:calcTarifa(v,form.dias_semana)||form.precio_mensual})}
+                      className={`py-2.5 px-2 rounded-xl border text-center transition-all ${form.modalidad===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 hover:border-black/20'}`}>
+                      <p className="text-lg">{ic}</p>
+                      <p className={`text-xs font-semibold mt-0.5 ${form.modalidad===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                    </button>
+                  ))}
+                </div>
+                {/* Tarifa calculada */}
+                {form.modalidad !== 'individual' && (() => {
+                  const t = calcTarifa(form.modalidad, form.dias_semana)
+                  return t ? (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-3 flex items-center justify-between">
+                      <p className="text-xs text-emerald-700">{form.modalidad === 'pareja' ? 'Pareja' : 'Grupo'} · {form.dias_semana} días/sem</p>
+                      <p className="text-sm font-bold text-emerald-700">{t}€/persona</p>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+                      <p className="text-xs text-amber-700">Sin tarifa estándar para esta combinación — introduce el precio manualmente</p>
+                    </div>
+                  )
+                })()}
+                {/* Selector de grupo */}
+                {form.modalidad !== 'individual' && (
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Asignar a grupo (opcional)</label>
+                    <select value={form.grupo_id} onChange={e=>setForm({...form,grupo_id:e.target.value})}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#FF5C00]">
+                      <option value="">— Sin grupo asignado —</option>
+                      {grupos.filter(g=>g.tipo===form.modalidad||(form.modalidad==='grupo'&&g.tipo==='grupo')).map(g=>{
+                        const nMiembros = (g.grupo_clientes||[]).filter(m=>m.activo).length
+                        const max = g.tipo==='pareja'?2:6
+                        return <option key={g.id} value={g.id} disabled={nMiembros>=max}>{g.nombre} ({nMiembros}/{max})</option>
+                      })}
+                    </select>
+                    {grupos.filter(g=>g.tipo===(form.modalidad==='pareja'?'pareja':'grupo')).length===0&&(
+                      <p className="text-xs text-[#9B9B9B] mt-1.5">Crea primero un grupo en la sección Grupos o déjalo vacío y asígnalo después</p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Precio mensual (€)</label>

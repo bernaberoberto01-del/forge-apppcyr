@@ -105,6 +105,7 @@ export default function Agenda({ session }) {
   const [sesiones, setSesiones] = useState([])
   const [recurrentes, setRecurrentes] = useState([])
   const [clientes, setClientes] = useState([])
+  const [gruposMap, setGruposMap] = useState({}) // grupo_id → {nombre, miembros:[{nombre}]}
   const [horasExtra, setHorasExtra] = useState([])
   const [vista, setVista] = useState(() => window.innerWidth < 768 ? 'lista' : 'timeline')
   const [modal, setModal] = useState(false)
@@ -169,7 +170,7 @@ export default function Agenda({ session }) {
 
   async function cargar() {
     const hace60 = formatFecha(new Date(Date.now() - 60*864e5))
-    const [{ data: se }, { data: cl }, { data: he }, { data: rc }] = await Promise.all([
+    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }] = await Promise.all([
       centro
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
@@ -180,11 +181,19 @@ export default function Agenda({ session }) {
       centro
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activa', true),
+      supabase.from('grupos').select('id,nombre,tipo,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
     ])
     setSesiones(se || [])
     setClientes(cl || [])
     setHorasExtra(he || [])
     setRecurrentes(rc || [])
+    // Construir mapa grupo_id → info
+    const gm = {}
+    ;(gs || []).forEach(g => {
+      const miembros = (g.grupo_clientes||[]).filter(m=>m.activo).map(m=>m.clientes).filter(Boolean)
+      gm[g.id] = { nombre: g.nombre, tipo: g.tipo, miembros }
+    })
+    setGruposMap(gm)
   }
 
   // Generar sesiones virtuales de recurrentes para la semana actual
@@ -482,7 +491,11 @@ export default function Agenda({ session }) {
                           className={`bg-white border rounded-xl p-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all ${completada ? 'border-emerald-100' : cancelada ? 'border-red-100 opacity-60' : 'border-black/6 hover:shadow-sm'}`}>
                           <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{background: color}} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre || 'Cliente'}</p>
+                            <p className="text-sm font-semibold text-[#0A0A0A] truncate">
+                              {s.grupo_id && gruposMap[s.grupo_id]
+                                ? gruposMap[s.grupo_id].miembros.map(m=>m.nombre.split(' ')[0]).join(' + ')
+                                : s.clientes?.nombre || 'Cliente'}
+                            </p>
                             <div className="flex items-center gap-2 mt-0.5">
                               <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos || 60}min</p>
                               {s.tipo && s.tipo !== 'presencial' && (
@@ -624,7 +637,10 @@ export default function Agenda({ session }) {
 
                       const entNombre = entrenadorMiembro?.nombre || entrenadorMiembro?.email?.split('@')[0] || ''
                       const entIni = entNombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-                      const nombreCliente = s.clientes?.nombre?.split(' ')[0] || '—'
+                      const grupo = s.grupo_id ? gruposMap[s.grupo_id] : null
+                      const nombreCliente = grupo
+                        ? grupo.miembros.map(m=>m.nombre.split(' ')[0]).join(' + ')
+                        : s.clientes?.nombre?.split(' ')[0] || '—'
                       
                       return (
                         <div key={s.id || idx}
