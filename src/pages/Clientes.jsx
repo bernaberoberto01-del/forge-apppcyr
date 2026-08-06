@@ -42,6 +42,7 @@ const PER_PAGE = 20
 export default function Clientes({ session }) {
   const [clientes, setClientes] = useState([])
   const [grupos, setGrupos] = useState([])
+  const [mostrarGrupos, setMostrarGrupos] = useState(false)
   const [cuestionarios, setCuestionarios] = useState([])
   const [checkins, setCheckins] = useState([])
   const [pagos, setPagos] = useState([])
@@ -311,8 +312,22 @@ export default function Clientes({ session }) {
             className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95">
             + Nuevo
           </button>
+          <button onClick={() => setMostrarGrupos(g => !g)}
+            className={`text-sm font-semibold px-4 py-2.5 rounded-xl border transition-all ${mostrarGrupos ? 'bg-[#0A0A0A] text-white border-[#0A0A0A]' : 'border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
+            👥 Grupos
+          </button>
         </div>
       </div>
+
+      {/* Desplegable Grupos */}
+      {mostrarGrupos && (
+        <PanelGrupos
+          grupos={grupos}
+          clientes={clientes}
+          uid={uid}
+          onActualizar={cargar}
+        />
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
@@ -1093,6 +1108,311 @@ export default function Clientes({ session }) {
                     })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Panel de grupos desplegable en Clientes ───────────────────────────────
+const DIAS_G = ['','Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+const TARIFAS_G = {
+  pareja: { 2:{pp:175,total:350}, 3:{pp:260,total:520}, 4:{pp:340,total:680} },
+  grupo:  { 3:{pp:160,total:null} },
+}
+function getTarifaG(tipo, n) { return TARIFAS_G[tipo]?.[n] || null }
+
+const initFormG = { nombre:'', tipo:'pareja', dias_semana:[], hora:'09:00', duracion_minutos:60, notas:'' }
+
+function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
+  const [sel,       setSel]       = useState(null)
+  const [modal,     setModal]     = useState(false)
+  const [editando,  setEditando]  = useState(false)
+  const [form,      setForm]      = useState(initFormG)
+  const [guardando, setGuardando] = useState(false)
+  const [cliAdd,    setCliAdd]    = useState('')
+  const [añadiendo, setAñadiendo] = useState(false)
+
+  // Refrescar sel cuando cambian grupos
+  useEffect(() => {
+    if (sel) {
+      const updated = grupos.find(g => g.id === sel.id)
+      if (updated) setSel(updated)
+    }
+  }, [grupos])
+
+  async function guardar() {
+    setGuardando(true)
+    const t = getTarifaG(form.tipo, form.dias_semana.length)
+    const payload = {
+      entrenador_id: uid, nombre: form.nombre.trim(), tipo: form.tipo,
+      dias_semana: form.dias_semana, hora: form.hora,
+      duracion_minutos: Number(form.duracion_minutos)||60,
+      precio_por_persona: t?.pp||0, precio_total: t?.total||0,
+      notas: form.notas.trim()||null,
+    }
+    if (editando && sel) await supabase.from('grupos').update(payload).eq('id', sel.id)
+    else await supabase.from('grupos').insert(payload)
+    setModal(false); setEditando(false)
+    await onActualizar(); setGuardando(false)
+  }
+
+  async function eliminar() {
+    if (!confirm('¿Eliminar este grupo?')) return
+    await supabase.from('grupos').update({ activo: false }).eq('id', sel.id)
+    setSel(null); await onActualizar()
+  }
+
+  async function añadir() {
+    if (!cliAdd || !sel) return
+    const miembros = sel.grupo_clientes?.filter(m=>m.activo)||[]
+    const max = sel.tipo==='pareja'?2:6
+    if (miembros.length>=max) { alert(`Máximo ${max}`); return }
+    setAñadiendo(true)
+    const t = getTarifaG(sel.tipo, sel.dias_semana?.length||0)
+    await supabase.from('grupo_clientes').upsert(
+      { grupo_id:sel.id, cliente_id:cliAdd, activo:true },
+      { onConflict:'grupo_id,cliente_id' }
+    )
+    await supabase.from('clientes').update({
+      modalidad: sel.tipo==='pareja'?'pareja':'grupo',
+      grupo_id: sel.id, precio_mensual: t?.pp||0,
+    }).eq('id', cliAdd)
+    setCliAdd(''); await onActualizar(); setAñadiendo(false)
+  }
+
+  async function quitar(gc) {
+    await supabase.from('grupo_clientes').update({ activo:false }).eq('id', gc.id)
+    await supabase.from('clientes').update({ modalidad:'individual', grupo_id:null }).eq('id', gc.cliente_id)
+    await onActualizar()
+  }
+
+  async function crearSesiones() {
+    const miembros = sel?.grupo_clientes?.filter(m=>m.activo)||[]
+    if (!miembros.length) { alert('Añade clientes primero'); return }
+    if (!confirm(`¿Crear sesiones recurrentes para ${miembros.length} miembros?`)) return
+    await supabase.from('sesiones_recurrentes').insert(
+      miembros.map(m=>({ entrenador_id:uid, cliente_id:m.cliente_id,
+        hora:sel.hora, duracion_minutos:sel.duracion_minutos,
+        dias_semana:sel.dias_semana, tipo:'presencial', activa:true, grupo_id:sel.id }))
+    )
+    alert('✓ Sesiones creadas en la Agenda')
+  }
+
+  const miembros = sel?.grupo_clientes?.filter(m=>m.activo)||[]
+  const max = sel?.tipo==='pareja'?2:6
+  const tarifaSel = sel ? getTarifaG(sel.tipo, sel.dias_semana?.length||0) : null
+  const tarifa = getTarifaG(form.tipo, form.dias_semana.length)
+  const disponibles = clientes.filter(c => !miembros.some(m=>m.cliente_id===c.id))
+
+  return (
+    <div className="mb-4 bg-white border border-black/8 rounded-2xl overflow-hidden shadow-sm">
+      {/* Header panel */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
+        <p className="font-bold text-[#0A0A0A]">Grupos de entrenamiento</p>
+        <button onClick={() => { setForm(initFormG); setEditando(false); setModal(true) }}
+          className="text-sm font-semibold text-[#FF5C00] hover:text-[#e05200] transition-colors">
+          + Nuevo grupo
+        </button>
+      </div>
+
+      <div className="flex divide-x divide-black/5" style={{minHeight: '180px'}}>
+        {/* Lista grupos */}
+        <div className="w-48 md:w-56 flex-shrink-0 overflow-y-auto" style={{maxHeight:'320px'}}>
+          {grupos.length === 0 ? (
+            <div className="p-4 text-center">
+              <p className="text-xs text-[#C0C0C0]">Sin grupos</p>
+              <button onClick={() => { setForm(initFormG); setModal(true) }}
+                className="mt-2 text-xs text-[#FF5C00] font-semibold">+ Crear</button>
+            </div>
+          ) : grupos.map(g => {
+            const ms = g.grupo_clientes?.filter(m=>m.activo)||[]
+            const mx = g.tipo==='pareja'?2:6
+            return (
+              <button key={g.id} onClick={() => setSel(sel?.id===g.id ? null : g)}
+                className={`w-full flex items-center gap-2.5 px-4 py-3 border-b border-black/5 text-left transition-all ${sel?.id===g.id?'bg-[#FF5C00]/5':'hover:bg-[#F7F6F3]'}`}>
+                <span>{g.tipo==='pareja'?'👫':'👥'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#0A0A0A] truncate">{g.nombre}</p>
+                  <p className={`text-xs mt-0.5 ${ms.length>=mx?'text-emerald-600 font-medium':'text-[#9B9B9B]'}`}>
+                    {ms.length}/{mx} · {g.hora?.slice(0,5)}
+                  </p>
+                </div>
+                {sel?.id===g.id && <span className="text-[#FF5C00] text-xs">→</span>}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Detalle grupo */}
+        {sel ? (
+          <div className="flex-1 p-4 overflow-y-auto" style={{maxHeight:'320px'}}>
+            {/* Header detalle */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{sel.tipo==='pareja'?'👫':'👥'}</span>
+                  <p className="font-bold text-[#0A0A0A]">{sel.nombre}</p>
+                </div>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {(sel.dias_semana||[]).map(d=>(
+                    <span key={d} className="text-xs bg-[#F5F5F0] text-[#6B6B6B] px-2 py-0.5 rounded-lg font-medium">{DIAS_G[d]}</span>
+                  ))}
+                  <span className="text-xs text-[#9B9B9B]">· {sel.hora?.slice(0,5)} · {sel.duracion_minutos}min</span>
+                </div>
+              </div>
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button onClick={() => { setForm({ nombre:sel.nombre, tipo:sel.tipo, dias_semana:sel.dias_semana||[], hora:sel.hora?.slice(0,5)||'09:00', duracion_minutos:sel.duracion_minutos||60, notas:sel.notas||'' }); setEditando(true); setModal(true) }}
+                  className="text-xs border border-black/10 text-[#6B6B6B] px-2.5 py-1.5 rounded-lg hover:bg-[#F5F5F0]">✏️ Editar</button>
+                <button onClick={eliminar}
+                  className="text-xs border border-red-100 text-red-400 px-2.5 py-1.5 rounded-lg hover:bg-red-50">Eliminar</button>
+              </div>
+            </div>
+
+            {/* Tarifa */}
+            {tarifaSel && (
+              <div className="flex gap-3 mb-4">
+                <div className="bg-[#F5F5F0] rounded-xl px-3 py-2 text-center">
+                  <p className="text-base font-bold text-[#0A0A0A]">{tarifaSel.pp}€</p>
+                  <p className="text-xs text-[#9B9B9B]">por persona</p>
+                </div>
+                {tarifaSel.total && (
+                  <div className="bg-[#FF5C00]/8 rounded-xl px-3 py-2 text-center">
+                    <p className="text-base font-bold text-[#FF5C00]">{tarifaSel.total}€</p>
+                    <p className="text-xs text-[#9B9B9B]">total grupo</p>
+                  </div>
+                )}
+                <div className="bg-emerald-50 rounded-xl px-3 py-2 text-center">
+                  <p className="text-base font-bold text-emerald-700">{tarifaSel.pp * miembros.length}€</p>
+                  <p className="text-xs text-[#9B9B9B]">ingreso real</p>
+                </div>
+              </div>
+            )}
+
+            {/* Miembros */}
+            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">Miembros {miembros.length}/{max}</p>
+            <div className="space-y-1.5 mb-3">
+              {miembros.length===0 && <p className="text-xs text-[#C0C0C0] py-2">Sin miembros — añade clientes</p>}
+              {miembros.map(m=>(
+                <div key={m.id} className="flex items-center gap-2 bg-[#F7F6F3] rounded-xl px-3 py-2">
+                  <div className="w-6 h-6 rounded-full bg-[#0A0A0A] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {m.clientes?.nombre?.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+                  </div>
+                  <p className="text-sm font-medium text-[#0A0A0A] flex-1 truncate">{m.clientes?.nombre}</p>
+                  {tarifaSel && <span className="text-xs font-bold text-[#FF5C00] flex-shrink-0">{tarifaSel.pp}€</span>}
+                  <button onClick={()=>quitar(m)} className="text-xs text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
+                </div>
+              ))}
+            </div>
+
+            {/* Añadir cliente */}
+            {miembros.length < max && (
+              <div className="flex gap-2 mb-4">
+                <select value={cliAdd} onChange={e=>setCliAdd(e.target.value)}
+                  className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#FF5C00]">
+                  <option value="">— Añadir cliente —</option>
+                  {disponibles.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+                <button onClick={añadir} disabled={!cliAdd||añadiendo}
+                  className="bg-[#0A0A0A] text-white text-sm font-semibold px-3 py-2 rounded-xl disabled:opacity-40">
+                  {añadiendo?'...':'Añadir'}
+                </button>
+              </div>
+            )}
+
+            {/* Crear sesiones */}
+            <button onClick={crearSesiones}
+              className="w-full border border-black/10 text-[#6B6B6B] text-xs font-semibold py-2 rounded-xl hover:bg-[#F5F5F0] transition-all">
+              📅 Crear sesiones recurrentes en Agenda
+            </button>
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-[#C0C0C0] text-sm">
+            Selecciona un grupo para gestionarlo
+          </div>
+        )}
+      </div>
+
+      {/* Modal crear/editar */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
+          onClick={()=>{setModal(false);setEditando(false)}}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <h2 className="font-bold text-[#0A0A0A] mb-4">{editando?`Editar — ${sel?.nombre}`:'Nuevo grupo'}</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
+                <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
+                  placeholder="Ej: Pareja Lunes/Miércoles · Ana y Carlos"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Modalidad</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['pareja','👫','Pareja','2 personas · 2-4 días'],['grupo','👥','Grupo','3-6 personas · 3 días']].map(([v,ic,l,sub])=>(
+                    <button key={v} type="button" onClick={()=>setForm({...form,tipo:v,dias_semana:[]})}
+                      className={`py-3 px-3 rounded-xl border text-left transition-all ${form.tipo===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 hover:border-black/20'}`}>
+                      <p className="text-xl mb-0.5">{ic}</p>
+                      <p className={`text-sm font-bold ${form.tipo===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                      <p className="text-xs text-[#9B9B9B]">{sub}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Días</label>
+                <div className="grid grid-cols-7 gap-1">
+                  {[1,2,3,4,5,6,7].map(d=>{
+                    const s = form.dias_semana.includes(d)
+                    const maxD = form.tipo==='grupo'?3:4
+                    const dis = !s && form.dias_semana.length>=maxD
+                    return (
+                      <button key={d} type="button" disabled={dis}
+                        onClick={()=>{ const c=form.dias_semana; setForm({...form,dias_semana:s?c.filter(x=>x!==d):[...c,d].sort()}) }}
+                        className={`py-2 rounded-xl text-xs font-semibold transition-all ${s?'text-white':'border border-black/10 text-[#6B6B6B]'} ${dis?'opacity-30 cursor-not-allowed':''}`}
+                        style={s?{background:'#0A0A0A'}:{}}>
+                        {DIAS_G[d]}
+                      </button>
+                    )
+                  })}
+                </div>
+                {tarifa && (
+                  <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex justify-between">
+                    <p className="text-xs text-emerald-700">{form.dias_semana.length} días · {form.tipo}</p>
+                    <p className="text-xs font-bold text-emerald-700">{tarifa.pp}€/p{tarifa.total?` · ${tarifa.total}€ total`:''}</p>
+                  </div>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Hora</label>
+                  <input type="time" value={form.hora} onChange={e=>setForm({...form,hora:e.target.value})}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Duración (min)</label>
+                  <input type="number" value={form.duracion_minutos} onChange={e=>setForm({...form,duracion_minutos:e.target.value})}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Notas (opcional)</label>
+                <textarea value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})}
+                  rows={2} placeholder="Amigos del trabajo, nivel intermedio…"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"/>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={()=>{setModal(false);setEditando(false)}}
+                  className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0]">
+                  Cancelar
+                </button>
+                <button onClick={guardar} disabled={!form.nombre.trim()||form.dias_semana.length===0||guardando}
+                  className="flex-1 bg-[#0A0A0A] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-[#222] transition-all">
+                  {guardando?'Guardando...':editando?'Guardar cambios':'Crear grupo'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

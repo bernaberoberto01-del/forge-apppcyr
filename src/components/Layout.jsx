@@ -5,7 +5,6 @@ import { NavLink, useLocation } from 'react-router-dom'
 const TODOS_MODULOS = [
   { id: 'dashboard',  path: '/dashboard',  label: 'Dashboard',  icon: '📊' },
   { id: 'clientes',   path: '/clientes',   label: 'Clientes',   icon: '👥' },
-  { id: 'grupos',     path: '/grupos',     label: 'Grupos',     icon: '🏃' },
   { id: 'rutinas',    path: '/rutinas',    label: 'Rutinas',    icon: '💪' },
   { id: 'seguimiento',path: '/seguimiento',label: 'Seguimiento',icon: '📋' },
   { id: 'pagos',      path: '/pagos',      label: 'Pagos',      icon: '💶' },
