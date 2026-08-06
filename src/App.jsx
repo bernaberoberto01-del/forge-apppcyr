@@ -19,7 +19,7 @@ import Configuracion from './pages/Configuracion'
 import Mensajes from './pages/Mensajes'
 import Nutricion from './pages/Nutricion'
 import Biblioteca from './pages/Biblioteca'
-import AdminCentro from './pages/AdminCentro'
+import Grupos from './pages/Grupos'
 import ImportarDatos from './pages/ImportarDatos'
 import PortalEntrenador from './pages/PortalEntrenador'
 import NotFound from './pages/NotFound'
@@ -59,6 +59,7 @@ function AppPrivada({ session }) {
           <Routes>
             <Route path="/dashboard" element={<Dashboard session={session} />} />
             <Route path="/clientes" element={<Clientes session={session} />} />
+            <Route path="/grupos" element={<Grupos session={session} />} />
             <Route path="/rutinas" element={<Rutinas session={session} />} />
             <Route path="/seguimiento" element={<Seguimiento session={session} />} />
             <Route path="/pagos" element={<Pagos session={session} />} />
