@@ -33,7 +33,7 @@ function calcTarifa(modalidad, dias) {
   return TARIFAS_GRUPO[modalidad]?.[dias] || null
 }
 
-const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'',modalidad:'individual',grupo_id:'' }
+const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'' }
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const AVATAR_COLORS = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
 const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
@@ -129,7 +129,7 @@ export default function Clientes({ session }) {
 
   async function guardar() {
     setLoading(true)
-    const p = { ...form, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, precio_mensual: Number(form.precio_mensual) || 0, modalidad: form.modalidad || 'individual', grupo_id: form.grupo_id || null }
+    const p = { ...form, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, precio_mensual: Number(form.precio_mensual) || 0 }
     let clienteId = editId
     if (editId) {
       await supabase.from('clientes').update(p).eq('id', editId)
@@ -275,7 +275,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', modalidad:c.modalidad||'individual', grupo_id:c.grupo_id||'' })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'' })
     setEditId(c.id); setModal(true); setDetalle(null)
   }
 
@@ -406,6 +406,12 @@ export default function Clientes({ session }) {
             {paginados.map(c => {
               const obj = OBJ[c.objetivo]
               const al = alertas[c.id] || {}
+              const grupoC = c.grupo_id ? grupos.find(g => g.id === c.grupo_id) : null
+              const modalidadBadge = grupoC
+                ? grupoC.tipo === 'pareja'
+                  ? { label: `👫 ${grupoC.nombre}`, cls: 'bg-blue-50 text-blue-700 border border-blue-200' }
+                  : { label: `👥 ${grupoC.nombre}`, cls: 'bg-purple-50 text-purple-700 border border-purple-200' }
+                : null
               const estadoBadge = al.pagoVencido
                 ? { label: '💳 Vencido', cls: 'bg-red-50 text-red-700' }
                 : al.sinCI
@@ -429,8 +435,8 @@ export default function Clientes({ session }) {
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoBadge.cls}`}>{estadoBadge.label}</span>
-                      {c.modalidad && c.modalidad !== 'individual' && (
-                        <span className="text-xs text-[#6B6B6B]">{c.modalidad === 'pareja' ? '👫' : '👥'}</span>
+                      {modalidadBadge && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate max-w-[100px] ${modalidadBadge.cls}`}>{modalidadBadge.label}</span>
                       )}
                       {c.precio_mensual > 0 && <span className="text-xs font-bold text-[#FF5C00]">{c.precio_mensual}€</span>}
                     </div>
@@ -451,7 +457,10 @@ export default function Clientes({ session }) {
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${c.tipo === 'online' ? 'bg-blue-50 text-blue-700' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
                         {c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}
                       </span>
-                      {c.tipo_entrenamiento && TIPOS_MAP[c.tipo_entrenamiento] && (
+                      {modalidadBadge && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate ${modalidadBadge.cls}`}>{modalidadBadge.label}</span>
+                      )}
+                      {!modalidadBadge && c.tipo_entrenamiento && TIPOS_MAP[c.tipo_entrenamiento] && (
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TIPOS_MAP[c.tipo_entrenamiento].color}`}>
                           {TIPOS_MAP[c.tipo_entrenamiento].icon} {TIPOS_MAP[c.tipo_entrenamiento].label}
                         </span>
@@ -631,68 +640,6 @@ export default function Clientes({ session }) {
                   <input type="number" step="0.1" value={form.peso_objetivo} onChange={e => setForm({...form,peso_objetivo:e.target.value})}
                     className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
                 </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Modalidad de entrenamiento</label>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  {[['individual','👤','Individual'],['pareja','👫','Pareja'],['grupo','👥','Grupo']].map(([v,ic,l])=>(
-                    <button key={v} type="button" onClick={()=>setForm({...form,modalidad:v,grupo_id:'',precio_mensual:calcTarifa(v,form.dias_semana)||form.precio_mensual})}
-                      className={`py-2.5 px-2 rounded-xl border text-center transition-all ${form.modalidad===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 hover:border-black/20'}`}>
-                      <p className="text-lg">{ic}</p>
-                      <p className={`text-xs font-semibold mt-0.5 ${form.modalidad===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
-                    </button>
-                  ))}
-                </div>
-                {/* Tarifa calculada */}
-                {form.modalidad !== 'individual' && (() => {
-                  const t = calcTarifa(form.modalidad, form.dias_semana)
-                  return t ? (
-                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 mb-3 flex items-center justify-between">
-                      <p className="text-xs text-emerald-700">{form.modalidad === 'pareja' ? 'Pareja' : 'Grupo'} · {form.dias_semana} días/sem</p>
-                      <p className="text-sm font-bold text-emerald-700">{t}€/persona</p>
-                    </div>
-                  ) : (
-                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
-                      <p className="text-xs text-amber-700">Sin tarifa estándar para esta combinación — introduce el precio manualmente</p>
-                    </div>
-                  )
-                })()}
-                {/* Selector de grupo + creación inline */}
-                {form.modalidad !== 'individual' && (() => {
-                  const gruposFiltrados = grupos.filter(g => g.tipo === form.modalidad)
-                  const [creandoGrupo, setCreandoGrupo] = window._grupoState || [false, ()=>{}]
-                  // Usamos un input controlado local
-                  return (
-                    <div>
-                      <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">
-                        {form.modalidad === 'pareja' ? '👫 Pareja' : '👥 Grupo'} — asignar a
-                      </label>
-                      {gruposFiltrados.length > 0 && (
-                        <select value={form.grupo_id} onChange={e=>setForm({...form,grupo_id:e.target.value})}
-                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#FF5C00] mb-2">
-                          <option value="">— Crear nuevo o sin grupo —</option>
-                          {gruposFiltrados.map(g=>{
-                            const nMiembros = (g.grupo_clientes||[]).filter(m=>m.activo).length
-                            const max = g.tipo==='pareja'?2:6
-                            return <option key={g.id} value={g.id} disabled={nMiembros>=max}>{g.nombre} · {nMiembros}/{max} personas</option>
-                          })}
-                        </select>
-                      )}
-                      {!form.grupo_id && (
-                        <NuevoGrupoInline
-                          modalidad={form.modalidad}
-                          diasSemana={form.dias_semana}
-                          hora={'09:00'}
-                          uid={uid}
-                          onCreado={async (grupoId) => {
-                            await cargar()
-                            setForm(f => ({...f, grupo_id: grupoId}))
-                          }}
-                        />
-                      )}
-                    </div>
-                  )
-                })()}
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Precio mensual (€)</label>
