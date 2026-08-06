@@ -126,218 +126,183 @@ export default function Dashboard({ session }) {
   const d = datos
 
   return (
-    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto space-y-4">
-      {/* Saludo */}
-      <div>
-        <h1 className="text-2xl font-bold text-[#0A0A0A]">{saludo}, {nombre} 👋</h1>
-        <p className="text-sm text-[#6B6B6B] mt-0.5 capitalize">
-          {new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
-        </p>
-      </div>
+    <div className="flex-1 overflow-y-auto">
+      <div className="p-4 md:p-6 pb-20 md:pb-6 space-y-4 max-w-screen-xl mx-auto">
 
-      {/* Métricas principales */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          ['Clientes activos', d.activos.length, '#FF5C00', '/clientes'],
-          ['Ingresos mes', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos'],
-          ['Sesiones hoy', d.sesioneHoy.length, '#6366f1', '/agenda'],
-          ['Adherencia 4s', d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento'],
-        ].map(([l,v,c,ruta]) => (
-          <button key={l} onClick={() => navigate(ruta)}
-            className="bg-white rounded-xl border border-black/5 shadow-sm p-4 text-center hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
-            <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
-            <p className="text-xs text-[#6B6B6B] mt-1 leading-tight">{l}</p>
-          </button>
-        ))}
-      </div>
-
-      {/* Layout 2 columnas en escritorio */}
-      <div className="md:grid md:grid-cols-3 md:gap-4 space-y-4 md:space-y-0">
-
-        {/* Columna izquierda — 2/3 */}
-        <div className="md:col-span-2 space-y-4">
-
-      {/* Sesiones de hoy */}
-      {sesionesHoy.length > 0 && (
-        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-bold text-[#0A0A0A]">Hoy — {sesionesHoy.length} sesiones</p>
-            <button onClick={() => navigate('/agenda')} className="text-xs text-[#FF5C00] font-medium">Ver agenda →</button>
-          </div>
-          <div className="space-y-2">
-            {sesionesHoy.map(s => {
-              const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-              return (
-                <div key={s.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${s.completada ? 'bg-emerald-50 border border-emerald-100' : 'bg-[#F5F5F0]'}`}>
-                  <div className="w-8 h-8 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">
-                    {ini(s.clientes?.nombre)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre}</p>
-                    <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos||60}min · {s.tipo}</p>
-                  </div>
-                  {s.completada
-                    ? <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium flex-shrink-0">✓ Hecha</span>
-                    : <span className="text-xs bg-white border border-black/10 text-[#6B6B6B] px-2 py-1 rounded-full flex-shrink-0">{s.hora}</span>
-                  }
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-        </div>{/* fin col-span-2 */}
-
-        {/* Columna derecha — 1/3 */}
-        <div className="space-y-4">
-
-        {/* Gráfica ingresos */}
-      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
-        <div className="flex items-center justify-between mb-4">
+        {/* Saludo */}
+        <div className="flex items-start justify-between">
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A]">Ingresos últimos 6 meses</p>
-            <p className="text-xs text-[#6B6B6B] mt-0.5">Total: {d.ingresosPorMes.reduce((s,m)=>s+m.valor,0)}€</p>
-          </div>
-          <button onClick={() => navigate('/pagos')} className="text-xs text-[#FF5C00] font-medium">Ver pagos →</button>
-        </div>
-        <BarChart datos={d.ingresosPorMes} max={d.maxIngreso} />
-      </div>
-
-      {/* Alertas */}
-      {(d.alertasPagos.length > 0 || d.clientesSinCI.length > 0 || d.alertasExtra.length > 0) && (
-        <div className="space-y-2">
-          <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide">⚠ Requieren atención</p>
-          {d.alertasPagos.slice(0,3).map(c => (
-            <button key={c.id} onClick={() => navigate('/pagos')}
-              className="w-full bg-red-50 border border-red-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-red-100 transition-all">
-              <span className="text-lg flex-shrink-0">💳</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-red-700 truncate">{c.nombre}</p>
-                <p className="text-xs text-red-500">Pago vencido</p>
-              </div>
-              <span className="text-red-400 flex-shrink-0">›</span>
-            </button>
-          ))}
-          {d.alertasPagos.length > 3 && (
-            <button onClick={() => navigate('/pagos')} className="w-full text-xs text-red-600 font-semibold text-center py-1.5 hover:underline">
-              +{d.alertasPagos.length - 3} pagos vencidos más →
-            </button>
-          )}
-          {d.clientesSinCI.slice(0,3).map(c => (
-            <button key={c.id} onClick={() => navigate('/seguimiento')}
-              className="w-full bg-amber-50 border border-amber-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-amber-100 transition-all">
-              <span className="text-lg flex-shrink-0">📋</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-amber-700 truncate">{c.nombre}</p>
-                <p className="text-xs text-amber-500">Sin check-in esta semana</p>
-              </div>
-              <span className="text-amber-400 flex-shrink-0">›</span>
-            </button>
-          ))}
-          {d.clientesSinCI.length > 3 && (
-            <button onClick={() => navigate('/seguimiento')} className="w-full text-xs text-amber-600 font-semibold text-center py-1.5 hover:underline">
-              +{d.clientesSinCI.length - 3} sin check-in más →
-            </button>
-          )}
-          {d.alertasExtra.filter(a => a.tipo === 'cancelacion_sesion').slice(0,3).map(a => (
-            <button key={a.id} onClick={() => navigate('/agenda')}
-              className="w-full bg-orange-50 border border-orange-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-orange-100 transition-all">
-              <span className="text-lg flex-shrink-0">❌</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-orange-700 truncate">Sesión cancelada por cliente</p>
-                <p className="text-xs text-orange-500 truncate">{a.mensaje}</p>
-              </div>
-              <button onClick={async e => { e.stopPropagation(); await supabase.from('alertas').update({ leida: true }).eq('id', a.id); cargar() }}
-                className="text-orange-300 hover:text-orange-600 text-lg flex-shrink-0">×</button>
-            </button>
-          ))}
-          {d.alertasExtra.filter(a => a.tipo === 'cancelacion_sesion').length > 3 && (
-            <button onClick={() => navigate('/agenda')} className="w-full text-xs text-orange-600 font-semibold text-center py-1.5 hover:underline">
-              +{d.alertasExtra.filter(a => a.tipo === 'cancelacion_sesion').length - 3} cancelaciones más →
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Stats secundarias */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
-          <p className="text-xs font-semibold text-[#6B6B6B] mb-2">Tasa de retención</p>
-          <p className="text-2xl font-bold text-[#0A0A0A]">{d.tasaRetencion}%</p>
-          <p className="text-xs text-[#6B6B6B] mt-0.5">{d.activos.length} activos de {d.totalClientes}</p>
-          <div className="mt-2 h-1.5 bg-black/5 rounded-full overflow-hidden">
-            <div className="h-full bg-[#FF5C00] rounded-full" style={{width:`${d.tasaRetencion}%`}} />
+            <h1 className="text-xl md:text-2xl font-bold text-[#0A0A0A]">{saludo}, {nombre} 👋</h1>
+            <p className="text-sm text-[#6B6B6B] mt-0.5 capitalize">
+              {new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
+            </p>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
-          <p className="text-xs font-semibold text-[#6B6B6B] mb-2">Sesiones hoy</p>
-          {d.sesioneHoy.length === 0 ? (
-            <p className="text-sm text-[#6B6B6B]">Sin sesiones programadas</p>
-          ) : (
-            <div className="space-y-1">
-              {d.sesioneHoy.slice(0,3).map(s => (
-                <div key={s.id} className="flex items-center gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.completada?'bg-emerald-500':'bg-[#FF5C00]'}`} />
-                  <p className="text-xs text-[#0A0A0A] truncate">{s.fecha}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Accesos rápidos */}
-      <div>
-        <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide mb-3">Accesos rápidos</p>
-        <div className="grid grid-cols-3 gap-2">
+        {/* KPIs — 4 columnas siempre */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
-            ['👤', 'Nuevo cliente', '/clientes'],
-            ['💪', 'Nueva rutina', '/rutinas'],
-            ['📋', 'Enviar check-in', '/seguimiento'],
-            ['💳', 'Registrar pago', '/pagos'],
-            ['📅', 'Ver agenda', '/agenda'],
-            ['💬', 'Mensajes', '/mensajes'],
-          ].map(([icon, label, ruta]) => (
-            <button key={label} onClick={() => navigate(ruta)}
-              className="bg-white rounded-xl border border-black/5 shadow-sm p-3 text-center hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
-              <p className="text-2xl mb-1">{icon}</p>
-              <p className="text-xs font-medium text-[#6B6B6B] leading-tight">{label}</p>
+            ['Clientes activos', d.activos.length, '#FF5C00', '/clientes', '👥'],
+            ['Ingresos mes', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos', '💶'],
+            ['Sesiones hoy', sesionesHoy.length, '#6366f1', '/agenda', '📅'],
+            ['Adherencia 4s', d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento', '📊'],
+          ].map(([l,v,c,ruta,ic]) => (
+            <button key={l} onClick={() => navigate(ruta)}
+              className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 text-left hover:shadow-md hover:border-[#FF5C00]/20 transition-all group">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xl">{ic}</span>
+                <span className="text-xs text-[#9B9B9B] group-hover:text-[#FF5C00] transition-colors">→</span>
+              </div>
+              <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
+              <p className="text-xs text-[#6B6B6B] mt-1 leading-tight">{l}</p>
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Clientes activos */}
-      {d.activos.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide">Clientes activos</p>
-            <button onClick={() => navigate('/clientes')} className="text-xs text-[#FF5C00] font-medium">Ver todos →</button>
+        {/* Grid principal — 3 columnas en escritorio */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* Sesiones de hoy — col 2 */}
+          <div className="lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-bold text-[#0A0A0A]">
+                  {sesionesHoy.length > 0 ? `Hoy — ${sesionesHoy.length} sesiones` : 'Agenda de hoy'}
+                </p>
+                <button onClick={() => navigate('/agenda')} className="text-xs text-[#FF5C00] font-medium hover:underline">Ver agenda →</button>
+              </div>
+              {sesionesHoy.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-2xl mb-2">🏖</p>
+                  <p className="text-sm text-[#9B9B9B]">Sin sesiones programadas hoy</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {sesionesHoy.map(s => {
+                    const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+                    return (
+                      <div key={s.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${s.completada ? 'bg-emerald-50 border border-emerald-100' : 'bg-[#F5F5F0]'}`}>
+                        <div className="w-8 h-8 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">
+                          {ini(s.clientes?.nombre)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre}</p>
+                          <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos||60}min</p>
+                        </div>
+                        {s.completada
+                          ? <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium flex-shrink-0">✓</span>
+                          : <span className="text-xs text-[#9B9B9B] flex-shrink-0">{s.hora}</span>
+                        }
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Gráfica ingresos */}
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-sm font-bold text-[#0A0A0A]">Ingresos últimos 6 meses</p>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Total: {d.ingresosPorMes.reduce((s,m)=>s+m.valor,0)}€</p>
+                </div>
+                <button onClick={() => navigate('/pagos')} className="text-xs text-[#FF5C00] font-medium hover:underline">Ver pagos →</button>
+              </div>
+              <BarChart datos={d.ingresosPorMes} max={d.maxIngreso} />
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {d.activos.slice(0,6).map(c => {
-              const tieneCI = d.clientesSinCI ? !d.clientesSinCI.find(x=>x.id===c.id) : true
-              return (
-                <button key={c.id} onClick={() => navigate('/clientes')}
-                  className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-left flex items-center gap-3 hover:shadow-md transition-all">
-                  <div className="w-9 h-9 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-sm flex-shrink-0">
-                    {(c.nombre||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+
+          {/* Columna derecha — alertas y estado clientes */}
+          <div className="space-y-4">
+
+            {/* Alertas */}
+            {(d.alertasPagos.length > 0 || d.clientesSinCI.length > 0 || d.alertasExtra.length > 0) ? (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 space-y-2">
+                <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide mb-3">⚠ Requieren atención</p>
+                {d.alertasPagos.slice(0,2).map(c => (
+                  <button key={c.id} onClick={() => navigate('/pagos')}
+                    className="w-full bg-red-50 border border-red-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-red-100 transition-all">
+                    <span className="text-base flex-shrink-0">💳</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-red-700 truncate">{c.nombre}</p>
+                      <p className="text-xs text-red-500">Pago vencido</p>
+                    </div>
+                  </button>
+                ))}
+                {d.clientesSinCI.slice(0,3).map(c => (
+                  <button key={c.id} onClick={() => navigate('/seguimiento')}
+                    className="w-full bg-amber-50 border border-amber-100 rounded-xl p-3 text-left flex items-center gap-3 hover:bg-amber-100 transition-all">
+                    <span className="text-base flex-shrink-0">📋</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-amber-700 truncate">{c.nombre}</p>
+                      <p className="text-xs text-amber-600">Sin check-in esta semana</p>
+                    </div>
+                  </button>
+                ))}
+                {d.alertasExtra.slice(0,2).map(a => (
+                  <div key={a.id} className="bg-[#F5F5F0] rounded-xl p-3 flex items-start gap-2">
+                    <span className="text-sm flex-shrink-0">🔔</span>
+                    <p className="text-xs text-[#444] leading-relaxed">{a.mensaje}</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{c.nombre}</p>
-                    <p className="text-xs text-[#6B6B6B]">{c.nivel} · {c.tipo}</p>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 text-center">
+                <p className="text-2xl mb-2">✅</p>
+                <p className="text-sm font-semibold text-[#0A0A0A]">Todo en orden</p>
+                <p className="text-xs text-[#9B9B9B] mt-0.5">Sin alertas pendientes</p>
+              </div>
+            )}
+
+            {/* Estado clientes */}
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+              <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide mb-3">Estado clientes</p>
+              <div className="space-y-2.5">
+                {[
+                  ['Activos', d.activos.length, '#10b981'],
+                  ['Retención', `${d.tasaRetencion}%`, '#6366f1'],
+                  ['Total histórico', d.totalClientes, '#9B9B9B'],
+                ].map(([l,v,c]) => (
+                  <div key={l} className="flex items-center justify-between">
+                    <p className="text-xs text-[#6B6B6B]">{l}</p>
+                    <p className="text-sm font-bold" style={{color:c}}>{v}</p>
                   </div>
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${tieneCI ? 'bg-emerald-500' : 'bg-amber-400'}`} />
-                </button>
-              )
-            })}
+                ))}
+                <div className="h-px bg-black/5 my-1"/>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-[#6B6B6B]">Online</p>
+                  <p className="text-sm font-bold text-[#0A0A0A]">{d.activos.filter(c=>c.tipo==='online').length}</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-[#6B6B6B]">Presencial</p>
+                  <p className="text-sm font-bold text-[#0A0A0A]">{d.activos.filter(c=>c.tipo!=='online').length}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Accesos directos */}
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+              <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide mb-3">Accesos rápidos</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  ['Nueva sesión', '📅', '/agenda'],
+                  ['Nuevo cliente', '👤', '/clientes'],
+                  ['Mensajes', '✉️', '/mensajes'],
+                  ['Seguimiento', '📋', '/seguimiento'],
+                ].map(([l,ic,ruta]) => (
+                  <button key={l} onClick={() => navigate(ruta)}
+                    className="flex flex-col items-center gap-1.5 p-3 bg-[#F7F6F3] rounded-xl hover:bg-[#F0EEE8] transition-all">
+                    <span className="text-xl">{ic}</span>
+                    <p className="text-xs font-medium text-[#6B6B6B] text-center leading-tight">{l}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
           </div>
         </div>
-      )}
-
-        </div>{/* fin col derecha */}
-      </div>{/* fin grid 2 columnas */}
+      </div>
     </div>
   )
 }

@@ -45,6 +45,9 @@ export default function Layout({ children, session, config }) {
   const negocio = config?.nombre_negocio || 'Forge Studio OS'
   const acento = config?.color_acento || '#FF5C00'
 
+  // Redirigir a dashboard si aterrizamos en /
+  if (location.pathname === '/') return <Navigate to="/dashboard" replace />
+
   const NavItem = ({ item }) => {
     const badge = item.id === 'mensajes' && mensajesNL > 0 ? mensajesNL : item.id === 'dashboard' && alertasNL > 0 ? alertasNL : 0
     return (
