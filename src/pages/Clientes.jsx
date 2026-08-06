@@ -1127,21 +1127,46 @@ function getTarifaG(tipo, n) { return TARIFAS_G[tipo]?.[n] || null }
 const initFormG = { nombre:'', tipo:'pareja', dias_semana:[], hora:'09:00', duracion_minutos:60, notas:'' }
 
 function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
-  const [sel,       setSel]       = useState(null)
-  const [modal,     setModal]     = useState(false)
-  const [editando,  setEditando]  = useState(false)
-  const [form,      setForm]      = useState(initFormG)
-  const [guardando, setGuardando] = useState(false)
-  const [cliAdd,    setCliAdd]    = useState('')
-  const [añadiendo, setAñadiendo] = useState(false)
+  const [sel,        setSel]        = useState(null)
+  const [modal,      setModal]      = useState(false)
+  const [editando,   setEditando]   = useState(false)
+  const [form,       setForm]       = useState(initFormG)
+  const [guardando,  setGuardando]  = useState(false)
+  const [cliAdd,     setCliAdd]     = useState('')
+  const [añadiendo,  setAñadiendo]  = useState(false)
+  const [precioPP,   setPrecioPP]   = useState('')   // precio/persona editable
+  const [vistaMovil, setVistaMovil] = useState('lista') // lista | detalle
 
   // Refrescar sel cuando cambian grupos
   useEffect(() => {
     if (sel) {
       const updated = grupos.find(g => g.id === sel.id)
-      if (updated) setSel(updated)
+      if (updated) {
+        setSel(updated)
+        const t = getTarifaG(updated.tipo, updated.dias_semana?.length||0)
+        setPrecioPP(String(updated.precio_por_persona || t?.pp || ''))
+      }
     }
   }, [grupos])
+
+  function seleccionar(g) {
+    if (sel?.id === g.id) { setSel(null); setVistaMovil('lista'); return }
+    setSel(g)
+    const t = getTarifaG(g.tipo, g.dias_semana?.length||0)
+    setPrecioPP(String(g.precio_por_persona || t?.pp || ''))
+    setVistaMovil('detalle')
+  }
+
+  async function guardarPrecio() {
+    if (!sel || !precioPP) return
+    await supabase.from('grupos').update({ precio_por_persona: Number(precioPP) }).eq('id', sel.id)
+    // Actualizar también los clientes del grupo
+    const miembrosIds = miembros.map(m => m.cliente_id)
+    if (miembrosIds.length > 0) {
+      await supabase.from('clientes').update({ precio_mensual: Number(precioPP) }).in('id', miembrosIds)
+    }
+    await onActualizar()
+  }
 
   async function guardar() {
     setGuardando(true)
@@ -1171,14 +1196,14 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
     const max = sel.tipo==='pareja'?2:6
     if (miembros.length>=max) { alert(`Máximo ${max}`); return }
     setAñadiendo(true)
-    const t = getTarifaG(sel.tipo, sel.dias_semana?.length||0)
+    const precioFinal = Number(precioPP) || getTarifaG(sel.tipo, sel.dias_semana?.length||0)?.pp || 0
     await supabase.from('grupo_clientes').upsert(
       { grupo_id:sel.id, cliente_id:cliAdd, activo:true },
       { onConflict:'grupo_id,cliente_id' }
     )
     await supabase.from('clientes').update({
       modalidad: sel.tipo==='pareja'?'pareja':'grupo',
-      grupo_id: sel.id, precio_mensual: t?.pp||0,
+      grupo_id: sel.id, precio_mensual: precioFinal,
     }).eq('id', cliAdd)
     setCliAdd(''); await onActualizar(); setAñadiendo(false)
   }
@@ -1206,131 +1231,151 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
   const tarifaSel = sel ? getTarifaG(sel.tipo, sel.dias_semana?.length||0) : null
   const tarifa = getTarifaG(form.tipo, form.dias_semana.length)
   const disponibles = clientes.filter(c => !miembros.some(m=>m.cliente_id===c.id))
+  const ppActual = Number(precioPP) || tarifaSel?.pp || 0
 
   return (
     <div className="mb-4 bg-white border border-black/8 rounded-2xl overflow-hidden shadow-sm">
-      {/* Header panel */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-black/5">
-        <p className="font-bold text-[#0A0A0A]">Grupos de entrenamiento</p>
-        <button onClick={() => { setForm(initFormG); setEditando(false); setModal(true) }}
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-black/5">
+        <div className="flex items-center gap-3">
+          {sel && vistaMovil==='detalle' && (
+            <button onClick={()=>setVistaMovil('lista')} className="md:hidden text-[#6B6B6B] text-lg leading-none">←</button>
+          )}
+          <p className="font-bold text-[#0A0A0A]">Grupos de entrenamiento</p>
+        </div>
+        <button onClick={()=>{setForm(initFormG);setEditando(false);setModal(true)}}
           className="text-sm font-semibold text-[#FF5C00] hover:text-[#e05200] transition-colors">
-          + Nuevo grupo
+          + Nuevo
         </button>
       </div>
 
-      <div className="flex divide-x divide-black/5" style={{minHeight: '180px'}}>
-        {/* Lista grupos */}
-        <div className="w-48 md:w-56 flex-shrink-0 overflow-y-auto" style={{maxHeight:'320px'}}>
+      {/* Layout responsive */}
+      <div className="flex" style={{minHeight:'200px', maxHeight:'380px'}}>
+
+        {/* Lista grupos — oculta en móvil cuando hay detalle */}
+        <div className={`border-r border-black/5 overflow-y-auto flex-shrink-0 w-full md:w-52 ${sel && vistaMovil==='detalle' ? 'hidden md:block' : 'block'}`}>
           {grupos.length === 0 ? (
-            <div className="p-4 text-center">
-              <p className="text-xs text-[#C0C0C0]">Sin grupos</p>
-              <button onClick={() => { setForm(initFormG); setModal(true) }}
-                className="mt-2 text-xs text-[#FF5C00] font-semibold">+ Crear</button>
+            <div className="p-5 text-center">
+              <p className="text-xs text-[#C0C0C0] mb-2">Sin grupos</p>
+              <button onClick={()=>{setForm(initFormG);setModal(true)}} className="text-xs text-[#FF5C00] font-semibold">+ Crear primero</button>
             </div>
           ) : grupos.map(g => {
             const ms = g.grupo_clientes?.filter(m=>m.activo)||[]
             const mx = g.tipo==='pareja'?2:6
             return (
-              <button key={g.id} onClick={() => setSel(sel?.id===g.id ? null : g)}
-                className={`w-full flex items-center gap-2.5 px-4 py-3 border-b border-black/5 text-left transition-all ${sel?.id===g.id?'bg-[#FF5C00]/5':'hover:bg-[#F7F6F3]'}`}>
-                <span>{g.tipo==='pareja'?'👫':'👥'}</span>
+              <button key={g.id} onClick={()=>seleccionar(g)}
+                className={`w-full flex items-center gap-2.5 px-4 py-3.5 border-b border-black/5 text-left transition-all ${sel?.id===g.id?'bg-[#FF5C00]/5':'hover:bg-[#F7F6F3]'}`}>
+                <span className="text-lg flex-shrink-0">{g.tipo==='pareja'?'👫':'👥'}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#0A0A0A] truncate">{g.nombre}</p>
                   <p className={`text-xs mt-0.5 ${ms.length>=mx?'text-emerald-600 font-medium':'text-[#9B9B9B]'}`}>
                     {ms.length}/{mx} · {g.hora?.slice(0,5)}
                   </p>
                 </div>
-                {sel?.id===g.id && <span className="text-[#FF5C00] text-xs">→</span>}
+                <span className={`text-xs flex-shrink-0 ${sel?.id===g.id?'text-[#FF5C00]':'text-[#C0C0C0]'}`}>›</span>
               </button>
             )
           })}
         </div>
 
-        {/* Detalle grupo */}
+        {/* Detalle — ocupa todo en móvil */}
         {sel ? (
-          <div className="flex-1 p-4 overflow-y-auto" style={{maxHeight:'320px'}}>
-            {/* Header detalle */}
-            <div className="flex items-start justify-between mb-4">
+          <div className={`overflow-y-auto p-4 space-y-4 ${sel && vistaMovil==='detalle' ? 'flex-1 w-full' : 'hidden md:block flex-1'}`}>
+
+            {/* Cabecera detalle */}
+            <div className="flex items-start justify-between">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-lg">{sel.tipo==='pareja'?'👫':'👥'}</span>
                   <p className="font-bold text-[#0A0A0A]">{sel.nombre}</p>
+                  <span className="text-xs bg-[#F5F5F0] text-[#6B6B6B] px-2 py-0.5 rounded-lg capitalize">{sel.tipo}</span>
                 </div>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   {(sel.dias_semana||[]).map(d=>(
                     <span key={d} className="text-xs bg-[#F5F5F0] text-[#6B6B6B] px-2 py-0.5 rounded-lg font-medium">{DIAS_G[d]}</span>
                   ))}
-                  <span className="text-xs text-[#9B9B9B]">· {sel.hora?.slice(0,5)} · {sel.duracion_minutos}min</span>
+                  <span className="text-xs text-[#9B9B9B]">· {sel.hora?.slice(0,5)}</span>
                 </div>
               </div>
-              <div className="flex gap-1.5 flex-shrink-0">
-                <button onClick={() => { setForm({ nombre:sel.nombre, tipo:sel.tipo, dias_semana:sel.dias_semana||[], hora:sel.hora?.slice(0,5)||'09:00', duracion_minutos:sel.duracion_minutos||60, notas:sel.notas||'' }); setEditando(true); setModal(true) }}
-                  className="text-xs border border-black/10 text-[#6B6B6B] px-2.5 py-1.5 rounded-lg hover:bg-[#F5F5F0]">✏️ Editar</button>
-                <button onClick={eliminar}
-                  className="text-xs border border-red-100 text-red-400 px-2.5 py-1.5 rounded-lg hover:bg-red-50">Eliminar</button>
+              <div className="flex gap-1.5 flex-shrink-0 ml-2">
+                <button onClick={()=>{setForm({nombre:sel.nombre,tipo:sel.tipo,dias_semana:sel.dias_semana||[],hora:sel.hora?.slice(0,5)||'09:00',duracion_minutos:sel.duracion_minutos||60,notas:sel.notas||''});setEditando(true);setModal(true)}}
+                  className="text-xs border border-black/10 text-[#6B6B6B] px-2.5 py-1.5 rounded-lg hover:bg-[#F5F5F0]">✏️</button>
+                <button onClick={eliminar} className="text-xs border border-red-100 text-red-400 px-2.5 py-1.5 rounded-lg hover:bg-red-50">✕</button>
               </div>
             </div>
 
-            {/* Tarifa */}
-            {tarifaSel && (
-              <div className="flex gap-3 mb-4">
-                <div className="bg-[#F5F5F0] rounded-xl px-3 py-2 text-center">
-                  <p className="text-base font-bold text-[#0A0A0A]">{tarifaSel.pp}€</p>
-                  <p className="text-xs text-[#9B9B9B]">por persona</p>
-                </div>
-                {tarifaSel.total && (
-                  <div className="bg-[#FF5C00]/8 rounded-xl px-3 py-2 text-center">
-                    <p className="text-base font-bold text-[#FF5C00]">{tarifaSel.total}€</p>
-                    <p className="text-xs text-[#9B9B9B]">total grupo</p>
+            {/* Tarifa editable */}
+            <div className="bg-[#F7F6F3] rounded-xl p-3">
+              <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2.5">Tarifa mensual</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-1 min-w-[120px]">
+                  <div className="relative flex-1">
+                    <input type="number" value={precioPP}
+                      onChange={e=>setPrecioPP(e.target.value)}
+                      onBlur={guardarPrecio}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm font-bold text-[#0A0A0A] focus:outline-none focus:border-[#FF5C00] bg-white pr-8"/>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[#9B9B9B]">€</span>
                   </div>
-                )}
-                <div className="bg-emerald-50 rounded-xl px-3 py-2 text-center">
-                  <p className="text-base font-bold text-emerald-700">{tarifaSel.pp * miembros.length}€</p>
-                  <p className="text-xs text-[#9B9B9B]">ingreso real</p>
+                  <p className="text-xs text-[#9B9B9B] flex-shrink-0">por persona</p>
                 </div>
+                {tarifaSel && Number(precioPP) !== tarifaSel.pp && (
+                  <button onClick={()=>setPrecioPP(String(tarifaSel.pp))}
+                    className="text-xs text-[#FF5C00] font-medium whitespace-nowrap">
+                    Tarifa std: {tarifaSel.pp}€
+                  </button>
+                )}
               </div>
-            )}
+              <div className="flex gap-2 mt-2">
+                {tarifaSel?.total && (
+                  <span className="text-xs bg-white border border-black/8 rounded-lg px-2 py-1 text-[#6B6B6B]">Total grupo: {tarifaSel.total}€</span>
+                )}
+                <span className="text-xs bg-emerald-50 border border-emerald-100 rounded-lg px-2 py-1 text-emerald-700 font-semibold">
+                  Ingreso real: {ppActual * miembros.length}€
+                </span>
+              </div>
+              <p className="text-xs text-[#C0C0C0] mt-1.5">Edita el precio y pulsa fuera para guardar y actualizar todos los miembros</p>
+            </div>
 
             {/* Miembros */}
-            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">Miembros {miembros.length}/{max}</p>
-            <div className="space-y-1.5 mb-3">
-              {miembros.length===0 && <p className="text-xs text-[#C0C0C0] py-2">Sin miembros — añade clientes</p>}
-              {miembros.map(m=>(
-                <div key={m.id} className="flex items-center gap-2 bg-[#F7F6F3] rounded-xl px-3 py-2">
-                  <div className="w-6 h-6 rounded-full bg-[#0A0A0A] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {m.clientes?.nombre?.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+            <div>
+              <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">Miembros {miembros.length}/{max}</p>
+              <div className="space-y-1.5 mb-3">
+                {miembros.length===0 && <p className="text-xs text-[#C0C0C0] py-2">Sin miembros — añade clientes</p>}
+                {miembros.map(m=>(
+                  <div key={m.id} className="flex items-center gap-2 bg-[#F7F6F3] rounded-xl px-3 py-2.5">
+                    <div className="w-7 h-7 rounded-full bg-[#0A0A0A] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                      {m.clientes?.nombre?.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+                    </div>
+                    <p className="text-sm font-medium text-[#0A0A0A] flex-1 truncate">{m.clientes?.nombre}</p>
+                    <span className="text-xs font-bold text-[#FF5C00] flex-shrink-0">{ppActual}€/mes</span>
+                    <button onClick={()=>quitar(m)} className="text-xs text-red-400 hover:text-red-600 flex-shrink-0 ml-1">✕</button>
                   </div>
-                  <p className="text-sm font-medium text-[#0A0A0A] flex-1 truncate">{m.clientes?.nombre}</p>
-                  {tarifaSel && <span className="text-xs font-bold text-[#FF5C00] flex-shrink-0">{tarifaSel.pp}€</span>}
-                  <button onClick={()=>quitar(m)} className="text-xs text-red-400 hover:text-red-600 flex-shrink-0">✕</button>
-                </div>
-              ))}
-            </div>
-
-            {/* Añadir cliente */}
-            {miembros.length < max && (
-              <div className="flex gap-2 mb-4">
-                <select value={cliAdd} onChange={e=>setCliAdd(e.target.value)}
-                  className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#FF5C00]">
-                  <option value="">— Añadir cliente —</option>
-                  {disponibles.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
-                <button onClick={añadir} disabled={!cliAdd||añadiendo}
-                  className="bg-[#0A0A0A] text-white text-sm font-semibold px-3 py-2 rounded-xl disabled:opacity-40">
-                  {añadiendo?'...':'Añadir'}
-                </button>
+                ))}
               </div>
-            )}
+              {miembros.length < max && (
+                <div className="flex gap-2">
+                  <select value={cliAdd} onChange={e=>setCliAdd(e.target.value)}
+                    className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#FF5C00]">
+                    <option value="">— Añadir cliente —</option>
+                    {disponibles.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
+                  <button onClick={añadir} disabled={!cliAdd||añadiendo}
+                    className="bg-[#0A0A0A] text-white text-sm font-semibold px-3 py-2 rounded-xl disabled:opacity-40 flex-shrink-0">
+                    {añadiendo?'...':'+ Añadir'}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Crear sesiones */}
             <button onClick={crearSesiones}
-              className="w-full border border-black/10 text-[#6B6B6B] text-xs font-semibold py-2 rounded-xl hover:bg-[#F5F5F0] transition-all">
+              className="w-full border border-black/10 text-[#6B6B6B] text-xs font-semibold py-2.5 rounded-xl hover:bg-[#F5F5F0] transition-all">
               📅 Crear sesiones recurrentes en Agenda
             </button>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-[#C0C0C0] text-sm">
-            Selecciona un grupo para gestionarlo
+          <div className="hidden md:flex flex-1 items-center justify-center text-[#C0C0C0] text-sm">
+            Selecciona un grupo
           </div>
         )}
       </div>
