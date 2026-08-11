@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, Navigate } from 'react-router-dom'
 
 const TODOS_MODULOS = [
   { id: 'dashboard',  path: '/dashboard',  label: 'Dashboard',  icon: '📊' },
