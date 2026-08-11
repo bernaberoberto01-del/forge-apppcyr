@@ -1138,36 +1138,7 @@ export default function PortalCliente() {
 
             {/* ══ PAGOS ═══════════════════════════════════════════════════════ */}
             {tab==='pagos'&&(
-              <>
-                {pagos[0]&&(()=>{
-                  const ult=pagos[0],vence=new Date(ult.fecha_pago)
-                  vence.setMonth(vence.getMonth()+1)
-                  const dias=Math.ceil((vence-new Date())/864e5)
-                  return(
-                    <div className={`rounded-2xl p-5 flex items-center gap-4 border ${dias>7?'bg-emerald-50 border-emerald-100':'bg-red-50 border-red-100'}`}>
-                      <span className="text-3xl">{dias>7?'✅':'⚠️'}</span>
-                      <div>
-                        <p className={`font-bold ${dias>7?'text-emerald-800':'text-red-800'}`}>{dias>7?'Suscripción al día':dias>0?`Vence en ${dias} días`:'Pago vencido'}</p>
-                        <p className={`text-sm mt-0.5 ${dias>7?'text-emerald-600':'text-red-600'}`}>{ult.concepto} · {Number(ult.importe).toFixed(0)}€/mes</p>
-                      </div>
-                    </div>
-                  )
-                })()}
-                <div className="bg-white rounded-2xl border border-black/6 overflow-hidden">
-                  {pagos.map((p,i)=>(
-                    <div key={p.id} className={`flex items-center gap-4 px-5 py-4 ${i>0?'border-t border-black/6':''}`}>
-                      <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                        <span className="text-emerald-600">✓</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[#0A0A0A] truncate">{p.concepto||'Entrenamiento'}</p>
-                        <p className="text-xs text-[#6B6B6B]">{new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</p>
-                      </div>
-                      <p className="text-sm font-bold text-emerald-600 flex-shrink-0">+{Number(p.importe).toFixed(0)}€</p>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <PagosCliente cliente={cliente} pagos={pagos} color={color} session={session}/>
             )}
 
             {/* ══ AJUSTES ══════════════════════════════════════════════════ */}
@@ -1446,6 +1417,124 @@ export default function PortalCliente() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PagosCliente({ cliente, pagos, color, session }) {
+  const [abriendo, setAbriendo] = useState(false)
+  const [error, setError] = useState('')
+
+  const tieneStripe = !!cliente?.stripe_customer_id
+  const suscripcionActiva = !!cliente?.suscripcion_activa
+  const proximaFactura = cliente?.proxima_factura
+  const ultimoPago = pagos?.[0]
+
+  // Calcular días hasta vencimiento si no tiene Stripe
+  const diasVencimiento = ultimoPago && !suscripcionActiva ? (() => {
+    const v = new Date(ultimoPago.fecha_pago)
+    v.setMonth(v.getMonth() + 1)
+    return Math.ceil((v - new Date()) / 864e5)
+  })() : null
+
+  async function abrirPortalStripe() {
+    setAbriendo(true); setError('')
+    try {
+      const { data, error } = await supabase.functions.invoke('stripe-portal-cliente')
+      if (error) throw error
+      if (data?.url) window.open(data.url, '_blank')
+      else throw new Error(data?.error || 'Error al abrir el portal')
+    } catch (e) {
+      setError('No se pudo abrir el portal de pagos. Contacta con tu entrenador.')
+    }
+    setAbriendo(false)
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Estado principal */}
+      <div className={`rounded-2xl p-5 border ${
+        suscripcionActiva ? 'bg-emerald-50 border-emerald-100' :
+        diasVencimiento !== null && diasVencimiento <= 0 ? 'bg-red-50 border-red-100' :
+        diasVencimiento !== null && diasVencimiento <= 7 ? 'bg-amber-50 border-amber-100' :
+        'bg-emerald-50 border-emerald-100'
+      }`}>
+        <div className="flex items-start gap-4">
+          <span className="text-3xl flex-shrink-0">
+            {suscripcionActiva ? '🔄' : diasVencimiento !== null && diasVencimiento <= 0 ? '⚠️' : '✅'}
+          </span>
+          <div className="flex-1">
+            {suscripcionActiva ? (
+              <>
+                <p className="font-bold text-emerald-800">Cobro automático activo</p>
+                <p className="text-sm text-emerald-600 mt-0.5">
+                  {cliente?.precio_mensual ? `${cliente.precio_mensual}€/mes` : ''}
+                  {proximaFactura ? ` · Próximo cobro: ${new Date(proximaFactura+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long'})}` : ''}
+                </p>
+              </>
+            ) : diasVencimiento !== null ? (
+              <>
+                <p className={`font-bold ${diasVencimiento <= 0 ? 'text-red-800' : diasVencimiento <= 7 ? 'text-amber-800' : 'text-emerald-800'}`}>
+                  {diasVencimiento <= 0 ? 'Pago vencido' : diasVencimiento <= 7 ? `Vence en ${diasVencimiento} días` : 'Pago al día'}
+                </p>
+                <p className={`text-sm mt-0.5 ${diasVencimiento <= 0 ? 'text-red-600' : diasVencimiento <= 7 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  {ultimoPago?.concepto||'Entrenamiento'} · {Number(ultimoPago?.importe||0).toFixed(0)}€/mes
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-bold text-[#6B6B6B]">Sin pagos registrados</p>
+                <p className="text-sm text-[#9B9B9B] mt-0.5">Tu entrenador gestionará tu plan de cobro</p>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Botón portal Stripe */}
+        {tieneStripe && (
+          <button onClick={abrirPortalStripe} disabled={abriendo}
+            className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all disabled:opacity-50"
+            style={{background: color, color: 'white'}}>
+            {abriendo ? (
+              <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>Abriendo...</>
+            ) : (
+              <>💳 Gestionar método de pago</>
+            )}
+          </button>
+        )}
+        {error && <p className="text-xs text-red-600 mt-2 text-center">{error}</p>}
+      </div>
+
+      {/* Historial de pagos */}
+      {pagos?.length > 0 && (
+        <div className="bg-white rounded-2xl border border-black/6 overflow-hidden">
+          <div className="px-5 py-3 border-b border-black/6">
+            <p className="text-sm font-bold text-[#0A0A0A]">Historial de pagos</p>
+          </div>
+          {pagos.map((p, i) => (
+            <div key={p.id} className={`flex items-center gap-4 px-5 py-4 ${i > 0 ? 'border-t border-black/6' : ''}`}>
+              <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <span className="text-emerald-600 text-lg">✓</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[#0A0A0A] truncate">{p.concepto || 'Entrenamiento'}</p>
+                <p className="text-xs text-[#6B6B6B]">
+                  {new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+                </p>
+              </div>
+              <p className="text-sm font-bold text-emerald-600 flex-shrink-0">{Number(p.importe).toFixed(0)}€</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Info si no tiene Stripe */}
+      {!tieneStripe && (
+        <div className="bg-[#F5F5F0] rounded-2xl p-4 text-center">
+          <p className="text-sm text-[#6B6B6B]">Tu entrenador activará el cobro automático cuando lo configure.</p>
+          <p className="text-xs text-[#9B9B9B] mt-1">Recibirás un enlace para guardar tu tarjeta.</p>
         </div>
       )}
     </div>
