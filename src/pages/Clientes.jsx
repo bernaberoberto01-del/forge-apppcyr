@@ -42,6 +42,7 @@ const PER_PAGE = 20
 export default function Clientes({ session }) {
   const [clientes, setClientes] = useState([])
   const [grupos, setGrupos] = useState([])
+  const [tarifas,     setTarifas]     = useState([])
   const [mostrarGrupos, setMostrarGrupos] = useState(false)
   const [cuestionarios, setCuestionarios] = useState([])
   const [checkins, setCheckins] = useState([])
@@ -71,15 +72,17 @@ export default function Clientes({ session }) {
 
   async function cargar() {
     const hace10 = new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0]
-    const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }] = await Promise.all([
+    const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([
       supabase.from('clientes').select('*').eq('entrenador_id', uid).order('created_at', { ascending: false }),
       supabase.from('cuestionarios').select('*').eq('entrenador_id', uid).eq('procesado', false).order('created_at', { ascending: false }),
       supabase.from('checkins').select('cliente_id,fecha').eq('entrenador_id', uid).gte('fecha', hace10),
       supabase.from('pagos').select('cliente_id,valido_hasta').eq('entrenador_id', uid),
       supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').eq('entrenador_id', uid).eq('activo', true),
+      supabase.from('tarifas').select('*').eq('entrenador_id', uid).eq('activa', true).order('modalidad').order('dias_semana'),
     ])
     setClientes(cl || [])
     setGrupos(gs || [])
+    setTarifas(tf || [])
     setCuestionarios(cu || [])
     setCheckins(ci || [])
     setPagos(pg || [])
@@ -642,7 +645,21 @@ export default function Clientes({ session }) {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Precio mensual (€)</label>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Tarifa</label>
+                <select
+                  onChange={e => {
+                    const t = tarifas.find(t => t.id === e.target.value)
+                    if (t) setForm(f => ({...f, precio_mensual: String(t.precio), dias_semana: t.dias_semana}))
+                  }}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#FF5C00] mb-2">
+                  <option value="">— Selecciona tarifa —</option>
+                  {tarifas.map(t => (
+                    <option key={t.id} value={t.id}>{t.nombre} — {t.precio}€/mes</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Precio mensual (€) <span className="text-[#9B9B9B] font-normal">— editable para excepciones</span></label>
                 <input type="number" value={form.precio_mensual} onChange={e => setForm({...form,precio_mensual:e.target.value})}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="99" />
               </div>

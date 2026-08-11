@@ -145,7 +145,7 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-5">
-        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia']].map(([id, label]) => (
+        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['tarifas', '💶 Tarifas']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all ${tab === id ? 'bg-white shadow-sm text-[#0A0A0A]' : 'text-[#6B6B6B] hover:text-[#0A0A0A]'}`}>
             {label}
@@ -353,6 +353,188 @@ export default function Configuracion({ session, onConfigChange }) {
               uid={uid}
               showToast={showToast}
             />
+      )}
+
+      {tab === 'tarifas' && (
+        <TarifasTab uid={uid} showToast={showToast} />
+      )}
+    </div>
+  )
+}
+
+// ─── Tab Tarifas ─────────────────────────────────────────────────────────────
+const MODALIDAD_LABEL = { individual: '👤 Individual', pareja: '👫 Pareja', grupo: '👥 Grupo' }
+const MODALIDAD_COLOR = { individual: 'bg-[#F5F5F0] text-[#6B6B6B]', pareja: 'bg-blue-50 text-blue-700', grupo: 'bg-purple-50 text-purple-700' }
+
+function TarifasTab({ uid, showToast }) {
+  const [tarifas, setTarifas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState(false)
+  const [editando, setEditando] = useState(null)
+  const [form, setForm] = useState({ nombre: '', modalidad: 'individual', dias_semana: 2, precio: '' })
+  const [guardando, setGuardando] = useState(false)
+
+  useEffect(() => { cargar() }, [])
+
+  async function cargar() {
+    setLoading(true)
+    const { data } = await supabase.from('tarifas').select('*').eq('entrenador_id', uid).eq('activa', true).order('modalidad').order('dias_semana')
+    setTarifas(data || [])
+    setLoading(false)
+  }
+
+  async function guardar() {
+    if (!form.nombre.trim() || !form.precio) return
+    setGuardando(true)
+    const payload = { entrenador_id: uid, nombre: form.nombre.trim(), modalidad: form.modalidad, dias_semana: Number(form.dias_semana), precio: Number(form.precio) }
+    if (editando) await supabase.from('tarifas').update(payload).eq('id', editando.id)
+    else await supabase.from('tarifas').insert(payload)
+    setModal(false); setEditando(null)
+    await cargar(); setGuardando(false)
+    showToast(editando ? 'Tarifa actualizada' : 'Tarifa creada')
+  }
+
+  async function eliminar(id) {
+    if (!confirm('¿Eliminar esta tarifa?')) return
+    await supabase.from('tarifas').update({ activa: false }).eq('id', id)
+    await cargar(); showToast('Tarifa eliminada')
+  }
+
+  function abrirNueva() {
+    setEditando(null); setForm({ nombre: '', modalidad: 'individual', dias_semana: 2, precio: '' }); setModal(true)
+  }
+  function abrirEditar(t) {
+    setEditando(t); setForm({ nombre: t.nombre, modalidad: t.modalidad, dias_semana: t.dias_semana, precio: String(t.precio) }); setModal(true)
+  }
+
+  // Sugerir precio según modalidad y días
+  const SUGERIDOS = { individual: { 2:220,3:330,4:440 }, pareja: { 2:175,3:260,4:340 }, grupo: { 3:160 } }
+  const precioSugerido = SUGERIDOS[form.modalidad]?.[form.dias_semana]
+
+  const agrupadasPorModalidad = ['individual','pareja','grupo'].map(m => ({
+    modalidad: m,
+    items: tarifas.filter(t => t.modalidad === m)
+  })).filter(g => g.items.length > 0)
+
+  if (loading) return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+
+  return (
+    <div>
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">Tarifas</h2>
+          <p className="text-xs text-[#6B6B6B]">Define tus tarifas estándar. Al crear un cliente solo seleccionas la tarifa y el precio se rellena solo.</p>
+        </div>
+        <button onClick={abrirNueva}
+          className="bg-[#FF5C00] text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-[#e05200] transition-all flex-shrink-0">
+          + Nueva
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {agrupadasPorModalidad.map(({ modalidad, items }) => (
+          <div key={modalidad}>
+            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">{MODALIDAD_LABEL[modalidad]}</p>
+            <div className="space-y-2">
+              {items.map(t => (
+                <div key={t.id} className="bg-white border border-black/8 rounded-xl px-4 py-3 flex items-center gap-3">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${MODALIDAD_COLOR[t.modalidad]}`}>
+                    {t.dias_semana}d/sem
+                  </span>
+                  <p className="text-sm font-semibold text-[#0A0A0A] flex-1 truncate">{t.nombre}</p>
+                  <p className="text-sm font-bold text-[#FF5C00] flex-shrink-0">{t.precio}€/mes</p>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    <button onClick={() => abrirEditar(t)} className="text-xs border border-black/10 text-[#6B6B6B] px-2.5 py-1.5 rounded-lg hover:bg-[#F5F5F0]">✏️</button>
+                    <button onClick={() => eliminar(t.id)} className="text-xs border border-red-100 text-red-400 px-2.5 py-1.5 rounded-lg hover:bg-red-50">×</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        {tarifas.length === 0 && (
+          <div className="text-center py-10">
+            <p className="text-3xl mb-3">💶</p>
+            <p className="text-[#6B6B6B] font-medium">Sin tarifas definidas</p>
+            <p className="text-xs text-[#9B9B9B] mt-1">Crea tus tarifas estándar para asignarlas rápidamente a los clientes</p>
+          </div>
+        )}
+      </div>
+
+      {/* Modal crear/editar */}
+      {modal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[#0A0A0A] mb-4">{editando ? 'Editar tarifa' : 'Nueva tarifa'}</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
+                <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})}
+                  placeholder="Ej: Individual 3 días"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Modalidad</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[['individual','👤 Individual'],['pareja','👫 Pareja'],['grupo','👥 Grupo']].map(([v,l]) => (
+                    <button key={v} type="button" onClick={() => {
+                      const dias = v === 'grupo' ? 3 : form.dias_semana
+                      const precio = SUGERIDOS[v]?.[dias] || ''
+                      setForm({...form, modalidad: v, dias_semana: dias, precio: String(precio)})
+                    }}
+                      className={`py-2 rounded-xl border text-xs font-semibold transition-all ${form.modalidad===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Días/semana</label>
+                  <div className="flex gap-1">
+                    {(form.modalidad === 'grupo' ? [3] : [2,3,4]).map(d => (
+                      <button key={d} type="button" onClick={() => {
+                        const precio = SUGERIDOS[form.modalidad]?.[d] || ''
+                        setForm({...form, dias_semana: d, precio: String(precio)})
+                      }}
+                        className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all ${form.dias_semana===d?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">
+                    Precio €/mes
+                    {precioSugerido && Number(form.precio) !== precioSugerido && (
+                      <button onClick={() => setForm({...form, precio: String(precioSugerido)})}
+                        className="ml-2 text-[#FF5C00] font-medium">std: {precioSugerido}€</button>
+                    )}
+                  </label>
+                  <input type="number" value={form.precio} onChange={e => setForm({...form, precio: e.target.value})}
+                    placeholder={String(precioSugerido || '')}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                </div>
+              </div>
+              {precioSugerido && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between">
+                  <p className="text-xs text-emerald-700">{form.modalidad} · {form.dias_semana} días/sem</p>
+                  <p className="text-xs font-bold text-emerald-700">Tarifa estándar: {precioSugerido}€</p>
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => { setModal(false); setEditando(null) }}
+                  className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0]">
+                  Cancelar
+                </button>
+                <button onClick={guardar} disabled={!form.nombre.trim() || !form.precio || guardando}
+                  className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-[#e05200] transition-all">
+                  {guardando ? 'Guardando...' : editando ? 'Guardar' : 'Crear'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
