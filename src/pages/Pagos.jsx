@@ -110,7 +110,7 @@ export default function Pagos({ session }) {
     const [{ data: pg }, { data: cl }, { data: pl }] = await Promise.all([
       supabase.from('pagos').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha_pago', { ascending: false }),
       supabase.from('clientes').select('id,nombre,tipo,precio_mensual').eq('entrenador_id', uid).eq('estado','activo'),
-      supabase.from('planes_cobro').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activo', true).order('proximo_cobro'),
+      supabase.from('planes_cobro').select('*, clientes(nombre,suscripcion_activa,proxima_factura)').eq('entrenador_id', uid).eq('activo', true).order('proximo_cobro'),
     ])
     setPagos(pg || [])
     setClientes(cl || [])
@@ -200,6 +200,33 @@ export default function Pagos({ session }) {
       } else setToast('Error al generar enlace Stripe')
     } catch { setToast('Error al generar enlace') }
     setGenerandoStripe(null)
+  }
+
+  async function activarSuscripcion(clienteId, importe, nombrePlan) {
+    setGenerandoStripe(clienteId)
+    try {
+      const { data, error } = await supabase.functions.invoke('gestionar-suscripcion', {
+        body: { accion: 'crear_suscripcion', cliente_id: clienteId, importe: Number(importe), nombre_plan: nombrePlan, frecuencia: 'mensual' }
+      })
+      if (error) throw error
+      if (data?.checkout_url) {
+        // Abrir en nueva pestaña y también copiar al portapapeles
+        window.open(data.checkout_url, '_blank')
+        await navigator.clipboard.writeText(data.checkout_url).catch(() => {})
+        setToast('✓ Enlace de suscripción abierto — el cliente debe introducir su tarjeta')
+      } else setToast('Error al crear suscripción: ' + (data?.error || 'desconocido'))
+    } catch (e) { setToast('Error: ' + e.message) }
+    setGenerandoStripe(null)
+    await cargar()
+  }
+
+  async function cancelarSuscripcion(clienteId) {
+    if (!confirm('¿Cancelar la suscripción? Se desactivará al final del período actual.')) return
+    const { error } = await supabase.functions.invoke('gestionar-suscripcion', {
+      body: { accion: 'cancelar_suscripcion', cliente_id: clienteId }
+    })
+    if (error) setToast('Error al cancelar')
+    else { setToast('Suscripción cancelada al final del período'); await cargar() }
   }
 
   const ingresosMes = useMemo(() => {
@@ -332,10 +359,37 @@ export default function Pagos({ session }) {
                     {p.ultimo_cobro && ` · Último: ${new Date(p.ultimo_cobro+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`}
                   </p>
                 )}
-                <div className="flex gap-2">
-                  <button onClick={() => marcarCobrado(p)} className="flex-1 bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg">✓ Cobrado</button>
+                {/* Estado suscripción Stripe */}
+                {p.clientes?.suscripcion_activa && (
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>
+                    <p className="text-xs text-emerald-600 font-semibold">Cobro automático activo</p>
+                    {p.clientes?.proxima_factura && (
+                      <p className="text-xs text-[#9B9B9B] ml-auto">
+                        Próxima: {new Date(p.clientes.proxima_factura+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="flex gap-2 flex-wrap">
+                  {!p.clientes?.suscripcion_activa ? (
+                    <button onClick={() => activarSuscripcion(p.cliente_id, p.importe, p.concepto)}
+                      disabled={generandoStripe===p.cliente_id}
+                      className="flex-1 bg-[#6366f1] text-white text-xs font-semibold py-2 px-3 rounded-lg hover:bg-[#5558e8] disabled:opacity-40 transition-all">
+                      {generandoStripe===p.cliente_id ? '⏳ Creando...' : '🔄 Activar cobro automático'}
+                    </button>
+                  ) : (
+                    <>
+                      <button onClick={() => marcarCobrado(p)} className="flex-1 bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg">✓ Cobrado manual</button>
+                      <button onClick={() => cancelarSuscripcion(p.cliente_id)} className="border border-red-100 text-red-400 text-xs py-2 px-2.5 rounded-lg hover:bg-red-50">Cancelar sub</button>
+                    </>
+                  )}
+                  {!p.clientes?.suscripcion_activa && (
+                    <button onClick={() => marcarCobrado(p)} className="bg-emerald-500 text-white text-xs font-semibold py-2 px-3 rounded-lg">✓ Manual</button>
+                  )}
                   <button onClick={() => generarEnlaceStripe(p.cliente_id, p.importe, p.concepto)} disabled={generandoStripe===p.cliente_id}
-                    className="border border-[#6B6B6B]/20 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40">
+                    className="border border-[#6B6B6B]/20 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40"
+                    title="Pago único (sin suscripción)">
                     {generandoStripe===p.cliente_id?'⏳':'💳'}
                   </button>
                   <button onClick={() => { setEditandoPlan(p); setFormPlan({ cliente_id:p.cliente_id, importe:String(p.importe), concepto:p.concepto, frecuencia:p.frecuencia, dia_cobro:p.dia_cobro }); setModalPlan(true) }}
