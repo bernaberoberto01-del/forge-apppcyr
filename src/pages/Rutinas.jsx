@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCentro } from '../hooks/useCentro.jsx'
 import ClienteQuickView from '../components/ClienteQuickView'
@@ -83,7 +84,8 @@ export default function Rutinas({ session }) {
   const [plantillasCentro, setPlantillasCentro] = useState([])
   const [modalPlantillas, setModalPlantillas] = useState(false)
   const [busqueda, setBusqueda] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState('activas')
+  const [searchParams] = useSearchParams()
+  const [filtroEstado, setFiltroEstado] = useState(() => searchParams.get('filtro') || 'activas')
   // Biblioteca states
   const [bibBusqueda, setBibBusqueda] = useState('')
   const [bibGrupo, setBibGrupo] = useState('Todos')
@@ -555,6 +557,18 @@ export default function Rutinas({ session }) {
               <button onClick={() => { setDetalle(null); setModoEdicion(false); setRutinaBorrador(null) }} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-xl">×</button>
             </div>
             <div className="p-4 space-y-3">
+              {/* Badge borrador IA */}
+              {detalle.estado === 'borrador' && (
+                <div className="bg-[#6366f1]/8 border border-[#6366f1]/20 rounded-xl px-4 py-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm">🤖</span>
+                    <p className="text-xs font-bold text-[#6366f1]">Borrador generado por IA — pendiente de revisión</p>
+                  </div>
+                  {detalle.borrador?.descripcion && (
+                    <p className="text-xs text-[#6366f1]/80 leading-relaxed">{detalle.borrador.descripcion}</p>
+                  )}
+                </div>
+              )}
               {/* Barra modo edición */}
               <div className="flex items-center justify-between">
                 <p className="text-xs text-[#6B6B6B]">{modoEdicion ? '✏️ Editando — toca cualquier campo' : 'Solo lectura'}</p>

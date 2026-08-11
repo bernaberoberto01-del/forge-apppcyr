@@ -232,7 +232,7 @@ export default function Dashboard({ session }) {
                       </div>
                     </div>
                     {d.rutinasIA.length > 0
-                      ? <button onClick={()=>navigate('/rutinas')} className="text-xs bg-[#6366f1] text-white font-semibold px-3 py-1.5 rounded-xl hover:bg-[#5558e8] transition-all flex-shrink-0">
+                      ? <button onClick={()=>navigate('/rutinas?filtro=borrador')} className="text-xs bg-[#6366f1] text-white font-semibold px-3 py-1.5 rounded-xl hover:bg-[#5558e8] transition-all flex-shrink-0">
                           Revisar →
                         </button>
                       : <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs flex-shrink-0">✓</span>}
