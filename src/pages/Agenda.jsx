@@ -118,6 +118,7 @@ export default function Agenda({ session }) {
   const [horaClick, setHoraClick] = useState('09:00')
   const [sesionDetalle, setSesionDetalle] = useState(null)
   const [editando, setEditando] = useState(false)
+  const [moverForm, setMoverForm] = useState(null) // {fecha, hora} para mover sesión virtual
   const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState(null)
@@ -199,6 +200,10 @@ export default function Agenda({ session }) {
   // Generar sesiones virtuales de recurrentes para la semana actual
   const sesionesConRecurrentes = useMemo(() => {
     const resultado = [...sesiones]
+    // Fechas que ya tienen excepción (sesión movida de ese día)
+    const fechasConExcepcion = new Set(
+      sesiones.filter(s => s.fecha_original).map(s => `${s.cliente_id}_${s.fecha_original}`)
+    )
     recurrentes.forEach(rec => {
       diasSemana.forEach((dia, diaIdx) => {
         const diaSemana = diaIdx + 1 // 1=lun...7=dom
@@ -206,24 +211,26 @@ export default function Agenda({ session }) {
         if (!rec.dias_semana.includes(diaSemana)) return
         if (fechaDia < rec.fecha_inicio) return
         if (rec.fecha_fin && fechaDia > rec.fecha_fin) return
-        // Comprobar que no existe ya sesión real para ese día y cliente
+        // No mostrar virtual si ya hay sesión real ese día/hora/cliente
         const yaExiste = sesiones.some(s => s.fecha === fechaDia && s.cliente_id === rec.cliente_id && s.hora === rec.hora)
-        if (!yaExiste) {
-          resultado.push({
-            id: `rec_${rec.id}_${fechaDia}`,
-            entrenador_id: rec.entrenador_id || uid,
-            cliente_id: rec.cliente_id,
-            fecha: fechaDia,
-            hora: rec.hora,
-            duracion_minutos: rec.duracion_minutos,
-            tipo: rec.tipo,
-            completada: false,
-            notas: rec.notas,
-            clientes: rec.clientes,
-            _esVirtual: true,
-            _recurrenteId: rec.id
-          })
-        }
+        if (yaExiste) return
+        // No mostrar virtual si ese día fue movido a otro día (excepción)
+        const tieneExcepcion = fechasConExcepcion.has(`${rec.cliente_id}_${fechaDia}`)
+        if (tieneExcepcion) return
+        resultado.push({
+          id: `rec_${rec.id}_${fechaDia}`,
+          entrenador_id: rec.entrenador_id || uid,
+          cliente_id: rec.cliente_id,
+          fecha: fechaDia,
+          hora: rec.hora,
+          duracion_minutos: rec.duracion_minutos,
+          tipo: rec.tipo,
+          completada: false,
+          notas: rec.notas,
+          clientes: rec.clientes,
+          _esVirtual: true,
+          _recurrenteId: rec.id
+        })
       })
     })
     return resultado.sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora))
@@ -308,6 +315,32 @@ export default function Agenda({ session }) {
       notas: sesion.notas, es_recurrente: true, recurrente_id: sesion._recurrenteId
     })
     if (!error) { setToast({ msg: 'Sesión confirmada ✓' }); setSesionDetalle(null); await cargar() }
+  }
+
+  async function moverSesionVirtual(sesion, nuevaFecha, nuevaHora) {
+    // Crea una sesión individual con la nueva fecha/hora
+    // La regla recurrente NO se modifica — solo esta ocurrencia cambia
+    const { error } = await supabase.from('sesiones').insert({
+      entrenador_id: sesion.entrenador_id || uid,
+      cliente_id: sesion.cliente_id,
+      centro_id: centro?.id || null,
+      fecha: nuevaFecha,
+      hora: nuevaHora,
+      tipo: sesion.tipo,
+      duracion_minutos: sesion.duracion_minutos,
+      completada: false,
+      notas: sesion.notas,
+      es_recurrente: true,
+      recurrente_id: sesion._recurrenteId,
+      // Guardamos la fecha original para saber que esta ocurrencia ya está gestionada
+      fecha_original: sesion.fecha,
+    })
+    if (!error) {
+      setToast({ msg: `Sesión movida al ${new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} a las ${nuevaHora}` })
+      setSesionDetalle(null)
+      setMoverForm(null)
+      await cargar()
+    }
   }
 
   async function toggleCompletada(id, completada) {
@@ -737,12 +770,52 @@ export default function Agenda({ session }) {
               <div className="space-y-2">
                 <div className="bg-[#6366f1]/8 rounded-xl p-3 text-center mb-2">
                   <p className="text-xs text-[#6366f1] font-medium">↻ Sesión recurrente programada</p>
+                  <p className="text-xs text-[#6366f1]/60 mt-0.5">La regla semanal no cambia — solo esta ocurrencia</p>
                 </div>
+
+                {/* Formulario mover */}
+                {moverForm ? (
+                  <div className="bg-[#F5F5F0] rounded-xl p-3 space-y-2">
+                    <p className="text-xs font-semibold text-[#0A0A0A]">Mover esta sesión a:</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">Día</label>
+                        <input type="date" value={moverForm.fecha}
+                          min={new Date().toISOString().split('T')[0]}
+                          onChange={e => setMoverForm(f => ({...f, fecha: e.target.value}))}
+                          className="w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                      </div>
+                      <div>
+                        <label className="text-xs text-[#6B6B6B] mb-1 block">Hora</label>
+                        <input type="time" value={moverForm.hora}
+                          onChange={e => setMoverForm(f => ({...f, hora: e.target.value}))}
+                          className="w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={() => setMoverForm(null)}
+                        className="flex-1 border border-black/10 text-[#6B6B6B] text-xs py-2 rounded-xl">
+                        Cancelar
+                      </button>
+                      <button onClick={() => moverSesionVirtual(sesionDetalle, moverForm.fecha, moverForm.hora)}
+                        disabled={!moverForm.fecha || !moverForm.hora}
+                        className="flex-1 bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40">
+                        Confirmar cambio
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setMoverForm({ fecha: sesionDetalle.fecha, hora: sesionDetalle.hora })}
+                    className="w-full border border-[#FF5C00]/30 text-[#FF5C00] text-sm font-semibold py-2.5 rounded-xl hover:bg-[#FF5C00]/5">
+                    📅 Mover esta sesión
+                  </button>
+                )}
+
                 <button onClick={() => confirmarSesionVirtual(sesionDetalle)}
                   className="w-full bg-emerald-500 text-white text-sm font-semibold py-2.5 rounded-xl">
                   ✓ Confirmar como completada
                 </button>
-                <button onClick={() => setSesionDetalle(null)}
+                <button onClick={() => { setSesionDetalle(null); setMoverForm(null) }}
                   className="w-full border border-black/10 text-[#6B6B6B] text-sm py-2.5 rounded-xl">
                   Cerrar
                 </button>
