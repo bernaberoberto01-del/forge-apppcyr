@@ -402,26 +402,37 @@ export default function PortalCliente() {
                 {/* Próximas sesiones presencial */}
                 {cliente?.tipo==='presencial'&&sesionesPortal.length>0&&(
                   <div className="bg-white rounded-2xl border border-black/6 p-5">
-                    <p className="text-sm font-bold text-[#0A0A0A] mb-3">📅 Próximas sesiones</p>
+                    <p className="text-sm font-bold text-[#0A0A0A] mb-3">📅 Tus próximas sesiones</p>
                     <div className="space-y-2">
                       {sesionesPortal.slice(0,4).map(s=>{
                         const esHoy=s.fecha===new Date().toISOString().split('T')[0]
                         const esMañana=s.fecha===new Date(Date.now()+864e5).toISOString().split('T')[0]
                         const label=esHoy?'Hoy':esMañana?'Mañana':new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
-                        const otroEntrenador=s.entrenador_id&&s.entrenador_id!==cliente?.entrenador_id?entrenadoresSesion[s.entrenador_id]:null
+                        const confirmada=s.asistencia_confirmada
                         return(
-                          <div key={s.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${esHoy?'bg-orange-50 border-orange-200':'bg-[#F7F6F3] border-transparent'}`}>
-                            <div className="flex-1">
-                              <p className={`text-sm font-semibold ${esHoy?'':'text-[#0A0A0A]'}`} style={esHoy?{color}:{}}>{label}</p>
-                              <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos||60}min</p>
-                              {otroEntrenador&&(
-                                <p className="text-xs font-medium mt-0.5 flex items-center gap-1.5" style={{color:otroEntrenador.color_acento||'#FF5C00'}}>
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{background:otroEntrenador.color_acento||'#FF5C00'}} />
-                                  Con {otroEntrenador.nombre_entrenador||'tu entrenador'}
-                                </p>
-                              )}
+                          <div key={s.id} className={`rounded-xl border p-4 transition-all ${esHoy?'border-2':'border'}`}
+                            style={esHoy?{borderColor:color,background:`${color}08`}:{borderColor:'#F0EEE8'}}>
+                            <div className="flex items-center gap-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-bold" style={esHoy||esMañana?{color}:{color:'#0A0A0A'}}>{label}</p>
+                                  {confirmada&&<span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">✓ Confirmada</span>}
+                                </div>
+                                <p className="text-xs text-[#6B6B6B] mt-0.5">{s.hora} · {s.duracion_minutos||60}min</p>
+                              </div>
+                              <div className="flex gap-2">
+                                {!confirmada&&(esHoy||esMañana)&&(
+                                  <button onClick={async()=>{
+                                    await supabase.from('sesiones').update({asistencia_confirmada:true,asistencia_confirmada_at:new Date().toISOString()}).eq('id',s.id)
+                                    const {data:sesPend2}=await supabase.from('sesiones').select('*').eq('cliente_id',clienteId).gte('fecha',new Date().toISOString().split('T')[0]).lte('fecha',new Date(Date.now()+7*864e5).toISOString().split('T')[0]).eq('cancelada',false).order('fecha').limit(5)
+                                    setSesionesPortal(sesPend2||[])
+                                  }} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-all" style={{background:color}}>
+                                    ✓ Confirmar
+                                  </button>
+                                )}
+                                <button onClick={()=>setCancelando(s)} className="text-xs text-[#6B6B6B] border border-black/10 px-3 py-1.5 rounded-lg hover:border-red-300 hover:text-red-500 transition-all bg-white">Cancelar</button>
+                              </div>
                             </div>
-                            <button onClick={()=>setCancelando(s)} className="text-xs text-[#6B6B6B] border border-black/10 px-3 py-1.5 rounded-lg hover:border-red-300 hover:text-red-500 transition-all bg-white">Cancelar</button>
                           </div>
                         )
                       })}
@@ -785,6 +796,43 @@ export default function PortalCliente() {
                       </div>
                     ))}
                     {cliente?.tipo==='online'&&<SesionesRegistradas clienteId={clienteId} color={color}/>}
+                    {/* Gráfico energía y fatiga — visible para presencial y online */}
+                    {checkins.length >= 2 && (
+                      <div className="bg-white rounded-2xl border border-black/6 p-5">
+                        <p className="text-sm font-bold text-[#0A0A0A] mb-4">⚡ Energía y fatiga</p>
+                        <div className="space-y-3">
+                          {/* Energía */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <p className="text-xs font-semibold text-[#6B6B6B]">Energía</p>
+                              <p className="text-xs font-bold text-blue-600">{checkins[0]?.energia||'—'}/10</p>
+                            </div>
+                            <div className="flex gap-0.5 items-end h-10">
+                              {checkins.slice(0,8).reverse().map((ci,i)=>{
+                                const v=ci.energia||0
+                                const h=v>0?(v/10)*100:5
+                                return <div key={i} className="flex-1 rounded-t-sm transition-all" style={{height:`${h}%`,background:`#6366f1`,opacity:0.4+((i/8)*0.6)}}/>
+                              })}
+                            </div>
+                          </div>
+                          {/* Fatiga */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <p className="text-xs font-semibold text-[#6B6B6B]">Fatiga</p>
+                              <p className="text-xs font-bold text-orange-600">{checkins[0]?.fatiga||'—'}/10</p>
+                            </div>
+                            <div className="flex gap-0.5 items-end h-10">
+                              {checkins.slice(0,8).reverse().map((ci,i)=>{
+                                const v=ci.fatiga||0
+                                const h=v>0?(v/10)*100:5
+                                return <div key={i} className="flex-1 rounded-t-sm transition-all" style={{height:`${h}%`,background:`#f97316`,opacity:0.4+((i/8)*0.6)}}/>
+                              })}
+                            </div>
+                          </div>
+                          <p className="text-xs text-[#9B9B9B] text-center">Últimos {Math.min(checkins.length,8)} check-ins</p>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
 
