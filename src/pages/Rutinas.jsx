@@ -138,6 +138,26 @@ export default function Rutinas({ session }) {
     else setToast('Error: ' + (data.error || 'desconocido'))
   }
 
+  async function analizarYActualizar(clienteId) {
+    setGenerando(clienteId)
+    try {
+      const { data } = await supabase.functions.invoke('actualizar-rutina-mensual', {
+        body: { cliente_id: clienteId, forzar: true }
+      })
+      if (data?.ok || data?.generadas > 0) {
+        setToast('🤖 Análisis completado — borrador listo para revisar')
+        await cargar()
+      } else if (data?.sin_datos) {
+        setToast('Sin check-ins suficientes para analizar — necesita al menos 2')
+      } else {
+        setToast('Error en el análisis: ' + (data?.error || 'desconocido'))
+      }
+    } catch (e) {
+      setToast('Error: ' + e.message)
+    }
+    setGenerando(null)
+  }
+
   async function guardarManual() {
     if (!manualClienteId || !manualNombre) return
     setGuardandoManual(true)
@@ -446,6 +466,13 @@ export default function Rutinas({ session }) {
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => { setDetalle(r); setNotasEdit(r.notas_entrenador||''); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }}
                     className="flex-1 border border-black/10 text-[#0A0A0A] text-xs font-medium py-2 rounded-lg hover:bg-[#F5F5F0]">Ver rutina</button>
+                  {r.estado === 'publicada' && (
+                    <button onClick={() => analizarYActualizar(r.cliente_id)} disabled={generando === r.cliente_id}
+                      title="Analizar check-ins y generar propuesta de actualización"
+                      className="border border-[#6366f1]/30 text-[#6366f1] text-xs py-2 px-3 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-40 flex items-center gap-1.5 flex-shrink-0">
+                      {generando === r.cliente_id ? '⏳' : '🤖'} <span className="hidden sm:inline">Actualizar</span>
+                    </button>
+                  )}
                   <button onClick={() => setMsgModal(r.cliente_id)} className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-lg hover:bg-[#F5F5F0]">✉️</button>
                 </div>
               </div>
