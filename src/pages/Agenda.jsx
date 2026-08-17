@@ -367,12 +367,12 @@ export default function Agenda({ session }) {
   async function confirmarSesionVirtual(sesion) {
     const esGrupo = sesion._esGrupo
     const grupoData = sesion._grupoData
+    const entrenadorId = moverForm?.entrenador_id || sesion.entrenador_id || uid
 
     if (esGrupo && grupoData) {
-      // Crear una sesión completada por cada miembro del grupo
-      const miembros = (grupoData.grupo_clientes||[]).filter(m=>m.activo)
-      const rows = miembros.map(m => ({
-        entrenador_id: uid,
+      const miembrosGrupo = (grupoData.grupo_clientes||[]).filter(m=>m.activo)
+      const rows = miembrosGrupo.map(m => ({
+        entrenador_id: entrenadorId,
         cliente_id: m.cliente_id,
         centro_id: centro?.id || null,
         fecha: sesion.fecha, hora: sesion.hora,
@@ -384,51 +384,59 @@ export default function Agenda({ session }) {
       }))
       const { error } = await supabase.from('sesiones').insert(rows)
       if (!error) {
-        setToast({ msg: `✓ Sesión del grupo completada para ${miembros.length} miembros` })
-        setSesionDetalle(null)
-        await cargar()
+        setToast({ msg: `✓ Sesión del grupo completada para ${miembrosGrupo.length} miembros` })
+        setSesionDetalle(null); setMoverForm(null); await cargar()
       }
     } else {
-      // Sesión individual normal
       const { error } = await supabase.from('sesiones').insert({
-        entrenador_id: sesion.entrenador_id || uid,
+        entrenador_id: entrenadorId,
         cliente_id: sesion.cliente_id,
         centro_id: centro?.id || null,
         fecha: sesion.fecha, hora: sesion.hora,
-        tipo: sesion.tipo,
-        duracion_minutos: sesion.duracion_minutos,
-        completada: true,
-        notas: sesion.notas,
-        es_recurrente: true,
-        recurrente_id: sesion._recurrenteId
+        tipo: sesion.tipo, duracion_minutos: sesion.duracion_minutos,
+        completada: true, notas: sesion.notas,
+        es_recurrente: true, recurrente_id: sesion._recurrenteId
       })
-      if (!error) { setToast({ msg: 'Sesión confirmada ✓' }); setSesionDetalle(null); await cargar() }
+      if (!error) { setToast({ msg: 'Sesión confirmada ✓' }); setSesionDetalle(null); setMoverForm(null); await cargar() }
     }
   }
 
   async function moverSesionVirtual(sesion, nuevaFecha, nuevaHora) {
-    // Crea una sesión individual con la nueva fecha/hora
-    // La regla recurrente NO se modifica — solo esta ocurrencia cambia
-    const { error } = await supabase.from('sesiones').insert({
-      entrenador_id: sesion.entrenador_id || uid,
-      cliente_id: sesion.cliente_id,
-      centro_id: centro?.id || null,
-      fecha: nuevaFecha,
-      hora: nuevaHora,
-      tipo: sesion.tipo,
-      duracion_minutos: sesion.duracion_minutos,
-      completada: false,
-      notas: sesion.notas,
-      es_recurrente: true,
-      recurrente_id: sesion._recurrenteId,
-      // Guardamos la fecha original para saber que esta ocurrencia ya está gestionada
-      fecha_original: sesion.fecha,
-    })
-    if (!error) {
-      setToast({ msg: `Sesión movida al ${new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} a las ${nuevaHora}` })
-      setSesionDetalle(null)
-      setMoverForm(null)
-      await cargar()
+    const entrenadorId = moverForm?.entrenador_id || sesion.entrenador_id || uid
+    const esGrupo = sesion._esGrupo
+    const grupoData = sesion._grupoData
+
+    if (esGrupo && grupoData) {
+      const miembrosGrupo = (grupoData.grupo_clientes||[]).filter(m=>m.activo)
+      const rows = miembrosGrupo.map(m => ({
+        entrenador_id: entrenadorId,
+        cliente_id: m.cliente_id,
+        centro_id: centro?.id || null,
+        fecha: nuevaFecha, hora: nuevaHora,
+        tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
+        completada: false, grupo_id: grupoData.id,
+        es_recurrente: true, fecha_original: sesion.fecha,
+      }))
+      const { error } = await supabase.from('sesiones').insert(rows)
+      if (!error) {
+        setToast({ msg: `Grupo movido al ${new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} a las ${nuevaHora}` })
+        setSesionDetalle(null); setMoverForm(null); await cargar()
+      }
+    } else {
+      const { error } = await supabase.from('sesiones').insert({
+        entrenador_id: entrenadorId,
+        cliente_id: sesion.cliente_id,
+        centro_id: centro?.id || null,
+        fecha: nuevaFecha, hora: nuevaHora,
+        tipo: sesion.tipo, duracion_minutos: sesion.duracion_minutos,
+        completada: false, notas: sesion.notas,
+        es_recurrente: true, recurrente_id: sesion._recurrenteId,
+        fecha_original: sesion.fecha,
+      })
+      if (!error) {
+        setToast({ msg: `Sesión movida al ${new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} a las ${nuevaHora}` })
+        setSesionDetalle(null); setMoverForm(null); await cargar()
+      }
     }
   }
 
@@ -859,9 +867,32 @@ export default function Agenda({ session }) {
             {sesionDetalle._esVirtual ? (
               <div className="space-y-2">
                 <div className="bg-[#6366f1]/8 rounded-xl p-3 text-center mb-2">
-                  <p className="text-xs text-[#6366f1] font-medium">↻ Sesión recurrente programada</p>
+                  <p className="text-xs text-[#6366f1] font-medium">
+                    {sesionDetalle._esGrupo ? `👥 ${sesionDetalle._grupoData?.nombre}` : '↻ Sesión recurrente programada'}
+                  </p>
                   <p className="text-xs text-[#6366f1]/60 mt-0.5">La regla semanal no cambia — solo esta ocurrencia</p>
                 </div>
+
+                {/* Selector de entrenador */}
+                {miembros && miembros.length > 1 && (
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Entrenador asignado</label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {miembros.map(m => {
+                        const seleccionado = (moverForm?.entrenador_id || sesionDetalle.entrenador_id) === m.user_id
+                        return (
+                          <button key={m.user_id} type="button"
+                            onClick={() => setMoverForm(f => ({...(f || { fecha: sesionDetalle.fecha, hora: sesionDetalle.hora }), entrenador_id: m.user_id}))}
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${seleccionado ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}
+                            style={seleccionado ? {background: m.color || '#FF5C00'} : {}}>
+                            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{background: m.color || '#FF5C00'}}/>
+                            {m.nombre?.split(' ')[0] || m.email?.split('@')[0]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Formulario mover */}
                 {moverForm ? (
