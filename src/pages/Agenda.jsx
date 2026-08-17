@@ -120,7 +120,8 @@ export default function Agenda({ session }) {
   const [sesionDetalle, setSesionDetalle] = useState(null)
   const [editando, setEditando] = useState(false)
   const [moverForm, setMoverForm] = useState(null)
-  const [entrenadorSel, setEntrenadorSel] = useState(null) // entrenador seleccionado para la sesión
+  const [entrenadorSel, setEntrenadorSel] = useState(null)
+  const [refreshKey, setRefreshKey] = useState(0) // entrenador seleccionado para la sesión
   const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState(null)
@@ -190,7 +191,7 @@ export default function Agenda({ session }) {
     autoCompletar()
     const intervalo = setInterval(autoCompletar, 60000) // cada minuto
     return () => clearInterval(intervalo)
-  }, [sesiones])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Scroll al inicio del día laboral al montar
   useEffect(() => {
@@ -211,7 +212,7 @@ export default function Agenda({ session }) {
       supabase.from('horas_extra').select('*').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha', { ascending: false }),
       centro
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
-        : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activa', true),
+        : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
       supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
     ])
     setSesiones(se || [])
@@ -226,6 +227,7 @@ export default function Agenda({ session }) {
     })
     setGruposMap(gm)
     setGrupos(gs || [])
+    setRefreshKey(k => k + 1)
   }
 
   // Generar sesiones virtuales de recurrentes y grupos para la semana actual
