@@ -119,7 +119,8 @@ export default function Agenda({ session }) {
   const [horaClick, setHoraClick] = useState('09:00')
   const [sesionDetalle, setSesionDetalle] = useState(null)
   const [editando, setEditando] = useState(false)
-  const [moverForm, setMoverForm] = useState(null) // {fecha, hora} para mover sesión virtual
+  const [moverForm, setMoverForm] = useState(null)
+  const [entrenadorSel, setEntrenadorSel] = useState(null) // entrenador seleccionado para la sesión
   const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState(null)
@@ -367,7 +368,7 @@ export default function Agenda({ session }) {
   async function confirmarSesionVirtual(sesion) {
     const esGrupo = sesion._esGrupo
     const grupoData = sesion._grupoData
-    const entrenadorId = moverForm?.entrenador_id || sesion.entrenador_id || uid
+    const entrenadorId = entrenadorSel || sesion.entrenador_id || uid
 
     if (esGrupo && grupoData) {
       const miembrosGrupo = (grupoData.grupo_clientes||[]).filter(m=>m.activo)
@@ -385,7 +386,7 @@ export default function Agenda({ session }) {
       const { error } = await supabase.from('sesiones').insert(rows)
       if (!error) {
         setToast({ msg: `✓ Sesión del grupo completada para ${miembrosGrupo.length} miembros` })
-        setSesionDetalle(null); setMoverForm(null); await cargar()
+        setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
       }
     } else {
       const { error } = await supabase.from('sesiones').insert({
@@ -397,12 +398,12 @@ export default function Agenda({ session }) {
         completada: true, notas: sesion.notas,
         es_recurrente: true, recurrente_id: sesion._recurrenteId
       })
-      if (!error) { setToast({ msg: 'Sesión confirmada ✓' }); setSesionDetalle(null); setMoverForm(null); await cargar() }
+      if (!error) { setToast({ msg: 'Sesión confirmada ✓' }); setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar() }
     }
   }
 
   async function moverSesionVirtual(sesion, nuevaFecha, nuevaHora) {
-    const entrenadorId = moverForm?.entrenador_id || sesion.entrenador_id || uid
+    const entrenadorId = entrenadorSel || sesion.entrenador_id || uid
     const esGrupo = sesion._esGrupo
     const grupoData = sesion._grupoData
 
@@ -420,7 +421,7 @@ export default function Agenda({ session }) {
       const { error } = await supabase.from('sesiones').insert(rows)
       if (!error) {
         setToast({ msg: `Grupo movido al ${new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} a las ${nuevaHora}` })
-        setSesionDetalle(null); setMoverForm(null); await cargar()
+        setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
       }
     } else {
       const { error } = await supabase.from('sesiones').insert({
@@ -435,7 +436,7 @@ export default function Agenda({ session }) {
       })
       if (!error) {
         setToast({ msg: `Sesión movida al ${new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} a las ${nuevaHora}` })
-        setSesionDetalle(null); setMoverForm(null); await cargar()
+        setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
       }
     }
   }
@@ -879,10 +880,10 @@ export default function Agenda({ session }) {
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Entrenador asignado</label>
                     <div className="flex gap-1.5 flex-wrap">
                       {miembros.map(m => {
-                        const seleccionado = (moverForm?.entrenador_id || sesionDetalle.entrenador_id) === m.user_id
+                        const seleccionado = (entrenadorSel || sesionDetalle.entrenador_id) === m.user_id
                         return (
                           <button key={m.user_id} type="button"
-                            onClick={() => setMoverForm(f => ({...(f || { fecha: sesionDetalle.fecha, hora: sesionDetalle.hora }), entrenador_id: m.user_id}))}
+                            onClick={e => { e.stopPropagation(); setEntrenadorSel(m.user_id) }}
                             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${seleccionado ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}
                             style={seleccionado ? {background: m.color || '#FF5C00'} : {}}>
                             <div className="w-4 h-4 rounded-full flex-shrink-0" style={{background: m.color || '#FF5C00'}}/>
@@ -936,7 +937,7 @@ export default function Agenda({ session }) {
                   className="w-full bg-emerald-500 text-white text-sm font-semibold py-2.5 rounded-xl">
                   ✓ Confirmar como completada
                 </button>
-                <button onClick={() => { setSesionDetalle(null); setMoverForm(null) }}
+                <button onClick={() => { setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null) }}
                   className="w-full border border-black/10 text-[#6B6B6B] text-sm py-2.5 rounded-xl">
                   Cerrar
                 </button>
