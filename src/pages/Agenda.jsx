@@ -106,6 +106,7 @@ export default function Agenda({ session }) {
   const [recurrentes, setRecurrentes] = useState([])
   const [clientes, setClientes] = useState([])
   const [gruposMap, setGruposMap] = useState({}) // grupo_id → {nombre, miembros:[{nombre}]}
+  const [grupos, setGrupos] = useState([])
   const [horasExtra, setHorasExtra] = useState([])
   const [vista, setVista] = useState(() => window.innerWidth < 768 ? 'lista' : 'timeline')
   const [modal, setModal] = useState(false)
@@ -162,6 +163,33 @@ export default function Agenda({ session }) {
 
   useEffect(() => { cargar() }, [uid, semanaBase])
 
+  // Auto-completar sesiones reales cuando pasa la hora de finalización
+  useEffect(() => {
+    async function autoCompletar() {
+      const ahora = new Date()
+      const hoy = ahora.toISOString().split('T')[0]
+      const horaActual = ahora.getHours() * 60 + ahora.getMinutes()
+      // Buscar sesiones de hoy no completadas cuya hora de fin ya pasó
+      const sesionesHoy = sesiones.filter(s =>
+        s.fecha === hoy && !s.completada && !s.cancelada && s.hora
+      )
+      const paraCompletar = sesionesHoy.filter(s => {
+        const [h, m] = s.hora.split(':').map(Number)
+        const horaFin = h * 60 + m + (s.duracion_minutos || 60)
+        return horaActual >= horaFin
+      })
+      if (paraCompletar.length > 0) {
+        await supabase.from('sesiones')
+          .update({ completada: true })
+          .in('id', paraCompletar.map(s => s.id))
+        await cargar()
+      }
+    }
+    autoCompletar()
+    const intervalo = setInterval(autoCompletar, 60000) // cada minuto
+    return () => clearInterval(intervalo)
+  }, [sesiones])
+
   // Scroll al inicio del día laboral al montar
   useEffect(() => {
     if (timelineRef.current && vista === 'timeline') {
@@ -182,59 +210,89 @@ export default function Agenda({ session }) {
       centro
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('activa', true),
-      supabase.from('grupos').select('id,nombre,tipo,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
+      supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
     ])
     setSesiones(se || [])
     setClientes(cl || [])
     setHorasExtra(he || [])
     setRecurrentes(rc || [])
-    // Construir mapa grupo_id → info
+    // Construir mapa grupo_id → info completa
     const gm = {}
     ;(gs || []).forEach(g => {
       const miembros = (g.grupo_clientes||[]).filter(m=>m.activo).map(m=>m.clientes).filter(Boolean)
-      gm[g.id] = { nombre: g.nombre, tipo: g.tipo, miembros }
+      gm[g.id] = { nombre: g.nombre, tipo: g.tipo, hora: g.hora, duracion_minutos: g.duracion_minutos, dias_semana: g.dias_semana, miembros }
     })
     setGruposMap(gm)
+    setGrupos(gs || [])
   }
 
-  // Generar sesiones virtuales de recurrentes para la semana actual
+  // Generar sesiones virtuales de recurrentes y grupos para la semana actual
   const sesionesConRecurrentes = useMemo(() => {
     const resultado = [...sesiones]
-    // Fechas que ya tienen excepción (sesión movida de ese día)
+    // Fechas con excepción (sesión movida)
     const fechasConExcepcion = new Set(
       sesiones.filter(s => s.fecha_original).map(s => `${s.cliente_id}_${s.fecha_original}`)
     )
+
+    // ── Sesiones recurrentes individuales ──
     recurrentes.forEach(rec => {
       diasSemana.forEach((dia, diaIdx) => {
-        const diaSemana = diaIdx + 1 // 1=lun...7=dom
+        const diaSemana = diaIdx + 1
         const fechaDia = formatFecha(dia)
         if (!rec.dias_semana.includes(diaSemana)) return
         if (fechaDia < rec.fecha_inicio) return
         if (rec.fecha_fin && fechaDia > rec.fecha_fin) return
-        // No mostrar virtual si ya hay sesión real ese día/hora/cliente
         const yaExiste = sesiones.some(s => s.fecha === fechaDia && s.cliente_id === rec.cliente_id && s.hora === rec.hora)
         if (yaExiste) return
-        // No mostrar virtual si ese día fue movido a otro día (excepción)
         const tieneExcepcion = fechasConExcepcion.has(`${rec.cliente_id}_${fechaDia}`)
         if (tieneExcepcion) return
         resultado.push({
           id: `rec_${rec.id}_${fechaDia}`,
           entrenador_id: rec.entrenador_id || uid,
           cliente_id: rec.cliente_id,
-          fecha: fechaDia,
-          hora: rec.hora,
-          duracion_minutos: rec.duracion_minutos,
-          tipo: rec.tipo,
-          completada: false,
-          notas: rec.notas,
-          clientes: rec.clientes,
-          _esVirtual: true,
-          _recurrenteId: rec.id
+          fecha: fechaDia, hora: rec.hora,
+          duracion_minutos: rec.duracion_minutos, tipo: rec.tipo,
+          completada: false, notas: rec.notas, clientes: rec.clientes,
+          _esVirtual: true, _recurrenteId: rec.id
         })
       })
     })
+
+    // ── Grupos: una sesión virtual por grupo con todos los miembros ──
+    grupos.forEach(g => {
+      const miembros = (g.grupo_clientes||[]).filter(m=>m.activo)
+      if (!miembros.length || !g.hora || !g.dias_semana?.length) return
+      diasSemana.forEach((dia, diaIdx) => {
+        const diaSemana = diaIdx + 1
+        const fechaDia = formatFecha(dia)
+        if (!g.dias_semana.includes(diaSemana)) return
+        // Si ya hay sesión real para cualquier miembro del grupo ese día/hora, no duplicar
+        const yaExiste = sesiones.some(s =>
+          s.fecha === fechaDia && s.hora?.slice(0,5) === g.hora?.slice(0,5) &&
+          miembros.some(m => m.cliente_id === s.cliente_id)
+        )
+        if (yaExiste) return
+        // Una sola sesión virtual que representa todo el grupo
+        resultado.push({
+          id: `grupo_${g.id}_${fechaDia}`,
+          entrenador_id: uid,
+          cliente_id: miembros[0].cliente_id, // cliente principal para el color
+          fecha: fechaDia,
+          hora: g.hora?.slice(0,5),
+          duracion_minutos: g.duracion_minutos || 60,
+          tipo: 'presencial',
+          completada: false,
+          grupo_id: g.id,
+          _esVirtual: true,
+          _esGrupo: true,
+          _grupoData: g,
+          clientes: miembros[0].clientes,
+        })
+      })
+    })
+
     return resultado.sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora))
-  }, [sesiones, recurrentes, diasSemana])
+  }, [sesiones, recurrentes, grupos, diasSemana])
 
   async function guardarSesion() {
     if (!form.cliente_id) return
@@ -306,15 +364,45 @@ export default function Agenda({ session }) {
   }
 
   async function confirmarSesionVirtual(sesion) {
-    // Convertir sesión virtual en real
-    const { error } = await supabase.from('sesiones').insert({
-      entrenador_id: sesion.entrenador_id || uid, cliente_id: sesion.cliente_id,
-      centro_id: centro?.id || null,
-      fecha: sesion.fecha, hora: sesion.hora, tipo: sesion.tipo,
-      duracion_minutos: sesion.duracion_minutos, completada: true,
-      notas: sesion.notas, es_recurrente: true, recurrente_id: sesion._recurrenteId
-    })
-    if (!error) { setToast({ msg: 'Sesión confirmada ✓' }); setSesionDetalle(null); await cargar() }
+    const esGrupo = sesion._esGrupo
+    const grupoData = sesion._grupoData
+
+    if (esGrupo && grupoData) {
+      // Crear una sesión completada por cada miembro del grupo
+      const miembros = (grupoData.grupo_clientes||[]).filter(m=>m.activo)
+      const rows = miembros.map(m => ({
+        entrenador_id: uid,
+        cliente_id: m.cliente_id,
+        centro_id: centro?.id || null,
+        fecha: sesion.fecha, hora: sesion.hora,
+        tipo: 'presencial',
+        duracion_minutos: sesion.duracion_minutos,
+        completada: true,
+        grupo_id: grupoData.id,
+        es_recurrente: true,
+      }))
+      const { error } = await supabase.from('sesiones').insert(rows)
+      if (!error) {
+        setToast({ msg: `✓ Sesión del grupo completada para ${miembros.length} miembros` })
+        setSesionDetalle(null)
+        await cargar()
+      }
+    } else {
+      // Sesión individual normal
+      const { error } = await supabase.from('sesiones').insert({
+        entrenador_id: sesion.entrenador_id || uid,
+        cliente_id: sesion.cliente_id,
+        centro_id: centro?.id || null,
+        fecha: sesion.fecha, hora: sesion.hora,
+        tipo: sesion.tipo,
+        duracion_minutos: sesion.duracion_minutos,
+        completada: true,
+        notas: sesion.notas,
+        es_recurrente: true,
+        recurrente_id: sesion._recurrenteId
+      })
+      if (!error) { setToast({ msg: 'Sesión confirmada ✓' }); setSesionDetalle(null); await cargar() }
+    }
   }
 
   async function moverSesionVirtual(sesion, nuevaFecha, nuevaHora) {
@@ -674,6 +762,7 @@ export default function Agenda({ session }) {
                       const nombreCliente = grupo
                         ? grupo.miembros.map(m=>m.nombre.split(' ')[0]).join(' + ')
                         : s.clientes?.nombre?.split(' ')[0] || '—'
+                      const colorSesion = grupo ? clienteColor(s.cliente_id) : col
                       
                       return (
                         <div key={s.id || idx}
