@@ -171,7 +171,8 @@ export default function Agenda({ session }) {
       const horaActual = ahora.getHours() * 60 + ahora.getMinutes()
       // Buscar sesiones de hoy no completadas cuya hora de fin ya pasó
       const sesionesHoy = sesiones.filter(s =>
-        s.fecha === hoy && !s.completada && !s.cancelada && s.hora
+        s.fecha === hoy && !s.completada && !s.cancelada && s.hora &&
+        s.tipo !== 'online' // solo presenciales — las online las registra el cliente
       )
       const paraCompletar = sesionesHoy.filter(s => {
         const [h, m] = s.hora.split(':').map(Number)
