@@ -372,36 +372,48 @@ export default function Agenda({ session }) {
     const grupoData = sesion._grupoData
     const entrenadorId = entrenadorSel || sesion.entrenador_id || uid
 
-    if (esGrupo && grupoData) {
-      const miembrosGrupo = (grupoData.grupo_clientes||[]).filter(m=>m.activo)
-      const rows = miembrosGrupo.map(m => ({
-        entrenador_id: entrenadorId,
-        cliente_id: m.cliente_id,
-        centro_id: centro?.id || null,
-        fecha: sesion.fecha, hora: sesion.hora,
-        tipo: 'presencial',
-        duracion_minutos: sesion.duracion_minutos,
-        completada: true,
-        grupo_id: grupoData.id,
-        es_recurrente: true,
-      }))
-      const { error } = await supabase.from('sesiones').insert(rows)
-      if (!error) {
-        setToast({ msg: `✓ Sesión del grupo completada para ${miembrosGrupo.length} miembros` })
-        setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
-      }
-    } else {
-      const { error } = await supabase.from('sesiones').insert({
-        entrenador_id: entrenadorId,
-        cliente_id: sesion.cliente_id,
-        centro_id: centro?.id || null,
-        fecha: sesion.fecha, hora: sesion.hora,
-        tipo: sesion.tipo, duracion_minutos: sesion.duracion_minutos,
-        completada: true, notas: sesion.notas,
-        es_recurrente: true, recurrente_id: sesion._recurrenteId
-      })
-      if (!error) { setToast({ msg: 'Sesión confirmada ✓' }); setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar() }
+    const clienteIds = esGrupo && grupoData
+      ? (grupoData.grupo_clientes||[]).filter(m=>m.activo).map(m=>m.cliente_id)
+      : [sesion.cliente_id]
+
+    // Verificar qué clientes ya tienen sesión en esa fecha/hora para no duplicar
+    const { data: existentes } = await supabase.from('sesiones')
+      .select('id, cliente_id')
+      .in('cliente_id', clienteIds)
+      .eq('fecha', sesion.fecha)
+      .eq('hora', sesion.hora)
+      .eq('cancelada', false)
+
+    const yaExisten = new Set((existentes||[]).map(s => s.cliente_id))
+
+    // Solo insertar los que NO tienen sesión ya
+    const nuevos = clienteIds.filter(id => !yaExisten.has(id))
+
+    // Actualizar los que ya existen como completados
+    const idsExistentes = (existentes||[]).map(s => s.id)
+    if (idsExistentes.length > 0) {
+      await supabase.from('sesiones').update({ completada: true, entrenador_id: entrenadorId })
+        .in('id', idsExistentes)
     }
+
+    // Insertar solo los que faltan
+    if (nuevos.length > 0) {
+      const rows = nuevos.map(cid => ({
+        entrenador_id: entrenadorId, cliente_id: cid,
+        centro_id: centro?.id || null,
+        fecha: sesion.fecha, hora: sesion.hora,
+        tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
+        completada: true,
+        grupo_id: esGrupo ? grupoData?.id : null,
+        es_recurrente: true,
+        recurrente_id: sesion._recurrenteId || null,
+      }))
+      await supabase.from('sesiones').insert(rows)
+    }
+
+    const total = clienteIds.length
+    setToast({ msg: total > 1 ? `✓ Sesión completada para ${total} miembros` : 'Sesión confirmada ✓' })
+    setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
   }
 
   async function moverSesionVirtual(sesion, nuevaFecha, nuevaHora) {
@@ -409,38 +421,47 @@ export default function Agenda({ session }) {
     const esGrupo = sesion._esGrupo
     const grupoData = sesion._grupoData
 
-    if (esGrupo && grupoData) {
-      const miembrosGrupo = (grupoData.grupo_clientes||[]).filter(m=>m.activo)
-      const rows = miembrosGrupo.map(m => ({
-        entrenador_id: entrenadorId,
-        cliente_id: m.cliente_id,
+    const clienteIds = esGrupo && grupoData
+      ? (grupoData.grupo_clientes||[]).filter(m=>m.activo).map(m=>m.cliente_id)
+      : [sesion.cliente_id]
+
+    // Verificar si ya existe excepción para estos clientes en la fecha original
+    const { data: existentes } = await supabase.from('sesiones')
+      .select('id, cliente_id')
+      .in('cliente_id', clienteIds)
+      .eq('fecha_original', sesion.fecha)
+      .eq('cancelada', false)
+
+    const yaExisten = new Set((existentes||[]).map(s => s.cliente_id))
+
+    // Actualizar los que ya tienen excepción
+    const idsExistentes = (existentes||[]).map(s => s.id)
+    if (idsExistentes.length > 0) {
+      await supabase.from('sesiones').update({
+        fecha: nuevaFecha, hora: nuevaHora, entrenador_id: entrenadorId
+      }).in('id', idsExistentes)
+    }
+
+    // Insertar solo los que no tienen excepción aún
+    const nuevos = clienteIds.filter(id => !yaExisten.has(id))
+    if (nuevos.length > 0) {
+      const rows = nuevos.map(cid => ({
+        entrenador_id: entrenadorId, cliente_id: cid,
         centro_id: centro?.id || null,
         fecha: nuevaFecha, hora: nuevaHora,
         tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
-        completada: false, grupo_id: grupoData.id,
-        es_recurrente: true, fecha_original: sesion.fecha,
-      }))
-      const { error } = await supabase.from('sesiones').insert(rows)
-      if (!error) {
-        setToast({ msg: `Grupo movido al ${new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} a las ${nuevaHora}` })
-        setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
-      }
-    } else {
-      const { error } = await supabase.from('sesiones').insert({
-        entrenador_id: entrenadorId,
-        cliente_id: sesion.cliente_id,
-        centro_id: centro?.id || null,
-        fecha: nuevaFecha, hora: nuevaHora,
-        tipo: sesion.tipo, duracion_minutos: sesion.duracion_minutos,
-        completada: false, notas: sesion.notas,
-        es_recurrente: true, recurrente_id: sesion._recurrenteId,
+        completada: false,
+        grupo_id: esGrupo ? grupoData?.id : null,
+        es_recurrente: true,
+        recurrente_id: sesion._recurrenteId || null,
         fecha_original: sesion.fecha,
-      })
-      if (!error) {
-        setToast({ msg: `Sesión movida al ${new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})} a las ${nuevaHora}` })
-        setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
-      }
+      }))
+      await supabase.from('sesiones').insert(rows)
     }
+
+    const label = new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
+    setToast({ msg: `Sesión movida al ${label} a las ${nuevaHora}` })
+    setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
   }
 
   async function toggleCompletada(id, completada) {
