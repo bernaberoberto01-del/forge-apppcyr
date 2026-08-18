@@ -105,8 +105,10 @@ export default function Agenda({ session }) {
   const [sesiones, setSesiones] = useState([])
   const [recurrentes, setRecurrentes] = useState([])
   const [clientes, setClientes] = useState([])
-  const [gruposMap, setGruposMap] = useState({}) // grupo_id → {nombre, miembros:[{nombre}]}
+  const [gruposMap, setGruposMap] = useState({})
   const [grupos, setGrupos] = useState([])
+  const [excepcionesGrupo, setExcepcionesGrupo] = useState([])
+  const [excepcionesInd, setExcepcionesInd] = useState([])
   const [horasExtra, setHorasExtra] = useState([])
   const [vista, setVista] = useState(() => window.innerWidth < 768 ? 'lista' : 'timeline')
   const [modal, setModal] = useState(false)
@@ -202,7 +204,7 @@ export default function Agenda({ session }) {
 
   async function cargar() {
     const hace60 = formatFecha(new Date(Date.now() - 60*864e5))
-    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }] = await Promise.all([
+    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: excGrupo }, { data: excInd }] = await Promise.all([
       centro
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
@@ -214,11 +216,17 @@ export default function Agenda({ session }) {
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
       supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
+      // Excepciones de grupos
+      supabase.from('sesiones_excepcion').select('*').eq('entrenador_id', uid),
+      // Excepciones individuales
+      supabase.from('sesiones_excepcion_individual').select('*').eq('entrenador_id', uid),
     ])
     setSesiones(se || [])
     setClientes(cl || [])
     setHorasExtra(he || [])
     setRecurrentes(rc || [])
+    setExcepcionesGrupo(excGrupo || [])
+    setExcepcionesInd(excInd || [])
     // Construir mapa grupo_id → info completa
     const gm = {}
     ;(gs || []).forEach(g => {
@@ -233,9 +241,16 @@ export default function Agenda({ session }) {
   // Generar sesiones virtuales de recurrentes y grupos para la semana actual
   const sesionesConRecurrentes = useMemo(() => {
     const resultado = [...sesiones]
-    // Fechas con excepción (sesión movida)
-    const fechasConExcepcion = new Set(
-      sesiones.filter(s => s.fecha_original).map(s => `${s.cliente_id}_${s.fecha_original}`)
+
+    // Mapas de excepciones para lookup rápido
+    const excGrupoMap = {} // grupo_id_fecha_original → excepcion
+    excepcionesGrupo.forEach(e => { excGrupoMap[`${e.grupo_id}_${e.fecha_original}`] = e })
+    const excIndMap = {}   // recurrente_id_fecha_original → excepcion
+    excepcionesInd.forEach(e => { excIndMap[`${e.recurrente_id}_${e.fecha_original}`] = e })
+
+    // Fechas de sesiones reales ya confirmadas (no duplicar virtual)
+    const sesionesRealesKey = new Set(
+      sesiones.map(s => `${s.cliente_id}_${s.fecha}_${s.hora?.slice(0,5)}`)
     )
 
     // ── Sesiones recurrentes individuales ──
@@ -243,60 +258,113 @@ export default function Agenda({ session }) {
       diasSemana.forEach((dia, diaIdx) => {
         const diaSemana = diaIdx + 1
         const fechaDia = formatFecha(dia)
-        if (!rec.dias_semana.includes(diaSemana)) return
-        if (fechaDia < rec.fecha_inicio) return
+        if (!rec.dias_semana?.includes(diaSemana)) return
+        if (rec.fecha_inicio && fechaDia < rec.fecha_inicio) return
         if (rec.fecha_fin && fechaDia > rec.fecha_fin) return
-        const yaExiste = sesiones.some(s => s.fecha === fechaDia && s.cliente_id === rec.cliente_id && s.hora === rec.hora)
-        if (yaExiste) return
-        const tieneExcepcion = fechasConExcepcion.has(`${rec.cliente_id}_${fechaDia}`)
-        if (tieneExcepcion) return
-        resultado.push({
-          id: `rec_${rec.id}_${fechaDia}`,
-          entrenador_id: rec.entrenador_id || uid,
-          cliente_id: rec.cliente_id,
-          fecha: fechaDia, hora: rec.hora,
-          duracion_minutos: rec.duracion_minutos, tipo: rec.tipo,
-          completada: false, notas: rec.notas, clientes: rec.clientes,
-          _esVirtual: true, _recurrenteId: rec.id
-        })
+
+        // ¿Hay excepción individual para este día?
+        const exc = excIndMap[`${rec.id}_${fechaDia}`]
+        if (exc) {
+          // Mostrar en la nueva fecha/hora si no está cancelada
+          if (!exc.cancelada) {
+            const key = `${rec.cliente_id}_${exc.nueva_fecha}_${exc.nueva_hora?.slice(0,5)}`
+            if (!sesionesRealesKey.has(key)) {
+              resultado.push({
+                id: `exc_ind_${exc.id}`,
+                entrenador_id: exc.entrenador_id || uid,
+                cliente_id: rec.cliente_id,
+                fecha: exc.nueva_fecha,
+                hora: exc.nueva_hora?.slice(0,5),
+                duracion_minutos: exc.duracion_minutos || rec.duracion_minutos,
+                tipo: rec.tipo, completada: exc.completada,
+                clientes: rec.clientes,
+                _esVirtual: true, _recurrenteId: rec.id,
+                _excepcionId: exc.id, _esExcepcion: true,
+                _fechaOriginal: fechaDia,
+              })
+            }
+          }
+          return // No mostrar la virtual en el día original
+        }
+
+        // Sin excepción — mostrar virtual normal si no hay sesión real
+        const key = `${rec.cliente_id}_${fechaDia}_${rec.hora?.slice(0,5)}`
+        if (!sesionesRealesKey.has(key)) {
+          resultado.push({
+            id: `rec_${rec.id}_${fechaDia}`,
+            entrenador_id: rec.entrenador_id || uid,
+            cliente_id: rec.cliente_id,
+            fecha: fechaDia, hora: rec.hora?.slice(0,5),
+            duracion_minutos: rec.duracion_minutos, tipo: rec.tipo,
+            completada: false, notas: rec.notas, clientes: rec.clientes,
+            _esVirtual: true, _recurrenteId: rec.id,
+            _fechaOriginal: fechaDia,
+          })
+        }
       })
     })
 
-    // ── Grupos: una sesión virtual por grupo con todos los miembros ──
+    // ── Grupos ──
     grupos.forEach(g => {
       const miembros = (g.grupo_clientes||[]).filter(m=>m.activo)
       if (!miembros.length || !g.hora || !g.dias_semana?.length) return
+
       diasSemana.forEach((dia, diaIdx) => {
         const diaSemana = diaIdx + 1
         const fechaDia = formatFecha(dia)
         if (!g.dias_semana.includes(diaSemana)) return
-        // Si ya hay sesión real para cualquier miembro del grupo ese día/hora, no duplicar
-        const yaExiste = sesiones.some(s =>
-          s.fecha === fechaDia && s.hora?.slice(0,5) === g.hora?.slice(0,5) &&
-          miembros.some(m => m.cliente_id === s.cliente_id)
+
+        // ¿Hay excepción de grupo para este día?
+        const exc = excGrupoMap[`${g.id}_${fechaDia}`]
+        if (exc) {
+          if (!exc.cancelada) {
+            // Mostrar en la nueva fecha/hora
+            const yaConfirmado = sesiones.some(s =>
+              s.grupo_id === g.id && s.fecha === exc.nueva_fecha
+            )
+            if (!yaConfirmado) {
+              resultado.push({
+                id: `exc_grupo_${exc.id}`,
+                entrenador_id: exc.entrenador_id || uid,
+                cliente_id: miembros[0].cliente_id,
+                fecha: exc.nueva_fecha,
+                hora: exc.nueva_hora?.slice(0,5),
+                duracion_minutos: exc.duracion_minutos || g.duracion_minutos || 60,
+                tipo: 'presencial', completada: exc.completada,
+                grupo_id: g.id,
+                _esVirtual: true, _esGrupo: true, _grupoData: g,
+                _excepcionId: exc.id, _esExcepcion: true,
+                _fechaOriginal: fechaDia,
+                clientes: miembros[0].clientes,
+              })
+            }
+          }
+          return // No mostrar virtual en el día original
+        }
+
+        // Sin excepción — virtual normal si no hay sesión real del grupo ese día
+        const yaConfirmado = sesiones.some(s =>
+          s.grupo_id === g.id && s.fecha === fechaDia
         )
-        if (yaExiste) return
-        // Una sola sesión virtual que representa todo el grupo
-        resultado.push({
-          id: `grupo_${g.id}_${fechaDia}`,
-          entrenador_id: uid,
-          cliente_id: miembros[0].cliente_id, // cliente principal para el color
-          fecha: fechaDia,
-          hora: g.hora?.slice(0,5),
-          duracion_minutos: g.duracion_minutos || 60,
-          tipo: 'presencial',
-          completada: false,
-          grupo_id: g.id,
-          _esVirtual: true,
-          _esGrupo: true,
-          _grupoData: g,
-          clientes: miembros[0].clientes,
-        })
+        if (!yaConfirmado) {
+          resultado.push({
+            id: `grupo_${g.id}_${fechaDia}`,
+            entrenador_id: uid,
+            cliente_id: miembros[0].cliente_id,
+            fecha: fechaDia, hora: g.hora?.slice(0,5),
+            duracion_minutos: g.duracion_minutos || 60,
+            tipo: 'presencial', completada: false,
+            grupo_id: g.id,
+            _esVirtual: true, _esGrupo: true, _grupoData: g,
+            _fechaOriginal: fechaDia,
+            clientes: miembros[0].clientes,
+          })
+        }
       })
     })
 
     return resultado.sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora))
-  }, [sesiones, recurrentes, grupos, diasSemana])
+  }, [sesiones, recurrentes, grupos, excepcionesGrupo, excepcionesInd, diasSemana])
 
   async function guardarSesion() {
     if (!form.cliente_id) return
@@ -374,37 +442,25 @@ export default function Agenda({ session }) {
       ? (sesion._grupoData.grupo_clientes||[]).filter(m=>m.activo).map(m=>m.cliente_id)
       : [sesion.cliente_id]
 
-    // Verificar si ya existe sesión recurrente en esa fecha/hora — solo las de la agenda
-    const { data: existentes } = await supabase.from('sesiones')
-      .select('id, cliente_id')
-      .in('cliente_id', clienteIds)
-      .eq('fecha', sesion.fecha)
-      .eq('hora', sesion.hora)
-      .eq('es_recurrente', true)
-      .eq('cancelada', false)
+    // 1. Crear sesiones reales confirmadas en la tabla sesiones
+    const rows = clienteIds.map(cid => ({
+      entrenador_id: entrenadorId, cliente_id: cid,
+      centro_id: centro?.id || null,
+      fecha: sesion.fecha, hora: sesion.hora,
+      tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
+      completada: true,
+      grupo_id: esGrupo ? sesion._grupoData.id : null,
+      es_recurrente: true,
+    }))
+    await supabase.from('sesiones').insert(rows)
 
-    const yaExisten = new Set((existentes||[]).map(s => s.cliente_id))
-    const idsExistentes = (existentes||[]).map(s => s.id)
-
-    // Actualizar las que ya existen
-    if (idsExistentes.length > 0) {
-      await supabase.from('sesiones')
-        .update({ completada: true, entrenador_id: entrenadorId })
-        .in('id', idsExistentes)
-    }
-
-    // Insertar solo las que no existen
-    const nuevos = clienteIds.filter(id => !yaExisten.has(id))
-    if (nuevos.length > 0) {
-      await supabase.from('sesiones').insert(nuevos.map(cid => ({
-        entrenador_id: entrenadorId, cliente_id: cid,
-        centro_id: centro?.id || null,
-        fecha: sesion.fecha, hora: sesion.hora,
-        tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
-        completada: true,
-        grupo_id: esGrupo ? sesion._grupoData.id : null,
-        es_recurrente: true,
-      })))
+    // 2. Si venía de una excepción, eliminarla (ya está confirmada como sesión real)
+    if (sesion._excepcionId) {
+      if (esGrupo) {
+        await supabase.from('sesiones_excepcion').delete().eq('id', sesion._excepcionId)
+      } else {
+        await supabase.from('sesiones_excepcion_individual').delete().eq('id', sesion._excepcionId)
+      }
     }
 
     setToast({ msg: clienteIds.length > 1 ? `✓ Sesión completada para ${clienteIds.length} miembros` : 'Sesión confirmada ✓' })
@@ -414,49 +470,30 @@ export default function Agenda({ session }) {
   async function moverSesionVirtual(sesion, nuevaFecha, nuevaHora) {
     const entrenadorId = entrenadorSel || sesion.entrenador_id || uid
     const esGrupo = sesion._esGrupo && sesion._grupoData
-    const clienteIds = esGrupo
-      ? (sesion._grupoData.grupo_clientes||[]).filter(m=>m.activo).map(m=>m.cliente_id)
-      : [sesion.cliente_id]
+    const fechaOriginal = sesion._fechaOriginal || sesion.fecha
 
-    // Eliminar excepciones anteriores para esa fecha original (evita acumulación)
-    await supabase.from('sesiones')
-      .delete()
-      .in('cliente_id', clienteIds)
-      .eq('fecha_original', sesion.fecha)
-      .eq('es_recurrente', true)
-      .eq('completada', false)
-
-    // Verificar si ya hay sesión recurrente en la nueva fecha/hora
-    const { data: existentesNueva } = await supabase.from('sesiones')
-      .select('id, cliente_id')
-      .in('cliente_id', clienteIds)
-      .eq('fecha', nuevaFecha)
-      .eq('hora', nuevaHora)
-      .eq('es_recurrente', true)
-      .eq('cancelada', false)
-
-    const yaExistenNueva = new Set((existentesNueva||[]).map(s => s.cliente_id))
-
-    // Actualizar las que ya existen en la nueva fecha
-    if (existentesNueva?.length > 0) {
-      await supabase.from('sesiones')
-        .update({ entrenador_id: entrenadorId, fecha_original: sesion.fecha })
-        .in('id', existentesNueva.map(s => s.id))
-    }
-
-    // Insertar solo las nuevas
-    const nuevos = clienteIds.filter(id => !yaExistenNueva.has(id))
-    if (nuevos.length > 0) {
-      await supabase.from('sesiones').insert(nuevos.map(cid => ({
-        entrenador_id: entrenadorId, cliente_id: cid,
-        centro_id: centro?.id || null,
-        fecha: nuevaFecha, hora: nuevaHora,
-        tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
+    if (esGrupo) {
+      // Upsert en sesiones_excepcion con UNIQUE(grupo_id, fecha_original)
+      await supabase.from('sesiones_excepcion').upsert({
+        grupo_id: sesion._grupoData.id,
+        entrenador_id: entrenadorId,
+        fecha_original: fechaOriginal,
+        nueva_fecha: nuevaFecha,
+        nueva_hora: nuevaHora,
+        duracion_minutos: sesion.duracion_minutos || 60,
         completada: false,
-        grupo_id: esGrupo ? sesion._grupoData.id : null,
-        es_recurrente: true,
-        fecha_original: sesion.fecha,
-      })))
+      }, { onConflict: 'grupo_id,fecha_original' })
+    } else {
+      // Upsert en sesiones_excepcion_individual con UNIQUE(recurrente_id, fecha_original)
+      await supabase.from('sesiones_excepcion_individual').upsert({
+        recurrente_id: sesion._recurrenteId,
+        entrenador_id: entrenadorId,
+        fecha_original: fechaOriginal,
+        nueva_fecha: nuevaFecha,
+        nueva_hora: nuevaHora,
+        duracion_minutos: sesion.duracion_minutos,
+        completada: false,
+      }, { onConflict: 'recurrente_id,fecha_original' })
     }
 
     const label = new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
