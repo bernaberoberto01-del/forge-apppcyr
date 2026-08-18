@@ -374,24 +374,39 @@ export default function Agenda({ session }) {
       ? (sesion._grupoData.grupo_clientes||[]).filter(m=>m.activo).map(m=>m.cliente_id)
       : [sesion.cliente_id]
 
-    // Upsert: si ya existe (cliente, fecha, hora) actualiza — si no existe crea
-    const rows = clienteIds.map(cid => ({
-      entrenador_id: entrenadorId, cliente_id: cid,
-      centro_id: centro?.id || null,
-      fecha: sesion.fecha, hora: sesion.hora,
-      tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
-      completada: true,
-      grupo_id: esGrupo ? sesion._grupoData.id : null,
-      es_recurrente: true,
-    }))
+    // Verificar si ya existe sesión recurrente en esa fecha/hora — solo las de la agenda
+    const { data: existentes } = await supabase.from('sesiones')
+      .select('id, cliente_id')
+      .in('cliente_id', clienteIds)
+      .eq('fecha', sesion.fecha)
+      .eq('hora', sesion.hora)
+      .eq('es_recurrente', true)
+      .eq('cancelada', false)
 
-    const { error } = await supabase.from('sesiones')
-      .upsert(rows, { onConflict: 'cliente_id,fecha,hora', ignoreDuplicates: false })
+    const yaExisten = new Set((existentes||[]).map(s => s.cliente_id))
+    const idsExistentes = (existentes||[]).map(s => s.id)
 
-    if (error) {
-      setToast({ msg: 'Error al confirmar: ' + error.message })
-      return
+    // Actualizar las que ya existen
+    if (idsExistentes.length > 0) {
+      await supabase.from('sesiones')
+        .update({ completada: true, entrenador_id: entrenadorId })
+        .in('id', idsExistentes)
     }
+
+    // Insertar solo las que no existen
+    const nuevos = clienteIds.filter(id => !yaExisten.has(id))
+    if (nuevos.length > 0) {
+      await supabase.from('sesiones').insert(nuevos.map(cid => ({
+        entrenador_id: entrenadorId, cliente_id: cid,
+        centro_id: centro?.id || null,
+        fecha: sesion.fecha, hora: sesion.hora,
+        tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
+        completada: true,
+        grupo_id: esGrupo ? sesion._grupoData.id : null,
+        es_recurrente: true,
+      })))
+    }
+
     setToast({ msg: clienteIds.length > 1 ? `✓ Sesión completada para ${clienteIds.length} miembros` : 'Sesión confirmada ✓' })
     setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
   }
@@ -403,33 +418,47 @@ export default function Agenda({ session }) {
       ? (sesion._grupoData.grupo_clientes||[]).filter(m=>m.activo).map(m=>m.cliente_id)
       : [sesion.cliente_id]
 
-    // Eliminar cualquier excepción anterior para esa fecha original + cliente
-    // para evitar acumulación de movimientos del mismo día
+    // Eliminar excepciones anteriores para esa fecha original (evita acumulación)
     await supabase.from('sesiones')
       .delete()
       .in('cliente_id', clienteIds)
       .eq('fecha_original', sesion.fecha)
+      .eq('es_recurrente', true)
       .eq('completada', false)
 
-    // Insertar nueva excepción con upsert
-    const rows = clienteIds.map(cid => ({
-      entrenador_id: entrenadorId, cliente_id: cid,
-      centro_id: centro?.id || null,
-      fecha: nuevaFecha, hora: nuevaHora,
-      tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
-      completada: false,
-      grupo_id: esGrupo ? sesion._grupoData.id : null,
-      es_recurrente: true,
-      fecha_original: sesion.fecha,
-    }))
+    // Verificar si ya hay sesión recurrente en la nueva fecha/hora
+    const { data: existentesNueva } = await supabase.from('sesiones')
+      .select('id, cliente_id')
+      .in('cliente_id', clienteIds)
+      .eq('fecha', nuevaFecha)
+      .eq('hora', nuevaHora)
+      .eq('es_recurrente', true)
+      .eq('cancelada', false)
 
-    const { error } = await supabase.from('sesiones')
-      .upsert(rows, { onConflict: 'cliente_id,fecha,hora', ignoreDuplicates: false })
+    const yaExistenNueva = new Set((existentesNueva||[]).map(s => s.cliente_id))
 
-    if (error) {
-      setToast({ msg: 'Error al mover: ' + error.message })
-      return
+    // Actualizar las que ya existen en la nueva fecha
+    if (existentesNueva?.length > 0) {
+      await supabase.from('sesiones')
+        .update({ entrenador_id: entrenadorId, fecha_original: sesion.fecha })
+        .in('id', existentesNueva.map(s => s.id))
     }
+
+    // Insertar solo las nuevas
+    const nuevos = clienteIds.filter(id => !yaExistenNueva.has(id))
+    if (nuevos.length > 0) {
+      await supabase.from('sesiones').insert(nuevos.map(cid => ({
+        entrenador_id: entrenadorId, cliente_id: cid,
+        centro_id: centro?.id || null,
+        fecha: nuevaFecha, hora: nuevaHora,
+        tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
+        completada: false,
+        grupo_id: esGrupo ? sesion._grupoData.id : null,
+        es_recurrente: true,
+        fecha_original: sesion.fecha,
+      })))
+    }
+
     const label = new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
     setToast({ msg: `Sesión movida al ${label} a las ${nuevaHora}` })
     setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
