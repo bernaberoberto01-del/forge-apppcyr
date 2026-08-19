@@ -207,7 +207,7 @@ export default function Agenda({ session }) {
     const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: excGrupo }, { data: excInd }] = await Promise.all([
       centro
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
-        : supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
+        : supabase.from('sesiones').select('*, clientes(nombre,tipo)').or(`entrenador_id.eq.${uid},grupo_id.not.is.null`).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
       centro
         ? supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('centro_id', centro.id).eq('estado','activo')
         : supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('entrenador_id', uid).eq('estado','activo'),
@@ -344,7 +344,9 @@ export default function Agenda({ session }) {
 
         // Sin excepción — virtual normal si no hay sesión real del grupo ese día
         const yaConfirmado = sesiones.some(s =>
-          s.grupo_id === g.id && s.fecha === fechaDia
+          s.grupo_id === g.id && s.fecha === fechaDia && s.completada
+        ) || sesiones.some(s =>
+          s.grupo_id === g.id && s.fecha === fechaDia && !s.completada
         )
         if (!yaConfirmado) {
           resultado.push({
