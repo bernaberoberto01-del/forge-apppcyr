@@ -6,7 +6,7 @@ const PASOS = ['Datos personales','Tu objetivo','Experiencia','Marcas básicas',
 
 const init = {
   nombre:'', email:'', telefono:'', edad:'', sexo:'', peso_actual:'', altura:'', tipo:'presencial',
-  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'', formato_entrenamiento:'', acepta_rgpd: false, acepta_ia: false,
+  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'', formato_entrenamiento:'', necesidades:'', acepta_rgpd: false, acepta_ia: false,
   nivel:'principiante', anos_entrenando:0,
   marca_press_banca:'', marca_sentadilla:'', marca_peso_muerto:'', marca_dominadas:'', marca_flexiones:'', marca_press_militar:'',
   material:'gimnasio', dias_semana:3, duracion_sesion:60, horario_preferido:'',
@@ -102,6 +102,7 @@ export default function RegistroCliente() {
   const validarPaso = () => {
     if (paso === 0 && (!form.nombre || !form.email)) { setError('Nombre y email son obligatorios'); return false }
     if (paso === 1 && !form.objetivo) { setError('Selecciona tu objetivo'); return false }
+    if (paso === 1 && !form.necesidades) { setError('Selecciona qué necesitas'); return false }
     setError(''); return true
   }
 
@@ -122,6 +123,7 @@ export default function RegistroCliente() {
         altura: form.altura ? (Number(form.altura) < 3 ? Math.round(Number(form.altura) * 100) : Math.round(Number(form.altura))) : null,
         objetivo: form.objetivo || null,
         objetivo_detalle: form.objetivo_detalle || null,
+        plan_online: form.necesidades || null,
         plazo: form.plazo || null,
         nivel: form.nivel || null,
         anos_entrenando: form.anos_entrenando ? Number(form.anos_entrenando) : 0,
@@ -250,7 +252,33 @@ export default function RegistroCliente() {
                 <h2 className="text-lg font-bold text-[#0A0A0A]">¿Qué quieres conseguir?</h2>
                 <p className="text-sm text-[#6B6B6B] mt-0.5">Cuanto más claro seas, mejor podremos ayudarte.</p>
               </div>
+
+              {/* Necesidades — determina el plan */}
               <div>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-1">¿Qué necesitas? <span className="text-[#FF5C00]">*</span></label>
+                <p className="text-xs text-[#6B6B6B] mb-3">Tu entrenador preparará exactamente lo que selecciones.</p>
+                <div className="space-y-2">
+                  {[
+                    ['entrenamiento', '💪 Solo entrenamiento', 'Rutina personalizada + seguimiento semanal', '35€/mes'],
+                    ['nutricion',    '🥗 Solo nutrición',     'Plan nutricional + seguimiento semanal',   '29€/mes'],
+                    ['completo',     '⚡ Entrenamiento + Nutrición', 'Rutina + nutrición + mensajería directa', '49€/mes'],
+                  ].map(([v, l, desc, precio]) => (
+                    <button key={v} type="button" onClick={() => set('necesidades', v)}
+                      className={`w-full p-4 rounded-xl border text-left transition-all flex items-start gap-3 ${form.necesidades===v ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/10 hover:border-[#FF5C00]/30'}`}>
+                      <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${form.necesidades===v ? 'border-[#FF5C00]' : 'border-black/20'}`}>
+                        {form.necesidades===v && <div className="w-2.5 h-2.5 rounded-full bg-[#FF5C00]"/>}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className={`text-sm font-bold ${form.necesidades===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                          <p className={`text-xs font-bold ${form.necesidades===v?'text-[#FF5C00]':'text-[#9B9B9B]'}`}>{precio}</p>
+                        </div>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5">{desc}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
                 <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Objetivo principal <span className="text-[#FF5C00]">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
                   {[

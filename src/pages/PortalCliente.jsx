@@ -247,12 +247,21 @@ export default function PortalCliente() {
     </div>
   )
 
+  const plan = cliente?.plan_online // 'nutricion' | 'entrenamiento' | 'completo' | null
+  const esOnline = cliente?.tipo === 'online'
+
+  // Para clientes online, mostrar solo las tabs de su plan
+  // Para presenciales, mostrar todo como siempre
+  const puedeVerRutina = !esOnline || !plan || plan === 'entrenamiento' || plan === 'completo'
+  const puedeVerNutricion = !esOnline || !plan || plan === 'nutricion' || plan === 'completo'
+  const puedeMensajes = !esOnline || !plan || plan === 'completo'
+
   const TABS=[
     {id:'inicio',label:'Inicio',icon:'⊞'},
-    {id:'rutina',label:'Rutina',icon:'💪'},
+    ...(puedeVerRutina ? [{id:'rutina',label:'Rutina',icon:'💪'}] : []),
     {id:'progreso',label:'Progreso',icon:'📈'},
-    {id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos},
-    ...(planNutricion||cliente?.nutricion_activa||tieneCuestNutricion?[{id:'nutricion',label:'Nutrición',icon:'🥗'}]:[]),
+    ...(puedeMensajes ? [{id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos}] : []),
+    ...(puedeVerNutricion && (planNutricion||cliente?.nutricion_activa||tieneCuestNutricion) ? [{id:'nutricion',label:'Nutrición',icon:'🥗'}] : []),
     ...(pagos.length>0?[{id:'pagos',label:'Pagos',icon:'💳'}]:[]),
     {id:'ajustes',label:'Ajustes',icon:'⚙️'},
   ]

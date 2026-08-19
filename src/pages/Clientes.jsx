@@ -201,18 +201,22 @@ export default function Clientes({ session }) {
     if (cliente) {
       await Promise.all([
         supabase.from('cuestionarios').update({ cliente_id: cliente.id, procesado: true }).eq('id', c.id),
-        // Mensaje de bienvenida en el portal
         supabase.from('mensajes_cliente').insert({
           entrenador_id: uid,
           cliente_id: cliente.id,
-          contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu rutina. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
+          contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu ${cliente.plan_online === 'nutricion' ? 'plan nutricional' : cliente.plan_online === 'entrenamiento' ? 'rutina' : 'rutina y plan nutricional'}. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
         })
       ])
-      // Email de bienvenida via Edge Function (Gmail SMTP)
-      if (cliente.email) {
-        supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: cliente.id } }).catch(() => {})
-        showToast(`✓ ${c.nombre.split(' ')[0]} convertido · Email enviado`)
+      // Si es cliente online con plan asignado, lanzar IA automáticamente
+      if (cliente.plan_online) {
+        supabase.functions.invoke('procesar-plan-online', {
+          body: { cliente_id: cliente.id }
+        }).catch(() => {})
+        showToast(`✓ ${c.nombre.split(' ')[0]} activado · Plan ${cliente.plan_online} generándose con IA...`)
       } else {
+        if (cliente.email) {
+          supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: cliente.id } }).catch(() => {})
+        }
         showToast(`✓ ${c.nombre.split(' ')[0]} convertido`)
       }
       setCuestionarios(prev => {
@@ -435,6 +439,15 @@ export default function Clientes({ session }) {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#0A0A0A] truncate">{c.nombre}</p>
                       <p className="text-xs text-[#6B6B6B]">{c.tipo === 'online' ? '🌐' : '📍'} {obj?.label || c.objetivo}</p>
+                      {c.tipo === 'online' && c.plan_online && (
+                        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${
+                          c.plan_online === 'completo' ? 'bg-[#FF5C00]/10 text-[#FF5C00]' :
+                          c.plan_online === 'entrenamiento' ? 'bg-[#6366f1]/10 text-[#6366f1]' :
+                          'bg-emerald-50 text-emerald-700'
+                        }`}>
+                          {c.plan_online === 'completo' ? '⚡ Completo' : c.plan_online === 'entrenamiento' ? '💪 Entrenamiento' : '🥗 Nutrición'}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoBadge.cls}`}>{estadoBadge.label}</span>
