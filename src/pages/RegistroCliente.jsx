@@ -279,6 +279,7 @@ export default function RegistroCliente() {
                   ))}
                 </div>
               </div>
+              <div>
                 <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Objetivo principal <span className="text-[#FF5C00]">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
