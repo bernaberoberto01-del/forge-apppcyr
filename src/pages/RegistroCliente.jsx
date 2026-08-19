@@ -253,27 +253,24 @@ export default function RegistroCliente() {
                 <p className="text-sm text-[#6B6B6B] mt-0.5">Cuanto más claro seas, mejor podremos ayudarte.</p>
               </div>
 
-              {/* Necesidades — determina el plan */}
+              {/* Necesidades — determina el plan internamente */}
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-1">¿Qué necesitas? <span className="text-[#FF5C00]">*</span></label>
-                <p className="text-xs text-[#6B6B6B] mb-3">Tu entrenador preparará exactamente lo que selecciones.</p>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-1">¿En qué área quieres mejorar? <span className="text-[#FF5C00]">*</span></label>
+                <p className="text-xs text-[#6B6B6B] mb-3">Tu entrenador diseñará exactamente lo que necesitas.</p>
                 <div className="space-y-2">
                   {[
-                    ['entrenamiento', '💪 Solo entrenamiento', 'Rutina personalizada + seguimiento semanal', '35€/mes'],
-                    ['nutricion',    '🥗 Solo nutrición',     'Plan nutricional + seguimiento semanal',   '29€/mes'],
-                    ['completo',     '⚡ Entrenamiento + Nutrición', 'Rutina + nutrición + mensajería directa', '49€/mes'],
-                  ].map(([v, l, desc, precio]) => (
+                    ['entrenamiento', '💪 Entrenamiento', 'Quiero mejorar mi condición física, ganar fuerza o perder peso entrenando.'],
+                    ['nutricion',    '🥗 Alimentación',  'Quiero aprender a comer mejor y estructurar mi dieta según mis objetivos.'],
+                    ['completo',     '⚡ Las dos cosas',  'Quiero un cambio completo — entrenar bien y comer mejor a la vez.'],
+                  ].map(([v, l, desc]) => (
                     <button key={v} type="button" onClick={() => set('necesidades', v)}
                       className={`w-full p-4 rounded-xl border text-left transition-all flex items-start gap-3 ${form.necesidades===v ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/10 hover:border-[#FF5C00]/30'}`}>
                       <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${form.necesidades===v ? 'border-[#FF5C00]' : 'border-black/20'}`}>
                         {form.necesidades===v && <div className="w-2.5 h-2.5 rounded-full bg-[#FF5C00]"/>}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className={`text-sm font-bold ${form.necesidades===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
-                          <p className={`text-xs font-bold ${form.necesidades===v?'text-[#FF5C00]':'text-[#9B9B9B]'}`}>{precio}</p>
-                        </div>
-                        <p className="text-xs text-[#6B6B6B] mt-0.5">{desc}</p>
+                      <div>
+                        <p className={`text-sm font-bold ${form.necesidades===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{desc}</p>
                       </div>
                     </button>
                   ))}
