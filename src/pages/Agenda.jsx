@@ -240,7 +240,28 @@ export default function Agenda({ session }) {
 
   // Generar sesiones virtuales de recurrentes y grupos para la semana actual
   const sesionesConRecurrentes = useMemo(() => {
-    const resultado = [...sesiones]
+    // Sesiones sin grupo_id van directo al resultado
+    const sesionesIndividuales = sesiones.filter(s => !s.grupo_id)
+    const resultado = [...sesionesIndividuales]
+
+    // Sesiones con grupo_id: agrupar por (grupo_id, fecha, hora) → una sola tarjeta
+    const sesionesGrupoReal = sesiones.filter(s => s.grupo_id)
+    const gruposRealesMap = {} // key: grupo_id_fecha_hora
+    sesionesGrupoReal.forEach(s => {
+      const key = `${s.grupo_id}_${s.fecha}_${s.hora?.slice(0,5)}`
+      if (!gruposRealesMap[key]) {
+        const grupoInfo = gruposMap[s.grupo_id]
+        gruposRealesMap[key] = {
+          ...s,
+          id: `real_grupo_${key}`,
+          _esGrupoReal: true,
+          _grupoData: grupos.find(g => g.id === s.grupo_id),
+          // Nombre: todos los miembros del grupo
+          clientes: { nombre: grupoInfo?.miembros?.map(m => m.nombre.split(' ')[0]).join(' + ') || s.clientes?.nombre },
+        }
+      }
+    })
+    resultado.push(...Object.values(gruposRealesMap))
 
     // Mapas de excepciones para lookup rápido
     const excGrupoMap = {} // grupo_id_fecha_original → excepcion
@@ -319,7 +340,7 @@ export default function Agenda({ session }) {
         if (exc) {
           if (!exc.cancelada) {
             // Mostrar en la nueva fecha/hora
-            const yaConfirmado = sesiones.some(s =>
+            const yaConfirmado = sesionesGrupoReal.some(s =>
               s.grupo_id === g.id && s.fecha === exc.nueva_fecha
             )
             if (!yaConfirmado) {
@@ -343,10 +364,8 @@ export default function Agenda({ session }) {
         }
 
         // Sin excepción — virtual normal si no hay sesión real del grupo ese día
-        const yaConfirmado = sesiones.some(s =>
-          s.grupo_id === g.id && s.fecha === fechaDia && s.completada
-        ) || sesiones.some(s =>
-          s.grupo_id === g.id && s.fecha === fechaDia && !s.completada
+        const yaConfirmado = sesionesGrupoReal.some(s =>
+          s.grupo_id === g.id && s.fecha === fechaDia
         )
         if (!yaConfirmado) {
           resultado.push({
