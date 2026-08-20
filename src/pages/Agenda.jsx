@@ -124,6 +124,7 @@ export default function Agenda({ session }) {
   const [editando, setEditando] = useState(false)
   const [moverForm, setMoverForm] = useState(null)
   const [entrenadorSel, setEntrenadorSel] = useState(null)
+  const [editGrupoModal, setEditGrupoModal] = useState(null) // grupo a editar
   const [refreshKey, setRefreshKey] = useState(0) // entrenador seleccionado para la sesión
   const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
@@ -952,11 +953,21 @@ export default function Agenda({ session }) {
 
             {sesionDetalle._esVirtual ? (
               <div className="space-y-2">
-                <div className="bg-[#6366f1]/8 rounded-xl p-3 text-center mb-2">
-                  <p className="text-xs text-[#6366f1] font-medium">
-                    {sesionDetalle._esGrupo ? `👥 ${sesionDetalle._grupoData?.nombre}` : '↻ Sesión recurrente programada'}
-                  </p>
-                  <p className="text-xs text-[#6366f1]/60 mt-0.5">La regla semanal no cambia — solo esta ocurrencia</p>
+                <div className="bg-[#6366f1]/8 rounded-xl p-3 mb-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-[#6366f1] font-medium">
+                        {sesionDetalle._esGrupo ? `👥 ${sesionDetalle._grupoData?.nombre}` : '↻ Sesión recurrente programada'}
+                      </p>
+                      <p className="text-xs text-[#6366f1]/60 mt-0.5">La regla semanal no cambia — solo esta ocurrencia</p>
+                    </div>
+                    {sesionDetalle._esGrupo && sesionDetalle._grupoData && (
+                      <button onClick={() => setEditGrupoModal(sesionDetalle._grupoData)}
+                        className="text-xs border border-[#6366f1]/30 text-[#6366f1] px-2.5 py-1.5 rounded-lg hover:bg-[#6366f1]/10 flex-shrink-0 ml-2">
+                        ✏️ Editar grupo
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Selector de entrenador */}
@@ -1388,6 +1399,129 @@ export default function Agenda({ session }) {
           </div>
         </div>
       )}
+
+      {/* Modal editar grupo desde agenda */}
+      {editGrupoModal && (
+        <EditarGrupoModal
+          grupo={editGrupoModal}
+          onClose={() => setEditGrupoModal(null)}
+          onGuardado={() => { setEditGrupoModal(null); setSesionDetalle(null); cargar() }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Modal editar grupo desde la Agenda ──────────────────────────────────────
+const DIAS_SEMANA = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+function EditarGrupoModal({ grupo, onClose, onGuardado }) {
+  const [form, setForm] = useState({
+    nombre: grupo.nombre || '',
+    hora: grupo.hora?.slice(0,5) || '09:00',
+    duracion_minutos: grupo.duracion_minutos || 60,
+    dias_semana: grupo.dias_semana || [],
+  })
+  const [guardando, setGuardando] = useState(false)
+
+  async function guardar() {
+    setGuardando(true)
+    await supabase.from('grupos').update({
+      nombre: form.nombre.trim(),
+      hora: form.hora,
+      duracion_minutos: Number(form.duracion_minutos),
+      dias_semana: form.dias_semana,
+    }).eq('id', grupo.id)
+    setGuardando(false)
+    onGuardado()
+  }
+
+  function toggleDia(d) {
+    setForm(f => ({
+      ...f,
+      dias_semana: f.dias_semana.includes(d)
+        ? f.dias_semana.filter(x => x !== d)
+        : [...f.dias_semana, d].sort()
+    }))
+  }
+
+  const miembros = (grupo.grupo_clientes||[]).filter(m=>m.activo)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
+      onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-[#0A0A0A]">Editar grupo</h3>
+          <button onClick={onClose} className="text-[#9B9B9B] hover:text-[#0A0A0A] text-xl leading-none">×</button>
+        </div>
+
+        <div className="space-y-4">
+          {/* Nombre */}
+          <div>
+            <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
+            <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})}
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+          </div>
+
+          {/* Días */}
+          <div>
+            <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Días de entrenamiento</label>
+            <div className="grid grid-cols-7 gap-1">
+              {[1,2,3,4,5,6,7].map(d => {
+                const sel = form.dias_semana.includes(d)
+                return (
+                  <button key={d} type="button" onClick={() => toggleDia(d)}
+                    className={`py-2 rounded-xl text-xs font-semibold transition-all ${sel ? 'text-white' : 'border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}
+                    style={sel ? {background:'#0A0A0A'} : {}}>
+                    {DIAS_SEMANA[d]}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Hora y duración */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Hora</label>
+              <input type="time" value={form.hora} onChange={e => setForm({...form, hora: e.target.value})}
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Duración (min)</label>
+              <input type="number" value={form.duracion_minutos} onChange={e => setForm({...form, duracion_minutos: e.target.value})}
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            </div>
+          </div>
+
+          {/* Miembros (solo lectura) */}
+          {miembros.length > 0 && (
+            <div className="bg-[#F7F6F3] rounded-xl p-3">
+              <p className="text-xs font-semibold text-[#9B9B9B] mb-2">Miembros</p>
+              <div className="flex gap-2 flex-wrap">
+                {miembros.map(m => (
+                  <span key={m.cliente_id} className="text-xs bg-white border border-black/8 px-2.5 py-1 rounded-lg text-[#0A0A0A] font-medium">
+                    {m.clientes?.nombre?.split(' ')[0]}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-[#9B9B9B] mt-2">Para añadir o quitar miembros ve a Clientes → Grupos</p>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0]">
+              Cancelar
+            </button>
+            <button onClick={guardar} disabled={!form.nombre.trim() || form.dias_semana.length === 0 || guardando}
+              className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-[#e05200] transition-all">
+              {guardando ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
