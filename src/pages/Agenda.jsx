@@ -109,6 +109,7 @@ export default function Agenda({ session }) {
   const [grupos, setGrupos] = useState([])
   const [excepcionesGrupo, setExcepcionesGrupo] = useState([])
   const [excepcionesInd, setExcepcionesInd] = useState([])
+  const [miembrosAgenda, setMiembrosAgenda] = useState([])
   const [horasExtra, setHorasExtra] = useState([])
   const [vista, setVista] = useState(() => window.innerWidth < 768 ? 'lista' : 'timeline')
   const [modal, setModal] = useState(false)
@@ -204,7 +205,7 @@ export default function Agenda({ session }) {
 
   async function cargar() {
     const hace60 = formatFecha(new Date(Date.now() - 60*864e5))
-    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: excGrupo }, { data: excInd }] = await Promise.all([
+    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: excGrupo }, { data: excInd }, { data: miem }] = await Promise.all([
       centro
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').or(`entrenador_id.eq.${uid},grupo_id.not.is.null`).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
@@ -216,6 +217,8 @@ export default function Agenda({ session }) {
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
       supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
+      // Cargar miembros del centro directamente — no depender del timing de useCentro
+      supabase.from('miembros_centro').select('user_id,nombre,rol,color,email').eq('activo', true),
       // Excepciones de grupos
       supabase.from('sesiones_excepcion').select('*').eq('entrenador_id', uid),
       // Excepciones individuales
@@ -227,6 +230,7 @@ export default function Agenda({ session }) {
     setRecurrentes(rc || [])
     setExcepcionesGrupo(excGrupo || [])
     setExcepcionesInd(excInd || [])
+    setMiembrosAgenda(miem || [])
     // Construir mapa grupo_id → info completa
     const gm = {}
     ;(gs || []).forEach(g => {
@@ -956,11 +960,11 @@ export default function Agenda({ session }) {
                 </div>
 
                 {/* Selector de entrenador */}
-                {miembros && miembros.length > 1 ? (
+                {miembrosAgenda.length > 1 ? (
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Entrenador que imparte</label>
                     <div className="flex gap-1.5 flex-wrap">
-                      {miembros.map(m => {
+                      {miembrosAgenda.map(m => {
                         const seleccionado = (entrenadorSel || sesionDetalle.entrenador_id) === m.user_id
                         return (
                           <button key={m.user_id} type="button"
@@ -1027,11 +1031,11 @@ export default function Agenda({ session }) {
             ) : (
               <div className="space-y-2">
                 {/* Selector entrenador en sesiones reales */}
-                {miembros && miembros.length > 1 && (
+                {miembrosAgenda.length > 1 && (
                   <div className="pb-1">
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Entrenador</label>
                     <div className="flex gap-1.5 flex-wrap">
-                      {miembros.map(m => {
+                      {miembrosAgenda.map(m => {
                         const seleccionado = (entrenadorSel || sesionDetalle.entrenador_id) === m.user_id
                         return (
                           <button key={m.user_id} type="button"
