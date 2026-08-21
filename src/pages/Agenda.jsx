@@ -45,11 +45,54 @@ function Toast({ msg, tipo='ok', onClose }) {
 }
 
 
-function VistaMensual({ mesVista, setMesVista, sesiones, hoy, abrirModalEnDia, setSesionDetalle, miembros, clienteColor }) {
+function VistaMensual({ mesVista, setMesVista, sesiones, hoy, abrirModalEnDia, setSesionDetalle, miembros, clienteColor, grupos, gruposMap, excepcionesGrupo }) {
   const primerDia = new Date(mesVista.getFullYear(), mesVista.getMonth(), 1)
   const ultimoDia = new Date(mesVista.getFullYear(), mesVista.getMonth()+1, 0)
   const diasMes = ultimoDia.getDate()
   const offsetInicio = (primerDia.getDay() + 6) % 7
+
+  // Expandir grupos para todo el mes
+  const sesionesConGrupos = useMemo(() => {
+    const resultado = [...sesiones]
+    const excGrupoMap = {}
+    ;(excepcionesGrupo||[]).forEach(e => { excGrupoMap[`${e.grupo_id}_${e.fecha_original}`] = e })
+
+    ;(grupos||[]).forEach(g => {
+      if (!g.hora || !g.dias_semana?.length) return
+      const miembrosG = (g.grupo_clientes||[]).filter(m=>m.activo)
+      if (!miembrosG.length) return
+
+      for (let dia = 1; dia <= diasMes; dia++) {
+        const fecha = new Date(mesVista.getFullYear(), mesVista.getMonth(), dia)
+        const diaSemana = ((fecha.getDay() + 6) % 7) + 1 // 1=Lun..7=Dom
+        if (!g.dias_semana.includes(diaSemana)) continue
+        const fechaStr = `${mesVista.getFullYear()}-${String(mesVista.getMonth()+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`
+
+        // ¿Excepción?
+        const exc = excGrupoMap[`${g.id}_${fechaStr}`]
+        if (exc) {
+          // Mostrar en nueva fecha si no está cancelada
+          if (!exc.cancelada && !resultado.some(s => s.grupo_id === g.id && s.fecha === exc.nueva_fecha)) {
+            resultado.push({ id: `exc_m_${exc.id}`, fecha: exc.nueva_fecha, hora: exc.nueva_hora?.slice(0,5), grupo_id: g.id, _esGrupo: true, _grupoData: g, _esVirtual: true, cliente_id: miembrosG[0].cliente_id, clientes: { nombre: (gruposMap[g.id]?.miembros||[]).map(m=>m.nombre.split(' ')[0]).join(' + ') } })
+          }
+          continue
+        }
+
+        // ¿Ya confirmada?
+        const yaConfirmada = resultado.some(s => s.grupo_id === g.id && s.fecha === fechaStr)
+        if (yaConfirmada) continue
+
+        resultado.push({
+          id: `grupo_m_${g.id}_${fechaStr}`,
+          fecha: fechaStr, hora: g.hora?.slice(0,5),
+          grupo_id: g.id, _esGrupo: true, _grupoData: g, _esVirtual: true,
+          cliente_id: miembrosG[0].cliente_id,
+          clientes: { nombre: (gruposMap[g.id]?.miembros||[]).map(m=>m.nombre.split(' ')[0]).join(' + ') }
+        })
+      }
+    })
+    return resultado
+  }, [sesiones, grupos, gruposMap, excepcionesGrupo, mesVista, diasMes])
 
   return (
     <div className="flex-1 overflow-y-auto p-4">
@@ -72,7 +115,7 @@ function VistaMensual({ mesVista, setMesVista, sesiones, hoy, abrirModalEnDia, s
         {Array.from({length: diasMes}, (_,i) => {
           const dia = i+1
           const fechaDia = `${mesVista.getFullYear()}-${String(mesVista.getMonth()+1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`
-          const sessDia = sesiones.filter(s => s.fecha === fechaDia)
+          const sessDia = sesionesConGrupos.filter(s => s.fecha === fechaDia)
           const esHoyDia = fechaDia === hoy
           return (
             <div key={dia} onClick={() => abrirModalEnDia(new Date(fechaDia+'T12:00'), '09:00')}
@@ -655,6 +698,8 @@ export default function Agenda({ session }) {
           sesiones={sesionesFiltradas} hoy={hoy}
           abrirModalEnDia={abrirModalEnDia} setSesionDetalle={setSesionDetalle}
           miembros={miembros} clienteColor={clienteColor}
+          grupos={grupos} gruposMap={gruposMap}
+          excepcionesGrupo={excepcionesGrupo}
         />
       )}
 
@@ -747,10 +792,12 @@ export default function Agenda({ session }) {
             const esHoy = formatFecha(dia) === hoy
             const nSes = sesionesFiltradas.filter(s => s.fecha === formatFecha(dia)).length
             return (
-              <div key={i} className={`flex-1 text-center py-1.5 border-l border-black/5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoy ? 'bg-[#FF5C00]/5' : ''}`}
+              <div key={i} className={`flex-1 text-center py-1.5 border-l border-black/5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoy ? 'bg-[#FF5C00]/8 border-b-2 border-b-[#FF5C00]' : ''}`}
                 onClick={() => abrirModalEnDia(dia, '09:00')}>
-                <p className={`text-xs font-medium ${esHoy ? 'text-[#FF5C00]' : 'text-[#6B6B6B]'}`}>{DIAS_LABEL[i]}</p>
-                <p className={`text-sm font-bold leading-tight ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>{dia.getDate()}</p>
+                <p className={`text-xs font-bold ${esHoy ? 'text-[#FF5C00]' : 'text-[#6B6B6B]'}`}>{DIAS_LABEL[i]}</p>
+                <p className={`text-sm font-bold leading-tight ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>
+                  {esHoy ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#FF5C00] text-white text-xs">{dia.getDate()}</span> : dia.getDate()}
+                </p>
                 {nSes > 0 && <div className={`w-1 h-1 rounded-full mx-auto mt-0.5 ${esHoy ? 'bg-[#FF5C00]' : 'bg-black/30'}`} />}
               </div>
             )
@@ -779,7 +826,7 @@ export default function Agenda({ session }) {
                 .sort((a,b) => (a.hora||'00:00').localeCompare(b.hora||'00:00'))
 
               return (
-                <div key={diaIdx} className={`flex-1 border-l border-black/5 relative ${esHoy ? 'bg-[#FF5C00]/2' : ''}`}
+                <div key={diaIdx} className={`flex-1 border-l border-black/5 relative ${esHoy ? 'bg-[#FF5C00]/5' : ''}`}
                   style={{ height: HORAS.length * pxH }}>
                   {/* Líneas de hora */}
                   {HORAS.map(h => (
