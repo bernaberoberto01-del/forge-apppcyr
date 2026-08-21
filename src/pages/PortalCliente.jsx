@@ -190,6 +190,17 @@ export default function PortalCliente() {
     const { error } = await supabase.from('sesiones').update({
       rpe: rpeVal, fatiga_post: fatigaVal, sensaciones: sensacionesVal||null, completada: true
     }).eq('id', valorando.id)
+
+    // Alerta inmediata si fatiga > 4/5 — sin esperar al check-in semanal
+    if (!error && fatigaVal >= 4) {
+      await supabase.from('alertas').insert({
+        entrenador_id: cliente?.entrenador_id,
+        cliente_id: clienteId,
+        tipo: 'fatiga_alta_post_sesion',
+        mensaje: `⚠️ ${cliente?.nombre?.split(' ')[0]} ha reportado fatiga ${fatigaVal}/5 tras su sesión de hoy. Considera ajustar la carga.`
+      }).catch(() => {})
+    }
+
     setGuardandoValoracion(false)
     if(!error){
       setPendientesValorar(prev => prev.filter(s => s.id !== valorando.id))

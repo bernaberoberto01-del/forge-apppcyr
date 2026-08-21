@@ -157,7 +157,7 @@ export default function Seguimiento({ session }) {
   const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
   return (
-    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
       {toast && (
         <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
           <span className="text-emerald-400">✓</span> {toast}
@@ -181,7 +181,7 @@ export default function Seguimiento({ session }) {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
         {[
           ['Total CI', checkins.length, '#FF5C00'],
           ['Con fatiga alta', checkins.filter(x=>x.fatiga>=4||x.estres>=4).length, '#ef4444'],
@@ -212,6 +212,9 @@ export default function Seguimiento({ session }) {
       </div>
 
       {tabPrincipal === 'checkins' && <>
+      <div className="lg:grid lg:grid-cols-3 lg:gap-5">
+      {/* Columna izquierda — lista de checkins */}
+      <div className="lg:col-span-2">
       {/* Buscador */}
       <div className="relative mb-3">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
@@ -500,6 +503,44 @@ export default function Seguimiento({ session }) {
         </div>
       )}
 
+      </div>{/* fin col izquierda */}
+
+      {/* Columna derecha — resumen desktop */}
+      <div className="hidden lg:block">
+        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 sticky top-4">
+          <p className="text-sm font-bold text-[#0A0A0A] mb-3">Estado por cliente</p>
+          <div className="space-y-1.5">
+            {clientes.map(cl => {
+              const ultimo = checkins.find(x => x.cliente_id === cl.id)
+              const diasSinCI = ultimo ? Math.floor((new Date() - new Date(ultimo.fecha + 'T12:00')) / 864e5) : null
+              const alertaFatiga = ultimo && (ultimo.fatiga >= 4 || ultimo.estres >= 4)
+              return (
+                <div key={cl.id} onClick={() => ultimo && setDetalleCI(ultimo)}
+                  className={`flex items-center gap-2.5 py-2.5 px-2 border-b border-black/5 last:border-0 rounded-xl transition-all ${ultimo ? 'cursor-pointer hover:bg-[#F7F6F3]' : ''}`}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    style={{background: alertaFatiga ? '#ef4444' : diasSinCI === null ? '#C0C0C0' : '#FF5C00'}}>
+                    {ini(cl.nombre)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#0A0A0A] truncate">{cl.nombre.split(' ')[0]}</p>
+                    {ultimo ? (
+                      <div className="flex gap-1.5 mt-0.5">
+                        {ultimo.energia != null && <span className="text-xs text-[#9B9B9B]">⚡{ultimo.energia}</span>}
+                        {ultimo.fatiga != null && <span className={`text-xs font-medium ${ultimo.fatiga >= 4 ? 'text-red-500' : 'text-[#9B9B9B]'}`}>🔥{ultimo.fatiga}</span>}
+                      </div>
+                    ) : <p className="text-xs text-[#C0C0C0]">Sin check-in</p>}
+                  </div>
+                  <p className={`text-xs font-semibold flex-shrink-0 ${diasSinCI === null ? 'text-[#C0C0C0]' : diasSinCI > 7 ? 'text-red-500' : diasSinCI > 4 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                    {diasSinCI === null ? '—' : diasSinCI === 0 ? 'Hoy' : diasSinCI === 1 ? 'Ayer' : `${diasSinCI}d`}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      </div>{/* fin grid */}
       </> }
 
       {/* TAB SESIONES */}

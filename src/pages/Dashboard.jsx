@@ -33,6 +33,7 @@ export default function Dashboard({ session }) {
   const [datos, setDatos] = useState(null)
   const [loading, setLoading] = useState(true)
   const [sesionesHoy, setSesionesHoy] = useState([])
+  const [sesionesManana, setSesionesManana] = useState([])
   const navigate = useNavigate()
   const uid = session.user.id
 
@@ -56,6 +57,7 @@ export default function Dashboard({ session }) {
       { data: mensajesNL },
       { data: rutinasIA },
       { data: sesHoy },
+      { data: sesManana },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -65,6 +67,7 @@ export default function Dashboard({ session }) {
       supabase.from('mensajes_cliente').select('id,cliente_id,contenido,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('leido_entrenador', false).eq('tipo','cliente').order('created_at',{ascending:false}).limit(10),
       supabase.from('rutinas').select('id,cliente_id,estado,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('estado','borrador').order('created_at',{ascending:false}).limit(10),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
+      supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
     ])
 
     if (alertas?.length > 0) {
@@ -73,6 +76,7 @@ export default function Dashboard({ session }) {
     }
 
     setSesionesHoy(sesHoy || [])
+    setSesionesManana(sesManana || [])
     const activos = (clientes||[]).filter(c => c.estado === 'activo')
     const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
     const hace4s = new Date(Date.now()-28*864e5).toISOString().split('T')[0]
@@ -296,6 +300,30 @@ export default function Dashboard({ session }) {
                       </div>
                     )
                   })}
+                </div>
+              )}
+              {/* Mañana */}
+              {sesionesManana.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-black/5">
+                  <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">
+                    Mañana — {sesionesManana.length} sesión{sesionesManana.length>1?'es':''}
+                  </p>
+                  <div className="space-y-1.5">
+                    {sesionesManana.map(s => {
+                      const ini2 = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+                      return (
+                        <div key={s.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F6F3]">
+                          <div className="w-7 h-7 bg-[#6366f1]/10 rounded-lg flex items-center justify-center text-[#6366f1] font-bold text-xs flex-shrink-0">
+                            {ini2(s.clientes?.nombre)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre}</p>
+                          </div>
+                          <span className="text-xs text-[#9B9B9B] flex-shrink-0">{s.hora}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>

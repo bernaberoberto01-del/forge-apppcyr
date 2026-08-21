@@ -110,7 +110,7 @@ export default function Nutricion({ session }) {
   const OBJETIVO_COLOR = { perdida_grasa:'#f59e0b', ganancia_muscular:'#6366f1', tonificacion:'#10b981', fuerza:'#ef4444', rendimiento:'#0ea5e9', salud_general:'#10b981', cambio_rapido_30dias:'#FF5C00' }
 
   return (
-    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
 
@@ -136,7 +136,13 @@ export default function Nutricion({ session }) {
         ))}
       </div>
 
-      {/* Clientes con nutrición activa sin plan */}
+      {/* Layout 2 columnas desktop */}
+      <div className="lg:grid lg:grid-cols-3 lg:gap-5">
+
+      {/* Columna izquierda — planes */}
+      <div className="lg:col-span-2">
+
+      {/* Clientes sin plan */}
       {clientesSinPlan.length > 0 && (
         <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-4">
           <p className="text-xs font-semibold text-amber-700 mb-3">⚠ Sin plan nutricional ({clientesSinPlan.length})</p>
@@ -175,23 +181,6 @@ export default function Nutricion({ session }) {
           </div>
         </div>
       )}
-
-      {/* Activar nutrición para clientes */}
-      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 mb-4">
-        <p className="text-sm font-bold text-[#0A0A0A] mb-3">Activar nutrición por cliente</p>
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {clientes.map(c => (
-            <div key={c.id} className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 bg-[#FF5C00]">{ini(c.nombre)}</div>
-              <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre}</p>
-              <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
-                className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${c.nutricion_activa ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
-                <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${c.nutricion_activa ? 'left-5' : 'left-0.5'}`} />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Buscador y filtros */}
       {planesActivos.length > 0 && (
@@ -304,6 +293,66 @@ export default function Nutricion({ session }) {
           </div>
         )})}
 
+      </div>{/* fin space-y-3 lista planes */}
+      </div>{/* fin lg:col-span-2 */}
+
+      {/* Columna derecha desktop */}
+      <div className="hidden lg:block">
+        <div className="space-y-4 sticky top-4">
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+            <p className="text-sm font-bold text-[#0A0A0A] mb-3">Nutrición por cliente</p>
+            <div className="space-y-2.5">
+              {clientes.map(c => (
+                <div key={c.id} className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                    style={{background: c.nutricion_activa ? '#FF5C00' : '#C0C0C0'}}>{ini(c.nombre)}</div>
+                  <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre.split(' ')[0]}</p>
+                  <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
+                    className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${c.nutricion_activa ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                    <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${c.nutricion_activa ? 'left-5' : 'left-0.5'}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Resumen</p>
+            <div className="space-y-2">
+              {[
+                ['Activos', clientesConNutricion.length, '#FF5C00'],
+                ['Borradores', planes.filter(p=>p.estado==='borrador').length, '#6366f1'],
+                ['Publicados', planes.filter(p=>p.estado==='publicado').length, '#10b981'],
+                ['Sin plan', clientesSinPlan.length, '#f59e0b'],
+              ].map(([l,v,c]) => (
+                <div key={l} className="flex justify-between items-center">
+                  <p className="text-xs text-[#6B6B6B]">{l}</p>
+                  <p className="text-sm font-bold" style={{color:c}}>{v}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      </div>{/* fin grid lg:grid-cols-3 */}
+
+      {/* Activar nutrición en móvil */}
+      <div className="lg:hidden mt-4">
+        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 mb-4">
+          <p className="text-sm font-bold text-[#0A0A0A] mb-3">Activar nutrición por cliente</p>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {clientes.map(c => (
+              <div key={c.id} className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 bg-[#FF5C00]">{ini(c.nombre)}</div>
+                <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre}</p>
+                <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
+                  className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${c.nutricion_activa ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                  <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${c.nutricion_activa ? 'left-5' : 'left-0.5'}`} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Modal detalle plan */}
