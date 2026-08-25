@@ -400,7 +400,7 @@ export default function Pagos({ session }) {
               </div>
             )
           })}
-          </div>{/* fin lg:col-span-2 */}
+          </div>
 
           {/* Panel derecho desktop */}
           <div className="hidden lg:block">
@@ -429,7 +429,7 @@ export default function Pagos({ session }) {
             </div>
           </div>
 
-        </div>{/* fin grid */}
+        </div>
       )}
 
       {/* TAB HISTORIAL */}
