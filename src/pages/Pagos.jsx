@@ -400,38 +400,37 @@ export default function Pagos({ session }) {
               </div>
             )
           })}
-        </div>
+          </div>{/* fin lg:col-span-2 */}
 
-        {/* Panel derecho desktop — resumen */}
-        <div className="hidden lg:block">
-          <div className="space-y-4 sticky top-4">
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-              <p className="text-sm font-bold text-[#0A0A0A] mb-3">Resumen del mes</p>
-              <div className="space-y-2.5">
-                {[
-                  ['Planes activos', planes.length, '#FF5C00'],
-                  ['Con cobro auto', planes.filter(p=>p.clientes?.suscripcion_activa).length, '#10b981'],
-                  ['Cobros próximos', planes.filter(p=>{ const d=diasRestantes(p); return d!==null&&d>=0&&d<=7}).length, '#f59e0b'],
-                  ['Vencidos', planes.filter(p=>{ const d=diasRestantes(p); return d!==null&&d<0}).length, '#ef4444'],
-                ].map(([l,v,c]) => (
-                  <div key={l} className="flex justify-between items-center">
-                    <p className="text-xs text-[#6B6B6B]">{l}</p>
-                    <p className="text-sm font-bold" style={{color:c}}>{v}</p>
-                  </div>
-                ))}
+          {/* Panel derecho desktop */}
+          <div className="hidden lg:block">
+            <div className="space-y-4 sticky top-4">
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                <p className="text-sm font-bold text-[#0A0A0A] mb-3">Resumen</p>
+                <div className="space-y-2.5">
+                  {[
+                    ['Planes activos', planes.length, '#FF5C00'],
+                    ['Cobro automático', planes.filter(p=>p.clientes?.suscripcion_activa).length, '#10b981'],
+                    ['Cobros próximos', planes.filter(p=>{ const d=diasRestantes(p); return d!==null&&d>=0&&d<=7}).length, '#f59e0b'],
+                    ['Vencidos', planes.filter(p=>{ const d=diasRestantes(p); return d!==null&&d<0}).length, '#ef4444'],
+                  ].map(([l,v,c]) => (
+                    <div key={l} className="flex justify-between items-center">
+                      <p className="text-xs text-[#6B6B6B]">{l}</p>
+                      <p className="text-sm font-bold" style={{color:c}}>{v}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-              <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Ingresos previstos</p>
-              <p className="text-2xl font-bold text-[#FF5C00]">
-                {planes.reduce((s,p) => s + Number(p.importe||0), 0)}€
-              </p>
-              <p className="text-xs text-[#9B9B9B] mt-1">/ mes si todos activos</p>
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">Ingreso mensual</p>
+                <p className="text-2xl font-bold text-[#FF5C00]">{planes.reduce((s,p)=>s+Number(p.importe||0),0)}€</p>
+                <p className="text-xs text-[#9B9B9B] mt-1">/ mes si todos activos</p>
+              </div>
             </div>
           </div>
 
-          </div>{/* fin grid */}
-        )}
+        </div>{/* fin grid */}
+      )}
 
       {/* TAB HISTORIAL */}
       {tab === 'historial' && (
