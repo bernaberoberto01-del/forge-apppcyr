@@ -248,7 +248,7 @@ export default function Pagos({ session }) {
   const totalHistorico = pagos.reduce((s,p) => s+Number(p.importe||0), 0)
 
   return (
-    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
 
@@ -322,7 +322,8 @@ export default function Pagos({ session }) {
 
       {/* TAB PLANES */}
       {tab === 'estado' && (
-        <div className="space-y-2">
+        <div className="lg:grid lg:grid-cols-3 lg:gap-5">
+        <div className="lg:col-span-2 space-y-2">
           {planes.length === 0 ? (
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
               <p className="text-4xl mb-3">💳</p>

@@ -130,12 +130,21 @@ export default function Rutinas({ session }) {
 
   async function generarRutina(clienteId, contextoExtra = '') {
     setGenerando(clienteId)
-    const { data } = await supabase.functions.invoke('generar-rutina', {
-      body: { cliente_id: clienteId, contexto_extra: contextoExtra }
-    }).catch(e => ({ data: { error: e.message } }))
+    try {
+      const { data, error } = await supabase.functions.invoke('generar-rutina', {
+        body: { cliente_id: clienteId, contexto_extra: contextoExtra }
+      })
+      if (error) throw new Error(error.message)
+      if (data?.ok) {
+        setToast(`✓ Rutina generada (${data.dias_generados} días, Fase ${data.fase_label}) — revísala y publícala`)
+        await cargar()
+      } else {
+        setToast('Error: ' + (data?.error || 'desconocido'))
+      }
+    } catch (e) {
+      setToast('Error al generar: ' + (e?.message || 'desconocido'))
+    }
     setGenerando(null)
-    if (data.ok) { setToast('✓ Rutina generada — revísala y publícala'); await cargar() }
-    else setToast('Error: ' + (data.error || 'desconocido'))
   }
 
   async function analizarYActualizar(clienteId) {
