@@ -682,14 +682,27 @@ export default function Clientes({ session }) {
                   {OBJETIVOS_LIST.map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nivel</label>
-                <select value={form.nivel} onChange={e => setForm({...form,nivel:e.target.value})}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
-                  <option value="principiante">Principiante</option>
-                  <option value="intermedio">Intermedio</option>
-                  <option value="avanzado">Avanzado</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nivel</label>
+                  <select value={form.nivel} onChange={e => setForm({...form,nivel:e.target.value})}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                    <option value="principiante">Principiante</option>
+                    <option value="intermedio">Intermedio</option>
+                    <option value="avanzado">Avanzado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Días/semana</label>
+                  <div className="flex gap-1">
+                    {[2,3,4,5,6].map(n => (
+                      <button key={n} type="button" onClick={() => setForm({...form, dias_semana:n})}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${form.dias_semana===n?'bg-[#FF5C00] text-white border-[#FF5C00]':'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
