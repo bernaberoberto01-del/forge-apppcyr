@@ -584,14 +584,17 @@ export default function Rutinas({ session }) {
       {/* Modal detalle rutina — overlay móvil + panel fijo derecho escritorio */}
       {detalle && (
         <div className="fixed inset-0 bg-black/50 z-50 md:bg-transparent md:inset-auto md:right-0 md:top-0 md:bottom-0 md:w-[480px]" onClick={() => setDetalle(null)}>
-          <div className="absolute inset-x-0 bottom-0 md:inset-0 bg-white rounded-t-2xl md:rounded-none md:shadow-2xl md:border-l md:border-black/8 overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white z-10">
+          <div className="absolute inset-x-0 bottom-0 md:inset-0 bg-white rounded-t-2xl md:rounded-none md:shadow-2xl md:border-l md:border-black/8 flex flex-col" style={{maxHeight:'92vh'}} onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-black/5 flex items-center justify-between flex-shrink-0 bg-white">
+              {/* Indicador de arrastre en móvil */}
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-black/15 rounded-full md:hidden"/>
               <div>
                 <h2 className="font-bold text-[#0A0A0A] text-sm">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2>
                 <button onClick={() => setQuickView(detalle.cliente_id)} className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">{detalle.clientes?.nombre} →</button>
               </div>
               <button onClick={() => { setDetalle(null); setModoEdicion(false); setRutinaBorrador(null) }} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-xl">×</button>
             </div>
+            <div className="overflow-y-auto flex-1 overscroll-contain" style={{WebkitOverflowScrolling:'touch'}}>
             <div className="p-4 space-y-3">
               {/* Badge borrador IA */}
               {detalle.estado === 'borrador' && (
@@ -784,6 +787,7 @@ export default function Rutinas({ session }) {
                 <button onClick={async () => { if(!confirm('¿Eliminar?')) return; await supabase.from('rutinas').delete().eq('id',detalle.id); setDetalle(null); await cargar() }}
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">🗑</button>
               </div>
+            </div>
             </div>
           </div>
         </div>
