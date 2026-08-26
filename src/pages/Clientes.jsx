@@ -721,13 +721,16 @@ export default function Clientes({ session }) {
                 <select
                   onChange={e => {
                     const t = tarifas.find(t => t.id === e.target.value)
-                    if (t) setForm(f => ({...f, precio_mensual: String(t.precio), dias_semana: t.dias_semana}))
+                    if (t) setForm(f => ({...f, precio_mensual: String(t.precio), dias_semana: t.dias_semana || f.dias_semana}))
                   }}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#FF5C00] mb-2">
                   <option value="">— Selecciona tarifa —</option>
-                  {tarifas.map(t => (
-                    <option key={t.id} value={t.id}>{t.nombre} — {t.precio}€/mes</option>
-                  ))}
+                  {tarifas
+                    .filter(t => (form.tipo === 'online' ? t.tipo === 'online' : t.tipo !== 'online'))
+                    .map(t => (
+                      <option key={t.id} value={t.id}>{t.nombre} — {t.precio}€/mes</option>
+                    ))
+                  }
                 </select>
               </div>
               <div>

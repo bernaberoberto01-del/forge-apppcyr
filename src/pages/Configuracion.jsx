@@ -371,7 +371,7 @@ function TarifasTab({ uid, showToast }) {
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(false)
   const [editando, setEditando] = useState(null)
-  const [form, setForm] = useState({ nombre: '', modalidad: 'individual', dias_semana: 2, precio: '' })
+  const [form, setForm] = useState({ nombre: '', modalidad: 'individual', dias_semana: 2, precio: '', tipo: 'presencial' })
   const [guardando, setGuardando] = useState(false)
 
   useEffect(() => { cargar() }, [])
@@ -386,7 +386,7 @@ function TarifasTab({ uid, showToast }) {
   async function guardar() {
     if (!form.nombre.trim() || !form.precio) return
     setGuardando(true)
-    const payload = { entrenador_id: uid, nombre: form.nombre.trim(), modalidad: form.modalidad, dias_semana: Number(form.dias_semana), precio: Number(form.precio) }
+    const payload = { entrenador_id: uid, nombre: form.nombre.trim(), modalidad: form.modalidad, dias_semana: Number(form.dias_semana), precio: Number(form.precio), tipo: form.tipo }
     if (editando) await supabase.from('tarifas').update(payload).eq('id', editando.id)
     else await supabase.from('tarifas').insert(payload)
     setModal(false); setEditando(null)
@@ -401,20 +401,20 @@ function TarifasTab({ uid, showToast }) {
   }
 
   function abrirNueva() {
-    setEditando(null); setForm({ nombre: '', modalidad: 'individual', dias_semana: 2, precio: '' }); setModal(true)
+    setEditando(null); setForm({ nombre: '', modalidad: 'individual', dias_semana: 2, precio: '', tipo: 'presencial' }); setModal(true)
   }
   function abrirEditar(t) {
-    setEditando(t); setForm({ nombre: t.nombre, modalidad: t.modalidad, dias_semana: t.dias_semana, precio: String(t.precio) }); setModal(true)
+    setEditando(t); setForm({ nombre: t.nombre, modalidad: t.modalidad, dias_semana: t.dias_semana, precio: String(t.precio), tipo: t.tipo || 'presencial' }); setModal(true)
   }
 
   // Sugerir precio según modalidad y días
   const SUGERIDOS = { individual: { 2:220,3:330,4:440 }, pareja: { 2:175,3:260,4:340 }, grupo: { 3:160 } }
   const precioSugerido = SUGERIDOS[form.modalidad]?.[form.dias_semana]
 
-  const agrupadasPorModalidad = ['individual','pareja','grupo'].map(m => ({
-    modalidad: m,
-    items: tarifas.filter(t => t.modalidad === m)
-  })).filter(g => g.items.length > 0)
+  const agrupadasPorTipo = [
+    { tipo: 'presencial', label: '📍 Presencial', items: tarifas.filter(t => t.tipo !== 'online') },
+    { tipo: 'online', label: '🌐 Online', items: tarifas.filter(t => t.tipo === 'online') },
+  ].filter(g => g.items.length > 0)
 
   if (loading) return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
 
@@ -432,15 +432,17 @@ function TarifasTab({ uid, showToast }) {
       </div>
 
       <div className="space-y-4">
-        {agrupadasPorModalidad.map(({ modalidad, items }) => (
-          <div key={modalidad}>
-            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">{MODALIDAD_LABEL[modalidad]}</p>
+        {agrupadasPorTipo.map(({ tipo, label, items }) => (
+          <div key={tipo}>
+            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">{label}</p>
             <div className="space-y-2">
               {items.map(t => (
                 <div key={t.id} className="bg-white border border-black/8 rounded-xl px-4 py-3 flex items-center gap-3">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${MODALIDAD_COLOR[t.modalidad]}`}>
-                    {t.dias_semana}d/sem
-                  </span>
+                  {t.tipo !== 'online' && (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${MODALIDAD_COLOR[t.modalidad]}`}>
+                      {t.dias_semana > 0 ? `${t.dias_semana}d/sem` : 'asesoría'}
+                    </span>
+                  )}
                   <p className="text-sm font-semibold text-[#0A0A0A] flex-1 truncate">{t.nombre}</p>
                   <p className="text-sm font-bold text-[#FF5C00] flex-shrink-0">{t.precio}€/mes</p>
                   <div className="flex gap-1.5 flex-shrink-0">
@@ -463,73 +465,91 @@ function TarifasTab({ uid, showToast }) {
 
       {/* Modal crear/editar */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-[#0A0A0A] mb-4">{editando ? 'Editar tarifa' : 'Nueva tarifa'}</h3>
-            <div className="space-y-3">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>{setModal(false);setEditando(false)}}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+            <h3 className="font-bold text-[#0A0A0A] mb-4">{editando?`Editar — ${editando.nombre}`:'Nueva tarifa'}</h3>
+            <div className="space-y-4">
+
+              {/* Tipo presencial/online */}
               <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
-                <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})}
-                  placeholder="Ej: Individual 3 días"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Modalidad</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[['individual','👤 Individual'],['pareja','👫 Pareja'],['grupo','👥 Grupo']].map(([v,l]) => (
-                    <button key={v} type="button" onClick={() => {
-                      const dias = v === 'grupo' ? 3 : form.dias_semana
-                      const precio = SUGERIDOS[v]?.[dias] || ''
-                      setForm({...form, modalidad: v, dias_semana: dias, precio: String(precio)})
-                    }}
-                      className={`py-2 rounded-xl border text-xs font-semibold transition-all ${form.modalidad===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Tipo de servicio</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['presencial','📍 Presencial'],['online','🌐 Online']].map(([v,l]) => (
+                    <button key={v} type="button"
+                      onClick={() => setForm({...form, tipo:v, dias_semana: v==='online'?0:2})}
+                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.tipo===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Días/semana</label>
-                  <div className="flex gap-1">
-                    {(form.modalidad === 'grupo' ? [3] : [2,3,4]).map(d => (
-                      <button key={d} type="button" onClick={() => {
-                        const precio = SUGERIDOS[form.modalidad]?.[d] || ''
-                        setForm({...form, dias_semana: d, precio: String(precio)})
-                      }}
-                        className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all ${form.dias_semana===d?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
-                        {d}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">
-                    Precio €/mes
-                    {precioSugerido && Number(form.precio) !== precioSugerido && (
-                      <button onClick={() => setForm({...form, precio: String(precioSugerido)})}
-                        className="ml-2 text-[#FF5C00] font-medium">std: {precioSugerido}€</button>
-                    )}
-                  </label>
-                  <input type="number" value={form.precio} onChange={e => setForm({...form, precio: e.target.value})}
-                    placeholder={String(precioSugerido || '')}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
-                </div>
+
+              {/* Nombre */}
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
+                <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
+                  placeholder={form.tipo==='online'?'Ej: Asesoría Completa':'Ej: Individual 3 días'}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
               </div>
-              {precioSugerido && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between">
-                  <p className="text-xs text-emerald-700">{form.modalidad} · {form.dias_semana} días/sem</p>
-                  <p className="text-xs font-bold text-emerald-700">Tarifa estándar: {precioSugerido}€</p>
-                </div>
+
+              {/* Solo presencial: modalidad y días */}
+              {form.tipo !== 'online' && (
+                <>
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Modalidad</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[['individual','👤 Individual'],['pareja','👫 Pareja'],['grupo','👥 Grupo']].map(([v,l]) => (
+                        <button key={v} type="button"
+                          onClick={() => setForm({...form, modalidad:v, dias_semana: v==='grupo'?3:form.dias_semana})}
+                          className={`py-2 rounded-xl border text-xs font-semibold transition-all ${form.modalidad===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Días/semana</label>
+                    <div className="flex gap-1">
+                      {(form.modalidad==='grupo'?[3]:[2,3,4]).map(d => (
+                        <button key={d} type="button"
+                          onClick={() => { const p=SUGERIDOS[form.modalidad]?.[d]||''; setForm({...form,dias_semana:d,precio:String(p)}) }}
+                          className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all ${form.dias_semana===d?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    {precioSugerido && (
+                      <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex justify-between">
+                        <p className="text-xs text-emerald-700">{form.modalidad} · {form.dias_semana} días</p>
+                        <p className="text-xs font-bold text-emerald-700">Std: {precioSugerido}€</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
+
+              {/* Precio */}
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">
+                  Precio €/mes
+                  {precioSugerido && Number(form.precio) !== precioSugerido && (
+                    <button onClick={() => setForm({...form, precio: String(precioSugerido)})}
+                      className="ml-2 text-[#FF5C00] font-medium text-xs">std: {precioSugerido}€</button>
+                  )}
+                </label>
+                <input type="number" value={form.precio} onChange={e=>setForm({...form,precio:e.target.value})}
+                  placeholder={String(precioSugerido || form.tipo==='online'?'29':'220')}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+              </div>
+
               <div className="flex gap-2 pt-1">
-                <button onClick={() => { setModal(false); setEditando(null) }}
+                <button onClick={()=>{setModal(false);setEditando(null)}}
                   className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0]">
                   Cancelar
                 </button>
-                <button onClick={guardar} disabled={!form.nombre.trim() || !form.precio || guardando}
+                <button onClick={guardar} disabled={!form.nombre.trim()||!form.precio||guardando}
                   className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-[#e05200] transition-all">
-                  {guardando ? 'Guardando...' : editando ? 'Guardar' : 'Crear'}
+                  {guardando?'Guardando...':editando?'Guardar cambios':'Crear tarifa'}
                 </button>
               </div>
             </div>
