@@ -33,7 +33,11 @@ function calcTarifa(modalidad, dias) {
   return TARIFAS_GRUPO[modalidad]?.[dias] || null
 }
 
-const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'' }
+const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'',
+  // Campos del cuestionario
+  edad:'',altura:'',anos_entrenando:'',
+  marca_press_banca:'',marca_sentadilla:'',marca_peso_muerto:'',marca_dominadas:'',marca_press_militar:'',
+}
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const AVATAR_COLORS = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
 const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
@@ -132,13 +136,36 @@ export default function Clientes({ session }) {
 
   async function guardar() {
     setLoading(true)
-    const p = { ...form, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, precio_mensual: Number(form.precio_mensual) || 0 }
+    const camposCliente = { nombre:form.nombre, email:form.email, telefono:form.telefono, objetivo:form.objetivo, tipo:form.tipo, estado:form.estado, nivel:form.nivel, dias_semana:Number(form.dias_semana)||3, material:form.material, lesiones:form.lesiones||null, enfermedades:form.enfermedades||null, medicacion:form.medicacion||null, notas:form.notas||null, precio_mensual:Number(form.precio_mensual)||0, tipo_entrenamiento:form.tipo_entrenamiento||null, formato_entrenamiento:form.formato_entrenamiento||null, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null }
     let clienteId = editId
     if (editId) {
-      await supabase.from('clientes').update(p).eq('id', editId)
+      await supabase.from('clientes').update(camposCliente).eq('id', editId)
     } else {
-      const { data: nuevo } = await supabase.from('clientes').insert(p).select('id').single()
+      const { data: nuevo } = await supabase.from('clientes').insert(camposCliente).select('id').single()
       clienteId = nuevo?.id
+    }
+    // Actualizar cuestionario si hay datos de seguimiento
+    if (clienteId && (form.edad || form.altura || form.anos_entrenando || form.marca_press_banca || form.lesiones)) {
+      const camposCuest = {
+        edad: form.edad ? Number(form.edad) : null,
+        altura: form.altura ? Number(form.altura) : null,
+        anos_entrenando: form.anos_entrenando ? Number(form.anos_entrenando) : null,
+        lesiones: form.lesiones || null,
+        enfermedades: form.enfermedades || null,
+        medicacion: form.medicacion || null,
+        marca_press_banca: form.marca_press_banca || null,
+        marca_sentadilla: form.marca_sentadilla || null,
+        marca_peso_muerto: form.marca_peso_muerto || null,
+        marca_dominadas: form.marca_dominadas || null,
+        marca_press_militar: form.marca_press_militar || null,
+      }
+      const { data: cuest } = await supabase.from('cuestionarios').select('id').eq('cliente_id', clienteId).order('created_at', {ascending:false}).limit(1).maybeSingle()
+      if (cuest) {
+        await supabase.from('cuestionarios').update(camposCuest).eq('id', cuest.id)
+      } else if (editId) {
+        // Crear cuestionario si no existe
+        await supabase.from('cuestionarios').insert({ ...camposCuest, cliente_id: clienteId, entrenador_id: uid, procesado: true })
+      }
     }
     // Vincular al grupo si se seleccionó uno
     if (clienteId && form.grupo_id) {
@@ -284,6 +311,25 @@ export default function Clientes({ session }) {
   function abrirEditar(c) {
     setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'' })
     setEditId(c.id); setModal(true); setDetalle(null)
+    // Cargar datos del cuestionario más reciente para este cliente
+    supabase.from('cuestionarios').select('*').eq('cliente_id', c.id).order('created_at', {ascending:false}).limit(1).maybeSingle()
+      .then(({ data: cuest }) => {
+        if (cuest) {
+          setForm(f => ({...f,
+            edad: cuest.edad || '',
+            altura: cuest.altura || '',
+            anos_entrenando: cuest.anos_entrenando || '',
+            marca_press_banca: cuest.marca_press_banca || '',
+            marca_sentadilla: cuest.marca_sentadilla || '',
+            marca_peso_muerto: cuest.marca_peso_muerto || '',
+            marca_dominadas: cuest.marca_dominadas || '',
+            marca_press_militar: cuest.marca_press_militar || '',
+            lesiones: cuest.lesiones || f.lesiones || '',
+            enfermedades: cuest.enfermedades || f.enfermedades || '',
+            medicacion: cuest.medicacion || f.medicacion || '',
+          }))
+        }
+      })
   }
 
   const Chip = ({ label, value, field, count }) => {
@@ -704,7 +750,49 @@ export default function Clientes({ session }) {
                   ))}
                 </div>
               </div>
-              {/* Salud — campos críticos para la generación de rutinas */}
+              {/* Datos personales */}
+              <div className="border border-black/8 rounded-xl p-3 space-y-3">
+                <p className="text-xs font-bold text-[#6B6B6B]">📊 Datos personales</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Edad</label>
+                    <input type="number" value={form.edad||''} onChange={e => setForm({...form,edad:e.target.value})}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="30" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Altura (cm)</label>
+                    <input type="number" value={form.altura||''} onChange={e => setForm({...form,altura:e.target.value})}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="175" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Años entreno</label>
+                    <input type="number" step="0.5" value={form.anos_entrenando||''} onChange={e => setForm({...form,anos_entrenando:e.target.value})}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="2" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Marcas personales */}
+              <div className="border border-black/8 rounded-xl p-3 space-y-3">
+                <p className="text-xs font-bold text-[#6B6B6B]">🏋️ Marcas personales <span className="font-normal text-[#9B9B9B]">— la IA las usa para calibrar la carga</span></p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ['marca_press_banca','Press banca','ej: 80kg x5'],
+                    ['marca_sentadilla','Sentadilla','ej: 100kg x3'],
+                    ['marca_peso_muerto','Peso muerto','ej: 120kg x1'],
+                    ['marca_dominadas','Dominadas','ej: 10 reps'],
+                    ['marca_press_militar','Press militar','ej: 60kg x5'],
+                  ].map(([k,l,ph]) => (
+                    <div key={k}>
+                      <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
+                      <input value={form[k]||''} onChange={e => setForm({...form,[k]:e.target.value})}
+                        className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder={ph} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Salud */}
               <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-3">
                 <p className="text-xs font-bold text-red-700">⚕️ Salud — afecta a la generación de rutinas</p>
                 <div>
