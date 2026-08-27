@@ -31,6 +31,7 @@ export default function PortalEntrenador({ session }) {
   // ─── Cargar datos ──────────────────────────────────────────────────────────
   async function cargar() {
     setLoading(true)
+    try {
     const hoy   = new Date().toISOString().split('T')[0]
     const lunes = getLunes()
 
@@ -69,6 +70,10 @@ export default function PortalEntrenador({ session }) {
 
     setDatos({ miembro, semana, sesHoy, clientes, cMap, alertas:alertas||[], msgsNL:msgsNL||[], horasSem, clientesSem })
     setLoading(false)
+    } catch(e) {
+      console.error('PortalEntrenador error:', e)
+      setLoading(false)
+    }
   }
 
   function getLunes() {
@@ -284,7 +289,7 @@ export default function PortalEntrenador({ session }) {
 
         {/* ── CLIENTES ── */}
         {tab==='clientes' && (
-          <div className="p-5 max-w-5xl mx-auto">
+          <div className="p-5 max-w-screen-lg mx-auto">
             {d.clientes.length===0 ? (
               <div className="text-center py-16">
                 <p className="text-3xl mb-3">👥</p>

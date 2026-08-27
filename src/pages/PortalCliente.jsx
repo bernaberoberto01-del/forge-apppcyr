@@ -358,7 +358,7 @@ export default function PortalCliente() {
         </aside>
 
         {/* ── Contenido principal ── */}
-        <main className="flex-1 min-w-0 p-4 md:p-8 pb-24 md:pb-8">
+        <main className="flex-1 min-w-0 p-4 md:p-8 pb-24 md:pb-8 overflow-y-auto overscroll-contain" style={{WebkitOverflowScrolling:'touch'}}>
           <div className="max-w-2xl mx-auto space-y-4">
 
             {/* ══ INICIO ══════════════════════════════════════════════════════ */}
