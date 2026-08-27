@@ -40,6 +40,7 @@ export default function Dashboard({ session }) {
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
+    try {
     const hoy = new Date()
     const hoyStr = hoy.toISOString().split('T')[0]
     const hace6m = new Date(hoy.getFullYear(), hoy.getMonth()-5, 1).toISOString().split('T')[0]
@@ -114,6 +115,10 @@ export default function Dashboard({ session }) {
       alertasExtra: alertas||[], tasaRetencion, totalClientes
     })
     setLoading(false)
+    } catch (e) {
+      console.error('Dashboard error:', e)
+      setLoading(false)
+    }
   }
 
   const hora = new Date().getHours()

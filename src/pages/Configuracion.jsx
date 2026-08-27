@@ -129,7 +129,7 @@ export default function Configuracion({ session, onConfigChange }) {
   if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-lg mx-auto">
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
       <div className="flex items-start justify-between mb-5">
@@ -155,7 +155,8 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {/* PERFIL */}
       {tab === 'perfil' && (
-        <div className="space-y-4">
+        <div className="lg:grid lg:grid-cols-2 lg:gap-5 space-y-4 lg:space-y-0">
+          <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
             <h2 className="text-sm font-bold text-[#0A0A0A] mb-4">Tu identidad</h2>
             <div className="space-y-3">
@@ -204,8 +205,12 @@ export default function Configuracion({ session, onConfigChange }) {
             </div>
           </div>
 
+          </div>
+
+          {/* Columna derecha — Preview */}
+          <div className="space-y-4">
           {/* Preview portal */}
-          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5 sticky top-4">
             <h2 className="text-sm font-bold text-[#0A0A0A] mb-3">Preview — así te ve el cliente</h2>
             <div className="bg-[#111] rounded-xl p-4 flex items-center gap-3">
               {config.foto_url ? (
@@ -220,7 +225,8 @@ export default function Configuracion({ session, onConfigChange }) {
                 <p className="text-white/50 text-xs">{config.nombre_negocio || 'Tu centro'}</p>
               </div>
             </div>
-            {config.bio && <p className="text-xs text-[#6B6B6B] mt-3 leading-relaxed italic">"{config.bio}"</p>}
+            {config.bio && <p className="text-xs text-[#6B6B6B] mt-3 leading-relaxed italic">&ldquo;{config.bio}&rdquo;</p>}
+          </div>
           </div>
         </div>
       )}

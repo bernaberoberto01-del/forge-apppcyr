@@ -63,6 +63,7 @@ export default function Rutinas({ session }) {
   const [rutinas, setRutinas] = useState([])
   const [clientes, setClientes] = useState([])
   const [biblioteca, setBiblioteca] = useState([])
+  const [loading, setLoading] = useState(true)
   const [generando, setGenerando] = useState(null)
   const [detalle, setDetalle] = useState(null)
   const [modoEdicion, setModoEdicion] = useState(false)
@@ -100,6 +101,7 @@ export default function Rutinas({ session }) {
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
+    setLoading(true)
     const [{ data: ru }, { data: cl }, { data: pl }, { data: bib }] = await Promise.all([
       supabase.from('rutinas').select('*, clientes(nombre,tipo,objetivo)').eq('entrenador_id', uid).order('created_at', { ascending: false }),
       supabase.from('clientes').select('id,nombre,objetivo,nivel,tipo').eq('entrenador_id', uid).eq('estado','activo'),
@@ -110,6 +112,7 @@ export default function Rutinas({ session }) {
     setClientes(cl || [])
     setPlantillas(pl || [])
     setBiblioteca(bib || [])
+    setLoading(false)
   }
 
   // ===== RUTINAS =====
@@ -342,8 +345,14 @@ export default function Rutinas({ session }) {
 
   const nivelColor = n => ({ principiante:'bg-emerald-50 text-emerald-700', intermedio:'bg-amber-50 text-amber-700', avanzado:'bg-red-50 text-red-700' })[n] || 'bg-[#F5F5F0] text-[#6B6B6B]'
 
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+    </div>
+  )
+
   return (
-    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       {videoActivo && <VideoModal ejercicio={videoActivo} onClose={() => setVideoActivo(null)} />}
 

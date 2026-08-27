@@ -28,6 +28,7 @@ export default function Mensajes({ session }) {
   const [showPlantillas, setShowPlantillas] = useState(false)
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState('')
+  const [loading, setLoading] = useState(true)
   const endRef = useRef()
   const uid = session.user.id
 
@@ -36,6 +37,7 @@ export default function Mensajes({ session }) {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes])
 
   async function cargarClientes() {
+    setLoading(true)
     const [{ data: cl }, { data: ms }] = await Promise.all([
       supabase.from('clientes').select('id,nombre,tipo,estado').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
       supabase.from('mensajes_cliente').select('cliente_id,leido_entrenador,tipo,created_at')
@@ -45,6 +47,7 @@ export default function Mensajes({ session }) {
     const nl = {}
     ;(ms || []).forEach(m => { nl[m.cliente_id] = (nl[m.cliente_id] || 0) + 1 })
     setNoLeidos(nl)
+    setLoading(false)
   }
 
   async function cargarMensajes(clienteId) {
@@ -113,7 +116,11 @@ export default function Mensajes({ session }) {
 
         {/* Lista clientes */}
         <div className="flex-1 overflow-y-auto">
-          {clientesFiltrados.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center h-32">
+              <div className="w-6 h-6 border-3 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+            </div>
+          ) : clientesFiltrados.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-3xl mb-2">💬</p>
               <p className="text-sm text-[#6B6B6B]">{busqueda ? 'Sin resultados' : 'Sin clientes activos'}</p>
