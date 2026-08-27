@@ -364,37 +364,126 @@ export default function PortalCliente() {
             {/* ══ INICIO ══════════════════════════════════════════════════════ */}
             {tab==='inicio'&&(
               <>
-                {/* Bienvenida */}
-                <div className="rounded-2xl p-6 text-white" style={{background:`linear-gradient(135deg, ${color}, ${color}cc)`}}>
-                  <p className="text-white/70 text-sm mb-1">Bienvenido/a</p>
-                  <p className="text-2xl font-bold">{cliente?.nombre?.split(' ')[0]} 👋</p>
-                  <p className="text-white/70 text-sm mt-2">{OBJ[cliente?.objetivo]||'Tu plan personalizado te espera'}</p>
-                </div>
-
-                {/* Sesiones presenciales pendientes de valorar */}
-                {cliente?.tipo==='presencial'&&pendientesValorar.map(s=>(
-                  <button key={s.id} onClick={()=>setValorando(s)}
-                    className="w-full bg-white rounded-2xl border-2 p-5 text-left transition-all hover:shadow-sm" style={{borderColor:color}}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{background:`${color}15`}}>💪</div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold text-[#0A0A0A]">¿Cómo fue tu entreno del {new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}?</p>
-                        <p className="text-xs text-[#6B6B6B] mt-0.5">Cuéntanos el esfuerzo y la fatiga · 20 segundos</p>
-                      </div>
-                      <span className="text-sm font-semibold flex-shrink-0" style={{color}}>Valorar →</span>
+                {/* ── ONBOARDING: cliente sin rutina ni plan ── */}
+                {!rutina && !planNutricion && pendientesValorar.length === 0 && (
+                  <div className="rounded-2xl overflow-hidden" style={{background:`linear-gradient(135deg, ${color}, ${color}bb)`}}>
+                    <div className="p-6 text-white">
+                      <p className="text-white/70 text-xs font-semibold uppercase tracking-wide mb-3">Bienvenido/a a Forge</p>
+                      <p className="text-2xl font-bold mb-1">{cliente?.nombre?.split(' ')[0]} 👋</p>
+                      <p className="text-white/80 text-sm leading-relaxed mt-2">
+                        Tu entrenador está preparando tu plan personalizado. En las próximas 24-48h tendrás tu rutina lista aquí.
+                      </p>
                     </div>
-                  </button>
-                ))}
+                    <div className="bg-black/20 px-6 py-4 space-y-2.5">
+                      {[
+                        ['✓','Tu cuestionario ha llegado correctamente'],
+                        ['⏳','Tu entrenador está analizando tus datos'],
+                        ['📋','Pronto recibirás tu plan personalizado'],
+                      ].map(([ic,txt]) => (
+                        <div key={txt} className="flex items-center gap-3">
+                          <span className="text-base flex-shrink-0">{ic}</span>
+                          <p className="text-white/80 text-sm">{txt}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-6 py-4 border-t border-white/10">
+                      <p className="text-white/50 text-xs">¿Tienes alguna duda? Escríbenos en la pestaña Mensajes.</p>
+                    </div>
+                  </div>
+                )}
 
-                {/* Aviso fotos de progreso desactualizadas */}
-                {(() => {
-                  const ultimaFoto = fotos[0]?.fecha
-                  const diasSinFoto = ultimaFoto ? Math.floor((Date.now()-new Date(ultimaFoto+'T12:00').getTime())/864e5) : 999
-                  if (diasSinFoto < 30) return null
-                  return (
+                {/* ── RPE PENDIENTE — máxima prioridad ── */}
+                {pendientesValorar.length > 0 && (
+                  <div className="rounded-2xl border-2 overflow-hidden" style={{borderColor:color}}>
+                    <div className="p-1" style={{background:`${color}12`}}>
+                      {pendientesValorar.map(s=>(
+                        <button key={s.id} onClick={()=>setValorando(s)}
+                          className="w-full p-4 text-left flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:`${color}20`}}>💪</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-wide mb-0.5" style={{color}}>Pendiente de valorar</p>
+                            <p className="text-sm font-bold text-[#0A0A0A]">¿Cómo fue tu entreno del {new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}?</p>
+                            <p className="text-xs text-[#6B6B6B] mt-0.5">Esfuerzo y fatiga · 20 segundos</p>
+                          </div>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg flex-shrink-0" style={{background:color}}>→</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── QUÉ HACER HOY ── */}
+                {(rutina || sesionesPortal.length > 0 || planNutricion) && (
+                  <div className="bg-white rounded-2xl border border-black/6 overflow-hidden">
+                    <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
+                      <p className="text-sm font-bold text-[#0A0A0A]">Hoy</p>
+                      <p className="text-xs text-[#9B9B9B] capitalize">{new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</p>
+                    </div>
+                    <div className="divide-y divide-black/5">
+                      {/* Sesión de hoy */}
+                      {sesionesPortal.filter(s=>s.fecha===new Date().toISOString().split('T')[0]).map(s=>(
+                        <div key={s.id} className="flex items-center gap-3 px-5 py-3.5">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{background:`${color}15`}}>📅</div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-[#0A0A0A]">Sesión hoy a las {s.hora?.slice(0,5)}</p>
+                            <p className="text-xs text-[#6B6B6B]">{s.duracion_minutos||60} minutos · Presencial</p>
+                          </div>
+                          {s.asistencia_confirmada
+                            ? <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">Confirmada ✓</span>
+                            : <button onClick={async()=>{
+                                await supabase.from('sesiones').update({asistencia_confirmada:true,asistencia_confirmada_at:new Date().toISOString()}).eq('id',s.id)
+                                const {data}=await supabase.from('sesiones').select('*').eq('cliente_id',clienteId).gte('fecha',new Date().toISOString().split('T')[0]).lte('fecha',new Date(Date.now()+7*864e5).toISOString().split('T')[0]).eq('cancelada',false).order('fecha').limit(5)
+                                setSesionesPortal(data||[])
+                              }} className="text-xs font-semibold px-3 py-1.5 rounded-xl text-white flex-shrink-0" style={{background:color}}>
+                                Confirmar
+                              </button>
+                          }
+                        </div>
+                      ))}
+                      {/* Rutina activa */}
+                      {rutina && (
+                        <button onClick={()=>setTab('rutina')} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#F7F6F3] transition-all text-left">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{background:`${color}15`}}>💪</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0A0A0A]">Tu rutina activa</p>
+                            <p className="text-xs text-[#6B6B6B] truncate">{rutina.nombre||'Ver plan de entrenamiento'}</p>
+                          </div>
+                          <span className="text-xs font-semibold flex-shrink-0" style={{color}}>Ver →</span>
+                        </button>
+                      )}
+                      {/* Plan de nutrición */}
+                      {planNutricion && (
+                        <button onClick={()=>setTab('nutricion')} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#F7F6F3] transition-all text-left">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{background:`${color}15`}}>🥗</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0A0A0A]">Tu plan nutricional</p>
+                            <p className="text-xs text-[#6B6B6B] truncate">{planNutricion.nombre||'Ver guía de alimentación'}</p>
+                          </div>
+                          <span className="text-xs font-semibold flex-shrink-0" style={{color}}>Ver →</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Cabecera cuando hay plan ── */}
+                {(rutina || planNutricion) && (
+                  <div className="rounded-2xl p-5 text-white" style={{background:`linear-gradient(135deg, ${color}, ${color}cc)`}}>
+                    <p className="text-white/70 text-sm mb-0.5">{configEntrenador?.nombre_negocio||'Tu entrenador'}</p>
+                    <p className="text-xl font-bold">{cliente?.nombre?.split(' ')[0]} 👋</p>
+                    <p className="text-white/70 text-xs mt-1.5">{OBJ[cliente?.objetivo]||'Sigue con tu plan'}</p>
+                  </div>
+                )}
+
+                {/* Aviso fotos */}
+                {(rutina || planNutricion) && (()=>{
+                  const ultimaFoto=fotos[0]?.fecha
+                  const diasSinFoto=ultimaFoto?Math.floor((Date.now()-new Date(ultimaFoto+'T12:00').getTime())/864e5):999
+                  if(diasSinFoto<30) return null
+                  return(
                     <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
                       <span className="text-lg flex-shrink-0">📸</span>
-                      <p className="text-xs text-amber-700 flex-1">{diasSinFoto>900?'Aún no has subido ninguna foto de progreso':`Llevas ${diasSinFoto} días sin subir una foto de progreso`} — ayuda a ver los cambios reales.</p>
+                      <p className="text-xs text-amber-700 flex-1">{diasSinFoto>900?'Aún no has subido ninguna foto de progreso':`Llevas ${diasSinFoto} días sin subir foto de progreso`} — ayuda a ver los cambios reales.</p>
                       <button onClick={()=>{setTab('progreso');setSubTabProgreso('fotos')}} className="text-xs font-semibold text-amber-700 flex-shrink-0">Subir →</button>
                     </div>
                   )
@@ -403,8 +492,7 @@ export default function PortalCliente() {
                 {/* Trabajo extra (presencial) */}
                 {cliente?.tipo==='presencial'&&tareasExtra.length>0&&(
                   <div className="bg-white rounded-2xl border border-black/6 p-5">
-                    <p className="text-sm font-bold text-[#0A0A0A] mb-1">💡 Tu trabajo extra</p>
-                    <p className="text-xs text-[#6B6B6B] mb-3">Para complementar tus sesiones presenciales</p>
+                    <p className="text-sm font-bold text-[#0A0A0A] mb-3">💡 Tu trabajo extra</p>
                     <div className="space-y-2">
                       {tareasExtra.map(t=>(
                         <div key={t.id} className="flex items-center gap-3 bg-[#F7F6F3] rounded-xl px-3.5 py-2.5">
@@ -419,40 +507,31 @@ export default function PortalCliente() {
                   </div>
                 )}
 
-                {/* Próximas sesiones presencial */}
-                {cliente?.tipo==='presencial'&&sesionesPortal.length>0&&(
+                {/* Próximas sesiones (mañana en adelante) */}
+                {cliente?.tipo==='presencial'&&sesionesPortal.filter(s=>s.fecha>new Date().toISOString().split('T')[0]).length>0&&(
                   <div className="bg-white rounded-2xl border border-black/6 p-5">
-                    <p className="text-sm font-bold text-[#0A0A0A] mb-3">📅 Tus próximas sesiones</p>
+                    <p className="text-sm font-bold text-[#0A0A0A] mb-3">📅 Próximas sesiones</p>
                     <div className="space-y-2">
-                      {sesionesPortal.slice(0,4).map(s=>{
-                        const esHoy=s.fecha===new Date().toISOString().split('T')[0]
+                      {sesionesPortal.filter(s=>s.fecha>new Date().toISOString().split('T')[0]).slice(0,3).map(s=>{
                         const esMañana=s.fecha===new Date(Date.now()+864e5).toISOString().split('T')[0]
-                        const label=esHoy?'Hoy':esMañana?'Mañana':new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
-                        const confirmada=s.asistencia_confirmada
+                        const label=esMañana?'Mañana':new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
                         return(
-                          <div key={s.id} className={`rounded-xl border p-4 transition-all ${esHoy?'border-2':'border'}`}
-                            style={esHoy?{borderColor:color,background:`${color}08`}:{borderColor:'#F0EEE8'}}>
-                            <div className="flex items-center gap-3">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-bold" style={esHoy||esMañana?{color}:{color:'#0A0A0A'}}>{label}</p>
-                                  {confirmada&&<span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">✓ Confirmada</span>}
-                                </div>
-                                <p className="text-xs text-[#6B6B6B] mt-0.5">{s.hora} · {s.duracion_minutos||60}min</p>
-                              </div>
-                              <div className="flex gap-2">
-                                {!confirmada&&(esHoy||esMañana)&&(
-                                  <button onClick={async()=>{
-                                    await supabase.from('sesiones').update({asistencia_confirmada:true,asistencia_confirmada_at:new Date().toISOString()}).eq('id',s.id)
-                                    const {data:sesPend2}=await supabase.from('sesiones').select('*').eq('cliente_id',clienteId).gte('fecha',new Date().toISOString().split('T')[0]).lte('fecha',new Date(Date.now()+7*864e5).toISOString().split('T')[0]).eq('cancelada',false).order('fecha').limit(5)
-                                    setSesionesPortal(sesPend2||[])
-                                  }} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-all" style={{background:color}}>
-                                    ✓ Confirmar
-                                  </button>
-                                )}
-                                <button onClick={()=>setCancelando(s)} className="text-xs text-[#6B6B6B] border border-black/10 px-3 py-1.5 rounded-lg hover:border-red-300 hover:text-red-500 transition-all bg-white">Cancelar</button>
-                              </div>
+                          <div key={s.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${esMañana?'bg-orange-50 border-orange-100':'bg-[#F7F6F3] border-transparent'}`}>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-[#0A0A0A]">{label}</p>
+                              <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos||60}min</p>
                             </div>
+                            {!s.asistencia_confirmada&&esMañana&&(
+                              <button onClick={async()=>{
+                                await supabase.from('sesiones').update({asistencia_confirmada:true,asistencia_confirmada_at:new Date().toISOString()}).eq('id',s.id)
+                                const {data}=await supabase.from('sesiones').select('*').eq('cliente_id',clienteId).gte('fecha',new Date().toISOString().split('T')[0]).lte('fecha',new Date(Date.now()+7*864e5).toISOString().split('T')[0]).eq('cancelada',false).order('fecha').limit(5)
+                                setSesionesPortal(data||[])
+                              }} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex-shrink-0" style={{background:color}}>
+                                Confirmar
+                              </button>
+                            )}
+                            {s.asistencia_confirmada&&<span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium flex-shrink-0">✓</span>}
+                            <button onClick={()=>setCancelando(s)} className="text-xs text-[#6B6B6B] border border-black/10 px-3 py-1.5 rounded-lg hover:border-red-300 hover:text-red-500 transition-all bg-white">Cancelar</button>
                           </div>
                         )
                       })}
