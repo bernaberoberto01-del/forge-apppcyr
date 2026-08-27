@@ -294,34 +294,67 @@ export default function Seguimiento({ session }) {
                 </div>
               </div>
             </div>
+            {/* Adherencia — lo más importante */}
+            {ci.sesiones_semana != null && (
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold mb-1 ${
+                ci.sesiones_planificadas && ci.sesiones_semana >= ci.sesiones_planificadas ? 'bg-emerald-50 text-emerald-700' :
+                ci.sesiones_planificadas && ci.sesiones_semana >= ci.sesiones_planificadas * 0.6 ? 'bg-amber-50 text-amber-700' :
+                'bg-red-50 text-red-600'
+              }`}>
+                <span>📅</span>
+                <span>{ci.sesiones_semana}{ci.sesiones_planificadas ? `/${ci.sesiones_planificadas}` : ''} días entrenados</span>
+                {ci.sesiones_planificadas && ci.sesiones_semana >= ci.sesiones_planificadas && <span className="ml-auto">✓ Semana completa</span>}
+              </div>
+            )}
+            {/* Cargas */}
+            {ci.cargas_sensacion && (
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold mb-2 ${
+                ci.cargas_sensacion === 'muy_duro' ? 'bg-red-50 text-red-600' :
+                ci.cargas_sensacion === 'duro' ? 'bg-amber-50 text-amber-700' :
+                ci.cargas_sensacion === 'muy_facil' ? 'bg-blue-50 text-blue-700' :
+                'bg-emerald-50 text-emerald-700'
+              }`}>
+                <span>🏋️</span>
+                <span>Cargas: {({muy_facil:'Demasiado fáciles ↑',bien:'Ajustadas ✓',duro:'Algo duras',muy_duro:'Demasiado duras ↓'})[ci.cargas_sensacion]}</span>
+              </div>
+            )}
+            {/* Bienestar */}
             <div className="flex gap-1.5 flex-wrap">
-              {ci.energia && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('energia', ci.energia)}`}>⚡ {ci.energia}/10</span>}
-              {ci.sueno && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full font-medium">😴 {ci.sueno}h</span>}
-              {ci.estres && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('estres', ci.estres)}`}>😤 {ci.estres}/5</span>}
-              {ci.fatiga && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('fatiga', ci.fatiga)}`}>🔥 {ci.fatiga}/5</span>}
-              {ci.motivacion && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('motivacion', ci.motivacion)}`}>💫 {ci.motivacion}/7</span>}
-              {ci.calidad_entreno && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('calidad_entreno', ci.calidad_entreno)}`}>🏋️ {ci.calidad_entreno}/7</span>}
-              {ci.sesiones_semana != null && <span className="text-xs bg-[#F5F5F0] text-[#6B6B6B] px-2 py-1 rounded-full font-medium">📅 {ci.sesiones_semana} ses</span>}
-              {ci.adherencia_entreno && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('adherencia_entreno', ci.adherencia_entreno)}`}>💪 {ci.adherencia_entreno}/10</span>}
-              {ci.adherencia_nutricion && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('adherencia_nutricion', ci.adherencia_nutricion)}`}>🥗 {ci.adherencia_nutricion}/10</span>}
+              {ci.energia != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('energia', ci.energia)}`}>⚡ {ci.energia}/5</span>}
+              {ci.sueno != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('sueno', ci.sueno)}`}>😴 {ci.sueno}/5</span>}
+              {ci.estres != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('estres', ci.estres)}`}>🧠 {ci.estres}/5</span>}
+              {ci.fatiga != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('fatiga', ci.fatiga)}`}>🔥 {ci.fatiga}/5</span>}
+              {ci.peso && <span className="text-xs bg-[#F5F5F0] text-[#6B6B6B] px-2 py-1 rounded-full font-medium">⚖️ {ci.peso}kg</span>}
             </div>
+            {/* Logro de la semana */}
+            {ci.logro_semana && (
+              <div className="mt-2 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                <p className="text-xs text-amber-700"><span className="font-bold">🏆 Logro:</span> {ci.logro_semana}</p>
+              </div>
+            )}
             {ci.comentario && <p className="text-xs text-[#6B6B6B] mt-2 italic border-t border-black/5 pt-2">"{ci.comentario}"</p>}
-            {/* Tendencia vs CI anterior del mismo cliente */}
+            {/* Tendencia vs CI anterior */}
             {(() => {
               const anterior = checkinsFiltrados.find(x => x.cliente_id === ci.cliente_id && x.fecha < ci.fecha)
               if (!anterior) return null
-              const diffEnergia = ci.energia && anterior.energia ? ci.energia - anterior.energia : null
+              const diffEnergia = ci.energia != null && anterior.energia != null ? ci.energia - anterior.energia : null
+              const diffFatiga = ci.fatiga != null && anterior.fatiga != null ? ci.fatiga - anterior.fatiga : null
               const diffPeso = ci.peso && anterior.peso ? (ci.peso - anterior.peso).toFixed(1) : null
-              if (!diffEnergia && !diffPeso) return null
+              if (!diffEnergia && !diffFatiga && !diffPeso) return null
               return (
-                <div className="flex gap-2 mt-2 pt-2 border-t border-black/5">
-                  {diffEnergia !== null && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diffEnergia > 0 ? 'bg-emerald-50 text-emerald-700' : diffEnergia < 0 ? 'bg-red-50 text-red-600' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
-                      ⚡ {diffEnergia > 0 ? '+' : ''}{diffEnergia} vs anterior
+                <div className="flex gap-2 mt-2 pt-2 border-t border-black/5 flex-wrap">
+                  {diffEnergia !== null && diffEnergia !== 0 && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diffEnergia > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                      ⚡ {diffEnergia > 0 ? '+' : ''}{diffEnergia} energía
+                    </span>
+                  )}
+                  {diffFatiga !== null && diffFatiga !== 0 && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diffFatiga < 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                      🔥 {diffFatiga > 0 ? '+' : ''}{diffFatiga} fatiga
                     </span>
                   )}
                   {diffPeso !== null && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${Number(diffPeso) < 0 ? 'bg-emerald-50 text-emerald-700' : Number(diffPeso) > 0 ? 'bg-red-50 text-red-600' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${Number(diffPeso) < 0 ? 'bg-emerald-50 text-emerald-700' : Number(diffPeso) > 0 ? 'bg-amber-50 text-amber-700' : 'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
                       ⚖️ {Number(diffPeso) > 0 ? '+' : ''}{diffPeso}kg
                     </span>
                   )}
@@ -524,7 +557,13 @@ export default function Seguimiento({ session }) {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-[#0A0A0A] truncate">{cl.nombre.split(' ')[0]}</p>
                     {ultimo ? (
-                      <div className="flex gap-1.5 mt-0.5">
+                      <div className="flex gap-1.5 mt-0.5 flex-wrap">
+                        {ultimo.sesiones_semana != null && (
+                          <span className={`text-xs font-medium ${
+                            ultimo.sesiones_planificadas && ultimo.sesiones_semana >= ultimo.sesiones_planificadas ? 'text-emerald-600' :
+                            ultimo.sesiones_semana === 0 ? 'text-red-500' : 'text-amber-600'
+                          }`}>📅{ultimo.sesiones_semana}{ultimo.sesiones_planificadas ? `/${ultimo.sesiones_planificadas}` : ''}</span>
+                        )}
                         {ultimo.energia != null && <span className="text-xs text-[#9B9B9B]">⚡{ultimo.energia}</span>}
                         {ultimo.fatiga != null && <span className={`text-xs font-medium ${ultimo.fatiga >= 4 ? 'text-red-500' : 'text-[#9B9B9B]'}`}>🔥{ultimo.fatiga}</span>}
                       </div>
