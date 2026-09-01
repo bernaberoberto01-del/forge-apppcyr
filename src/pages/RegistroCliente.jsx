@@ -1,549 +1,484 @@
-import { useState, useCallback, useEffect } from 'react'
-import { TIPOS_ENTRENAMIENTO } from '../utils/tiposEntrenamiento'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-const PASOS = ['Datos personales','Tu objetivo','Experiencia','Marcas básicas','Material y horario','Salud','Expectativas']
+// ─── Constantes ────────────────────────────────────────────────────────────────
+const BLOQUES = [
+  'Quién eres',
+  'Tu objetivo',
+  'Tu situación actual',
+  'Lo que no ha funcionado',
+  'Tu disponibilidad',
+  'Expectativas',
+]
 
-const init = {
-  nombre:'', email:'', telefono:'', edad:'', sexo:'', peso_actual:'', altura:'', tipo:'presencial',
-  objetivo:'', objetivo_detalle:'', plazo:'3_meses', tipo_entrenamiento:'', formato_entrenamiento:'', necesidades:'', acepta_rgpd: false, acepta_ia: false,
-  nivel:'principiante', anos_entrenando:0,
-  marca_press_banca:'', marca_sentadilla:'', marca_peso_muerto:'', marca_dominadas:'', marca_flexiones:'', marca_press_militar:'',
-  material:'gimnasio', dias_semana:3, duracion_sesion:60, horario_preferido:'',
-  lesiones:'', enfermedades:'', medicacion:'',
-  motivacion:'', experiencias_anteriores:'', compromisos:'', como_nos_conocio:''
-}
+const OBJETIVOS = [
+  { v: 'perdida_grasa',       l: 'Perder grasa y definirme',              emoji: '🔥' },
+  { v: 'ganancia_muscular',   l: 'Ganar músculo y fuerza',                emoji: '💪' },
+  { v: 'rendimiento',         l: 'Mejorar mi rendimiento deportivo',       emoji: '🏃' },
+  { v: 'salud_general',       l: 'Sentirme mejor y tener más energía',     emoji: '✨' },
+  { v: 'cambio_rapido_30dias',l: 'Las dos primeras a la vez',              emoji: '⚡' },
+]
 
-// Componentes FUERA del componente principal para evitar pérdida de foco
-const Input = ({ label, value, onChange, type='text', placeholder='', required=false }) => (
+const MATERIALES = [
+  { v: 'sin_material',    l: 'Sin material',           sub: 'Solo cuerpo' },
+  { v: 'material_basico', l: 'Mancuernas y gomas',     sub: 'En casa' },
+  { v: 'gimnasio',        l: 'Gimnasio completo',       sub: 'Máquinas y pesas' },
+]
+
+// ─── Componentes base ──────────────────────────────────────────────────────────
+const Input = ({ label, value, onChange, type='text', placeholder='', required=false, small=false }) => (
   <div>
-    <label className="block text-sm font-semibold text-[#0A0A0A] mb-1.5">
-      {label}{required && <span className="text-[#FF5C00] ml-1">*</span>}
-    </label>
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      required={required}
-      className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] transition-colors bg-white"
-    />
+    {label && <label className="block text-sm font-semibold text-[#0A0A0A] mb-1.5">{label}{required && <span className="text-[#FF5C00] ml-1">*</span>}</label>}
+    <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+      className={`w-full border border-black/10 rounded-xl px-4 ${small?'py-2':'py-3'} text-sm focus:outline-none focus:border-[#FF5C00] bg-white`}/>
   </div>
 )
 
-const Textarea = ({ label, value, onChange, placeholder='' }) => (
+const Textarea = ({ label, value, onChange, placeholder='', rows=3 }) => (
   <div>
-    <label className="block text-sm font-semibold text-[#0A0A0A] mb-1.5">{label}</label>
-    <textarea
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      rows={3}
-      className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] resize-none bg-white"
-    />
+    {label && <label className="block text-sm font-semibold text-[#0A0A0A] mb-1.5">{label}</label>}
+    <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows}
+      className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] resize-none bg-white"/>
   </div>
 )
 
-const Select = ({ label, value, onChange, options, required=false }) => (
-  <div>
-    <label className="block text-sm font-semibold text-[#0A0A0A] mb-1.5">
-      {label}{required && <span className="text-[#FF5C00] ml-1">*</span>}
-    </label>
-    <select
-      value={value}
-      onChange={onChange}
-      className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] bg-white"
-    >
-      <option value="">Selecciona...</option>
-      {options.map(([v,l]) => <option key={v} value={v}>{l}</option>)}
-    </select>
-  </div>
-)
-
+// ─── Componente principal ──────────────────────────────────────────────────────
 export default function RegistroCliente() {
+  const [entrenadorId, setEntrenadorId] = useState(null)
   const [paso, setPaso] = useState(0)
-  const [bloques, setBloques] = useState({ basico:true, objetivo:true, historial:true, disponibilidad:true, material:true, salud:true, motivacion:true })
+  const [error, setError] = useState('')
+  const [enviado, setEnviado] = useState(false)
+  const [enviando, setEnviando] = useState(false)
 
-  // Cargar bloques del entrenador desde la URL
+  const [form, setForm] = useState({
+    // Bloque 1
+    nombre: '', email: '', edad: '', sexo: '', ciudad: '',
+    // Bloque 2
+    objetivo: '',
+    // Bloque 3
+    entrenas_ahora: '',
+    dias_semana: 3,
+    donde_entrena: '',
+    alimentacion_actual: '',
+    anos_intentando: '',
+    // Bloque 4
+    que_no_funciono: '',
+    // Bloque 5
+    disponibilidad_dias: 3,
+    material: '',
+    tiene_lesion: false,
+    lesiones: '',
+    // Bloque 6
+    expectativas_30dias: '',
+    tiempo_semanal: '',
+    acepta_rgpd: false,
+  })
+
+  const set = (k, v) => { setError(''); setForm(f => ({ ...f, [k]: v })) }
+
   useEffect(() => {
     const uid = new URLSearchParams(window.location.search).get('e')
-    if (!uid) return
-    supabase.from('configuracion').select('cuestionario_bloques').eq('entrenador_id', uid).single()
-      .then(({ data }) => { if (data?.cuestionario_bloques) setBloques(b => ({ ...b, ...data.cuestionario_bloques })) })
+    if (uid) setEntrenadorId(uid)
   }, [])
 
-  // Mapa de paso -> bloque
-  const PASO_BLOQUE = ['basico', 'objetivo', 'historial', 'historial', 'material', 'salud', 'motivacion']
-
-  const siguiente = () => {
-    if (!validarPaso()) return
-    let next = paso + 1
-    // Saltar pasos desactivados
-    while (next < PASOS.length - 1 && PASO_BLOQUE[next] && !bloques[PASO_BLOQUE[next]]) next++
-    setPaso(Math.min(next, PASOS.length - 1))
-  }
-
-  const anterior2 = () => {
-    setError('')
-    let prev = paso - 1
-    while (prev > 0 && PASO_BLOQUE[prev] && !bloques[PASO_BLOQUE[prev]]) prev--
-    setPaso(Math.max(prev, 0))
-  }
-  const [form, setForm] = useState(init)
-  const [enviado, setEnviado] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const params = new URLSearchParams(window.location.search)
-  const entrenadorId = params.get('e')
-
-  const set = useCallback((k, v) => setForm(f => ({ ...f, [k]: v })), [])
-
-  const validarPaso = () => {
-    if (paso === 0 && (!form.nombre || !form.email)) { setError('Nombre y email son obligatorios'); return false }
-    if (paso === 1 && !form.objetivo) { setError('Selecciona tu objetivo'); return false }
-    if (paso === 1 && !form.necesidades) { setError('Selecciona qué necesitas'); return false }
-    setError(''); return true
-  }
-
-
-
-  const enviar = async () => {
-    if (!validarPaso()) return
-    setLoading(true)
-    try {
-      const { error: err } = await supabase.from('cuestionarios').insert({
-        entrenador_id: entrenadorId,
-        nombre: form.nombre,
-        email: form.email,
-        telefono: form.telefono || null,
-        edad: form.edad ? Number(form.edad) : null,
-        sexo: form.sexo || null,
-        peso_actual: form.peso_actual ? Number(form.peso_actual) : null,
-        altura: form.altura ? (Number(form.altura) < 3 ? Math.round(Number(form.altura) * 100) : Math.round(Number(form.altura))) : null,
-        objetivo: form.objetivo || null,
-        objetivo_detalle: form.objetivo_detalle || null,
-        plan_online: form.necesidades || null,
-        plazo: form.plazo || null,
-        nivel: form.nivel || null,
-        anos_entrenando: form.anos_entrenando ? Number(form.anos_entrenando) : 0,
-        marca_press_banca: form.marca_press_banca || null,
-        marca_sentadilla: form.marca_sentadilla || null,
-        marca_peso_muerto: form.marca_peso_muerto || null,
-        marca_dominadas: form.marca_dominadas || null,
-        marca_flexiones: form.marca_flexiones || null,
-        marca_press_militar: form.marca_press_militar || null,
-        material: form.material || null,
-        dias_semana: form.dias_semana ? Number(form.dias_semana) : 3,
-        duracion_sesion: form.duracion_sesion ? Number(form.duracion_sesion) : 60,
-        horario_preferido: form.horario_preferido || null,
-        lesiones: form.lesiones || null,
-        enfermedades: form.enfermedades || null,
-        medicacion: form.medicacion || null,
-        motivacion: form.motivacion || null,
-        experiencias_anteriores: form.experiencias_anteriores || null,
-        compromisos: form.compromisos || null,
-        como_nos_conocio: form.como_nos_conocio || null,
-        tipo_entrenamiento: form.tipo_entrenamiento || null,
-        formato_entrenamiento: form.formato_entrenamiento || null,
-        acepta_rgpd: form.acepta_rgpd || false,
-        acepta_ia: form.acepta_ia || false,
-        fecha_consentimiento: new Date().toISOString(),
-        procesado: false,
-      })
-      if (err) throw err
-      setEnviado(true)
-    } catch(e) {
-      setError('Error al enviar: ' + e.message)
+  function validar() {
+    if (paso === 0) {
+      if (!form.nombre.trim()) return 'El nombre es obligatorio'
+      if (!form.email.trim() || !form.email.includes('@')) return 'Email válido obligatorio'
+      if (!form.edad) return 'La edad es obligatoria'
+      if (!form.sexo) return 'Selecciona tu sexo biológico'
     }
-    setLoading(false)
+    if (paso === 1) {
+      if (!form.objetivo) return 'Selecciona tu objetivo principal'
+    }
+    if (paso === 2) {
+      if (!form.entrenas_ahora) return 'Indica si entrenas actualmente'
+    }
+    if (paso === 4) {
+      if (!form.material) return 'Indica el material disponible'
+    }
+    if (paso === 5) {
+      if (!form.expectativas_30dias.trim()) return 'Cuéntanos qué esperas en los primeros 30 días'
+      if (!form.acepta_rgpd) return 'Debes aceptar la política de privacidad'
+    }
+    return ''
   }
 
-  if (!entrenadorId) return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[#F5F5F0]">
-      <div className="text-center"><p className="text-3xl mb-2">🔗</p><p className="text-[#6B6B6B]">Enlace no válido</p></div>
-    </div>
-  )
+  function siguiente() {
+    const err = validar()
+    if (err) { setError(err); return }
+    setPaso(p => p + 1)
+    window.scrollTo(0, 0)
+  }
 
+  async function enviar() {
+    const err = validar()
+    if (err) { setError(err); return }
+    if (!entrenadorId) { setError('Enlace de registro no válido'); return }
+    setEnviando(true)
+
+    const payload = {
+      entrenador_id: entrenadorId,
+      nombre: form.nombre.trim(),
+      email: form.email.trim().toLowerCase(),
+      edad: Number(form.edad) || null,
+      sexo: form.sexo || null,
+      ciudad: form.ciudad.trim() || null,
+      objetivo: form.objetivo,
+      entrenas_ahora: form.entrenas_ahora,
+      dias_semana: Number(form.disponibilidad_dias) || 3,
+      donde_entrena: form.donde_entrena.trim() || null,
+      alimentacion_actual: form.alimentacion_actual.trim() || null,
+      anos_entrenando: form.anos_intentando ? Number(form.anos_intentando) : null,
+      que_no_funciono: form.que_no_funciono.trim() || null,
+      material: form.material,
+      tiene_lesion: form.tiene_lesion,
+      lesiones: form.lesiones.trim() || null,
+      expectativas_30dias: form.expectativas_30dias.trim(),
+      tiempo_semanal: form.tiempo_semanal.trim() || null,
+      tipo: 'online',
+      procesado: false,
+      acepta_rgpd: form.acepta_rgpd,
+      fecha_consentimiento: new Date().toISOString(),
+    }
+
+    const { error: err2 } = await supabase.from('cuestionarios').insert(payload)
+    if (err2) { setError('Error al enviar. Inténtalo de nuevo.'); setEnviando(false); return }
+
+    // Lanzar análisis IA en background (no bloqueante)
+    supabase.functions.invoke('analizar-diagnostico', {
+      body: { entrenador_id: entrenadorId, email: form.email.trim().toLowerCase() }
+    }).catch(() => {})
+
+    setEnviado(true)
+    setEnviando(false)
+  }
+
+  // ── Pantalla de éxito ──────────────────────────────────────────────────────
   if (enviado) return (
-    <div className="min-h-screen bg-[#F5F5F0] flex items-center justify-center p-4">
-      <div className="text-center max-w-sm">
+    <div className="min-h-screen bg-[#F7F6F3] flex items-center justify-center p-4">
+      <div className="max-w-sm w-full text-center">
         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5 text-4xl">✓</div>
-        <h2 className="text-2xl font-bold text-[#0A0A0A] mb-3">¡Todo listo!</h2>
-        <p className="text-[#6B6B6B] leading-relaxed text-sm">Tu cuestionario ha sido enviado. Tu entrenador lo revisará y recibirás tu plan personalizado en breve.</p>
-        <div className="mt-5 bg-[#FF5C00]/8 border border-[#FF5C00]/20 rounded-2xl p-4">
-          <p className="text-sm font-semibold text-[#FF5C00]">Próximos pasos</p>
-          <p className="text-xs text-[#6B6B6B] mt-1">Recibirás tu rutina personalizada en las próximas 24-48 horas.</p>
+        <h2 className="text-2xl font-bold text-[#0A0A0A] mb-2">¡Recibido, {form.nombre.split(' ')[0]}!</h2>
+        <p className="text-[#6B6B6B] text-sm leading-relaxed">
+          Analizaremos tu situación y en menos de 24h te enviamos una recomendación personalizada con el plan que mejor encaja contigo.
+        </p>
+        <div className="mt-6 bg-white rounded-2xl border border-black/5 p-4 text-left space-y-2">
+          <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide">Qué pasa ahora</p>
+          {[
+            ['📋', 'Revisamos tu diagnóstico'],
+            ['🤖', 'La IA analiza tu situación'],
+            ['📬', 'Te enviamos nuestra recomendación'],
+            ['💳', 'Pagas solo si estás de acuerdo'],
+          ].map(([ic, txt]) => (
+            <div key={txt} className="flex items-center gap-3">
+              <span className="text-base flex-shrink-0">{ic}</span>
+              <p className="text-sm text-[#0A0A0A]">{txt}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   )
 
-  const progreso = (paso / (PASOS.length - 1)) * 100
+  const progreso = ((paso) / BLOQUES.length) * 100
 
   return (
-    <div className="min-h-screen bg-[#F5F5F0]">
-      {/* Header fijo */}
-      <div className="bg-[#111] px-4 py-4 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto">
+    <div className="min-h-screen bg-[#F7F6F3]">
+      {/* Header */}
+      <div className="bg-[#111] sticky top-0 z-10">
+        <div className="max-w-lg mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-[#FF5C00] rounded-lg flex items-center justify-center">
+              <div className="w-7 h-7 bg-[#FF5C00] rounded-xl flex items-center justify-center flex-shrink-0">
                 <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
                   <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
                   <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
                   <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
                 </svg>
               </div>
-              <span className="text-white font-semibold text-sm">Forge</span>
+              <div>
+                <p className="text-white font-semibold text-sm">Diagnóstico inicial</p>
+                <p className="text-[#6B6B6B] text-xs">{BLOQUES[paso]}</p>
+              </div>
             </div>
-            <span className="text-white/40 text-xs">{paso + 1} / {PASOS.length}</span>
+            <p className="text-white/40 text-xs">{paso + 1} / {BLOQUES.length}</p>
           </div>
-          <div className="bg-white/10 rounded-full h-1.5 mb-2">
-            <div className="bg-[#FF5C00] h-1.5 rounded-full transition-all duration-500" style={{ width: `${progreso}%` }} />
+          <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+            <div className="h-full bg-[#FF5C00] rounded-full transition-all duration-500" style={{width:`${progreso}%`}}/>
           </div>
-          <p className="text-white font-semibold text-sm">{PASOS[paso]}</p>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto p-4 pb-8">
-        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5 mt-2">
+      <div className="max-w-lg mx-auto p-4 pb-12 space-y-4">
 
-          {/* PASO 0 — Datos personales */}
-          {paso === 0 && (
-            <div className="space-y-4">
-              <div className="mb-2">
-                <h2 className="text-lg font-bold text-[#0A0A0A]">Cuéntanos sobre ti</h2>
-                <p className="text-sm text-[#6B6B6B] mt-0.5">Esta información nos ayuda a personalizar tu plan al máximo.</p>
+        {/* ── BLOQUE 1: Quién eres ── */}
+        {paso === 0 && (
+          <>
+            <div className="pt-2">
+              <h2 className="text-xl font-bold text-[#0A0A0A]">Cuéntanos quién eres</h2>
+              <p className="text-sm text-[#6B6B6B] mt-1">Información básica para personalizar tu plan</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 p-5 space-y-4">
+              <Input label="Nombre completo" value={form.nombre} onChange={e=>set('nombre',e.target.value)} placeholder="Tu nombre" required/>
+              <Input label="Email" type="email" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="tu@email.com" required/>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="Edad" type="number" value={form.edad} onChange={e=>set('edad',e.target.value)} placeholder="28" required/>
+                <Input label="Ciudad" value={form.ciudad} onChange={e=>set('ciudad',e.target.value)} placeholder="Murcia"/>
               </div>
-              <Input label="Nombre completo" value={form.nombre} onChange={e => set('nombre', e.target.value)} required placeholder="Tu nombre y apellidos" />
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Modalidad de entrenamiento</label>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Sexo biológico <span className="text-[#FF5C00]">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
-                  {[
-                    ['presencial','📍 Presencial','Entrenas en persona con tu entrenador'],
-                    ['online','🌐 Online','Seguimiento y rutinas a distancia'],
-                  ].map(([v,l,d]) => (
-                    <button key={v} type="button" onClick={() => set('tipo', v)}
-                      className={`p-3.5 rounded-xl border text-left transition-all ${form.tipo===v ? 'bg-[#FF5C00] border-[#FF5C00]' : 'border-black/10 hover:border-[#FF5C00]/50'}`}>
-                      <p className={`text-sm font-semibold ${form.tipo===v ? 'text-white' : 'text-[#0A0A0A]'}`}>{l}</p>
-                      <p className={`text-xs mt-0.5 ${form.tipo===v ? 'text-white/80' : 'text-[#6B6B6B]'}`}>{d}</p>
+                  {[['hombre','Hombre'],['mujer','Mujer']].map(([v,l]) => (
+                    <button key={v} type="button" onClick={() => set('sexo', v)}
+                      className={`py-3 rounded-xl border text-sm font-semibold transition-all ${form.sexo===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      {l}
                     </button>
                   ))}
                 </div>
-              </div>
-              <Input label="Email" value={form.email} onChange={e => set('email', e.target.value)} type="email" required placeholder="tu@email.com" />
-              <Input label="Teléfono" value={form.telefono} onChange={e => set('telefono', e.target.value)} type="tel" placeholder="+34 600 000 000" />
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Edad" value={form.edad} onChange={e => set('edad', e.target.value)} type="number" placeholder="25" />
-                <Select label="Sexo" value={form.sexo} onChange={e => set('sexo', e.target.value)} options={[['hombre','Hombre'],['mujer','Mujer'],['otro','Otro']]} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Peso actual (kg)" value={form.peso_actual} onChange={e => set('peso_actual', e.target.value)} type="number" placeholder="75" />
-                <Input label="Altura (cm)" value={form.altura} onChange={e => set('altura', e.target.value)} type="number" placeholder="175" />
+                <p className="text-xs text-[#9B9B9B] mt-1.5">Lo usamos para calcular parámetros fisiológicos correctos</p>
               </div>
             </div>
-          )}
+          </>
+        )}
 
-          {/* PASO 1 — Objetivo */}
-          {paso === 1 && (
-            <div className="space-y-4">
-              <div className="mb-2">
-                <h2 className="text-lg font-bold text-[#0A0A0A]">¿Qué quieres conseguir?</h2>
-                <p className="text-sm text-[#6B6B6B] mt-0.5">Cuanto más claro seas, mejor podremos ayudarte.</p>
-              </div>
+        {/* ── BLOQUE 2: Objetivo ── */}
+        {paso === 1 && (
+          <>
+            <div className="pt-2">
+              <h2 className="text-xl font-bold text-[#0A0A0A]">¿Cuál es tu objetivo?</h2>
+              <p className="text-sm text-[#6B6B6B] mt-1">Elige el que mejor describe lo que quieres conseguir</p>
+            </div>
 
-              {/* Necesidades — determina el plan internamente */}
+            <div className="space-y-2">
+              {OBJETIVOS.map(({ v, l, emoji }) => (
+                <button key={v} type="button" onClick={() => set('objetivo', v)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all ${form.objetivo===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 bg-white hover:border-black/20'}`}>
+                  <span className="text-2xl flex-shrink-0">{emoji}</span>
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold ${form.objetivo===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                  </div>
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${form.objetivo===v?'border-[#FF5C00]':'border-black/20'}`}>
+                    {form.objetivo===v && <div className="w-2.5 h-2.5 rounded-full bg-[#FF5C00]"/>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ── BLOQUE 3: Situación actual ── */}
+        {paso === 2 && (
+          <>
+            <div className="pt-2">
+              <h2 className="text-xl font-bold text-[#0A0A0A]">Tu situación actual</h2>
+              <p className="text-sm text-[#6B6B6B] mt-1">Queremos entender de dónde partes</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 p-5 space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-1">¿En qué área quieres mejorar? <span className="text-[#FF5C00]">*</span></label>
-                <p className="text-xs text-[#6B6B6B] mb-3">Tu entrenador diseñará exactamente lo que necesitas.</p>
-                <div className="space-y-2">
-                  {[
-                    ['entrenamiento', '💪 Entrenamiento', 'Quiero mejorar mi condición física, ganar fuerza o perder peso entrenando.'],
-                    ['nutricion',    '🥗 Alimentación',  'Quiero aprender a comer mejor y estructurar mi dieta según mis objetivos.'],
-                    ['completo',     '⚡ Las dos cosas',  'Quiero un cambio completo — entrenar bien y comer mejor a la vez.'],
-                  ].map(([v, l, desc]) => (
-                    <button key={v} type="button" onClick={() => set('necesidades', v)}
-                      className={`w-full p-4 rounded-xl border text-left transition-all flex items-start gap-3 ${form.necesidades===v ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/10 hover:border-[#FF5C00]/30'}`}>
-                      <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${form.necesidades===v ? 'border-[#FF5C00]' : 'border-black/20'}`}>
-                        {form.necesidades===v && <div className="w-2.5 h-2.5 rounded-full bg-[#FF5C00]"/>}
-                      </div>
-                      <div>
-                        <p className={`text-sm font-bold ${form.necesidades===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
-                        <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{desc}</p>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Objetivo principal <span className="text-[#FF5C00]">*</span></label>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    ['perdida_grasa','🔥 Perder grasa'],
-                    ['ganancia_muscular','💪 Ganar músculo'],
-                    ['tonificacion','✨ Tonificarme'],
-                    ['fuerza','🏋️ Ganar fuerza'],
-                    ['rendimiento','⚡ Rendimiento'],
-                    ['cambio_rapido_30dias','🚀 Cambio 30 días'],
-                  ].map(([v,l]) => (
-                    <button key={v} type="button" onClick={() => set('objetivo', v)}
-                      className={`p-3.5 rounded-xl border text-sm font-medium text-left transition-all ${form.objetivo===v ? 'bg-[#FF5C00] text-white border-[#FF5C00]' : 'border-black/10 text-[#0A0A0A] hover:border-[#FF5C00]/50'}`}>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">¿Entrenas ahora mismo? <span className="text-[#FF5C00]">*</span></label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[['si','Sí'],['aveces','A veces'],['no','No']].map(([v,l]) => (
+                    <button key={v} type="button" onClick={() => set('entrenas_ahora', v)}
+                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.entrenas_ahora===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {(form.entrenas_ahora === 'si' || form.entrenas_ahora === 'aveces') && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Días por semana que entrenas</label>
+                    <div className="flex gap-2">
+                      {[1,2,3,4,5,6,7].map(n => (
+                        <button key={n} type="button" onClick={() => set('dias_semana', n)}
+                          className={`flex-1 py-2.5 rounded-xl border text-sm font-bold transition-all ${form.dias_semana===n?'bg-[#FF5C00] text-white border-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <Input label="¿Dónde entrenas?" value={form.donde_entrena} onChange={e=>set('donde_entrena',e.target.value)} placeholder="Gimnasio, en casa, parque…"/>
+                </>
+              )}
+
+              <Textarea label="¿Cómo describes tu alimentación ahora?" value={form.alimentacion_actual} onChange={e=>set('alimentacion_actual',e.target.value)}
+                placeholder="Sé honesto/a. Ej: Como bastante bien entre semana pero los fines de semana me descontrolo. No desayuno casi nunca..."/>
+
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Tipo de entrenamiento preferido</label>
-                <p className="text-xs text-[#6B6B6B] mb-3">Tu entrenador lo usará para diseñar tu programa</p>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">¿Cuánto tiempo llevas intentando conseguir tu objetivo?</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {TIPOS_ENTRENAMIENTO.map(t => (
-                    <button key={t.id} type="button" onClick={() => set('tipo_entrenamiento', t.id)}
-                      className={`p-3 rounded-xl border text-left transition-all ${form.tipo_entrenamiento===t.id ? 'bg-[#FF5C00] border-[#FF5C00]' : 'border-black/10 hover:border-[#FF5C00]/50'}`}>
-                      <p className={`text-sm font-semibold ${form.tipo_entrenamiento===t.id?'text-white':'text-[#0A0A0A]'}`}>{t.icon} {t.label}</p>
-                      <p className={`text-xs mt-0.5 leading-tight ${form.tipo_entrenamiento===t.id?'text-white/80':'text-[#6B6B6B]'}`}>{t.desc}</p>
+                  {[['menos_mes','Menos de 1 mes'],['1_3_meses','1-3 meses'],['3_12_meses','3-12 meses'],['mas_1_año','Más de un año']].map(([v,l]) => (
+                    <button key={v} type="button" onClick={() => set('anos_intentando', v)}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${form.anos_intentando===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── BLOQUE 4: Lo que no ha funcionado ── */}
+        {paso === 3 && (
+          <>
+            <div className="pt-2">
+              <h2 className="text-xl font-bold text-[#0A0A0A]">Lo que no ha funcionado</h2>
+              <p className="text-sm text-[#6B6B6B] mt-1">Esta es la parte más importante para nosotros. Sin filtros.</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 p-5 space-y-4">
+              <Textarea
+                label="¿Has intentado cambiar algo antes? ¿Qué pasó?"
+                value={form.que_no_funciono}
+                onChange={e => set('que_no_funciono', e.target.value)}
+                rows={5}
+                placeholder="Ej: Empecé a ir al gimnasio hace un año pero lo dejé al mes porque no sabía qué hacer y me aburrí. También probé una dieta de Instagram que aguanté dos semanas..."
+              />
+              <div className="bg-[#F7F6F3] rounded-xl p-3">
+                <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                  💡 Cuanto más detallado, mejor. Entender qué ha fallado antes es lo que nos permite diseñar algo que sí funcione para ti.
+                </p>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ── BLOQUE 5: Disponibilidad ── */}
+        {paso === 4 && (
+          <>
+            <div className="pt-2">
+              <h2 className="text-xl font-bold text-[#0A0A0A]">Tu disponibilidad</h2>
+              <p className="text-sm text-[#6B6B6B] mt-1">Diseñamos el plan en torno a tu vida real, no al revés</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 p-5 space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Días disponibles para entrenar <span className="text-[#FF5C00]">*</span></label>
+                <div className="flex gap-1.5">
+                  {[2,3,4,'5+'].map(n => (
+                    <button key={n} type="button" onClick={() => set('disponibilidad_dias', n)}
+                      className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all ${form.disponibilidad_dias===n?'bg-[#FF5C00] text-white border-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      {n}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Formato de entrenamiento preferido */}
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">¿Cómo te gusta entrenar?</label>
-                <p className="text-xs text-[#6B6B6B] mb-3">Esto nos ayuda a crear rutinas que se adapten a ti y que puedas mantener</p>
-                <div className="grid grid-cols-1 gap-2">
-                  {[
-                    ['superseries', '↕️ Superseries / Biseries', 'Encadeno 2 ejercicios seguidos y luego descanso. Más eficiente.'],
-                    ['circuitos', '🔄 Circuitos', 'Hago 3-4 ejercicios seguidos sin parar. Me gusta el ritmo alto.'],
-                    ['descanso_tradicional', '⏱ Descanso tradicional', 'Prefiero descansar bien entre cada ejercicio. Me concentro más.'],
-                    ['sin_preferencia', '🎯 Sin preferencia', 'Que mi entrenador decida lo que mejor me conviene.'],
-                  ].map(([val, label, desc]) => (
-                    <button key={val} type="button" onClick={() => set('formato_entrenamiento', val)}
-                      className={`p-3.5 rounded-xl border text-left transition-all flex items-start gap-3 ${form.formato_entrenamiento===val ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/10 hover:border-[#FF5C00]/30'}`}>
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center ${form.formato_entrenamiento===val ? 'border-[#FF5C00]' : 'border-black/20'}`}>
-                        {form.formato_entrenamiento===val && <div className="w-2 h-2 rounded-full bg-[#FF5C00]"/>}
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Material disponible <span className="text-[#FF5C00]">*</span></label>
+                <div className="space-y-2">
+                  {MATERIALES.map(({ v, l, sub }) => (
+                    <button key={v} type="button" onClick={() => set('material', v)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${form.material===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 hover:border-black/20'}`}>
+                      <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${form.material===v?'border-[#FF5C00]':'border-black/20'}`}>
+                        {form.material===v && <div className="w-2.5 h-2.5 rounded-full bg-[#FF5C00]"/>}
                       </div>
                       <div>
-                        <p className={`text-sm font-semibold ${form.formato_entrenamiento===val?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{label}</p>
-                        <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{desc}</p>
+                        <p className={`text-sm font-semibold ${form.material===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                        <p className="text-xs text-[#9B9B9B]">{sub}</p>
                       </div>
                     </button>
                   ))}
                 </div>
               </div>
-              <Textarea label="Descríbelo con tus palabras" value={form.objetivo_detalle} onChange={e => set('objetivo_detalle', e.target.value)} placeholder="Ej: Quiero perder 8kg antes del verano..." />
+
               <div>
-                <Select label="¿En qué plazo?" value={form.plazo} onChange={e => set('plazo', e.target.value)} options={[
-                  ['30_dias','30 días'],['3_meses','3 meses'],['6_meses','6 meses'],['1_ano','1 año'],['sin_prisa','Sin prisa']
-                ]} />
-                {form.plazo === '30_dias' && (
-                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <p className="text-sm font-bold text-amber-800 mb-1">⚠️ Este plan requiere experiencia previa</p>
-                    <p className="text-xs text-amber-700 leading-relaxed">El cambio en 30 días está diseñado para personas con hábito de entrenamiento establecido. Sin base previa, el riesgo de frustración y abandono es muy alto.</p>
-                    <p className="text-xs text-amber-700 leading-relaxed mt-1.5">En el siguiente paso confirmaremos si tu nivel de experiencia es el adecuado para este plan.</p>
-                    <div className="flex gap-2 mt-3">
-                      <button type="button" onClick={() => set('plazo', '3_meses')}
-                        className="flex-1 bg-amber-600 text-white text-xs font-bold py-2.5 rounded-lg">
-                        ✓ Cambiar a 3 meses
-                      </button>
-                      <button type="button" onClick={() => {}}
-                        className="flex-1 border border-amber-300 text-amber-700 text-xs font-medium py-2.5 rounded-lg">
-                        Continuar con 30 días
-                      </button>
-                    </div>
-                  </div>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">¿Tienes alguna lesión o condición física?</label>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {[['false','No'],['true','Sí']].map(([v,l]) => (
+                    <button key={v} type="button" onClick={() => set('tiene_lesion', v==='true')}
+                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${String(form.tiene_lesion)===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                {form.tiene_lesion && (
+                  <Input value={form.lesiones} onChange={e=>set('lesiones',e.target.value)} placeholder="Ej: Rodilla derecha, hernia lumbar L4-L5…"/>
                 )}
               </div>
             </div>
-          )}
+          </>
+        )}
 
-          {/* PASO 2 — Experiencia */}
-          {paso === 2 && (
-            <div className="space-y-5">
-              <div className="mb-2">
-                <h2 className="text-lg font-bold text-[#0A0A0A]">Tu experiencia</h2>
-                <p className="text-sm text-[#6B6B6B] mt-0.5">Adaptamos la intensidad a tu nivel real.</p>
-              </div>
+        {/* ── BLOQUE 6: Expectativas ── */}
+        {paso === 5 && (
+          <>
+            <div className="pt-2">
+              <h2 className="text-xl font-bold text-[#0A0A0A]">Para terminar</h2>
+              <p className="text-sm text-[#6B6B6B] mt-1">Ayúdanos a entender qué esperas y qué tiempo tienes</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-black/5 p-5 space-y-5">
+              <Textarea
+                label="¿Qué esperas conseguir en los primeros 30 días?"
+                value={form.expectativas_30dias}
+                onChange={e => set('expectativas_30dias', e.target.value)}
+                rows={4}
+                placeholder="Ej: Me gustaría bajar 3-4kg, empezar a notar más energía por las mañanas y establecer una rutina de entrenamiento que pueda mantener..."
+              />
+
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Nivel de entrenamiento</label>
-                <div className="space-y-2">
-                  {[
-                    ['principiante','🌱 Principiante','Menos de 1 año o con poca constancia'],
-                    ['intermedio','📈 Intermedio','1-3 años entrenando con regularidad'],
-                    ['avanzado','🔥 Avanzado','Más de 3 años, domino los básicos'],
-                  ].map(([v,l,d]) => (
-                    <button key={v} type="button" onClick={() => set('nivel', v)}
-                      className={`w-full p-4 rounded-xl border text-left transition-all ${form.nivel===v ? 'bg-[#FF5C00] border-[#FF5C00]' : 'border-black/10 hover:border-[#FF5C00]/50'}`}>
-                      <p className={`text-sm font-semibold ${form.nivel===v ? 'text-white' : 'text-[#0A0A0A]'}`}>{l}</p>
-                      <p className={`text-xs mt-0.5 ${form.nivel===v ? 'text-white/80' : 'text-[#6B6B6B]'}`}>{d}</p>
-                    </button>
-                  ))}
-                </div>
-                {/* Aviso si eligió 30 días pero es principiante */}
-                {form.plazo === '30_dias' && form.nivel === 'principiante' && (
-                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
-                    <p className="text-sm font-bold text-amber-800 mb-1">⚠️ Con nivel principiante, 30 días no es realista</p>
-                    <p className="text-xs text-amber-700 leading-relaxed">Construir hábitos y ver resultados reales lleva tiempo. Con nivel principiante, un plan de 3 meses te dará resultados más sólidos y duraderos.</p>
-                    <div className="flex gap-2 mt-3">
-                      <button type="button" onClick={() => set('plazo', '3_meses')}
-                        className="flex-1 bg-amber-600 text-white text-xs font-bold py-2.5 rounded-lg">
-                        ✓ Cambiar a 3 meses
-                      </button>
-                      <button type="button" onClick={() => {}}
-                        className="flex-1 border border-amber-300 text-amber-700 text-xs font-medium py-2.5 rounded-lg">
-                        Mantener 30 días
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Años entrenando: <span className="text-[#FF5C00]">{form.anos_entrenando}</span></label>
-                <div className="flex gap-2 flex-wrap">
-                  {[0,1,2,3,4,5,6,7,8,9,10].map(v => (
-                    <button key={v} type="button" onClick={() => set('anos_entrenando', v)}
-                      className={`w-10 h-10 rounded-xl text-sm font-semibold transition-all ${form.anos_entrenando===v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
-                      {v}
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Tiempo real disponible por semana</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[['menos_3h','Menos de 3h'],['3_5h','3-5 horas'],['5_8h','5-8 horas'],['mas_8h','Más de 8h']].map(([v,l]) => (
+                    <button key={v} type="button" onClick={() => set('tiempo_semanal', v)}
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all ${form.tiempo_semanal===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      {l}
                     </button>
                   ))}
                 </div>
               </div>
-            </div>
-          )}
 
-          {/* PASO 3 — Marcas */}
-          {paso === 3 && (
-            <div className="space-y-4">
-              <div className="mb-2">
-                <h2 className="text-lg font-bold text-[#0A0A0A]">Marcas básicas</h2>
-                <p className="text-sm text-[#6B6B6B] mt-0.5">Pon el peso máximo que mueves o el número de reps. Si no sabes, déjalo en blanco.</p>
-              </div>
-              <Input label="Press de banca" value={form.marca_press_banca} onChange={e => set('marca_press_banca', e.target.value)} placeholder="Ej: 80kg × 5 / 20 flexiones" />
-              <Input label="Sentadilla" value={form.marca_sentadilla} onChange={e => set('marca_sentadilla', e.target.value)} placeholder="Ej: 100kg × 3" />
-              <Input label="Peso muerto" value={form.marca_peso_muerto} onChange={e => set('marca_peso_muerto', e.target.value)} placeholder="Ej: 120kg × 1" />
-              <Input label="Dominadas" value={form.marca_dominadas} onChange={e => set('marca_dominadas', e.target.value)} placeholder="Ej: 10 reps o 15kg lastradas" />
-              <Input label="Flexiones" value={form.marca_flexiones} onChange={e => set('marca_flexiones', e.target.value)} placeholder="Ej: 30 reps seguidas" />
-              <Input label="Press militar" value={form.marca_press_militar} onChange={e => set('marca_press_militar', e.target.value)} placeholder="Ej: 60kg × 5" />
-            </div>
-          )}
-
-          {/* PASO 4 — Material y horario */}
-          {paso === 4 && (
-            <div className="space-y-5">
-              <div className="mb-2">
-                <h2 className="text-lg font-bold text-[#0A0A0A]">Material y disponibilidad</h2>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Material disponible</label>
-                <div className="space-y-2">
-                  {[
-                    ['sin_material','🏠 Sin material','Solo peso corporal, en casa'],
-                    ['material_basico','🎽 Material básico','Mancuernas, bandas, barra'],
-                    ['gimnasio','🏋️ Gimnasio completo','Acceso a máquinas y peso libre'],
-                  ].map(([v,l,d]) => (
-                    <button key={v} type="button" onClick={() => set('material', v)}
-                      className={`w-full p-4 rounded-xl border text-left transition-all ${form.material===v ? 'bg-[#FF5C00] border-[#FF5C00]' : 'border-black/10 hover:border-[#FF5C00]/50'}`}>
-                      <p className={`text-sm font-semibold ${form.material===v ? 'text-white' : 'text-[#0A0A0A]'}`}>{l}</p>
-                      <p className={`text-xs mt-0.5 ${form.material===v ? 'text-white/80' : 'text-[#6B6B6B]'}`}>{d}</p>
-                    </button>
-                  ))}
+              {/* RGPD */}
+              <button type="button" onClick={() => set('acepta_rgpd', !form.acepta_rgpd)}
+                className="w-full flex items-start gap-3 text-left">
+                <div className={`w-5 h-5 rounded border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all ${form.acepta_rgpd?'bg-[#FF5C00] border-[#FF5C00]':'border-black/20'}`}>
+                  {form.acepta_rgpd && <span className="text-white text-xs font-bold">✓</span>}
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Días disponibles por semana: <span className="text-[#FF5C00]">{form.dias_semana}</span></label>
-                <div className="flex gap-2">
-                  {[2,3,4,5,6].map(v => (
-                    <button key={v} type="button" onClick={() => set('dias_semana', v)}
-                      className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${form.dias_semana===v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
-                      {v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Duración de sesión: <span className="text-[#FF5C00]">{form.duracion_sesion} min</span></label>
-                <div className="flex gap-2 flex-wrap">
-                  {[30,45,60,75,90].map(v => (
-                    <button key={v} type="button" onClick={() => set('duracion_sesion', v)}
-                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${form.duracion_sesion===v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
-                      {v}min
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <Input label="Horario preferido" value={form.horario_preferido} onChange={e => set('horario_preferido', e.target.value)} placeholder="Ej: Mañanas antes del trabajo, 7-9am" />
+                <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                  Acepto que mis datos sean tratados para recibir un plan personalizado. 
+                  No compartimos tu información con terceros. <span className="text-[#FF5C00]">*</span>
+                </p>
+              </button>
             </div>
-          )}
+          </>
+        )}
 
-          {/* PASO 5 — Salud */}
-          {paso === 5 && (
-            <div className="space-y-4">
-              <div className="mb-2">
-                <h2 className="text-lg font-bold text-[#0A0A0A]">Salud y limitaciones</h2>
-                <p className="text-sm text-[#6B6B6B] mt-0.5">Importante para adaptar tu plan y evitar lesiones. Todo queda confidencial.</p>
-              </div>
-              <Textarea label="Lesiones o dolor crónico" value={form.lesiones} onChange={e => set('lesiones', e.target.value)} placeholder="Ej: Lumbar baja recurrente, rodilla derecha operada en 2022..." />
-              <Textarea label="Enfermedades o condiciones médicas" value={form.enfermedades} onChange={e => set('enfermedades', e.target.value)} placeholder="Ej: Hipertensión controlada, diabetes tipo 2..." />
-              <Input label="Medicación actual (si aplica)" value={form.medicacion} onChange={e => set('medicacion', e.target.value)} placeholder="Ej: Ninguna / Metformina 500mg..." />
-            </div>
-          )}
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+            <p className="text-sm text-red-600 font-medium">{error}</p>
+          </div>
+        )}
 
-          {/* PASO 6 — Expectativas */}
-          {paso === 6 && (
-            <div className="space-y-4">
-              <div className="mb-2">
-                <h2 className="text-lg font-bold text-[#0A0A0A]">Últimas preguntas</h2>
-                <p className="text-sm text-[#6B6B6B] mt-0.5">Esto nos ayuda a entenderte mejor como persona.</p>
-              </div>
-              <Textarea label="¿Por qué quieres cambiar ahora?" value={form.motivacion} onChange={e => set('motivacion', e.target.value)} placeholder="Qué te ha llevado a dar este paso..." />
-              <Textarea label="¿Has intentado algo antes? ¿Qué pasó?" value={form.experiencias_anteriores} onChange={e => set('experiencias_anteriores', e.target.value)} placeholder="Qué has probado, por qué no funcionó..." />
-              <Textarea label="¿A qué te comprometes?" value={form.compromisos} onChange={e => set('compromisos', e.target.value)} placeholder="Sé honesto sobre lo que estás dispuesto a hacer..." />
-              <Select label="¿Cómo nos has conocido?" value={form.como_nos_conocio} onChange={e => set('como_nos_conocio', e.target.value)} options={[
-                ['tiktok','TikTok'],['instagram','Instagram'],['recomendacion','Recomendación'],['google','Google'],['otro','Otro']
-              ]} />
-            </div>
-          )}
-
-          {error && <p className="text-red-500 text-sm bg-red-50 px-3 py-2 rounded-xl mt-4">{error}</p>}
-        </div>
-
-        {/* Botones */}
-        <div className="flex gap-3 mt-4">
+        {/* Navegación */}
+        <div className="flex gap-3 pt-2">
           {paso > 0 && (
-            <button onClick={anterior2} className="flex-1 bg-white border border-black/10 text-[#0A0A0A] text-sm font-semibold py-4 rounded-2xl transition-all active:scale-95">
-              ← Anterior
+            <button onClick={() => { setPaso(p=>p-1); setError(''); window.scrollTo(0,0) }}
+              className="flex-1 border border-black/15 text-[#6B6B6B] font-semibold py-4 rounded-2xl text-sm hover:bg-[#F0EEE8] transition-all">
+              ← Atrás
             </button>
           )}
-          {paso === PASOS.length - 1 && (
-            <div className="space-y-2">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" checked={form.acepta_rgpd} onChange={e => set('acepta_rgpd', e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
-                <span className="text-xs text-[#6B6B6B] leading-relaxed">
-                  He leído y acepto la <span className="text-[#FF5C00] underline cursor-pointer" onClick={() => window.open('/privacidad.html', '_blank')}>Política de Privacidad</span> y el tratamiento de mis datos personales conforme al RGPD.
-                </span>
-              </label>
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input type="checkbox" checked={form.acepta_ia || false} onChange={e => set('acepta_ia', e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0" />
-                <span className="text-xs text-[#6B6B6B] leading-relaxed">
-                  Acepto que mis datos se utilicen para personalizar mi programa de entrenamiento y nutrición mediante herramientas digitales avanzadas.
-                </span>
-              </label>
-            </div>
-          )}
-          {paso < PASOS.length - 1 ? (
-            <button onClick={siguiente} className="flex-1 bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95">
+          {paso < BLOQUES.length - 1 ? (
+            <button onClick={siguiente}
+              className="flex-1 bg-[#FF5C00] text-white font-bold py-4 rounded-2xl text-sm hover:bg-[#e05200] transition-all active:scale-98">
               Siguiente →
             </button>
           ) : (
-            <button onClick={enviar} disabled={loading || !form.acepta_rgpd || !form.acepta_ia} className="flex-1 bg-[#111] text-white text-sm font-bold py-4 rounded-2xl transition-all active:scale-95 disabled:opacity-40">
-              {loading ? 'Enviando...' : '✅ Enviar cuestionario'}
+            <button onClick={enviar} disabled={enviando}
+              className="flex-1 bg-[#FF5C00] text-white font-bold py-4 rounded-2xl text-sm disabled:opacity-50 transition-all">
+              {enviando ? 'Enviando…' : 'Enviar diagnóstico 📋'}
             </button>
           )}
         </div>
-        <p className="text-center text-xs text-[#6B6B6B] mt-4">Forge Studio OS · Tus datos están protegidos</p>
+
+        <p className="text-center text-xs text-[#9B9B9B]">Forge Studio · Tus datos están protegidos</p>
       </div>
     </div>
   )

@@ -595,55 +595,108 @@ export default function Clientes({ session }) {
 
       {/* Modal registros pendientes */}
       {modalRegistros && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-[#0A0A0A]">Registros pendientes</h2>
-              <button onClick={() => setModalRegistros(false)} className="text-[#6B6B6B] text-xl">×</button>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalRegistros(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-black/5 sticky top-0 bg-white">
+              <h2 className="font-bold text-[#0A0A0A]">📋 Diagnósticos pendientes ({cuestionarios.length})</h2>
+              <button onClick={() => setModalRegistros(false)} className="text-[#6B6B6B] text-xl leading-none">×</button>
             </div>
-            <div className="space-y-3">
-              {cuestionarios.map(c => (
-                <div key={c.id} className="border border-black/8 rounded-xl p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                      style={{ background: avatarColor(c.nombre) }}>{ini(c.nombre)}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-[#0A0A0A] truncate">{c.nombre}</p>
-                      <p className="text-xs text-[#6B6B6B]">{c.email} · {new Date(c.created_at).toLocaleDateString('es-ES')}</p>
+            <div className="p-5 space-y-4">
+              {cuestionarios.map(c => {
+                const PLAN_INFO = {
+                  nutricion:     { label: 'Hábitos & Alimentación', precio: '29€/mes', emoji: '🥗', color: '#10b981' },
+                  entrenamiento: { label: 'Entrenamiento',          precio: '35€/mes', emoji: '💪', color: '#6366f1' },
+                  completo:      { label: 'Plan Completo',          precio: '49€/mes', emoji: '⚡', color: '#FF5C00' },
+                }
+                const planInfo = PLAN_INFO[c.sugerencia_plan]
+
+                return (
+                  <div key={c.id} className="border border-black/8 rounded-2xl overflow-hidden">
+
+                    {/* Cabecera cliente */}
+                    <div className="p-4 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                        style={{ background: avatarColor(c.nombre) }}>{ini(c.nombre)}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm text-[#0A0A0A]">{c.nombre}</p>
+                        <p className="text-xs text-[#6B6B6B]">{c.email}{c.ciudad ? ` · ${c.ciudad}` : ''} · {new Date(c.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</p>
+                      </div>
+                      {c.ciudad?.toLowerCase().includes('murcia') && (
+                        <span className="text-xs bg-amber-50 text-amber-700 font-semibold px-2 py-1 rounded-full flex-shrink-0">📍 Murcia</span>
+                      )}
+                    </div>
+
+                    {/* Resumen diagnóstico */}
+                    <div className="px-4 pb-3">
+                      <div className="bg-[#F7F6F3] rounded-xl p-3 text-xs text-[#6B6B6B] space-y-1">
+                        <p><span className="font-semibold text-[#0A0A0A]">Objetivo:</span> {OBJ[c.objetivo]?.label || c.objetivo || '—'}</p>
+                        <p><span className="font-semibold text-[#0A0A0A]">Entrena:</span> {({si:'Sí',no:'No',aveces:'A veces'})[c.entrenas_ahora] || '—'} · <span className="font-semibold text-[#0A0A0A]">Material:</span> {c.material || '—'} · <span className="font-semibold text-[#0A0A0A]">Días:</span> {c.disponibilidad_dias || c.dias_semana || '—'}</p>
+                        {c.lesiones && <p><span className="font-semibold text-amber-600">⚠ Lesiones:</span> {c.lesiones}</p>}
+                        {c.que_no_funciono && <p className="italic">"{c.que_no_funciono.slice(0,120)}{c.que_no_funciono.length>120?'…':''}"</p>}
+                      </div>
+                    </div>
+
+                    {/* Sugerencia IA */}
+                    {c.sugerencia_plan ? (
+                      <div className="px-4 pb-3">
+                        <div className="rounded-xl border-2 overflow-hidden" style={{borderColor: planInfo?.color || '#FF5C00'}}>
+                          <div className="px-3 py-2.5 flex items-center gap-2" style={{background: `${planInfo?.color || '#FF5C00'}10`}}>
+                            <span className="text-lg">{planInfo?.emoji || '🤖'}</span>
+                            <div className="flex-1">
+                              <p className="text-xs font-bold text-[#0A0A0A]">IA sugiere: {planInfo?.label || c.sugerencia_plan}</p>
+                              <p className="text-xs" style={{color: planInfo?.color}}>{planInfo?.precio}</p>
+                            </div>
+                            <span className="text-xs bg-white font-bold px-2 py-1 rounded-lg" style={{color: planInfo?.color}}>IA</span>
+                          </div>
+                          {c.sugerencia_justificacion && (
+                            <div className="px-3 py-2 bg-white">
+                              <p className="text-xs text-[#444] leading-relaxed">{c.sugerencia_justificacion}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="px-4 pb-3">
+                        <div className="bg-[#F7F6F3] rounded-xl px-3 py-2.5 flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin flex-shrink-0"/>
+                          <p className="text-xs text-[#6B6B6B]">IA analizando diagnóstico…</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Selector de plan (override manual) */}
+                    <div className="px-4 pb-3">
+                      <p className="text-xs font-semibold text-[#9B9B9B] mb-2 uppercase tracking-wide">Plan a activar</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          ['nutricion','🥗 Hábitos','29€'],
+                          ['entrenamiento','💪 Entreno','35€'],
+                          ['completo','⚡ Completo','49€'],
+                        ].map(([v,l,p]) => (
+                          <button key={v} type="button"
+                            onClick={() => setCuestionarios(prev => prev.map(x => x.id === c.id ? {...x, necesidades: v} : x))}
+                            className={`py-2.5 px-2 rounded-xl border text-center transition-all ${(c.necesidades||c.sugerencia_plan)===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 hover:border-black/20'}`}>
+                            <p className={`text-xs font-bold ${(c.necesidades||c.sugerencia_plan)===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                            <p className="text-xs text-[#9B9B9B]">{p}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="px-4 pb-4 flex gap-2">
+                      <button onClick={() => descartarCuestionario(c.id)}
+                        className="border border-black/10 text-[#6B6B6B] text-sm py-2.5 px-4 rounded-xl hover:border-red-300 hover:text-red-500 transition-all">
+                        🗑
+                      </button>
+                      <button onClick={() => convertirCuestionario({...c, necesidades: c.necesidades || c.sugerencia_plan})}
+                        className="flex-1 bg-[#FF5C00] text-white text-sm font-bold py-2.5 rounded-xl hover:bg-[#e05200] transition-all">
+                        ✅ Aprobar y activar plan
+                      </button>
                     </div>
                   </div>
-                  <div className="bg-[#F5F5F0] rounded-xl p-3 mb-3 text-xs text-[#6B6B6B] space-y-1">
-                    <p>Objetivo: {OBJ[c.objetivo]?.label || c.objetivo || '—'}</p>
-                    <p>Nivel: {c.nivel||'—'} · {c.dias_semana||'—'} días/sem · {c.material||'—'}</p>
-                    {c.lesiones && <p>Lesiones: {c.lesiones}</p>}
-                  </div>
-                  <div className="mb-3">
-                    <p className="text-xs font-semibold text-[#6B6B6B] mb-2">Modalidad</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {['presencial','online'].map(t => (
-                        <button key={t} type="button"
-                          onClick={() => {
-                            const updated = cuestionarios.map(x => x.id === c.id ? { ...x, tipo: t } : x)
-                            setCuestionarios(updated)
-                          }}
-                          className={`py-2 rounded-xl text-xs font-semibold transition-all ${(c.tipo||'presencial') === t ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
-                          {t === 'presencial' ? '📍 Presencial' : '🌐 Online'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => descartarCuestionario(c.id)}
-                      className="border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 px-4 rounded-xl hover:border-red-300 hover:text-red-500 transition-all">
-                      🗑
-                    </button>
-                    <button onClick={() => convertirCuestionario(c)}
-                      className="flex-1 bg-[#FF5C00] text-white text-sm font-bold py-2.5 rounded-xl hover:bg-[#e05200] transition-all">
-                      ✅ Aprobar y generar plan{c.necesidades ? ` ${({entrenamiento:'💪',nutricion:'🥗',completo:'⚡'})[c.necesidades]||''}` : ''}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
