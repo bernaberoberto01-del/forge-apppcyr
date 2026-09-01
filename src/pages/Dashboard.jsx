@@ -144,10 +144,10 @@ export default function Dashboard({ session }) {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto space-y-5">
+      <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto space-y-4">
 
-        {/* Saludo + resumen */}
-        <div className="flex items-start justify-between">
+        {/* Cabecera */}
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-[#0A0A0A]">{saludo}, {nombre} 👋</h1>
             <p className="text-sm text-[#6B6B6B] mt-0.5 capitalize">
@@ -155,219 +155,202 @@ export default function Dashboard({ session }) {
             </p>
           </div>
           {totalPendiente > 0 && (
-            <div className="bg-[#FF5C00] text-white text-sm font-bold px-3 py-1.5 rounded-full flex-shrink-0">
+            <div className="bg-[#FF5C00] text-white text-sm font-bold px-3 py-1.5 rounded-full">
               {totalPendiente} pendiente{totalPendiente > 1 ? 's' : ''}
             </div>
           )}
         </div>
 
-        {/* ── CUESTIONARIOS PENDIENTES — máxima prioridad ── */}
-        {cuestPendientes.length > 0 && (
-          <div className="bg-[#FF5C00] rounded-2xl p-4 text-white">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">📋</span>
-                <div>
-                  <p className="font-bold text-sm">
-                    {cuestPendientes.length === 1
-                      ? '1 cliente nuevo esperando tu revisión'
-                      : `${cuestPendientes.length} clientes nuevos esperando tu revisión`}
-                  </p>
-                  <p className="text-white/70 text-xs">Revisa, aprueba y Forge genera el plan automáticamente</p>
-                </div>
+        {/* Grid principal: atención (izq) + agenda y métricas (der) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+          {/* ── COLUMNA IZQUIERDA: Todo lo que necesita tu atención ── */}
+          <div className="lg:col-span-2 space-y-4">
+
+            {/* Lista de atención priorizada */}
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
+                <p className="font-bold text-[#0A0A0A] text-sm">Atención requerida</p>
+                {totalPendiente === 0 && (
+                  <span className="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full">✓ Todo al día</span>
+                )}
               </div>
-              <button onClick={() => navigate('/clientes?tab=cuestionarios')}
-                className="bg-white text-[#FF5C00] text-xs font-bold px-4 py-2 rounded-xl flex-shrink-0 hover:bg-white/90 transition-all">
-                Revisar →
-              </button>
-            </div>
-            <div className="space-y-2">
-              {cuestPendientes.slice(0,3).map(c => {
-                const planLabel = {entrenamiento:'💪 Entrenamiento',nutricion:'🥗 Nutrición',completo:'⚡ Completo'}[c.necesidades] || '—'
-                return (
-                  <div key={c.id} className="bg-white/15 rounded-xl px-3 py-2 flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">{c.nombre}</p>
-                      <p className="text-white/70 text-xs">{planLabel} · {new Date(c.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</p>
+              <div className="divide-y divide-black/4">
+
+                {/* Clientes nuevos — máxima prioridad */}
+                {cuestPendientes.map(c => {
+                  const planLabel = {entrenamiento:'💪',nutricion:'🥗',completo:'⚡'}[c.necesidades] || '📋'
+                  return (
+                    <div key={c.id} className="flex items-center gap-3 px-5 py-3.5 bg-[#FF5C00]/4">
+                      <div className="w-8 h-8 bg-[#FF5C00] rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">{planLabel}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-[#0A0A0A]">Nuevo: {c.nombre.split(' ')[0]}</p>
+                        <p className="text-xs text-[#6B6B6B]">
+                          {({entrenamiento:'Plan entrenamiento',nutricion:'Plan nutrición',completo:'Plan completo'})[c.necesidades] || 'Plan por asignar'}
+                          {' · '}{new Date(c.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
+                        </p>
+                      </div>
+                      <button onClick={() => navigate('/clientes?tab=cuestionarios')}
+                        className="text-xs bg-[#FF5C00] text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
+                        Aprobar →
+                      </button>
                     </div>
-                    <button onClick={() => navigate('/clientes?tab=cuestionarios')}
-                      className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg font-medium transition-all">
+                  )
+                })}
+
+                {/* IA generando o con error */}
+                {clientesIAPendiente.map(c => (
+                  <div key={c.id} className={`flex items-center gap-3 px-5 py-3.5 ${c.ia_estado==='error'?'bg-red-50':''}`}>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0 ${c.ia_estado==='error'?'bg-red-500':'bg-[#6366f1]'}`}>
+                      {c.ia_estado==='error'?'⚠':'⏳'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">{c.nombre.split(' ')[0]}</p>
+                      <p className={`text-xs ${c.ia_estado==='error'?'text-red-600':'text-[#6366f1]'}`}>
+                        {c.ia_estado==='generando'?'IA generando plan…':'Error al generar — revisa manualmente'}
+                      </p>
+                    </div>
+                    {c.ia_estado==='error' && (
+                      <button onClick={() => navigate('/rutinas')}
+                        className="text-xs bg-red-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                        Generar →
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Rutinas IA por revisar */}
+                {d.rutinasIA.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="w-8 h-8 bg-[#6366f1]/10 rounded-xl flex items-center justify-center text-[#6366f1] text-sm flex-shrink-0">🤖</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">
+                        {d.rutinasIA.length} rutina{d.rutinasIA.length>1?'s':''} por revisar
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">
+                        {d.rutinasIA.slice(0,3).map(r=>r.clientes?.nombre?.split(' ')[0]).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/rutinas?filtro=borrador')}
+                      className="text-xs bg-[#6366f1] text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Revisar →
+                    </button>
+                  </div>
+                )}
+
+                {/* Mensajes sin leer */}
+                {d.mensajesNL.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="w-8 h-8 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] text-sm flex-shrink-0">✉️</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">
+                        {d.mensajesNL.length} mensaje{d.mensajesNL.length>1?'s':''} sin leer
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">
+                        {d.mensajesNL.slice(0,3).map(m=>m.clientes?.nombre?.split(' ')[0]).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/mensajes')}
+                      className="text-xs bg-[#FF5C00] text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Ver {d.mensajesNL.length} →
+                    </button>
+                  </div>
+                )}
+
+                {/* Cobros vencidos */}
+                {d.alertasPagos.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5 bg-red-50">
+                    <div className="w-8 h-8 bg-red-500 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">💳</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-red-700">
+                        {d.alertasPagos.length} cobro{d.alertasPagos.length>1?'s':''} vencido{d.alertasPagos.length>1?'s':''}
+                      </p>
+                      <p className="text-xs text-red-500 truncate">
+                        {d.alertasPagos.slice(0,3).map(c=>c.nombre.split(' ')[0]).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/pagos')}
+                      className="text-xs bg-red-500 text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Cobrar →
+                    </button>
+                  </div>
+                )}
+
+                {/* Cobros próximos */}
+                {d.alertasPagos.length === 0 && d.cobrosProximos.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700 text-sm flex-shrink-0">💳</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">
+                        {d.cobrosProximos.length} cobro{d.cobrosProximos.length>1?'s':''} esta semana
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/pagos')}
+                      className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Ver →
                     </button>
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+                )}
 
-        {/* ── ESTADO IA — generando o error ── */}
-        {clientesIAPendiente.length > 0 && (
-          <div className={`rounded-2xl p-4 ${clientesIAPendiente.some(c=>c.ia_estado==='error') ? 'bg-red-50 border border-red-100' : 'bg-[#6366f1]/8 border border-[#6366f1]/20'}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">{clientesIAPendiente.some(c=>c.ia_estado==='error') ? '⚠️' : '⏳'}</span>
-              <p className="text-sm font-bold text-[#0A0A0A]">
-                {clientesIAPendiente.some(c=>c.ia_estado==='generando') && `IA generando plan${clientesIAPendiente.filter(c=>c.ia_estado==='generando').length > 1 ? 's' : ''}…`}
-                {clientesIAPendiente.every(c=>c.ia_estado==='error') && 'Error al generar — acción requerida'}
-              </p>
-            </div>
-            <div className="space-y-1.5">
-              {clientesIAPendiente.map(c => (
-                <div key={c.id} className="flex items-center gap-3">
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.ia_estado === 'error' ? 'bg-red-100 text-red-700' : 'bg-[#6366f1]/10 text-[#6366f1]'}`}>
-                    {c.ia_estado === 'generando' ? '⏳ Generando' : '❌ Error'}
-                  </span>
-                  <p className="text-xs text-[#0A0A0A] font-medium">{c.nombre}</p>
-                  {c.ia_estado === 'error' && (
-                    <button onClick={() => navigate('/rutinas')} className="text-xs text-red-600 font-semibold ml-auto">
-                      Generar manual →
+                {/* Check-ins sin hacer */}
+                {d.clientesSinCI.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700 text-sm flex-shrink-0">📋</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">
+                        {d.clientesSinCI.length} sin check-in esta semana
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">
+                        {d.clientesSinCI.slice(0,3).map(c=>c.nombre.split(' ')[0]).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/seguimiento')}
+                      className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Ver →
                     </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                  </div>
+                )}
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            ['Clientes activos', d.activos.length, '#FF5C00', '/clientes', '👥'],
-            ['Ingresos mes',     `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos', '💶'],
-            ['Sesiones hoy',    sesionesHoy.length, '#6366f1', '/agenda', '📅'],
-            ['Adherencia 4s',   d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento', '📊'],
-          ].map(([l,v,c,ruta,ic]) => (
-            <button key={l} onClick={() => navigate(ruta)}
-              className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 text-left hover:shadow-md hover:border-[#FF5C00]/20 transition-all group">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xl">{ic}</span>
-                <span className="text-xs text-[#9B9B9B] group-hover:text-[#FF5C00]">→</span>
+                {/* Alertas extra (fatiga, etc.) */}
+                {d.alertasExtra.slice(0,2).map(a => (
+                  <div key={a.id} className={`flex items-start gap-3 px-5 py-3.5 ${a.tipo==='fatiga_alta_post_sesion'?'bg-red-50':''}`}>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 ${a.tipo==='fatiga_alta_post_sesion'?'bg-red-100 text-red-600':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                      {a.tipo==='fatiga_alta_post_sesion'?'⚠️':'🔔'}
+                    </div>
+                    <p className="text-xs text-[#444] leading-relaxed pt-1.5">{a.mensaje}</p>
+                  </div>
+                ))}
+
+                {/* Todo al día */}
+                {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && (
+                  <div className="px-5 py-8 text-center">
+                    <p className="text-3xl mb-2">✨</p>
+                    <p className="text-sm font-semibold text-[#0A0A0A]">Todo al día</p>
+                    <p className="text-xs text-[#9B9B9B] mt-1">Sin tareas pendientes</p>
+                  </div>
+                )}
               </div>
-              <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
-              <p className="text-xs text-[#6B6B6B] mt-1 leading-tight">{l}</p>
-            </button>
-          ))}
-        </div>
+            </div>
 
-        {/* Grid principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-          {/* Columna izquierda — Panel de control diario */}
-          <div className="lg:col-span-2 space-y-4">
-
-            {/* ── PANEL DE CONTROL DIARIO ── */}
+            {/* Agenda — hoy y mañana */}
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
-                <p className="font-bold text-[#0A0A0A]">Panel de control</p>
-                {totalPendiente === 0 && <span className="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full">✓ Todo al día</span>}
-              </div>
-
-              <div className="divide-y divide-black/4">
-
-                {/* Mensajes sin leer */}
-                <div className="px-5 py-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-lg">✉️</span>
-                      <div>
-                        <p className="text-sm font-semibold text-[#0A0A0A]">Mensajes sin leer</p>
-                        {d.mensajesNL.length > 0
-                          ? <p className="text-xs text-[#6B6B6B] mt-0.5">{d.mensajesNL.slice(0,2).map(m=>m.clientes?.nombre?.split(' ')[0]).join(', ')}{d.mensajesNL.length>2?` y ${d.mensajesNL.length-2} más`:''}</p>
-                          : <p className="text-xs text-emerald-600 mt-0.5">Sin mensajes nuevos</p>}
-                      </div>
-                    </div>
-                    {d.mensajesNL.length > 0
-                      ? <button onClick={()=>navigate('/mensajes')} className="text-xs bg-[#FF5C00] text-white font-semibold px-3 py-1.5 rounded-xl hover:bg-[#e05200] transition-all flex-shrink-0">
-                          Ver {d.mensajesNL.length} →
-                        </button>
-                      : <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs flex-shrink-0">✓</span>}
-                  </div>
-                </div>
-
-                {/* Check-ins sin responder */}
-                <div className="px-5 py-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-lg">📋</span>
-                      <div>
-                        <p className="text-sm font-semibold text-[#0A0A0A]">Check-ins esta semana</p>
-                        {d.clientesSinCI.length > 0
-                          ? <p className="text-xs text-amber-600 mt-0.5">{d.clientesSinCI.length} cliente{d.clientesSinCI.length>1?'s':''} sin check-in: {d.clientesSinCI.slice(0,2).map(c=>c.nombre.split(' ')[0]).join(', ')}</p>
-                          : <p className="text-xs text-emerald-600 mt-0.5">Todos los clientes han hecho check-in</p>}
-                      </div>
-                    </div>
-                    {d.clientesSinCI.length > 0
-                      ? <button onClick={()=>navigate('/seguimiento')} className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl hover:bg-amber-600 transition-all flex-shrink-0">
-                          Ver →
-                        </button>
-                      : <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs flex-shrink-0">✓</span>}
-                  </div>
-                </div>
-
-                {/* Rutinas con borrador IA */}
-                <div className="px-5 py-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-lg">🤖</span>
-                      <div>
-                        <p className="text-sm font-semibold text-[#0A0A0A]">Rutinas por revisar</p>
-                        {d.rutinasIA.length > 0
-                          ? <p className="text-xs text-[#6366f1] mt-0.5">{d.rutinasIA.length} borrador{d.rutinasIA.length>1?'es':''} de IA esperando tu revisión</p>
-                          : <p className="text-xs text-emerald-600 mt-0.5">Sin borradores pendientes</p>}
-                      </div>
-                    </div>
-                    {d.rutinasIA.length > 0
-                      ? <button onClick={()=>navigate('/rutinas?filtro=borrador')} className="text-xs bg-[#6366f1] text-white font-semibold px-3 py-1.5 rounded-xl hover:bg-[#5558e8] transition-all flex-shrink-0">
-                          Revisar →
-                        </button>
-                      : <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs flex-shrink-0">✓</span>}
-                  </div>
-                </div>
-
-                {/* Cobros */}
-                <div className="px-5 py-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <span className="text-lg">💳</span>
-                      <div>
-                        <p className="text-sm font-semibold text-[#0A0A0A]">Cobros</p>
-                        {d.alertasPagos.length > 0
-                          ? <p className="text-xs text-red-600 mt-0.5">{d.alertasPagos.length} pago{d.alertasPagos.length>1?'s':''} vencido{d.alertasPagos.length>1?'s':''}: {d.alertasPagos.slice(0,2).map(c=>c.nombre.split(' ')[0]).join(', ')}</p>
-                          : d.cobrosProximos.length > 0
-                          ? <p className="text-xs text-amber-600 mt-0.5">{d.cobrosProximos.length} cobro{d.cobrosProximos.length>1?'s':''} próximo{d.cobrosProximos.length>1?'s':''} esta semana</p>
-                          : <p className="text-xs text-emerald-600 mt-0.5">Sin cobros pendientes</p>}
-                      </div>
-                    </div>
-                    {(d.alertasPagos.length > 0 || d.cobrosProximos.length > 0)
-                      ? <button onClick={()=>navigate('/pagos')} className={`text-xs text-white font-semibold px-3 py-1.5 rounded-xl transition-all flex-shrink-0 ${d.alertasPagos.length>0?'bg-red-500 hover:bg-red-600':'bg-amber-500 hover:bg-amber-600'}`}>
-                          Ver →
-                        </button>
-                      : <span className="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs flex-shrink-0">✓</span>}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Sesiones de hoy */}
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-bold text-[#0A0A0A]">
                   {sesionesHoy.length > 0 ? `Hoy — ${sesionesHoy.length} sesión${sesionesHoy.length>1?'es':''}` : 'Agenda de hoy'}
                 </p>
-                <button onClick={()=>navigate('/agenda')} className="text-xs text-[#FF5C00] font-medium hover:underline">Ver agenda →</button>
+                <button onClick={() => navigate('/agenda')} className="text-xs text-[#FF5C00] font-medium">Ver agenda →</button>
               </div>
               {sesionesHoy.length === 0 ? (
-                <div className="text-center py-6">
+                <div className="text-center py-8">
                   <p className="text-2xl mb-2">🏖</p>
-                  <p className="text-sm text-[#9B9B9B]">Sin sesiones programadas hoy</p>
+                  <p className="text-sm text-[#9B9B9B]">Sin sesiones hoy</p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="divide-y divide-black/4">
                   {sesionesHoy.map(s => {
                     const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                     return (
-                      <div key={s.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl ${s.completada?'bg-emerald-50 border border-emerald-100':'bg-[#F5F5F0]'}`}>
+                      <div key={s.id} className={`flex items-center gap-3 px-5 py-3 ${s.completada?'bg-emerald-50':''}`}>
                         <div className="w-8 h-8 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">
                           {ini(s.clientes?.nombre)}
                         </div>
@@ -377,30 +360,24 @@ export default function Dashboard({ session }) {
                         </div>
                         {s.completada
                           ? <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium flex-shrink-0">✓</span>
-                          : <span className="text-xs text-[#9B9B9B] flex-shrink-0 font-medium">{s.hora}</span>}
+                          : <span className="text-xs text-[#9B9B9B] flex-shrink-0">{s.hora}</span>}
                       </div>
                     )
                   })}
                 </div>
               )}
-              {/* Mañana */}
               {sesionesManana.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-black/5">
+                <div className="px-5 py-3 border-t border-black/5 bg-[#F9F8F6]">
                   <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">
                     Mañana — {sesionesManana.length} sesión{sesionesManana.length>1?'es':''}
                   </p>
-                  <div className="space-y-1.5">
+                  <div className="flex gap-2 flex-wrap">
                     {sesionesManana.map(s => {
-                      const ini2 = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+                      const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                       return (
-                        <div key={s.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#F7F6F3]">
-                          <div className="w-7 h-7 bg-[#6366f1]/10 rounded-lg flex items-center justify-center text-[#6366f1] font-bold text-xs flex-shrink-0">
-                            {ini2(s.clientes?.nombre)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold text-[#0A0A0A] truncate">{s.clientes?.nombre}</p>
-                          </div>
-                          <span className="text-xs text-[#9B9B9B] flex-shrink-0">{s.hora}</span>
+                        <div key={s.id} className="flex items-center gap-2 bg-white border border-black/8 px-3 py-1.5 rounded-xl">
+                          <span className="text-xs font-bold text-[#6366f1]">{ini(s.clientes?.nombre)}</span>
+                          <span className="text-xs text-[#9B9B9B]">{s.hora}</span>
                         </div>
                       )
                     })}
@@ -410,54 +387,50 @@ export default function Dashboard({ session }) {
             </div>
           </div>
 
-          {/* Columna derecha */}
+          {/* ── COLUMNA DERECHA: Números y estado ── */}
           <div className="space-y-4">
 
-            {/* Gráfica ingresos */}
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-sm font-bold text-[#0A0A0A]">Ingresos 6 meses</p>
-                  <p className="text-xs text-[#6B6B6B] mt-0.5">{d.ingresosPorMes.reduce((s,m)=>s+m.valor,0)}€ total</p>
-                </div>
-                <button onClick={()=>navigate('/pagos')} className="text-xs text-[#FF5C00] font-medium hover:underline">Ver →</button>
+            {/* KPIs — compactos en columna */}
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  ['Clientes', d.activos.length, '#FF5C00', '/clientes'],
+                  ['Ingresos', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos'],
+                  ['Sesiones hoy', sesionesHoy.length, '#6366f1', '/agenda'],
+                  ['Adherencia', d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento'],
+                ].map(([l,v,c,ruta]) => (
+                  <button key={l} onClick={() => navigate(ruta)}
+                    className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
+                    <p className="text-lg font-bold" style={{color:c}}>{v}</p>
+                    <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Ingresos 6 meses */}
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-bold text-[#0A0A0A]">Ingresos 6 meses</p>
+                <p className="text-xs text-[#9B9B9B]">{d.ingresosPorMes.reduce((s,m)=>s+m.valor,0)}€</p>
               </div>
               <BarChart datos={d.ingresosPorMes} max={d.maxIngreso} />
             </div>
 
-            {/* Estado clientes */}
+            {/* Mix online / presencial */}
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-              <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Estado clientes</p>
-              <div className="space-y-2.5">
+              <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Clientes</p>
+              <div className="space-y-2">
                 {[
-                  ['Activos', d.activos.length, '#10b981'],
-                  ['Retención', `${d.tasaRetencion}%`, '#6366f1'],
-                  ['Online', d.activos.filter(c=>c.tipo==='online').length, '#0A0A0A'],
-                  ['Presencial', d.activos.filter(c=>c.tipo!=='online').length, '#0A0A0A'],
+                  ['Total activos', d.activos.length, '#0A0A0A'],
+                  ['Online', d.activos.filter(c=>c.tipo==='online').length, '#FF5C00'],
+                  ['Presencial', d.activos.filter(c=>c.tipo!=='online').length, '#6366f1'],
+                  ['Retención', `${d.tasaRetencion}%`, '#10b981'],
                 ].map(([l,v,c]) => (
                   <div key={l} className="flex items-center justify-between">
                     <p className="text-xs text-[#6B6B6B]">{l}</p>
                     <p className="text-sm font-bold" style={{color:c}}>{v}</p>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Accesos rápidos */}
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-              <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Accesos rápidos</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  ['Agenda', '📅', '/agenda'],
-                  ['Clientes', '👤', '/clientes'],
-                  ['Mensajes', '✉️', '/mensajes'],
-                  ['Seguimiento', '📋', '/seguimiento'],
-                ].map(([l,ic,ruta]) => (
-                  <button key={l} onClick={()=>navigate(ruta)}
-                    className="flex flex-col items-center gap-1.5 p-3 bg-[#F7F6F3] rounded-xl hover:bg-[#EEECEA] transition-all">
-                    <span className="text-xl">{ic}</span>
-                    <p className="text-xs font-medium text-[#6B6B6B] text-center">{l}</p>
-                  </button>
                 ))}
               </div>
             </div>
