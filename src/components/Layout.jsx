@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { NavLink, useLocation, Navigate } from 'react-router-dom'
+import { NavLink, useLocation, Navigate, useNavigate } from 'react-router-dom'
 
 const TODOS_MODULOS = [
   { id: 'dashboard',  path: '/dashboard',  label: 'Dashboard',  icon: '📊' },
@@ -18,6 +18,19 @@ export default function Layout({ children, session, config }) {
   const [mensajesNL, setMensajesNL] = useState(0)
   const [alertasNL, setAlertasNL] = useState(0)
   const location = useLocation()
+
+  const navigate = useNavigate()
+
+  // Al montar por primera vez en la sesión, ir siempre a dashboard
+  useEffect(() => {
+    const key = `forge_session_init_${session?.user?.id}`
+    if (!sessionStorage.getItem(key)) {
+      sessionStorage.setItem(key, '1')
+      if (location.pathname !== '/dashboard') {
+        navigate('/dashboard', { replace: true })
+      }
+    }
+  }, [session?.user?.id]) // eslint-disable-line
 
   useEffect(() => { setMobileOpen(false) }, [location.pathname])
 
