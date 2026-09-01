@@ -26,6 +26,36 @@ export default function Mensajes({ session }) {
   const [busqueda, setBusqueda] = useState('')
   const [noLeidos, setNoLeidos] = useState({})
   const [showPlantillas, setShowPlantillas] = useState(false)
+  const [generandoLink, setGenerandoLink] = useState(false)
+  const [modalPago, setModalPago] = useState(false)
+  const [tarifas, setTarifas] = useState([])
+
+  useEffect(() => {
+    if (!uid) return
+    supabase.from('tarifas').select('id,nombre,tipo,precio,stripe_price_id,modalidad,dias_semana')
+      .eq('entrenador_id', uid).eq('activa', true).not('stripe_price_id', 'is', null)
+      .then(({ data }) => setTarifas(data || []))
+  }, [uid])
+
+  async function generarLinkPago(tarifaId, tarifaNombre) {
+    if (!seleccionado) return
+    setGenerandoLink(true)
+    setModalPago(false)
+    try {
+      const { data, error } = await supabase.functions.invoke('crear-checkout', {
+        body: { cliente_id: seleccionado.id, tarifa_id: tarifaId }
+      })
+      if (error || !data?.url) throw new Error(error?.message || 'Sin URL')
+      // Insertar el link directamente en el textarea
+      const linkMsg = `Aquí tienes el enlace para formalizar tu plan:\n\n${data.url}\n\nUna vez completado el pago, activo tu plan y en menos de 24h tienes todo preparado. ¡Vamos a por ello! 💪`
+      setTexto(linkMsg)
+      await navigator.clipboard.writeText(data.url).catch(() => {})
+      setToast('✓ Link generado y añadido al mensaje')
+    } catch (e) {
+      setToast('Error al generar link: ' + e.message)
+    }
+    setGenerandoLink(false)
+  }
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
@@ -39,7 +69,7 @@ export default function Mensajes({ session }) {
   async function cargarClientes() {
     setLoading(true)
     const [{ data: cl }, { data: ms }] = await Promise.all([
-      supabase.from('clientes').select('id,nombre,tipo,estado').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
+      supabase.from('clientes').select('id,nombre,tipo,estado,plan_online,suscripcion_activa,email').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
       supabase.from('mensajes_cliente').select('cliente_id,leido_entrenador,tipo,created_at')
         .eq('entrenador_id', uid).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema')
     ])
@@ -248,6 +278,12 @@ export default function Mensajes({ session }) {
               className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all flex-shrink-0 ${showPlantillas ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
               ⚡
             </button>
+            {/* Botón link de pago */}
+            <button onClick={() => setModalPago(true)} disabled={generandoLink}
+              title="Generar link de pago"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] transition-all flex-shrink-0 disabled:opacity-40">
+              {generandoLink ? <span className="w-4 h-4 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/> : '💳'}
+            </button>
             <textarea value={texto} onChange={e => setTexto(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar() } }}
               rows={texto.split('\n').length > 2 ? 3 : 1}
@@ -270,6 +306,63 @@ export default function Mensajes({ session }) {
         </div>
       )}
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
+
+      {/* Modal selección tarifa para link de pago */}
+      {modalPago && seleccionado && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalPago(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-bold text-[#0A0A0A]">💳 Generar link de pago</h3>
+                <p className="text-xs text-[#6B6B6B] mt-0.5">Para {seleccionado.nombre.split(' ')[0]}</p>
+              </div>
+              <button onClick={() => setModalPago(false)} className="text-[#9B9B9B] text-xl leading-none">×</button>
+            </div>
+
+            {/* Online */}
+            {tarifas.filter(t => t.tipo === 'online').length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">🌐 Asesorías online</p>
+                <div className="space-y-2">
+                  {tarifas.filter(t => t.tipo === 'online').map(t => (
+                    <button key={t.id} onClick={() => generarLinkPago(t.id, t.nombre)}
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-black/10 hover:border-[#FF5C00] hover:bg-[#FF5C00]/5 transition-all text-left">
+                      <div>
+                        <p className="text-sm font-semibold text-[#0A0A0A]">{t.nombre}</p>
+                        <p className="text-xs text-[#9B9B9B]">Suscripción mensual</p>
+                      </div>
+                      <p className="text-sm font-bold text-[#FF5C00]">{t.precio}€/mes</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Presencial */}
+            {tarifas.filter(t => t.tipo !== 'online').length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">📍 Presencial</p>
+                <div className="space-y-2">
+                  {tarifas.filter(t => t.tipo !== 'online').map(t => (
+                    <button key={t.id} onClick={() => generarLinkPago(t.id, t.nombre)}
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-black/10 hover:border-[#FF5C00] hover:bg-[#FF5C00]/5 transition-all text-left">
+                      <div>
+                        <p className="text-sm font-semibold text-[#0A0A0A]">{t.nombre}</p>
+                        <p className="text-xs text-[#9B9B9B]">{t.modalidad} · {t.dias_semana}d/sem</p>
+                      </div>
+                      <p className="text-sm font-bold text-[#FF5C00]">{t.precio}€/mes</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {tarifas.length === 0 && (
+              <p className="text-sm text-[#9B9B9B] text-center py-4">No hay tarifas con Stripe configurado</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
