@@ -34,6 +34,7 @@ export default function Dashboard({ session }) {
   const [loading, setLoading] = useState(true)
   const [sesionesHoy, setSesionesHoy] = useState([])
   const [sesionesManana, setSesionesManana] = useState([])
+  const [cuestPendientes, setCuestPendientes] = useState([])
   const navigate = useNavigate()
   const uid = session.user.id
 
@@ -59,6 +60,7 @@ export default function Dashboard({ session }) {
       { data: rutinasIA },
       { data: sesHoy },
       { data: sesManana },
+      { data: cuestPendientes },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -69,6 +71,7 @@ export default function Dashboard({ session }) {
       supabase.from('rutinas').select('id,cliente_id,estado,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('estado','borrador').order('created_at',{ascending:false}).limit(10),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
+      supabase.from('cuestionarios').select('id,nombre,email,necesidades,objetivo,created_at').eq('entrenador_id', uid).eq('procesado', false).order('created_at', {ascending:false}),
     ])
 
     if (alertas?.length > 0) {
@@ -78,6 +81,7 @@ export default function Dashboard({ session }) {
 
     setSesionesHoy(sesHoy || [])
     setSesionesManana(sesManana || [])
+    setCuestPendientes(cuestPendientes || [])
     const activos = (clientes||[]).filter(c => c.estado === 'activo')
     const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
     const hace4s = new Date(Date.now()-28*864e5).toISOString().split('T')[0]
@@ -152,6 +156,46 @@ export default function Dashboard({ session }) {
             </div>
           )}
         </div>
+
+        {/* ── CUESTIONARIOS PENDIENTES — máxima prioridad ── */}
+        {cuestPendientes.length > 0 && (
+          <div className="bg-[#FF5C00] rounded-2xl p-4 text-white">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📋</span>
+                <div>
+                  <p className="font-bold text-sm">
+                    {cuestPendientes.length === 1
+                      ? '1 cliente nuevo esperando tu revisión'
+                      : `${cuestPendientes.length} clientes nuevos esperando tu revisión`}
+                  </p>
+                  <p className="text-white/70 text-xs">Revisa, aprueba y Forge genera el plan automáticamente</p>
+                </div>
+              </div>
+              <button onClick={() => navigate('/clientes?tab=cuestionarios')}
+                className="bg-white text-[#FF5C00] text-xs font-bold px-4 py-2 rounded-xl flex-shrink-0 hover:bg-white/90 transition-all">
+                Revisar →
+              </button>
+            </div>
+            <div className="space-y-2">
+              {cuestPendientes.slice(0,3).map(c => {
+                const planLabel = {entrenamiento:'💪 Entrenamiento',nutricion:'🥗 Nutrición',completo:'⚡ Completo'}[c.necesidades] || '—'
+                return (
+                  <div key={c.id} className="bg-white/15 rounded-xl px-3 py-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">{c.nombre}</p>
+                      <p className="text-white/70 text-xs">{planLabel} · {new Date(c.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</p>
+                    </div>
+                    <button onClick={() => navigate('/clientes?tab=cuestionarios')}
+                      className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded-lg font-medium transition-all">
+                      Ver →
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

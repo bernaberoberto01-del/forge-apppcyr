@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TIPOS_ENTRENAMIENTO, TIPOS_MAP } from '../utils/tiposEntrenamiento'
 import GraficasCliente from '../components/GraficasCliente'
 import { supabase } from '../lib/supabase'
@@ -44,6 +45,7 @@ const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATA
 const PER_PAGE = 20
 
 export default function Clientes({ session }) {
+  const navigate = useNavigate()
   const [clientes, setClientes] = useState([])
   const [grupos, setGrupos] = useState([])
   const [tarifas,     setTarifas]     = useState([])
@@ -220,8 +222,10 @@ export default function Clientes({ session }) {
         c.como_nos_conocio ? `Conocido por: ${c.como_nos_conocio}` : null,
       ].filter(Boolean).join(' · ') || null,
       precio_mensual: null,
+      plan_online: c.necesidades || null,
+      plan_activo: !!c.necesidades,
       tipo_entrenamiento: c.tipo_entrenamiento || normObj,
-      nutricion_activa: false,
+      nutricion_activa: c.necesidades === 'nutricion' || c.necesidades === 'completo',
       horas_semana: c.dias_semana || 3,
     }).select().single()
     if (error) { showToast('Error: ' + error.message, 'error'); return }
@@ -239,7 +243,9 @@ export default function Clientes({ session }) {
         supabase.functions.invoke('procesar-plan-online', {
           body: { cliente_id: cliente.id }
         }).catch(() => {})
-        showToast(`✓ ${c.nombre.split(' ')[0]} activado · Plan ${cliente.plan_online} generándose con IA...`)
+        const planLabel = {entrenamiento:'entrenamiento 💪', nutricion:'nutrición 🥗', completo:'completo ⚡'}[cliente.plan_online] || cliente.plan_online
+        showToast(`✓ ${c.nombre.split(' ')[0]} activado — IA generando plan de ${planLabel}`)
+        setTimeout(() => navigate('/rutinas?filtro=borrador'), 2500)
       } else {
         if (cliente.email) {
           supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: cliente.id } }).catch(() => {})
@@ -628,12 +634,12 @@ export default function Clientes({ session }) {
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => descartarCuestionario(c.id)}
-                      className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:border-red-300 hover:text-red-500 transition-all">
-                      🗑 Descartar
+                      className="border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 px-4 rounded-xl hover:border-red-300 hover:text-red-500 transition-all">
+                      🗑
                     </button>
                     <button onClick={() => convertirCuestionario(c)}
-                      className="flex-1 bg-[#111] text-white text-sm font-semibold py-2.5 rounded-xl">
-                      ✅ Convertir
+                      className="flex-1 bg-[#FF5C00] text-white text-sm font-bold py-2.5 rounded-xl hover:bg-[#e05200] transition-all">
+                      ✅ Aprobar y generar plan{c.necesidades ? ` ${({entrenamiento:'💪',nutricion:'🥗',completo:'⚡'})[c.necesidades]||''}` : ''}
                     </button>
                   </div>
                 </div>
