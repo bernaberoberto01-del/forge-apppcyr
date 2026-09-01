@@ -187,33 +187,31 @@ export default function Pagos({ session }) {
     await cargar()
   }
 
-  async function generarEnlaceStripe(clienteId, importe, concepto) {
+  async function generarEnlaceStripe(clienteId, importe, concepto, tarifaId) {
     setGenerandoStripe(clienteId)
     try {
       const { data, error } = await supabase.functions.invoke('crear-checkout', {
-        body: { cliente_id: clienteId, importe: Number(importe), concepto }
+        body: { cliente_id: clienteId, tarifa_id: tarifaId, importe: Number(importe), concepto }
       })
       if (error) throw error
       if (data.url) {
         await navigator.clipboard.writeText(data.url)
-        setToast('Enlace Stripe copiado')
-      } else setToast('Error al generar enlace Stripe')
+        setToast('✓ Enlace de pago copiado — envíaselo al cliente')
+      } else setToast('Error al generar enlace')
     } catch { setToast('Error al generar enlace') }
     setGenerandoStripe(null)
   }
 
-  async function activarSuscripcion(clienteId, importe, nombrePlan) {
+  async function activarSuscripcion(clienteId, importe, nombrePlan, tarifaId) {
     setGenerandoStripe(clienteId)
     try {
-      const { data, error } = await supabase.functions.invoke('gestionar-suscripcion', {
-        body: { accion: 'crear_suscripcion', cliente_id: clienteId, importe: Number(importe), nombre_plan: nombrePlan, frecuencia: 'mensual' }
+      const { data, error } = await supabase.functions.invoke('crear-checkout', {
+        body: { cliente_id: clienteId, tarifa_id: tarifaId, importe: Number(importe), concepto: nombrePlan }
       })
       if (error) throw error
-      if (data?.checkout_url) {
-        // Abrir en nueva pestaña y también copiar al portapapeles
-        window.open(data.checkout_url, '_blank')
-        await navigator.clipboard.writeText(data.checkout_url).catch(() => {})
-        setToast('✓ Enlace de suscripción abierto — el cliente debe introducir su tarjeta')
+      if (data?.url) {
+        await navigator.clipboard.writeText(data.url).catch(() => {})
+        setToast('✓ Enlace de suscripción copiado — envíaselo al cliente')
       } else setToast('Error al crear suscripción: ' + (data?.error || 'desconocido'))
     } catch (e) { setToast('Error: ' + e.message) }
     setGenerandoStripe(null)
@@ -374,7 +372,7 @@ export default function Pagos({ session }) {
                 )}
                 <div className="flex gap-2 flex-wrap">
                   {!p.clientes?.suscripcion_activa ? (
-                    <button onClick={() => activarSuscripcion(p.cliente_id, p.importe, p.concepto)}
+                    <button onClick={() => activarSuscripcion(p.cliente_id, p.importe, p.concepto, p.tarifa_id)}
                       disabled={generandoStripe===p.cliente_id}
                       className="flex-1 bg-[#6366f1] text-white text-xs font-semibold py-2 px-3 rounded-lg hover:bg-[#5558e8] disabled:opacity-40 transition-all">
                       {generandoStripe===p.cliente_id ? '⏳ Creando...' : '🔄 Activar cobro automático'}
@@ -388,7 +386,7 @@ export default function Pagos({ session }) {
                   {!p.clientes?.suscripcion_activa && (
                     <button onClick={() => marcarCobrado(p)} className="bg-emerald-500 text-white text-xs font-semibold py-2 px-3 rounded-lg">✓ Manual</button>
                   )}
-                  <button onClick={() => generarEnlaceStripe(p.cliente_id, p.importe, p.concepto)} disabled={generandoStripe===p.cliente_id}
+                  <button onClick={() => generarEnlaceStripe(p.cliente_id, p.importe, p.concepto, p.tarifa_id)} disabled={generandoStripe===p.cliente_id}
                     className="border border-[#6B6B6B]/20 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40"
                     title="Pago único (sin suscripción)">
                     {generandoStripe===p.cliente_id?'⏳':'💳'}
