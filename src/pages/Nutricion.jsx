@@ -44,7 +44,7 @@ export default function Nutricion({ session }) {
 
   async function cargar() {
     const [{ data: cl }, { data: pl }, { data: cu }] = await Promise.all([
-      supabase.from('clientes').select('id,nombre,tipo,nivel,peso_actual,peso_objetivo,objetivo,nutricion_activa').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
+      supabase.from('clientes').select('id,nombre,tipo,nivel,peso_actual,peso_objetivo,objetivo,nutricion_activa,plan_online').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
       supabase.from('planes_nutricion').select('*, clientes(nombre)').eq('entrenador_id', uid).order('created_at', { ascending: false }),
       supabase.from('cuestionarios_nutricion').select('cliente_id, created_at').eq('entrenador_id', uid)
     ])
@@ -90,7 +90,13 @@ export default function Nutricion({ session }) {
     await cargar()
   }
 
-  const clientesConNutricion = clientes.filter(c => c.nutricion_activa)
+  // Para presenciales: nutricion_activa (toggle manual)
+  // Para online: se deriva de plan_online (nutricion o completo)
+  const tieneNutricion = c => c.tipo === 'online'
+    ? (c.plan_online === 'nutricion' || c.plan_online === 'completo')
+    : c.nutricion_activa
+
+  const clientesConNutricion = clientes.filter(tieneNutricion)
   const clientesSinPlan = clientesConNutricion.filter(c => !planes.find(p => p.cliente_id === c.id && p.estado !== 'archivado'))
   const planesActivos = planes.filter(p => p.estado !== 'archivado')
 
@@ -302,17 +308,26 @@ export default function Nutricion({ session }) {
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
             <p className="text-sm font-bold text-[#0A0A0A] mb-3">Nutrición por cliente</p>
             <div className="space-y-2.5">
-              {clientes.map(c => (
+              {clientes.map(c => {
+                const activo = tieneNutricion(c)
+                const esOnline = c.tipo === 'online'
+                return (
                 <div key={c.id} className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                    style={{background: c.nutricion_activa ? '#FF5C00' : '#C0C0C0'}}>{ini(c.nombre)}</div>
+                    style={{background: activo ? '#FF5C00' : '#C0C0C0'}}>{ini(c.nombre)}</div>
                   <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre.split(' ')[0]}</p>
-                  <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
-                    className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${c.nutricion_activa ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
-                    <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${c.nutricion_activa ? 'left-5' : 'left-0.5'}`} />
-                  </button>
+                  {esOnline
+                    ? <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${activo ? 'bg-[#FF5C00]/10 text-[#FF5C00]' : 'bg-black/5 text-[#9B9B9B]'}`}>
+                        {activo ? (c.plan_online === 'completo' ? '⚡ Completo' : '🥗 Online') : 'Sin plan'}
+                      </span>
+                    : <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
+                        className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                        <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                      </button>
+                  }
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
@@ -341,16 +356,26 @@ export default function Nutricion({ session }) {
         <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 mb-4">
           <p className="text-sm font-bold text-[#0A0A0A] mb-3">Activar nutrición por cliente</p>
           <div className="space-y-2 max-h-48 overflow-y-auto">
-            {clientes.map(c => (
+            {clientes.map(c => {
+              const activo = tieneNutricion(c)
+              const esOnline = c.tipo === 'online'
+              return (
               <div key={c.id} className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 bg-[#FF5C00]">{ini(c.nombre)}</div>
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                  style={{background: activo ? '#FF5C00' : '#C0C0C0'}}>{ini(c.nombre)}</div>
                 <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre}</p>
-                <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
-                  className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${c.nutricion_activa ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${c.nutricion_activa ? 'left-5' : 'left-0.5'}`} />
-                </button>
+                {esOnline
+                  ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${activo ? 'bg-[#FF5C00]/10 text-[#FF5C00]' : 'bg-black/5 text-[#9B9B9B]'}`}>
+                      {activo ? '🟠 Online' : 'Sin plan'}
+                    </span>
+                  : <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
+                      className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                      <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                    </button>
+                }
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

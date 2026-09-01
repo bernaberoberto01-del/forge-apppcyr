@@ -35,6 +35,7 @@ export default function Dashboard({ session }) {
   const [sesionesHoy, setSesionesHoy] = useState([])
   const [sesionesManana, setSesionesManana] = useState([])
   const [cuestPendientes, setCuestPendientes] = useState([])
+  const [clientesIAPendiente, setClientesIAPendiente] = useState([])
   const navigate = useNavigate()
   const uid = session.user.id
 
@@ -61,6 +62,7 @@ export default function Dashboard({ session }) {
       { data: sesHoy },
       { data: sesManana },
       { data: cuestPendientes },
+      { data: clientesIAPendiente },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -72,6 +74,7 @@ export default function Dashboard({ session }) {
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
       supabase.from('cuestionarios').select('id,nombre,email,necesidades,objetivo,created_at').eq('entrenador_id', uid).eq('procesado', false).order('created_at', {ascending:false}),
+      supabase.from('clientes').select('id,nombre,plan_online,ia_estado').eq('entrenador_id', uid).eq('tipo','online').in('ia_estado',['generando','error']).eq('estado','activo'),
     ])
 
     if (alertas?.length > 0) {
@@ -82,6 +85,7 @@ export default function Dashboard({ session }) {
     setSesionesHoy(sesHoy || [])
     setSesionesManana(sesManana || [])
     setCuestPendientes(cuestPendientes || [])
+    setClientesIAPendiente(clientesIAPendiente || [])
     const activos = (clientes||[]).filter(c => c.estado === 'activo')
     const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
     const hace4s = new Date(Date.now()-28*864e5).toISOString().split('T')[0]
@@ -193,6 +197,34 @@ export default function Dashboard({ session }) {
                   </div>
                 )
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ── ESTADO IA — generando o error ── */}
+        {clientesIAPendiente.length > 0 && (
+          <div className={`rounded-2xl p-4 ${clientesIAPendiente.some(c=>c.ia_estado==='error') ? 'bg-red-50 border border-red-100' : 'bg-[#6366f1]/8 border border-[#6366f1]/20'}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">{clientesIAPendiente.some(c=>c.ia_estado==='error') ? '⚠️' : '⏳'}</span>
+              <p className="text-sm font-bold text-[#0A0A0A]">
+                {clientesIAPendiente.some(c=>c.ia_estado==='generando') && `IA generando plan${clientesIAPendiente.filter(c=>c.ia_estado==='generando').length > 1 ? 's' : ''}…`}
+                {clientesIAPendiente.every(c=>c.ia_estado==='error') && 'Error al generar — acción requerida'}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              {clientesIAPendiente.map(c => (
+                <div key={c.id} className="flex items-center gap-3">
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${c.ia_estado === 'error' ? 'bg-red-100 text-red-700' : 'bg-[#6366f1]/10 text-[#6366f1]'}`}>
+                    {c.ia_estado === 'generando' ? '⏳ Generando' : '❌ Error'}
+                  </span>
+                  <p className="text-xs text-[#0A0A0A] font-medium">{c.nombre}</p>
+                  {c.ia_estado === 'error' && (
+                    <button onClick={() => navigate('/rutinas')} className="text-xs text-red-600 font-semibold ml-auto">
+                      Generar manual →
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
