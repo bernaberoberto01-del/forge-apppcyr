@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useOnboardingPortal } from '../hooks/useOnboardingPortal'
 import GraficasCliente from '../components/GraficasCliente'
 
 const OBJ = { perdida_grasa:'Pérdida de grasa', ganancia_muscular:'Ganancia muscular', tonificacion:'Tonificación', fuerza:'Fuerza', rendimiento:'Rendimiento', cambio_rapido_30dias:'Cambio 30 días' }
@@ -70,6 +71,7 @@ export default function PortalCliente() {
   const [searchParams] = useSearchParams()
   const [clienteSession, setClienteSession] = useState(undefined)
   const [clienteId, setClienteId] = useState(null)
+  const { marcarVisto, esNuevo, TUTORIALES_CLIENTE } = useOnboardingPortal(clienteId)
   const [cliente, setCliente] = useState(null)
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -744,6 +746,19 @@ export default function PortalCliente() {
             {/* ══ RUTINA ══════════════════════════════════════════════════════ */}
             {tab==='rutina'&&(
               <>
+                {/* Tutorial primer acceso */}
+                {esNuevo('rutina') && rutina && (
+                  <div className="bg-gradient-to-r from-[#FF5C00]/10 to-transparent border border-[#FF5C00]/20 rounded-2xl p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-xl flex-shrink-0">💪</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-[#0A0A0A]">{TUTORIALES_CLIENTE.rutina.titulo}</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{TUTORIALES_CLIENTE.rutina.desc}</p>
+                      </div>
+                      <button onClick={() => marcarVisto('rutina')} className="text-[#9B9B9B] text-sm flex-shrink-0">×</button>
+                    </div>
+                  </div>
+                )}
                 {!rutina?(
                   <div className="bg-white rounded-2xl border border-black/6 p-12 text-center">
                     <p className="text-5xl mb-4">💪</p>
@@ -829,6 +844,16 @@ export default function PortalCliente() {
             {/* ══ PROGRESO ════════════════════════════════════════════════════ */}
             {tab==='progreso'&&(
               <>
+                {esNuevo('progreso') && (
+                  <div className="bg-gradient-to-r from-[#FF5C00]/10 to-transparent border border-[#FF5C00]/20 rounded-2xl p-4 mb-4 flex items-start gap-3">
+                    <span className="text-xl flex-shrink-0">📈</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-[#0A0A0A]">{TUTORIALES_CLIENTE.progreso.titulo}</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{TUTORIALES_CLIENTE.progreso.desc}</p>
+                    </div>
+                    <button onClick={() => marcarVisto('progreso')} className="text-[#9B9B9B] text-sm">×</button>
+                  </div>
+                )}
                 {/* Subtabs */}
                 <div className="flex gap-2 bg-white rounded-2xl border border-black/6 p-1.5">
                   {[['peso','⚖️ Peso'],['medidas','📏 Medidas'],['marcas','🏆 Marcas'],['fotos','📸 Fotos']].map(([id,label])=>(
@@ -1131,6 +1156,16 @@ export default function PortalCliente() {
             {/* ══ MENSAJES ════════════════════════════════════════════════════ */}
             {tab==='mensajes'&&(
               <div className="flex flex-col" style={{minHeight:'60vh'}}>
+                {esNuevo('mensajes') && (
+                  <div className="bg-gradient-to-r from-[#FF5C00]/10 to-transparent border border-[#FF5C00]/20 rounded-2xl p-4 mb-4 flex items-start gap-3">
+                    <span className="text-xl flex-shrink-0">💬</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-[#0A0A0A]">{TUTORIALES_CLIENTE.mensajes.titulo}</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{TUTORIALES_CLIENTE.mensajes.desc}</p>
+                    </div>
+                    <button onClick={() => marcarVisto('mensajes')} className="text-[#9B9B9B] text-sm">×</button>
+                  </div>
+                )}
                 <div className="flex-1 space-y-3 mb-4">
                   {mensajes.filter(m=>m.tipo!=='sistema').length===0?(
                     <div className="bg-white rounded-2xl border border-black/6 p-12 text-center">
