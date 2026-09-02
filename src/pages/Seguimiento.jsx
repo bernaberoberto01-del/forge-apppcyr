@@ -69,7 +69,7 @@ export default function Seguimiento({ session }) {
       supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(200),
       supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(300),
-      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'borrador').order('created_at', { ascending: false }),
+      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'por revisar').order('created_at', { ascending: false }),
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
@@ -169,9 +169,9 @@ export default function Seguimiento({ session }) {
           <p className="text-sm text-[#6B6B6B] mt-0.5">Check-ins semanales · Detecta fatiga y abandono antes de que ocurran</p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
-          <button onClick={reenviarCheckin} disabled={enviando} title="Reenviar check-in a todos los clientes"
-            className="border border-black/10 text-[#6B6B6B] text-sm font-medium px-3 py-2 rounded-xl hover:bg-[#F5F5F0] transition-all disabled:opacity-40">
-            {enviando ? '⏳' : '📨'}
+          <button onClick={reenviarCheckin} disabled={enviando}
+            className="border border-black/10 text-[#6B6B6B] text-sm font-medium px-3 py-2 rounded-xl hover:bg-[#F5F5F0] transition-all disabled:opacity-40 flex items-center gap-1.5">
+            {enviando ? '⏳' : '📨'} {enviando ? 'Enviando...' : 'Enviar check-in'}
           </button>
           <button onClick={() => setModal(true)}
             className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95">
@@ -287,9 +287,9 @@ export default function Seguimiento({ session }) {
                     if (data?.mensaje_sugerido) setMensajeSugerido({ texto: data.mensaje_sugerido, borrador_id: data.borrador_id })
                     else { setToast('Error al analizar'); setTimeout(() => setToast(''), 3000) }
                     setAnalizando(false)
-                  }} className="text-xs font-semibold px-2 py-1 rounded-lg text-white flex items-center gap-1"
+                  }} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5"
                     style={{background:'#6366f1'}}>
-                    ✨ IA
+                    {analizando ? '⏳' : '✨'} Generar respuesta con IA
                   </button>
                 </div>
               </div>

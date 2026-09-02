@@ -125,7 +125,7 @@ export default function Rutinas({ session }) {
       alert('Error al generar la evaluación')
     } else {
       const tipo = data.es_inicial ? 'inicial' : `nº ${data.numero}`
-      alert(`✓ Evaluación ${tipo} generada — revísala en la lista de borradores y publícala`)
+      alert(`✓ Evaluación ${tipo} generada — revísala en la lista y publícala`)
       cargar()
     }
     setGenerando(null)
@@ -157,7 +157,7 @@ export default function Rutinas({ session }) {
         body: { cliente_id: clienteId, forzar: true }
       })
       if (data?.ok || data?.generadas > 0) {
-        setToast('🤖 Análisis completado — borrador listo para revisar')
+        setToast('🤖 Análisis completado — plan listo para revisar y publicar')
         await cargar()
       } else if (data?.sin_datos) {
         setToast('Sin check-ins suficientes para analizar — necesita al menos 2')
@@ -177,7 +177,7 @@ export default function Rutinas({ session }) {
     const borrador = { nombre: manualNombre, descripcion: manualDescripcion, semanas: 4, dias: manualDias.filter(d => d.ejercicios.some(e => e.nombre)) }
     await supabase.from('rutinas').insert({ cliente_id: manualClienteId, entrenador_id: uid, nombre: manualNombre, objetivo: cliente?.objetivo, semanas: 4, dias_semana: borrador.dias.length, borrador, estado: 'borrador' })
     setModalManual(false); setManualClienteId(''); setManualNombre(''); setManualDescripcion(''); setManualDias([initDia(1), initDia(2), initDia(3)]); setGuardandoManual(false)
-    setToast('Rutina creada como borrador'); await cargar()
+    setToast('Rutina creada — revísala y publícala pendiente'); await cargar()
   }
 
   async function publicar(rutina) {
@@ -404,7 +404,7 @@ export default function Rutinas({ session }) {
         <>
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mb-4">
-            {[['Total',stats.total,'#FF5C00'],['Borradores',stats.borradores,'#f59e0b'],['Publicadas',stats.publicadas,'#10b981']].map(([l,v,c])=>(
+            {[['Total',stats.total,'#FF5C00'],['Por revisar',stats.borradores,'#f59e0b'],['Publicadas',stats.publicadas,'#10b981']].map(([l,v,c])=>(
               <div key={l} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-center">
                 <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
                 <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
@@ -445,15 +445,16 @@ export default function Rutinas({ session }) {
                     <div className="flex gap-1.5 flex-shrink-0">
                       <button onClick={() => generarRutina(c.id)} disabled={generando === c.id}
                         className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
-                        {generando === c.id ? '⏳' : '✨ IA'}
+                        {generando === c.id ? '⏳ Generando...' : '✨ Generar con IA'}
                       </button>
                       <button onClick={() => generarEvaluacion(c.id)} disabled={generando === c.id}
-                        title="Generar sesión de evaluación"
                         className="border border-[#6366f1] text-[#6366f1] text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-50">
-                        📋
+                        📋 Evaluación inicial
                       </button>
                       <button onClick={() => { setManualClienteId(c.id); setModalManual(true) }}
-                        className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-3 py-1.5 rounded-lg hover:border-[#111]">✍️</button>
+                        className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-3 py-1.5 rounded-lg hover:border-[#111]">
+                        ✍️ Crear manual
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -478,7 +479,7 @@ export default function Rutinas({ session }) {
                     <p className="text-xs text-[#6B6B6B] truncate">{r.borrador?.nombre || r.contenido?.nombre || 'Rutina'} · {r.dias_semana} días/sem</p>
                   </div>
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${r.estado==='publicada'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
-                    {r.estado==='publicada'?'✓ Publicada':'Borrador'}
+                    {r.estado==='publicada'?'✓ Publicada':'Por revisar'}
                   </span>
                 </div>
                 <div className="flex gap-2 mt-3">
@@ -488,7 +489,7 @@ export default function Rutinas({ session }) {
                     <button onClick={() => analizarYActualizar(r.cliente_id)} disabled={generando === r.cliente_id}
                       title="Analizar check-ins y generar propuesta de actualización"
                       className="border border-[#6366f1]/30 text-[#6366f1] text-xs py-2 px-3 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-40 flex items-center gap-1.5 flex-shrink-0">
-                      {generando === r.cliente_id ? '⏳' : '🤖'} <span className="hidden sm:inline">Actualizar</span>
+                      {generando === r.cliente_id ? '⏳' : '🤖 Actualizar con IA'
                     </button>
                   )}
                   <button onClick={() => setMsgModal(r.cliente_id)} className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-lg hover:bg-[#F5F5F0]">✉️</button>
@@ -610,7 +611,7 @@ export default function Rutinas({ session }) {
                 <div className="bg-[#6366f1]/8 border border-[#6366f1]/20 rounded-xl px-4 py-3">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm">🤖</span>
-                    <p className="text-xs font-bold text-[#6366f1]">Borrador generado por IA — pendiente de revisión</p>
+                    <p className="text-xs font-bold text-[#6366f1]">✨ Generado con IA — revisa y publica</p>
                   </div>
                   {detalle.borrador?.descripcion && (
                     <p className="text-xs text-[#6366f1]/80 leading-relaxed">{detalle.borrador.descripcion}</p>

@@ -321,8 +321,31 @@ export default function Dashboard({ session }) {
                   </div>
                 ))}
 
-                {/* Todo al día */}
-                {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && (
+                {/* Onboarding — sistema vacío, usuario nuevo */}
+                {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && d.activos.length === 0 && (
+                  <div className="px-5 py-6 space-y-3">
+                    <p className="text-sm font-bold text-[#0A0A0A]">👋 Bienvenido a Forge</p>
+                    <p className="text-xs text-[#6B6B6B]">Empieza en 3 pasos:</p>
+                    {[
+                      ['1', 'Configura tu perfil', 'Tu nombre, logo y colores', '/configuracion', '#FF5C00'],
+                      ['2', 'Añade tu primer cliente', 'Presencial u online', '/clientes', '#6366f1'],
+                      ['3', 'Genera su rutina con IA', 'En menos de 30 segundos', '/rutinas', '#10b981'],
+                    ].map(([n, t, s, ruta, c]) => (
+                      <button key={n} onClick={() => navigate(ruta)}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-[#F7F6F3] hover:bg-[#F0EEE8] transition-all text-left">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{background:c}}>{n}</div>
+                        <div>
+                          <p className="text-sm font-semibold text-[#0A0A0A]">{t}</p>
+                          <p className="text-xs text-[#9B9B9B]">{s}</p>
+                        </div>
+                        <span className="ml-auto text-xs text-[#9B9B9B]">→</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Todo al día — sin clientes nuevos ni pendientes */}
+                {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && d.activos.length > 0 && (
                   <div className="px-5 py-8 text-center">
                     <p className="text-3xl mb-2">✨</p>
                     <p className="text-sm font-semibold text-[#0A0A0A]">Todo al día</p>

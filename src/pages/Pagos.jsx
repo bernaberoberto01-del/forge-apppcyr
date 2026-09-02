@@ -323,12 +323,14 @@ export default function Pagos({ session }) {
         <div className="lg:grid lg:grid-cols-3 lg:gap-5">
         <div className="lg:col-span-2 space-y-2">
           {planes.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
+            <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-8 text-center">
               <p className="text-4xl mb-3">💳</p>
-              <p className="font-semibold text-[#0A0A0A]">Sin planes de cobro</p>
-              <p className="text-sm text-[#6B6B6B] mt-1">Crea un plan para cada cliente y el sistema te avisará cuándo cobrar</p>
-              <button onClick={() => setModalPlan(true)} className="mt-4 bg-[#FF5C00] text-white text-sm font-semibold px-5 py-2.5 rounded-xl">
-                ↻ Crear plan
+              <p className="font-bold text-[#0A0A0A]">Sin planes de cobro activos</p>
+              <p className="text-sm text-[#6B6B6B] mt-2 mb-5 leading-relaxed max-w-xs mx-auto">
+                Crea un plan por cada cliente con el importe y la fecha de cobro. Forge te avisará cuando toque cobrar.
+              </p>
+              <button onClick={() => setModalPlan(true)} className="bg-[#FF5C00] text-white text-sm font-bold px-6 py-3 rounded-xl">
+                + Crear primer plan de cobro
               </button>
             </div>
           ) : planes.map(p => {
@@ -387,13 +389,12 @@ export default function Pagos({ session }) {
                     <button onClick={() => marcarCobrado(p)} className="bg-emerald-500 text-white text-xs font-semibold py-2 px-3 rounded-lg">✓ Manual</button>
                   )}
                   <button onClick={() => generarEnlaceStripe(p.cliente_id, p.importe, p.concepto, p.tarifa_id)} disabled={generandoStripe===p.cliente_id}
-                    className="border border-[#6B6B6B]/20 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40"
-                    title="Pago único (sin suscripción)">
-                    {generandoStripe===p.cliente_id?'⏳':'💳'}
+                    className="border border-[#6B6B6B]/20 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40 flex items-center gap-1">
+                    {generandoStripe===p.cliente_id?'⏳':'💳'} Link pago
                   </button>
                   <button onClick={() => { setEditandoPlan(p); setFormPlan({ cliente_id:p.cliente_id, importe:String(p.importe), concepto:p.concepto, frecuencia:p.frecuencia, dia_cobro:p.dia_cobro }); setModalPlan(true) }}
-                    className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0]">✏️</button>
-                  <button onClick={() => eliminarPlan(p.id)} className="border border-red-100 text-red-400 text-xs py-2 px-2.5 rounded-lg hover:bg-red-50">×</button>
+                    className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0]">✏️ Editar</button>
+                  <button onClick={() => eliminarPlan(p.id)} className="border border-red-100 text-red-400 text-xs py-2 px-2.5 rounded-lg hover:bg-red-50">× Eliminar</button>
                 </div>
               </div>
             )
