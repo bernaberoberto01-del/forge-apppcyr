@@ -283,6 +283,12 @@ export default function Agenda({ session }) {
     // Cargar clases
     const { data: cls } = await supabase.from('clases_con_plazas').eq('entrenador_id', uid).eq('cancelada', false).gte('fecha', hace60).order('fecha').order('hora')
     setClases(cls || [])
+    // DEBUG TEMPORAL
+    console.log('[Agenda] gs (grupos):', gs?.length, JSON.stringify(gs?.map(g=>({n:g.nombre,d:g.dias_semana,m:g.grupo_clientes?.length}))))
+    console.log('[Agenda] excGrupo:', excGrupo?.length)
+    console.log('[Agenda] excInd:', excInd?.length)
+    console.log('[Agenda] miem:', miem?.length)
+    // FIN DEBUG
     // Construir mapa grupo_id → info completa
     const gm = {}
     ;(gs || []).forEach(g => {
