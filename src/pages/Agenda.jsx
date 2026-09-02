@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import TutorialBanner from '../components/TutorialBanner'
+import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { useCentro } from '../hooks/useCentro.jsx'
@@ -629,6 +631,12 @@ export default function Agenda({ session }) {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+            {/* Tutorial primer acceso */}
+      <TutorialBanner
+        tutorial={TUTORIALES.agenda}
+        completado={completado('primera_sesion') || (sesiones.length > 0 || grupos.length > 0)}
+        onCompletar={() => completar('primera_sesion')}
+      />
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
 

@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
+import TutorialBanner from '../components/TutorialBanner'
+import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 
@@ -247,6 +249,12 @@ export default function Pagos({ session }) {
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
+            {/* Tutorial primer acceso */}
+      <TutorialBanner
+        tutorial={TUTORIALES.pagos}
+        completado={completado('primer_pago') || (planes.length > 0)}
+        onCompletar={() => completar('primer_pago')}
+      />
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
 

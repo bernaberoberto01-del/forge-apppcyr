@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { NavLink, useLocation, Navigate, useNavigate } from 'react-router-dom'
+import TutorialBanner, { BarraProgreso } from './TutorialBanner'
+import { useOnboarding } from '../hooks/useOnboarding'
 
 const TODOS_MODULOS = [
   { id: 'dashboard',  path: '/dashboard',  label: 'Dashboard',  icon: '📊' },
@@ -18,7 +19,7 @@ export default function Layout({ children, session, config }) {
   const [mensajesNL, setMensajesNL] = useState(0)
   const [alertasNL, setAlertasNL] = useState(0)
   const location = useLocation()
-
+  const { porcentaje } = useOnboarding(session?.user?.id)
   const navigate = useNavigate()
 
   // Al montar por primera vez en la sesión, ir siempre a dashboard
@@ -105,6 +106,9 @@ export default function Layout({ children, session, config }) {
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {modulosActivos.map(item => <NavItem key={item.id} item={item} />)}
       </nav>
+
+      {/* Progreso onboarding */}
+      <BarraProgreso porcentaje={porcentaje} onClick={() => navigate('/dashboard')} />
 
       {/* Footer */}
       <div className="px-3 py-3 border-t border-white/8 space-y-1">

@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import TutorialBanner from '../components/TutorialBanner'
+import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { TIPOS_ENTRENAMIENTO, TIPOS_MAP } from '../utils/tiposEntrenamiento'
 import GraficasCliente from '../components/GraficasCliente'
 import { supabase } from '../lib/supabase'

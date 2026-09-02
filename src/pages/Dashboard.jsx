@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import TutorialBanner, { BarraProgreso } from '../components/TutorialBanner'
+import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
@@ -38,6 +40,7 @@ export default function Dashboard({ session }) {
   const [clientesIAPendiente, setClientesIAPendiente] = useState([])
   const navigate = useNavigate()
   const uid = session.user.id
+  const { completar, completado, porcentaje } = useOnboarding(uid)
 
   useEffect(() => { cargar() }, [uid])
 
@@ -145,6 +148,14 @@ export default function Dashboard({ session }) {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto space-y-4">
+
+        {/* Tutorial primer acceso */}
+        <TutorialBanner
+          tutorial={TUTORIALES.dashboard}
+          completado={completado('primer_cliente') || d.activos.length > 0}
+          onCompletar={() => {}}
+          onAccion={() => navigate('/configuracion')}
+        />
 
         {/* Cabecera */}
         <div className="flex items-center justify-between">

@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
+import TutorialBanner from '../components/TutorialBanner'
+import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 

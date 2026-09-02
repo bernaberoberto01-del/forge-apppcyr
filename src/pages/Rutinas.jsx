@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
+import TutorialBanner from '../components/TutorialBanner'
+import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useCentro } from '../hooks/useCentro.jsx'
@@ -96,6 +98,7 @@ export default function Rutinas({ session }) {
   const [modalNuevoEj, setModalNuevoEj] = useState(false)
   const [formEj, setFormEj] = useState({ nombre:'', sinonimos:'', grupo_muscular:'Pecho', grupo_secundario:'', patron:'empuje_horizontal', nivel:'principiante', modalidad:'fuerza', consejos_tecnica:'', youtube_url:'' })
   const uid = session.user.id
+  const { completar, completado } = useOnboarding(uid)
   const { centro } = useCentro() || {}
 
   useEffect(() => { cargar() }, [uid])
@@ -353,7 +356,14 @@ export default function Rutinas({ session }) {
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
-      {toast && <Toast msg={toast} onClose={() => setToast('')} />}
+
+      {/* Tutorial */}
+      <TutorialBanner
+        tutorial={TUTORIALES.rutinas}
+        completado={completado('primera_rutina') || rutinas.length > 0}
+        onCompletar={() => completar('primera_rutina')}
+      />
+
       {videoActivo && <VideoModal ejercicio={videoActivo} onClose={() => setVideoActivo(null)} />}
 
       <div>
