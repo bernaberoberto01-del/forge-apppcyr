@@ -215,7 +215,7 @@ export default function Agenda({ session }) {
   const finSemana = formatFecha(diasSemana[6])
   const inicioMes = formatFecha(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
-  useEffect(() => { cargar() }, [uid, semanaBase])
+  useEffect(() => { if (uid) cargar() }, [uid, semanaBase, centro])
 
   // Auto-completar sesiones reales cuando pasa la hora de finalización
   useEffect(() => {
@@ -265,7 +265,9 @@ export default function Agenda({ session }) {
       centro
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
-      supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
+      centro
+        ? supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('centro_id', centro.id).eq('activo', true)
+        : supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
       supabase.from('miembros_centro').select('user_id,nombre,rol,color,email').eq('activo', true),
       supabase.from('sesiones_excepcion').select('*').eq('entrenador_id', uid),
       supabase.from('sesiones_excepcion_individual').select('*').eq('entrenador_id', uid),
