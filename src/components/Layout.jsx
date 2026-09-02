@@ -108,8 +108,8 @@ export default function Layout({ children, session, config }) {
         {modulosActivos.map(item => <NavItem key={item.id} item={item} />)}
       </nav>
 
-      {/* Progreso onboarding */}
-      <BarraProgreso porcentaje={porcentaje} onClick={() => navigate('/dashboard')} />
+      {/* Progreso onboarding — solo hasta que el usuario lo descarte */}
+      {porcentaje < 100 && <BarraProgreso porcentaje={porcentaje} onClick={() => navigate('/dashboard')} />}
 
       {/* Footer */}
       <div className="px-3 py-3 border-t border-white/8 space-y-1">

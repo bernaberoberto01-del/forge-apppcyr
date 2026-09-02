@@ -266,9 +266,9 @@ export default function Agenda({ session }) {
       centroId
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centroId).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
-      centroId
-        ? supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('centro_id', centroId).eq('activo', true)
-        : supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
+      // Grupos: buscar SIEMPRE por entrenador_id (funciona sin centro)
+      // Y también por centro_id si hay centro — combinar para no perder ninguno
+      supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
       supabase.from('miembros_centro').select('user_id,nombre,rol,color,email').eq('activo', true),
       supabase.from('sesiones_excepcion').select('*').eq('entrenador_id', uid),
       supabase.from('sesiones_excepcion_individual').select('*').eq('entrenador_id', uid),
@@ -286,10 +286,8 @@ export default function Agenda({ session }) {
       .gte('fecha', hace60).order('fecha').order('hora')
     setClases(cls || [])
     // DEBUG — query directa para ver el error real
-    const debugQuery = centroId
-      ? await supabase.from('grupos').select('id,nombre').eq('centro_id', centroId).eq('activo', true)
-      : await supabase.from('grupos').select('id,nombre').eq('entrenador_id', uid).eq('activo', true)
-    setDebugInfo(`centroId=${centroId||'null'} | grupos=${debugQuery.data?.length||0} | err=${debugQuery.error?.message||'ok'}`)
+    const debugQuery = await supabase.from('grupos').select('id,nombre').eq('entrenador_id', uid).eq('activo', true)
+    setDebugInfo(`uid=${uid?.slice(0,8)} | cId=${centroId?.slice(0,8)||'null'} | g=${debugQuery.data?.length||0} | err=${debugQuery.error?.message||'ok'}`)
     // Construir mapa grupo_id → info completa
     const gm = {}
     ;(gs || []).forEach(g => {
