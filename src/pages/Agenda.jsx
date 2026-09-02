@@ -457,7 +457,7 @@ export default function Agenda({ session }) {
     })
 
     return resultado.sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora))
-  }, [sesiones, recurrentes, grupos, excepcionesGrupo, excepcionesInd, diasSemana, clases])
+  }, [sesiones, recurrentes, grupos, gruposMap, excepcionesGrupo, excepcionesInd, diasSemana, clases])
 
   async function guardarSesion() {
     if (!form.cliente_id) return
