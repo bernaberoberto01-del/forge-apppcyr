@@ -185,6 +185,7 @@ export default function Agenda({ session }) {
   const { centro, miembros, esAdmin } = useCentro() || {}
   const timelineRef = useRef()
   const uid = session.user.id
+  const { completar, completado } = useOnboarding(uid)
   const [pxH, setPxH] = useState(PIXELS_POR_HORA)
 
   useEffect(() => {

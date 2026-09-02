@@ -20,6 +20,8 @@ const avatarColor = n => AVATARES[(n||'').charCodeAt(0) % AVATARES.length]
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 
 export default function Mensajes({ session }) {
+  const uid = session.user.id
+  const { completar, completado } = useOnboarding(uid)
   const [clientes, setClientes] = useState([])
   const [seleccionado, setSeleccionado] = useState(null)
   const [mensajes, setMensajes] = useState([])
@@ -62,7 +64,6 @@ export default function Mensajes({ session }) {
   const [toast, setToast] = useState('')
   const [loading, setLoading] = useState(true)
   const endRef = useRef()
-  const uid = session.user.id
 
   useEffect(() => { cargarClientes() }, [uid])
   useEffect(() => { if (seleccionado) cargarMensajes(seleccionado.id) }, [seleccionado])

@@ -36,6 +36,7 @@ export default function Seguimiento({ session }) {
   const [loading, setLoading] = useState(false)
   const [filtroCliente, setFiltroCliente] = useState('todos')
   const uid = session.user.id
+  const { completar, completado } = useOnboarding(uid)
   const [tabPrincipal, setTabPrincipal] = useState('checkins') // checkins | sesiones | mensual
   const [lanzandoMensual, setLanzandoMensual] = useState(false)
   const [borradores, setBorradores] = useState([])

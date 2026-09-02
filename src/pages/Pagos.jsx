@@ -42,6 +42,7 @@ export default function Pagos({ session }) {
   const [loading, setLoading] = useState(false)
   const [generandoStripe, setGenerandoStripe] = useState(null)
   const uid = session.user.id
+  const { completar, completado } = useOnboarding(uid)
 
   function generarRecibo(pago) {
     const html = `<!DOCTYPE html>
