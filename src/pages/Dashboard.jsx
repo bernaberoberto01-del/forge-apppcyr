@@ -66,6 +66,7 @@ export default function Dashboard({ session }) {
       { data: sesManana },
       { data: cuestPendientes },
       { data: clientesIAPendiente },
+      { data: cfg },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -78,6 +79,7 @@ export default function Dashboard({ session }) {
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
       supabase.from('cuestionarios').select('id,nombre,email,necesidades,objetivo,created_at').eq('entrenador_id', uid).eq('procesado', false).order('created_at', {ascending:false}),
       supabase.from('clientes').select('id,nombre,plan_online,ia_estado').eq('entrenador_id', uid).eq('tipo','online').in('ia_estado',['generando','error']).eq('estado','activo'),
+      supabase.from('configuracion').select('nombre_entrenador').eq('entrenador_id', uid).maybeSingle(),
     ])
 
     if (alertas?.length > 0) {
@@ -123,7 +125,8 @@ export default function Dashboard({ session }) {
       activos, ingresosMes, adherenciaMedia, ingresosPorMes, maxIngreso,
       alertasPagos, cobrosProximos, clientesSinCI, checkinsNuevos,
       mensajesNL: mensajesNL||[], rutinasIA: rutinasIA||[],
-      alertasExtra: alertas||[], tasaRetencion, totalClientes
+      alertasExtra: alertas||[], tasaRetencion, totalClientes,
+      nombreEntrenador: cfg?.nombre_entrenador?.split(' ')[0] || null
     })
     setLoading(false)
     } catch (e) {
@@ -134,7 +137,7 @@ export default function Dashboard({ session }) {
 
   const hora = new Date().getHours()
   const saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches'
-  const nombre = config?.nombre_entrenador?.split(' ')[0] || session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || 'Roberto'
+  const nombre = datos?.nombreEntrenador || session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || 'Roberto'
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
