@@ -254,7 +254,7 @@ export default function Agenda({ session }) {
 
   async function cargar() {
     const hace60 = formatFecha(new Date(Date.now() - 60*864e5))
-    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: miem }, { data: excGrupo }, { data: excInd }] = await Promise.all([
+    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: excGrupo }, { data: excInd }, { data: miem }] = await Promise.all([
       centro
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').or(`entrenador_id.eq.${uid},grupo_id.not.is.null`).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
@@ -266,11 +266,8 @@ export default function Agenda({ session }) {
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
       supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
-      // Cargar miembros del centro directamente — no depender del timing de useCentro
       supabase.from('miembros_centro').select('user_id,nombre,rol,color,email').eq('activo', true),
-      // Excepciones de grupos
       supabase.from('sesiones_excepcion').select('*').eq('entrenador_id', uid),
-      // Excepciones individuales
       supabase.from('sesiones_excepcion_individual').select('*').eq('entrenador_id', uid),
     ])
     setSesiones(se || [])
@@ -280,15 +277,11 @@ export default function Agenda({ session }) {
     setExcepcionesGrupo(excGrupo || [])
     setExcepcionesInd(excInd || [])
     setMiembrosAgenda(miem || [])
-    // Cargar clases
-    const { data: cls } = await supabase.from('clases_con_plazas').eq('entrenador_id', uid).eq('cancelada', false).gte('fecha', hace60).order('fecha').order('hora')
+    // Clases (separado — vista clases_con_plazas)
+    const { data: cls } = await supabase.from('clases_con_plazas')
+      .eq('entrenador_id', uid).eq('cancelada', false)
+      .gte('fecha', hace60).order('fecha').order('hora')
     setClases(cls || [])
-    // DEBUG TEMPORAL
-    console.log('[Agenda] gs (grupos):', gs?.length, JSON.stringify(gs?.map(g=>({n:g.nombre,d:g.dias_semana,m:g.grupo_clientes?.length}))))
-    console.log('[Agenda] excGrupo:', excGrupo?.length)
-    console.log('[Agenda] excInd:', excInd?.length)
-    console.log('[Agenda] miem:', miem?.length)
-    // FIN DEBUG
     // Construir mapa grupo_id → info completa
     const gm = {}
     ;(gs || []).forEach(g => {
@@ -299,6 +292,7 @@ export default function Agenda({ session }) {
     setGrupos(gs || [])
     setRefreshKey(k => k + 1)
   }
+
 
   // Generar sesiones virtuales de recurrentes y grupos para la semana actual
   const sesionesConRecurrentes = useMemo(() => {
