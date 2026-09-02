@@ -280,12 +280,14 @@ export default function Agenda({ session }) {
     setExcepcionesGrupo(excGrupo || [])
     setExcepcionesInd(excInd || [])
     setMiembrosAgenda(miem || [])
-    // Cargar clases (separado — vista clases_con_plazas)
-    const { data: cls } = await supabase.from('clases_con_plazas')
-      .eq('entrenador_id', uid).eq('cancelada', false)
-      .gte('fecha', hace60).order('fecha').order('hora')
-    setClases(cls || [])
-    // DEBUG — query directa para ver el error real
+    // Cargar clases — en try propio para no abortar el resto si falla
+    try {
+      const { data: cls } = await supabase.from('clases_con_plazas')
+        .select('*').eq('entrenador_id', uid).eq('cancelada', false)
+        .gte('fecha', hace60).order('fecha').order('hora')
+      setClases(cls || [])
+    } catch { setClases([]) }
+    // DEBUG
     const debugQuery = await supabase.from('grupos').select('id,nombre').eq('entrenador_id', uid).eq('activo', true)
     setDebugInfo(`uid=${uid?.slice(0,8)} | cId=${centroId?.slice(0,8)||'null'} | g=${debugQuery.data?.length||0} | err=${debugQuery.error?.message||'ok'}`)
     // Construir mapa grupo_id → info completa
