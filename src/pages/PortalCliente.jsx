@@ -272,6 +272,7 @@ export default function PortalCliente() {
   const TABS=[
     {id:'inicio',label:'Inicio',icon:'⊞'},
     ...(puedeVerRutina ? [{id:'rutina',label:'Rutina',icon:'💪'}] : []),
+    {id:'clases',label:'Clases',icon:'👥'},
     {id:'progreso',label:'Progreso',icon:'📈'},
     ...(puedeMensajes ? [{id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos}] : []),
     ...(puedeVerNutricion && (planNutricion || tieneCuestNutricion) ? [{id:'nutricion',label:'Nutrición',icon:'🥗'}] : []),
@@ -1318,6 +1319,15 @@ export default function PortalCliente() {
               </>
             )}
 
+            {/* ══ CLASES ═══════════════════════════════════════════════════════ */}
+            {tab==='clases'&&(
+              <ClasesCliente
+                clienteId={clienteId}
+                entrenadorId={cliente?.entrenador_id}
+                color={color}
+              />
+            )}
+
             {/* ══ PAGOS ═══════════════════════════════════════════════════════ */}
             {tab==='pagos'&&(
               <PagosCliente cliente={cliente} pagos={pagos} color={color} session={session}/>
@@ -1719,6 +1729,171 @@ function PagosCliente({ cliente, pagos, color, session }) {
           <p className="text-xs text-[#9B9B9B] mt-1">Recibirás un enlace para guardar tu tarjeta.</p>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Componente Clases del cliente ───────────────────────────────────────────
+function ClasesCliente({ clienteId, entrenadorId, color }) {
+  const [clases, setClases] = useState([])
+  const [reservas, setReservas] = useState(new Set())
+  const [cargando, setCargando] = useState(true)
+  const [reservando, setReservando] = useState(null)
+  const [toast, setToast] = useState('')
+
+  useEffect(() => {
+    if (!entrenadorId || !clienteId) return
+    cargar()
+  }, [entrenadorId, clienteId])
+
+  async function cargar() {
+    setCargando(true)
+    const hoy = new Date().toISOString().split('T')[0]
+    const en30 = new Date(Date.now() + 30*864e5).toISOString().split('T')[0]
+
+    const [{ data: cls }, { data: res }] = await Promise.all([
+      supabase.from('clases_con_plazas')
+        .eq('entrenador_id', entrenadorId)
+        .eq('cancelada', false)
+        .gte('fecha', hoy)
+        .lte('fecha', en30)
+        .order('fecha').order('hora'),
+      supabase.from('reservas_clase')
+        .select('clase_id')
+        .eq('cliente_id', clienteId)
+        .eq('estado', 'confirmada'),
+    ])
+    setClases(cls || [])
+    setReservas(new Set((res || []).map(r => r.clase_id)))
+    setCargando(false)
+  }
+
+  async function reservar(claseId) {
+    setReservando(claseId)
+    const { error } = await supabase.from('reservas_clase').insert({
+      clase_id: claseId, cliente_id: clienteId, entrenador_id: entrenadorId, estado: 'confirmada'
+    })
+    if (!error) {
+      setReservas(prev => new Set([...prev, claseId]))
+      setToast('✓ Plaza reservada')
+    } else {
+      setToast('Error al reservar')
+    }
+    setReservando(null)
+    setTimeout(() => setToast(''), 3000)
+    await cargar()
+  }
+
+  async function cancelar(claseId) {
+    setReservando(claseId)
+    await supabase.from('reservas_clase')
+      .update({ estado: 'cancelada' })
+      .eq('clase_id', claseId)
+      .eq('cliente_id', clienteId)
+    setReservas(prev => { const n = new Set(prev); n.delete(claseId); return n })
+    setToast('Reserva cancelada')
+    setTimeout(() => setToast(''), 3000)
+    setReservando(null)
+    await cargar()
+  }
+
+  // Agrupar por semana
+  const clasesPorDia = clases.reduce((acc, c) => {
+    const fecha = c.fecha
+    if (!acc[fecha]) acc[fecha] = []
+    acc[fecha].push(c)
+    return acc
+  }, {})
+
+  const TIPO_ICON = { pilates:'🧘', yoga:'🌿', crossfit:'⚡', funcional:'💪', grupo:'👥', otra:'📋' }
+
+  if (cargando) return (
+    <div className="flex items-center justify-center h-40">
+      <div className="w-7 h-7 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+    </div>
+  )
+
+  return (
+    <div className="space-y-4">
+      {toast && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-xl">
+          {toast}
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl border border-black/6 p-4">
+        <p className="text-sm font-bold text-[#0A0A0A] mb-1">Clases disponibles 👥</p>
+        <p className="text-xs text-[#9B9B9B]">Próximos 30 días · Pulsa para reservar tu plaza</p>
+      </div>
+
+      {Object.keys(clasesPorDia).length === 0 ? (
+        <div className="bg-white rounded-2xl border border-black/6 p-10 text-center">
+          <p className="text-4xl mb-3">📅</p>
+          <p className="font-semibold text-[#0A0A0A]">Sin clases próximas</p>
+          <p className="text-sm text-[#9B9B9B] mt-1">Tu entrenador publicará las clases disponibles aquí</p>
+        </div>
+      ) : Object.entries(clasesPorDia).map(([fecha, cls]) => {
+        const d = new Date(fecha + 'T12:00')
+        const hoy = new Date().toISOString().split('T')[0]
+        const manana = new Date(Date.now()+864e5).toISOString().split('T')[0]
+        const label = fecha === hoy ? 'Hoy' : fecha === manana ? 'Mañana'
+          : d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })
+
+        return (
+          <div key={fecha}>
+            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2 capitalize">{label}</p>
+            <div className="space-y-2">
+              {cls.map(c => {
+                const yaReservada = reservas.has(c.id)
+                const llena = c.plazas_libres <= 0 && !yaReservada
+                const listaEspera = c.plazas_libres <= 0 && !yaReservada
+
+                return (
+                  <div key={c.id} className={`bg-white rounded-2xl border overflow-hidden ${yaReservada ? 'border-emerald-200' : 'border-black/6'}`}>
+                    <div className="flex items-center">
+                      {/* Franja de color */}
+                      <div className="w-1 self-stretch rounded-l-2xl flex-shrink-0" style={{background: c.color || color}}/>
+                      <div className="flex-1 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-base">{TIPO_ICON[c.tipo] || '👥'}</span>
+                              <p className="text-sm font-bold text-[#0A0A0A] truncate">{c.nombre}</p>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-[#9B9B9B]">
+                              <span>{c.hora?.slice(0,5)}</span>
+                              <span>{c.duracion_minutos} min</span>
+                              <span className={`font-semibold ${c.plazas_libres <= 2 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {yaReservada ? '✓ Reservada' : llena ? 'Completa' : `${c.plazas_libres} plaza${c.plazas_libres !== 1 ? 's' : ''}`}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex-shrink-0">
+                            {yaReservada ? (
+                              <button onClick={() => cancelar(c.id)} disabled={reservando === c.id}
+                                className="text-xs border border-red-200 text-red-500 px-3 py-2 rounded-xl hover:bg-red-50 transition-all disabled:opacity-40">
+                                {reservando === c.id ? '...' : 'Cancelar'}
+                              </button>
+                            ) : llena ? (
+                              <span className="text-xs bg-[#F5F5F0] text-[#9B9B9B] px-3 py-2 rounded-xl font-medium">Llena</span>
+                            ) : (
+                              <button onClick={() => reservar(c.id)} disabled={reservando === c.id}
+                                className="text-xs font-bold px-4 py-2 rounded-xl text-white transition-all disabled:opacity-40 active:scale-95"
+                                style={{background: color}}>
+                                {reservando === c.id ? '...' : 'Reservar'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

@@ -169,7 +169,9 @@ export default function Agenda({ session }) {
   const [editando, setEditando] = useState(false)
   const [moverForm, setMoverForm] = useState(null)
   const [entrenadorSel, setEntrenadorSel] = useState(null)
-  const [editGrupoModal, setEditGrupoModal] = useState(null) // grupo a editar
+  const [editGrupoModal, setEditGrupoModal] = useState(null)
+  const [modalClase, setModalClase] = useState(false)
+  const [clases, setClases] = useState([]) // grupo a editar
   const [refreshKey, setRefreshKey] = useState(0) // entrenador seleccionado para la sesión
   const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
@@ -277,6 +279,9 @@ export default function Agenda({ session }) {
     setExcepcionesGrupo(excGrupo || [])
     setExcepcionesInd(excInd || [])
     setMiembrosAgenda(miem || [])
+    // Cargar clases
+    const { data: cls } = await supabase.from('clases_con_plazas').eq('entrenador_id', uid).eq('cancelada', false).gte('fecha', hace60).order('fecha').order('hora')
+    setClases(cls || [])
     // Construir mapa grupo_id → info completa
     const gm = {}
     ;(gs || []).forEach(g => {
@@ -434,8 +439,24 @@ export default function Agenda({ session }) {
       })
     })
 
+    // Añadir clases al timeline
+    clases.forEach(cl => {
+      resultado.push({
+        id: `clase_${cl.id}`,
+        _esClase: true,
+        _claseData: cl,
+        fecha: cl.fecha,
+        hora: cl.hora?.slice(0,5),
+        duracion_minutos: cl.duracion_minutos,
+        cliente_id: null,
+        clientes: { nombre: cl.nombre },
+        completada: false,
+        tipo: 'clase',
+      })
+    })
+
     return resultado.sort((a,b) => (a.fecha+a.hora).localeCompare(b.fecha+b.hora))
-  }, [sesiones, recurrentes, grupos, excepcionesGrupo, excepcionesInd, diasSemana])
+  }, [sesiones, recurrentes, grupos, excepcionesGrupo, excepcionesInd, diasSemana, clases])
 
   async function guardarSesion() {
     if (!form.cliente_id) return
@@ -694,6 +715,10 @@ export default function Agenda({ session }) {
           </button>
           <button onClick={() => { setEditandoRecId(null); setModalRecurrente(true) }}
             className="border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-[#FF5C00]/5">↻ Nueva regla</button>
+          <button onClick={() => setModalClase(true)}
+            className="border border-emerald-300 text-emerald-700 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-emerald-50">
+            👥 Nueva clase
+          </button>
         </div>
         <button onClick={() => { setDiaClick(hoy); setModal(true) }}
           className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg">+ Sesión</button>
@@ -1463,6 +1488,14 @@ export default function Agenda({ session }) {
           onGuardado={() => { setEditGrupoModal(null); setSesionDetalle(null); cargar() }}
         />
       )}
+
+      {modalClase && (
+        <ModalNuevaClase
+          uid={uid}
+          onClose={() => setModalClase(false)}
+          onGuardada={() => { setModalClase(false); cargar() }}
+        />
+      )}
     </div>
   )
 }
@@ -1573,6 +1606,144 @@ function EditarGrupoModal({ grupo, onClose, onGuardado }) {
             <button onClick={guardar} disabled={!form.nombre.trim() || form.dias_semana.length === 0 || guardando}
               className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-[#e05200] transition-all">
               {guardando ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Modal crear clase ────────────────────────────────────────────────────────
+function ModalNuevaClase({ uid, onClose, onGuardada }) {
+  const [form, setForm] = useState({
+    nombre: '', tipo: 'grupo', descripcion: '',
+    fecha: new Date().toISOString().split('T')[0],
+    hora: '09:00', duracion_minutos: 60,
+    plazas_max: 10, es_recurrente: false,
+    dias_semana: [], color: '#10b981',
+  })
+  const [guardando, setGuardando] = useState(false)
+  const set = (k, v) => setForm(f => ({...f, [k]: v}))
+
+  const TIPOS = [
+    ['grupo','👥 Grupo libre'],['pilates','🧘 Pilates'],
+    ['yoga','🌿 Yoga'],['crossfit','⚡ CrossFit'],
+    ['funcional','💪 Funcional'],['otra','📋 Otra'],
+  ]
+  const DIAS = ['','L','M','X','J','V','S','D']
+  const COLORES = ['#10b981','#6366f1','#FF5C00','#f59e0b','#ec4899','#14b8a6']
+
+  function toggleDia(d) {
+    set('dias_semana', form.dias_semana.includes(d)
+      ? form.dias_semana.filter(x => x !== d)
+      : [...form.dias_semana, d].sort())
+  }
+
+  async function guardar() {
+    if (!form.nombre.trim()) return
+    setGuardando(true)
+    const payload = {
+      entrenador_id: uid,
+      nombre: form.nombre.trim(),
+      tipo: form.tipo,
+      descripcion: form.descripcion || null,
+      fecha: form.fecha,
+      hora: form.hora,
+      duracion_minutos: Number(form.duracion_minutos),
+      plazas_max: Number(form.plazas_max),
+      es_recurrente: form.es_recurrente,
+      dias_semana: form.es_recurrente ? form.dias_semana : null,
+      color: form.color,
+    }
+    await supabase.from('clases').insert(payload)
+    setGuardando(false)
+    onGuardada()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-black/5">
+          <h3 className="font-bold text-[#0A0A0A]">👥 Nueva clase</h3>
+          <button onClick={onClose} className="text-[#9B9B9B] text-xl leading-none">×</button>
+        </div>
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre de la clase *</label>
+            <input value={form.nombre} onChange={e => set('nombre', e.target.value)}
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+              placeholder="Ej: Pilates Matinal, Funcional 7am..."/>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Tipo</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {TIPOS.map(([v,l]) => (
+                <button key={v} type="button" onClick={() => set('tipo', v)}
+                  className={`py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center ${form.tipo===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Fecha</label>
+              <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)}
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Hora</label>
+              <input type="time" value={form.hora} onChange={e => set('hora', e.target.value)}
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Duración (min)</label>
+              <input type="number" value={form.duracion_minutos} onChange={e => set('duracion_minutos', e.target.value)}
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Plazas máx</label>
+              <input type="number" value={form.plazas_max} onChange={e => set('plazas_max', e.target.value)}
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Color en agenda</label>
+            <div className="flex gap-2">
+              {COLORES.map(c => (
+                <button key={c} type="button" onClick={() => set('color', c)}
+                  className={`w-8 h-8 rounded-full transition-all ${form.color===c?'ring-2 ring-offset-2 ring-black/30 scale-110':''}`}
+                  style={{background:c}}/>
+              ))}
+            </div>
+          </div>
+          <div>
+            <button type="button" onClick={() => set('es_recurrente', !form.es_recurrente)}
+              className="flex items-center gap-2 text-sm font-medium text-[#0A0A0A]">
+              <div className={`w-10 h-5 rounded-full transition-all relative ${form.es_recurrente?'bg-[#FF5C00]':'bg-black/20'}`}>
+                <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all shadow ${form.es_recurrente?'left-5':'left-0.5'}`}/>
+              </div>
+              Clase recurrente semanal
+            </button>
+            {form.es_recurrente && (
+              <div className="flex gap-1.5 mt-3">
+                {[1,2,3,4,5,6,7].map(d => (
+                  <button key={d} type="button" onClick={() => toggleDia(d)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${form.dias_semana.includes(d)?'bg-[#0A0A0A] text-white border-[#0A0A0A]':'border-black/10 text-[#6B6B6B]'}`}>
+                    {DIAS[d]}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl">Cancelar</button>
+            <button onClick={guardar} disabled={!form.nombre.trim() || guardando}
+              className="flex-1 bg-emerald-600 text-white text-sm font-bold py-2.5 rounded-xl disabled:opacity-40 hover:bg-emerald-700 transition-all">
+              {guardando ? 'Guardando...' : 'Crear clase'}
             </button>
           </div>
         </div>
