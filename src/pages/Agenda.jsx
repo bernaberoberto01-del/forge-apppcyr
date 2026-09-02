@@ -720,6 +720,10 @@ export default function Agenda({ session }) {
             className="border border-emerald-300 text-emerald-700 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-emerald-50">
             👥 Nueva clase
           </button>
+          {/* DEBUG TEMPORAL — mostrar grupos cargados */}
+          <span className="text-xs text-[#9B9B9B] px-2">
+            Grupos: {grupos.length} | G-clientes: {grupos.reduce((s,g)=>s+(g.grupo_clientes?.filter(m=>m.activo)?.length||0),0)}
+          </span>
         </div>
         <button onClick={() => { setDiaClick(hoy); setModal(true) }}
           className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg">+ Sesión</button>
