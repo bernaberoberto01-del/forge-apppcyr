@@ -215,7 +215,7 @@ export default function Agenda({ session }) {
   const finSemana = formatFecha(diasSemana[6])
   const inicioMes = formatFecha(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
 
-  useEffect(() => { if (uid) cargar() }, [uid, semanaBase, centro])
+  useEffect(() => { if (uid) cargar(centro?.id) }, [uid, semanaBase, centro?.id])
 
   // Auto-completar sesiones reales cuando pasa la hora de finalización
   useEffect(() => {
@@ -237,7 +237,7 @@ export default function Agenda({ session }) {
         await supabase.from('sesiones')
           .update({ completada: true })
           .in('id', paraCompletar.map(s => s.id))
-        await cargar()
+        await cargar(centro?.id)
       }
     }
     autoCompletar()
@@ -252,21 +252,21 @@ export default function Agenda({ session }) {
     }
   }, [vista])
 
-  async function cargar() {
+  async function cargar(centroId) {
     const hace60 = formatFecha(new Date(Date.now() - 60*864e5))
     const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: excGrupo }, { data: excInd }, { data: miem }] = await Promise.all([
-      centro
-        ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centro.id).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
+      centroId
+        ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centroId).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').or(`entrenador_id.eq.${uid},grupo_id.not.is.null`).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
-      centro
-        ? supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('centro_id', centro.id).eq('estado','activo')
+      centroId
+        ? supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('centro_id', centroId).eq('estado','activo')
         : supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('entrenador_id', uid).eq('estado','activo'),
       supabase.from('horas_extra').select('*').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha', { ascending: false }),
-      centro
-        ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centro.id).eq('activa', true)
+      centroId
+        ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centroId).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
-      centro
-        ? supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('centro_id', centro.id).eq('activo', true)
+      centroId
+        ? supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('centro_id', centroId).eq('activo', true)
         : supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
       supabase.from('miembros_centro').select('user_id,nombre,rol,color,email').eq('activo', true),
       supabase.from('sesiones_excepcion').select('*').eq('entrenador_id', uid),
@@ -476,7 +476,7 @@ export default function Agenda({ session }) {
     else setToast({ msg: 'Sesión añadida' })
     setModal(false)
     setForm({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'' })
-    await cargar()
+    await cargar(centro?.id)
     setLoading(false)
   }
 
@@ -499,7 +499,7 @@ export default function Agenda({ session }) {
     setModalRecurrente(false)
     setEditandoRecId(null)
     setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: formatFecha(new Date()), fecha_fin:'', notas:'', entrenador_id:'' })
-    await cargar()
+    await cargar(centro?.id)
     setLoading(false)
   }
 
@@ -526,7 +526,7 @@ export default function Agenda({ session }) {
     setEditando(false)
     setSesionDetalle(null)
     setToast({ msg: 'Sesión actualizada' })
-    await cargar()
+    await cargar(centro?.id)
     setLoading(false)
   }
 
@@ -559,7 +559,7 @@ export default function Agenda({ session }) {
     }
 
     setToast({ msg: clienteIds.length > 1 ? `✓ Sesión completada para ${clienteIds.length} miembros` : 'Sesión confirmada ✓' })
-    setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
+    setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar(centro?.id)
   }
 
   async function moverSesionVirtual(sesion, nuevaFecha, nuevaHora) {
@@ -593,31 +593,31 @@ export default function Agenda({ session }) {
 
     const label = new Date(nuevaFecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
     setToast({ msg: `Sesión movida al ${label} a las ${nuevaHora}` })
-    setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar()
+    setSesionDetalle(null); setMoverForm(null); setEntrenadorSel(null); await cargar(centro?.id)
   }
 
   async function toggleCompletada(id, completada) {
     await supabase.from('sesiones').update({ completada: !completada }).eq('id', id)
-    await cargar()
+    await cargar(centro?.id)
   }
 
   async function eliminarSesion(id) {
     if (!confirm('¿Eliminar esta sesión?')) return
     await supabase.from('sesiones').delete().eq('id', id)
     setSesionDetalle(null)
-    await cargar()
+    await cargar(centro?.id)
   }
 
   async function pausarRecurrente(id, activa) {
     await supabase.from('sesiones_recurrentes').update({ activa: !activa }).eq('id', id)
     setToast({ msg: activa ? 'Regla pausada' : 'Regla activada' })
-    await cargar()
+    await cargar(centro?.id)
   }
 
   async function eliminarRecurrente(id) {
     if (!confirm('¿Eliminar esta regla recurrente? No afecta a las sesiones ya registradas.')) return
     await supabase.from('sesiones_recurrentes').delete().eq('id', id)
-    await cargar()
+    await cargar(centro?.id)
   }
 
   async function guardarExtra() {
@@ -627,7 +627,7 @@ export default function Agenda({ session }) {
     setToast({ msg: 'Horas extra registradas' })
     setModalExtra(false)
     setFormExtra({ fecha: formatFecha(new Date()), concepto:'', horas:'1', tipo:'desplazamiento' })
-    await cargar()
+    await cargar(centro?.id)
     setLoading(false)
   }
 
@@ -1141,7 +1141,7 @@ export default function Agenda({ session }) {
                               e.stopPropagation()
                               setEntrenadorSel(m.user_id)
                               await supabase.from('sesiones').update({ entrenador_id: m.user_id }).eq('id', sesionDetalle.id)
-                              await cargar()
+                              await cargar(centro?.id)
                               setToast({ msg: `Entrenador cambiado a ${m.nombre?.split(' ')[0]}` })
                             }}
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${seleccionado ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}
@@ -1492,7 +1492,7 @@ export default function Agenda({ session }) {
         <EditarGrupoModal
           grupo={editGrupoModal}
           onClose={() => setEditGrupoModal(null)}
-          onGuardado={() => { setEditGrupoModal(null); setSesionDetalle(null); cargar() }}
+          onGuardado={() => { setEditGrupoModal(null); setSesionDetalle(null); cargar(centro?.id) }}
         />
       )}
 
@@ -1500,7 +1500,7 @@ export default function Agenda({ session }) {
         <ModalNuevaClase
           uid={uid}
           onClose={() => setModalClase(false)}
-          onGuardada={() => { setModalClase(false); cargar() }}
+          onGuardada={() => { setModalClase(false); cargar(centro?.id) }}
         />
       )}
     </div>
