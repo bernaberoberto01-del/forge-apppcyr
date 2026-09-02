@@ -177,20 +177,24 @@ export default function Layout({ children, session, config }) {
 
         {/* Nav móvil inferior */}
         <nav className="md:hidden bg-white border-t border-black/5 flex items-center px-2 py-1 flex-shrink-0 safe-bottom">
-          {modulosActivos.slice(0, 5).map(item => (
-            <NavLink key={item.id} to={item.path}
-              className={({ isActive }) =>
-                `flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`
-              }>
-              {({ isActive }) => (
-                <>
-                  <span className="text-lg">{item.icon}</span>
-                  <span className="text-[10px] font-medium text-[#0A0A0A]">{item.label.split(' ')[0]}</span>
-                  {isActive && <div className="w-1 h-1 rounded-full" style={{ background: acento }} />}
-                </>
-              )}
-            </NavLink>
-          ))}
+          {['dashboard','clientes','agenda','seguimiento','mensajes'].map(id => {
+            const item = modulosActivos.find(m => m.id === id)
+            if (!item) return null
+            return (
+              <NavLink key={item.id} to={item.path}
+                className={({ isActive }) =>
+                  `flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`
+                }>
+                {({ isActive }) => (
+                  <>
+                    <span className="text-lg">{item.icon}</span>
+                    <span className="text-[10px] font-medium text-[#0A0A0A]">{item.label.split(' ')[0]}</span>
+                    {isActive && <div className="w-1 h-1 rounded-full" style={{ background: acento }} />}
+                  </>
+                )}
+              </NavLink>
+            )
+          })}
           <NavLink to="/configuracion"
             className={({ isActive }) => `flex-1 flex flex-col items-center gap-0.5 py-2 rounded-xl transition-all ${isActive ? 'opacity-100' : 'opacity-40'}`}>
             {({ isActive }) => (
