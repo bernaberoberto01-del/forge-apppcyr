@@ -489,10 +489,10 @@ export default function Rutinas({ session }) {
                     <button onClick={() => analizarYActualizar(r.cliente_id)} disabled={generando === r.cliente_id}
                       title="Analizar check-ins y generar propuesta de actualización"
                       className="border border-[#6366f1]/30 text-[#6366f1] text-xs py-2 px-3 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-40 flex items-center gap-1.5 flex-shrink-0">
-                      {generando === r.cliente_id ? '⏳' : '🤖 Actualizar con IA'
+                      {generando === r.cliente_id ? '⏳' : '🤖 Actualizar con IA'}
                     </button>
                   )}
-                  <button onClick={() => setMsgModal(r.cliente_id)} className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-lg hover:bg-[#F5F5F0]">✉️</button>
+                  <button onClick={() => setMsgModal(r.cliente_id)} className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-lg hover:bg-[#F5F5F0]">✉️ Mensaje</button>
                 </div>
               </div>
             ))}
