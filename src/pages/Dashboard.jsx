@@ -134,7 +134,7 @@ export default function Dashboard({ session }) {
 
   const hora = new Date().getHours()
   const saludo = hora < 12 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches'
-  const nombre = session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || 'Roberto'
+  const nombre = config?.nombre_entrenador?.split(' ')[0] || session.user.user_metadata?.nombre || session.user.email?.split('@')[0] || 'Roberto'
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">

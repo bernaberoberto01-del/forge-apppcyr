@@ -171,8 +171,7 @@ export default function Agenda({ session }) {
   const [entrenadorSel, setEntrenadorSel] = useState(null)
   const [editGrupoModal, setEditGrupoModal] = useState(null)
   const [modalClase, setModalClase] = useState(false)
-  const [clases, setClases] = useState([])
-  const [debugInfo, setDebugInfo] = useState('') // grupo a editar
+  const [clases, setClases] = useState([]) // grupo a editar
   const [refreshKey, setRefreshKey] = useState(0) // entrenador seleccionado para la sesión
   const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
@@ -287,9 +286,7 @@ export default function Agenda({ session }) {
         .gte('fecha', hace60).order('fecha').order('hora')
       setClases(cls || [])
     } catch { setClases([]) }
-    // DEBUG
-    const debugQuery = await supabase.from('grupos').select('id,nombre').eq('entrenador_id', uid).eq('activo', true)
-    setDebugInfo(`uid=${uid?.slice(0,8)} | cId=${centroId?.slice(0,8)||'null'} | g=${debugQuery.data?.length||0} | err=${debugQuery.error?.message||'ok'}`)
+
     // Construir mapa grupo_id → info completa
     const gm = {}
     ;(gs || []).forEach(g => {
@@ -728,8 +725,7 @@ export default function Agenda({ session }) {
             className="border border-emerald-300 text-emerald-700 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-emerald-50">
             👥 Nueva clase
           </button>
-          {/* DEBUG */}
-          <span className="text-xs text-red-500 px-2 font-mono">{debugInfo}</span>
+
         </div>
         <button onClick={() => { setDiaClick(hoy); setModal(true) }}
           className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg">+ Sesión</button>

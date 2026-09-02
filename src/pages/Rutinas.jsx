@@ -432,7 +432,7 @@ export default function Rutinas({ session }) {
 
           {/* Filtros */}
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-            {[['activas','Todas'],['borrador','Borradores'],['publicada','Publicadas']].map(([v,l])=>(
+            {[['activas','Todas'],['borrador','Por revisar'],['publicada','Publicadas']].map(([v,l])=>(
               <button key={v} onClick={() => setFiltroEstado(v)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroEstado===v?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
                 {l}

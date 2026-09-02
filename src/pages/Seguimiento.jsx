@@ -548,7 +548,7 @@ export default function Seguimiento({ session }) {
           <div className="space-y-1.5">
             {clientes.map(cl => {
               const ultimo = checkins.find(x => x.cliente_id === cl.id)
-              const diasSinCI = ultimo ? Math.floor((new Date() - new Date(ultimo.fecha + 'T12:00')) / 864e5) : null
+              const diasSinCI = ultimo?.fecha ? Math.floor((Date.now() - new Date(ultimo.fecha + 'T12:00').getTime()) / 864e5) : null
               const alertaFatiga = ultimo && (ultimo.fatiga >= 4 || ultimo.estres >= 4)
               return (
                 <div key={cl.id} onClick={() => ultimo && setDetalleCI(ultimo)}
