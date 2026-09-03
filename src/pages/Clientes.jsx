@@ -78,6 +78,22 @@ export default function Clientes({ session }) {
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
   useEffect(() => { cargar() }, [uid])
 
+  // Realtime — nuevo cuestionario llega sin recargar página
+  useEffect(() => {
+    if (!uid) return
+    const channel = supabase.channel(`clientes-cuest-${uid}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'cuestionarios',
+        filter: `entrenador_id=eq.${uid}`
+      }, (payload) => {
+        setCuestionarios(prev => [payload.new, ...prev])
+        setModalRegistros(true) // abre el modal automáticamente
+        setToast('📋 Nuevo diagnóstico recibido')
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [uid])
+
   async function cargar() {
     const hace10 = new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0]
     const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([

@@ -44,6 +44,29 @@ export default function Dashboard({ session }) {
 
   useEffect(() => { cargar() }, [uid])
 
+  // Realtime — recargar cuando llega cuestionario nuevo o alerta nueva
+  useEffect(() => {
+    if (!uid) return
+    const channel = supabase.channel(`dashboard-${uid}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'cuestionarios',
+        filter: `entrenador_id=eq.${uid}`
+      }, () => {
+        cargar(uid)
+        // Notificación visual en el badge del sidebar
+        window.dispatchEvent(new CustomEvent('forge-alerta-nueva'))
+      })
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'alertas',
+        filter: `entrenador_id=eq.${uid}`
+      }, () => {
+        cargar(uid)
+        window.dispatchEvent(new CustomEvent('forge-alerta-nueva'))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [uid])
+
   async function cargar() {
     try {
     const hoy = new Date()
@@ -78,7 +101,7 @@ export default function Dashboard({ session }) {
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
       supabase.from('cuestionarios').select('id,nombre,email,necesidades,objetivo,created_at').eq('entrenador_id', uid).eq('procesado', false).order('created_at', {ascending:false}),
-      supabase.from('clientes').select('id,nombre,plan_online,ia_estado').eq('entrenador_id', uid).eq('tipo','online').in('ia_estado',['generando','error']).eq('estado','activo'),
+      supabase.from('clientes').select('id,nombre,plan_online,ia_estado').eq('entrenador_id', uid).eq('tipo','online').in('ia_estado',['generando','error','pendiente_datos']).eq('estado','activo'),
       supabase.from('configuracion').select('nombre_entrenador').eq('entrenador_id', uid).maybeSingle(),
     ])
 
@@ -214,14 +237,14 @@ export default function Dashboard({ session }) {
 
                 {/* IA generando o con error */}
                 {clientesIAPendiente.map(c => (
-                  <div key={c.id} className={`flex items-center gap-3 px-5 py-3.5 ${c.ia_estado==='error'?'bg-red-50':''}`}>
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0 ${c.ia_estado==='error'?'bg-red-500':'bg-[#6366f1]'}`}>
-                      {c.ia_estado==='error'?'⚠':'⏳'}
+                  <div key={c.id} className={`flex items-center gap-3 px-5 py-3.5 ${c.ia_estado==='error'?'bg-red-50':c.ia_estado==='pendiente_datos'?'bg-amber-50':''}`}>
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0 ${c.ia_estado==='error'?'bg-red-500':c.ia_estado==='pendiente_datos'?'bg-amber-500':'bg-[#6366f1]'}`}>
+                      {c.ia_estado==='generando'?'⏳':c.ia_estado==='pendiente_datos'?'📋':'⚠'}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#0A0A0A]">{c.nombre.split(' ')[0]}</p>
-                      <p className={`text-xs ${c.ia_estado==='error'?'text-red-600':'text-[#6366f1]'}`}>
-                        {c.ia_estado==='generando'?'IA generando plan…':'Error al generar — revisa manualmente'}
+                      <p className={`text-xs ${c.ia_estado==='error'?'text-red-600':c.ia_estado==='pendiente_datos'?'text-amber-700':'text-[#6366f1]'}`}>
+                        {c.ia_estado==='generando'?'IA generando plan…':c.ia_estado==='pendiente_datos'?'Falta cuestionario de nutrición — el cliente debe rellenarlo':'Error al generar — revisa manualmente'}
                       </p>
                     </div>
                     {c.ia_estado==='error' && (
