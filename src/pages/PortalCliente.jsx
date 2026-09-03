@@ -268,11 +268,12 @@ export default function PortalCliente() {
   const puedeVerRutina = !esOnline || !plan || plan === 'entrenamiento' || plan === 'completo'
   const puedeVerNutricion = !esOnline || !plan || plan === 'nutricion' || plan === 'completo'
   const puedeMensajes = !esOnline || !plan || plan === 'completo'
+  const puedeVerClases = !esOnline // solo presenciales por ahora
 
   const TABS=[
     {id:'inicio',label:'Inicio',icon:'⊞'},
     ...(puedeVerRutina ? [{id:'rutina',label:'Rutina',icon:'💪'}] : []),
-    {id:'clases',label:'Clases',icon:'👥'},
+    ...(puedeVerClases ? [{id:'clases',label:'Clases',icon:'👥'}] : []),
     {id:'progreso',label:'Progreso',icon:'📈'},
     ...(puedeMensajes ? [{id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos}] : []),
     ...(puedeVerNutricion && (planNutricion || tieneCuestNutricion) ? [{id:'nutricion',label:'Nutrición',icon:'🥗'}] : []),

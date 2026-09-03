@@ -80,6 +80,7 @@ export default function Dashboard({ session }) {
     const [
       { data: clientes },
       { data: pagos },
+      { data: planesCobro },
       { data: sesiones },
       { data: checkins },
       { data: alertas },
@@ -93,6 +94,7 @@ export default function Dashboard({ session }) {
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
+      supabase.from('planes_cobro').select('cliente_id,importe,concepto,proximo_cobro').eq('entrenador_id', uid).eq('activo', true),
       supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').eq('entrenador_id', uid).gte('fecha', inicioSemana),
       supabase.from('checkins').select('cliente_id,fecha,adherencia_entreno,energia,fatiga,contenido').eq('entrenador_id', uid).gte('fecha', hace6m).order('fecha', {ascending:false}),
       supabase.from('alertas').select('*').eq('entrenador_id', uid).eq('leida', false).order('created_at',{ascending:false}).limit(20),
@@ -135,9 +137,13 @@ export default function Dashboard({ session }) {
     })
     const cobrosProximos = activos.filter(c => {
       const p = (pagos||[]).filter(p=>p.cliente_id===c.id).sort((a,b)=>b.fecha_pago?.localeCompare(a.fecha_pago))[0]
-      if (!p?.valido_hasta) return false
-      const v = new Date(p.valido_hasta)
-      return v >= hoy && v <= new Date(en7d)
+      const tieneVencimiento = p?.valido_hasta && new Date(p.valido_hasta) >= hoy && new Date(p.valido_hasta) <= new Date(en7d)
+      // También incluir si hay plan de cobro con proximo_cobro en los próximos 7 días
+      const planCobro = (planesCobro||[]).find(pc => pc.cliente_id === c.id)
+      const tienePlanProximo = planCobro?.proximo_cobro && 
+        new Date(planCobro.proximo_cobro) >= hoy && 
+        new Date(planCobro.proximo_cobro) <= new Date(en7d)
+      return tieneVencimiento || tienePlanProximo
     })
     const clientesSinCI = activos.filter(c => !ciRecientes.some(ci => ci.cliente_id===c.id && ci.fecha>=hace7d))
     const checkinsNuevos = ciRecientes.filter(ci => ci.fecha >= inicioSemana)
