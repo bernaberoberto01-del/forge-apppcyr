@@ -153,11 +153,11 @@ Deno.serve(async (req) => {
       datos_calculo: { peso, altura, edad, sexo, actividad, TMB:Math.round(TMB), TDEE, ajuste, objetivo:objetivoRaw }
     }
 
-    await supabase.from('planes_nutricion').delete().eq('cliente_id', cliente_id)
+    await supabase.from('planes_nutricion').delete().eq('cliente_id', cliente_id).eq('contenido', null)
     const { data: saved, error: saveErr } = await supabase.from('planes_nutricion').insert({
       cliente_id, entrenador_id: cliente.entrenador_id, nombre, objetivo: cliente.objetivo,
       calorias_dia:kcal, proteinas_g:prot, carbohidratos_g:carb, grasas_g:gras,
-      borrador: contenido, estado: 'borrador'
+      contenido: contenido, borrador: contenido, estado: 'borrador'
     }).select().single()
 
     if (saveErr) return new Response(JSON.stringify({ error: 'Error guardando: '+saveErr.message }), { status: 500, headers: CORS })
