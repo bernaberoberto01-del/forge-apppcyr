@@ -486,22 +486,41 @@ export default function Agenda({ session }) {
   async function guardarRecurrente() {
     if (!formRec.cliente_id || !formRec.dias_semana.length) return
     setLoading(true)
-    const payload = {
-      entrenador_id: formRec.entrenador_id || uid, cliente_id: formRec.cliente_id,
-      centro_id: centro?.id || null,
-      hora: formRec.hora, duracion_minutos: formRec.duracion_minutos,
-      tipo: formRec.tipo, dias_semana: formRec.dias_semana,
-      fecha_inicio: formRec.fecha_inicio, fecha_fin: formRec.fecha_fin || null,
-      notas: formRec.notas
+    const usaHorasPorDia = formRec.horasPorDia && Object.keys(formRec.horasPorDia).length > 0
+
+    if (usaHorasPorDia && !editandoRecId) {
+      // Crear una regla por cada día con su hora específica
+      const errores = []
+      for (const dia of formRec.dias_semana) {
+        const hora = formRec.horasPorDia[dia] || formRec.hora
+        const { error } = await supabase.from('sesiones_recurrentes').insert({
+          entrenador_id: formRec.entrenador_id || uid, cliente_id: formRec.cliente_id,
+          centro_id: centro?.id || null, hora, duracion_minutos: formRec.duracion_minutos,
+          tipo: formRec.tipo, dias_semana: [dia],
+          fecha_inicio: formRec.fecha_inicio, fecha_fin: formRec.fecha_fin || null,
+          notas: formRec.notas, activa: true
+        })
+        if (error) errores.push(dia)
+      }
+      setToast(errores.length ? { msg: 'Error en algunos días', tipo: 'error' } : { msg: `${formRec.dias_semana.length} reglas creadas con horarios distintos` })
+    } else {
+      const payload = {
+        entrenador_id: formRec.entrenador_id || uid, cliente_id: formRec.cliente_id,
+        centro_id: centro?.id || null,
+        hora: formRec.hora, duracion_minutos: formRec.duracion_minutos,
+        tipo: formRec.tipo, dias_semana: formRec.dias_semana,
+        fecha_inicio: formRec.fecha_inicio, fecha_fin: formRec.fecha_fin || null,
+        notas: formRec.notas
+      }
+      const { error } = editandoRecId
+        ? await supabase.from('sesiones_recurrentes').update(payload).eq('id', editandoRecId)
+        : await supabase.from('sesiones_recurrentes').insert({ ...payload, activa: true })
+      if (error) setToast({ msg: 'Error', tipo: 'error' })
+      else setToast({ msg: editandoRecId ? 'Regla actualizada' : 'Sesión recurrente creada' })
     }
-    const { error } = editandoRecId
-      ? await supabase.from('sesiones_recurrentes').update(payload).eq('id', editandoRecId)
-      : await supabase.from('sesiones_recurrentes').insert({ ...payload, activa: true })
-    if (error) setToast({ msg: 'Error', tipo: 'error' })
-    else setToast({ msg: editandoRecId ? 'Regla actualizada' : 'Sesión recurrente creada' })
     setModalRecurrente(false)
     setEditandoRecId(null)
-    setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: formatFecha(new Date()), fecha_fin:'', notas:'', entrenador_id:'' })
+    setFormRec({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: formatFecha(new Date()), fecha_fin:'', notas:'', entrenador_id:'', horasPorDia:{} })
     await cargar(centro?.id)
     setLoading(false)
   }
@@ -1292,7 +1311,7 @@ export default function Agenda({ session }) {
                     const diaNum = i+1
                     const sel = formRec.dias_semana.includes(diaNum)
                     return (
-                      <button key={d} type="button" onClick={() => setFormRec(f=>({...f, dias_semana: sel ? f.dias_semana.filter(x=>x!==diaNum) : [...f.dias_semana,diaNum]}))}
+                      <button key={d} type="button" onClick={() => setFormRec(f=>({...f, dias_semana: sel ? f.dias_semana.filter(x=>x!==diaNum) : [...f.dias_semana,diaNum].sort()}))}
                         className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${sel?'bg-[#FF5C00] text-white':'border border-black/10 text-[#6B6B6B]'}`}>
                         {d}
                       </button>
@@ -1300,20 +1319,51 @@ export default function Agenda({ session }) {
                   })}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Hora</label>
-                  <input type="time" value={formRec.hora} onChange={e => setFormRec(f=>({...f,hora:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración</label>
-                  <select value={formRec.duracion_minutos} onChange={e => setFormRec(f=>({...f,duracion_minutos:Number(e.target.value)}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
-                    {[30,45,60,75,90,120].map(v=><option key={v} value={v}>{v}min</option>)}
-                  </select>
-                </div>
-              </div>
+
+              {/* Hora y duración */}
+              {formRec.dias_semana.length > 0 && (() => {
+                const labels = ['','Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+                const usaHorasPorDia = formRec.horasPorDia && Object.keys(formRec.horasPorDia).length > 0
+                return (
+                  <div>
+                    {formRec.dias_semana.length > 1 && (
+                      <div className="flex justify-end mb-2">
+                        <button type="button"
+                          onClick={() => setFormRec(f => ({...f, horasPorDia: usaHorasPorDia ? {} : Object.fromEntries(f.dias_semana.map(d=>[d, f.hora]))}))}
+                          className="text-xs text-[#FF5C00] font-semibold">
+                          {usaHorasPorDia ? '← Misma hora todos los días' : 'Hora distinta por día →'}
+                        </button>
+                      </div>
+                    )}
+                    {usaHorasPorDia ? (
+                      <div className="space-y-2 mb-3">
+                        {formRec.dias_semana.map(dNum => (
+                          <div key={dNum} className="flex items-center gap-3">
+                            <span className="text-xs font-bold text-[#0A0A0A] w-8 flex-shrink-0">{labels[dNum]}</span>
+                            <input type="time"
+                              value={formRec.horasPorDia[dNum] || '09:00'}
+                              onChange={e => setFormRec(f=>({...f, horasPorDia:{...f.horasPorDia,[dNum]:e.target.value}}))}
+                              className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mb-3">
+                        <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Hora</label>
+                        <input type="time" value={formRec.hora} onChange={e => setFormRec(f=>({...f,hora:e.target.value}))}
+                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración</label>
+                      <select value={formRec.duracion_minutos} onChange={e => setFormRec(f=>({...f,duracion_minutos:Number(e.target.value)}))}
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                        {[30,45,60,75,90,120].map(v=><option key={v} value={v}>{v}min</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )
+              })()}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Desde</label>

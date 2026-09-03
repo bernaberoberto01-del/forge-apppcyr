@@ -198,7 +198,7 @@ export default function Nutricion({ session }) {
             {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]">×</button>}
           </div>
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-            {[['todos','Todos'],['borrador','Borrador'],['publicado','Publicado']].map(([v,l])=>(
+            {[['todos','Todos'],['borrador','Por revisar'],['publicado','Publicado']].map(([v,l])=>(
               <button key={v} onClick={() => setFiltro(v)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtro===v?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
                 {l}
@@ -246,7 +246,7 @@ export default function Nutricion({ session }) {
                   </div>
                 </div>
                 <span className={`text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 ${p.estado==='publicado'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
-                  {p.estado==='publicado'?'✓ Publicado':'Borrador'}
+                  {p.estado==='publicado'?'✓ Publicado':'Por revisar'}
                 </span>
               </div>
 
@@ -295,6 +295,16 @@ export default function Nutricion({ session }) {
                 className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
                 {generando===p.cliente_id ? <span className="w-4 h-4 border-2 border-[#6B6B6B] border-t-transparent rounded-full animate-spin block"/> : '🔄'}
               </button>
+              {p.estado==='borrador' && (
+                <button onClick={async () => {
+                  if (!confirm(`¿Eliminar el borrador de ${p.clientes?.nombre?.split(' ')[0] || 'este cliente'}?`)) return
+                  await supabase.from('planes_nutricion').delete().eq('id', p.id)
+                  cargar()
+                }}
+                  className="border border-red-100 text-red-400 text-xs py-2 px-3 rounded-xl hover:bg-red-50">
+                  🗑
+                </button>
+              )}
             </div>
           </div>
         )})}
