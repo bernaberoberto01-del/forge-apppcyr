@@ -941,7 +941,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['actividad','📡 Actividad'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -1065,6 +1065,10 @@ export default function Clientes({ session }) {
                   </div>
                 </div>
               )})()}
+              {dTab==='actividad' && (
+                <ActividadCliente clienteId={detalle.id} />
+              )}
+
               {dTab==='progreso' && (
                 <div className="space-y-2">
                   <GraficasCliente clienteId={detalle.id} />
@@ -1694,6 +1698,125 @@ function NuevoGrupoInline({ modalidad, diasSemana, hora, uid, onCreado }) {
           className="flex-1 bg-[#0A0A0A] text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40">
           {creando ? 'Creando...' : 'Crear y asignar'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Actividad del cliente en el portal ────────────────────────────────────
+function ActividadCliente({ clienteId }) {
+  const [actividad, setActividad] = useState([])
+  const [cargando, setCargando] = useState(true)
+
+  useEffect(() => {
+    if (!clienteId) return
+    supabase.from('actividad_cliente')
+      .select('*')
+      .eq('cliente_id', clienteId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => { setActividad(data || []); setCargando(false) })
+  }, [clienteId])
+
+  const ICONOS = {
+    portal_acceso: '🔐',
+    rutina_vista: '💪',
+    dia_completado: '✅',
+    checkin_enviado: '📋',
+    foto_subida: '📸',
+    mensaje_enviado: '💬',
+    pago_realizado: '💳',
+    cuest_nutricion: '🥗',
+  }
+
+  const LABELS = {
+    portal_acceso: 'Entró al portal',
+    rutina_vista: 'Vio su rutina',
+    dia_completado: 'Completó un día de entreno',
+    checkin_enviado: 'Envió el check-in semanal',
+    foto_subida: 'Subió foto de progreso',
+    mensaje_enviado: 'Escribió un mensaje',
+    pago_realizado: 'Realizó un pago',
+    cuest_nutricion: 'Rellenó cuestionario de nutrición',
+  }
+
+  function tiempoRelativo(fecha) {
+    const diff = Date.now() - new Date(fecha).getTime()
+    const min = Math.floor(diff / 60000)
+    if (min < 1) return 'ahora mismo'
+    if (min < 60) return `hace ${min}m`
+    const h = Math.floor(min / 60)
+    if (h < 24) return `hace ${h}h`
+    const d = Math.floor(h / 24)
+    if (d === 1) return 'ayer'
+    if (d < 7) return `hace ${d} días`
+    return new Date(fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })
+  }
+
+  if (cargando) return (
+    <div className="flex items-center justify-center h-32">
+      <div className="w-6 h-6 border-3 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+    </div>
+  )
+
+  if (actividad.length === 0) return (
+    <div className="text-center py-12">
+      <p className="text-3xl mb-2">📡</p>
+      <p className="text-sm font-semibold text-[#0A0A0A]">Sin actividad registrada</p>
+      <p className="text-xs text-[#9B9B9B] mt-1">Aquí verás cada vez que el cliente entre al portal o realice alguna acción</p>
+    </div>
+  )
+
+  // Última conexión
+  const ultimaConexion = actividad.find(a => a.tipo === 'portal_acceso')
+  const diasSinConectar = ultimaConexion
+    ? Math.floor((Date.now() - new Date(ultimaConexion.created_at).getTime()) / 864e5)
+    : null
+
+  return (
+    <div className="space-y-4">
+      {/* Resumen de actividad */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-[#F7F6F3] rounded-2xl p-3 text-center">
+          <p className="text-lg font-bold text-[#0A0A0A]">
+            {ultimaConexion ? tiempoRelativo(ultimaConexion.created_at) : '—'}
+          </p>
+          <p className="text-xs text-[#9B9B9B] mt-0.5">Última conexión</p>
+        </div>
+        <div className="bg-[#F7F6F3] rounded-2xl p-3 text-center">
+          <p className="text-lg font-bold text-[#0A0A0A]">
+            {actividad.filter(a => a.tipo === 'portal_acceso' && new Date(a.created_at) > new Date(Date.now()-7*864e5)).length}
+          </p>
+          <p className="text-xs text-[#9B9B9B] mt-0.5">Accesos 7 días</p>
+        </div>
+        <div className="bg-[#F7F6F3] rounded-2xl p-3 text-center">
+          <p className="text-lg font-bold text-[#0A0A0A]">
+            {actividad.filter(a => a.tipo === 'dia_completado').length}
+          </p>
+          <p className="text-xs text-[#9B9B9B] mt-0.5">Días completados</p>
+        </div>
+      </div>
+
+      {diasSinConectar !== null && diasSinConectar > 5 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+          <span className="text-lg">⚠️</span>
+          <p className="text-xs text-amber-800 font-medium">
+            Lleva {diasSinConectar} días sin entrar al portal — considera enviarle un mensaje de seguimiento
+          </p>
+        </div>
+      )}
+
+      {/* Timeline de actividad */}
+      <div className="space-y-1">
+        {actividad.map((a, i) => (
+          <div key={a.id} className="flex items-start gap-3 py-2 border-b border-black/4 last:border-0">
+            <span className="text-base flex-shrink-0 mt-0.5">{ICONOS[a.tipo] || '•'}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-[#0A0A0A]">{a.descripcion || LABELS[a.tipo] || a.tipo}</p>
+            </div>
+            <p className="text-xs text-[#9B9B9B] flex-shrink-0">{tiempoRelativo(a.created_at)}</p>
+          </div>
+        ))}
       </div>
     </div>
   )

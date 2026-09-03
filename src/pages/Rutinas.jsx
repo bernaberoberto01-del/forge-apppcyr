@@ -66,6 +66,7 @@ export default function Rutinas({ session }) {
   const [clientes, setClientes] = useState([])
   const [biblioteca, setBiblioteca] = useState([])
   const [loading, setLoading] = useState(true)
+  const [mostrarSinRutina, setMostrarSinRutina] = useState(false)
   const [generando, setGenerando] = useState(null)
   const [detalle, setDetalle] = useState(null)
   const [modoEdicion, setModoEdicion] = useState(false)
@@ -440,35 +441,45 @@ export default function Rutinas({ session }) {
             ))}
           </div>
 
-          {/* Clientes sin rutina */}
+          {/* Clientes sin rutina — colapsable */}
           {clientesSinRutina.length > 0 && !busqueda && filtroEstado === 'activas' && (
-            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-4">
-              <p className="text-xs font-semibold text-amber-700 mb-3">⚠ Sin rutina · online ({clientesSinRutina.length})</p>
-              <div className="space-y-2">
-                {clientesSinRutina.map(c => (
-                  <div key={c.id} className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{ini(c.nombre)}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-[#0A0A0A] truncate">{c.nombre}</p>
-                      <p className="text-xs text-[#6B6B6B]">{c.nivel} · {c.tipo}</p>
+            <div className="border border-amber-200 rounded-2xl overflow-hidden mb-4">
+              <button
+                onClick={() => setMostrarSinRutina(v => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-all">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">{clientesSinRutina.length}</span>
+                  <p className="text-xs font-semibold text-amber-800">Pendientes de asignar plan</p>
+                </div>
+                <span className="text-amber-600 text-sm">{mostrarSinRutina ? '▲' : '▼'}</span>
+              </button>
+              {mostrarSinRutina && (
+                <div className="p-4 space-y-3 bg-white">
+                  {clientesSinRutina.map(c => (
+                    <div key={c.id} className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{ini(c.nombre)}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-[#0A0A0A] truncate">{c.nombre}</p>
+                        <p className="text-xs text-[#6B6B6B]">{c.nivel} · {c.tipo}</p>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        <button onClick={() => generarRutina(c.id)} disabled={generando === c.id}
+                          className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
+                          {generando === c.id ? '⏳ Generando...' : '✨ Generar con IA'}
+                        </button>
+                        <button onClick={() => generarEvaluacion(c.id)} disabled={generando === c.id}
+                          className="border border-[#6366f1] text-[#6366f1] text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-50">
+                          📋 Evaluación inicial
+                        </button>
+                        <button onClick={() => { setManualClienteId(c.id); setModalManual(true) }}
+                          className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-3 py-1.5 rounded-lg hover:border-[#111]">
+                          ✍️ Crear manual
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex gap-1.5 flex-shrink-0">
-                      <button onClick={() => generarRutina(c.id)} disabled={generando === c.id}
-                        className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
-                        {generando === c.id ? '⏳ Generando...' : '✨ Generar con IA'}
-                      </button>
-                      <button onClick={() => generarEvaluacion(c.id)} disabled={generando === c.id}
-                        className="border border-[#6366f1] text-[#6366f1] text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-50">
-                        📋 Evaluación inicial
-                      </button>
-                      <button onClick={() => { setManualClienteId(c.id); setModalManual(true) }}
-                        className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-3 py-1.5 rounded-lg hover:border-[#111]">
-                        ✍️ Crear manual
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

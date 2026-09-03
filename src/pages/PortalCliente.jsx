@@ -135,6 +135,11 @@ export default function PortalCliente() {
       const {data:cl,error}=await supabase.from('clientes').select('*').eq('auth_user_id',clienteSession.id).maybeSingle()
       if(error||!cl){setNotFound(true);setLoading(false);return}
       const cid=cl.id; setCliente(cl); setClienteId(cid)
+      // Registrar acceso al portal
+      supabase.from('actividad_cliente').insert({
+        cliente_id: cid, entrenador_id: cl.entrenador_id,
+        tipo: 'portal_acceso', descripcion: 'Entró al portal'
+      }).catch(() => {})
       const [ru,ci,pg,ms,ft,pn,cfg,mc,meds,tieneCuest]=await Promise.all([
         supabase.from('rutinas').select('*').eq('cliente_id',cid).eq('estado','publicada').order('created_at',{ascending:false}).limit(1).then(r=>r.data||[]).catch(()=>[]),
         supabase.from('checkins').select('*').eq('cliente_id',cid).order('fecha',{ascending:false}).limit(12).then(r=>r.data||[]).catch(()=>[]),
@@ -368,6 +373,23 @@ export default function PortalCliente() {
             {/* ══ INICIO ══════════════════════════════════════════════════════ */}
             {tab==='inicio'&&(
               <>
+                {/* ── CUESTIONARIO NUTRICIÓN PENDIENTE — acción urgente ── */}
+                {puedeVerNutricion && !planNutricion && !tieneCuestNutricion && (
+                  <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4 mb-1">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl flex-shrink-0">🥗</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-[#0A0A0A]">Cuestionario de alimentación pendiente</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">Tu entrenador necesita conocer tus hábitos alimentarios para crear tu plan de nutrición personalizado.</p>
+                        <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+                          className="mt-2 inline-block bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl">
+                          📋 Rellenar cuestionario ahora
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* ── ONBOARDING: cliente sin rutina ni plan ── */}
                 {!rutina && !planNutricion && pendientesValorar.length === 0 && (
                   <div className="rounded-2xl overflow-hidden" style={{background:`linear-gradient(135deg, ${color}, ${color}bb)`}}>
