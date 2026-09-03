@@ -283,10 +283,22 @@ export default function Mensajes({ session }) {
             </button>
             {/* Botón link de pago */}
             <button onClick={() => setModalPago(true)} disabled={generandoLink}
-              title="Generar link de pago"
               className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] transition-all flex-shrink-0 disabled:opacity-40">
               {generandoLink ? <span className="w-4 h-4 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/> : '💳'}
             </button>
+            {/* Botón cuestionario nutrición — solo para clientes online con plan nutrición/completo */}
+            {seleccionado?.plan_online && (seleccionado.plan_online === 'nutricion' || seleccionado.plan_online === 'completo') && (
+              <button
+                onClick={() => {
+                  const link = `https://forge-studio-os.vercel.app/nutricion-cuest?e=${uid}&c=${seleccionado.id}`
+                  const msg = `Hola ${seleccionado.nombre.split(' ')[0]} 👋\n\nPara preparar tu plan de alimentación personalizado necesito que rellenes este breve cuestionario nutricional:\n\n${link}\n\nSolo te llevará 2-3 minutos. Con esa información podré crear un plan adaptado exactamente a ti. ¡Gracias!`
+                  setTexto(msg)
+                }}
+                className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-emerald-600 hover:bg-emerald-50 transition-all flex-shrink-0"
+                title="Enviar link cuestionario nutrición">
+                🥗
+              </button>
+            )}
             <textarea value={texto} onChange={e => setTexto(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar() } }}
               rows={texto.split('\n').length > 2 ? 3 : 1}
