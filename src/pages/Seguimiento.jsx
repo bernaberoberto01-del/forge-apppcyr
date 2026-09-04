@@ -89,7 +89,7 @@ export default function Seguimiento({ session }) {
   async function lanzarMensual() {
     setLanzandoMensual(true)
     try {
-      const { data, error } = await supabase.functions.invoke('actualizar-rutina-mensual', { body: {} })
+      const { data, error } = await supabase.functions.invoke('analizar-cliente-mensual', { body: {} })
       if (!error && data?.ok) {
         setToast(`✓ ${data.procesados} rutinas generadas para revisión`)
         cargar()
@@ -776,42 +776,53 @@ export default function Seguimiento({ session }) {
       {/* ── TAB MENSUAL ── */}
       {tabPrincipal === 'mensual' && (
         <div className="space-y-4">
-          {/* Cabecera */}
-          <div className="bg-[#111] rounded-2xl p-5">
-            <p className="text-white font-bold text-lg mb-1">🔄 Análisis mensual automático</p>
-            <p className="text-white/50 text-sm mb-4">Cada domingo, tras el 4º check-in de cada cliente, Forge analiza su progreso y prepara la acción adecuada. Tú revisas y decides.</p>
-            <div className="bg-white/5 rounded-xl p-3 mb-4 space-y-1.5">
-              <div className="flex justify-between text-sm">
-                <span className="text-white/60">Pendientes de revisar</span>
-                <span className="font-bold" style={{color: analisisMensual.length > 0 ? '#FF5C00' : 'white'}}>{analisisMensual.length}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-white/60">Rutinas borrador generadas</span>
-                <span className="font-bold" style={{color: borradores.length > 0 ? '#FF5C00' : 'white'}}>{borradores.length}</span>
-              </div>
+
+          {/* Sin pendientes */}
+          {analisisMensual.length === 0 && borradores.length === 0 && (
+            <div className="bg-white rounded-2xl border border-black/5 p-8 text-center">
+              <p className="text-3xl mb-3">✓</p>
+              <p className="text-sm font-bold text-[#0A0A0A]">Todo al día</p>
+              <p className="text-xs text-[#9B9B9B] mt-1 mb-4">El análisis se ejecuta automáticamente cada domingo tras el 4º check-in de cada cliente</p>
+              <button onClick={async () => {
+                setLanzandoMensual(true)
+                await supabase.functions.invoke('analizar-cliente-mensual', { body: {} })
+                await cargar()
+                setLanzandoMensual(false)
+                setToast('✓ Análisis completado')
+                setTimeout(() => setToast(''), 3000)
+              }} disabled={lanzandoMensual}
+                className="text-xs border border-black/10 text-[#6B6B6B] px-4 py-2 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40 flex items-center gap-1.5 mx-auto">
+                {lanzandoMensual ? <><span className="w-3 h-3 border-2 border-[#6B6B6B] border-t-transparent rounded-full animate-spin"/>Analizando...</> : '↻ Forzar análisis ahora'}
+              </button>
             </div>
-            <button onClick={async () => {
-              setLanzandoMensual(true)
-              await supabase.functions.invoke('analizar-cliente-mensual', { body: {} })
-              await cargar()
-              setLanzandoMensual(false)
-              setToast('✓ Análisis completado')
-              setTimeout(() => setToast(''), 3000)
-            }} disabled={lanzandoMensual}
-              className="w-full py-3 rounded-xl text-white font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-              style={{background:'#FF5C00'}}>
-              {lanzandoMensual
-                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Analizando clientes...</>
-                : '✨ Lanzar análisis manual ahora'
-              }
-            </button>
-            <p className="text-white/30 text-xs text-center mt-2">Se ejecuta automáticamente cada domingo. Usa este botón para forzarlo.</p>
-          </div>
+          )}
+
+          {/* Botón lanzar cuando hay pendientes */}
+          {(analisisMensual.length > 0 || borradores.length > 0) && (
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-3">
+                {analisisMensual.length > 0 && (
+                  <span className="text-xs font-semibold text-[#FF5C00]">{analisisMensual.length} análisis pendiente{analisisMensual.length > 1 ? 's' : ''}</span>
+                )}
+                {borradores.length > 0 && (
+                  <span className="text-xs font-semibold text-[#6366f1]">{borradores.length} rutina{borradores.length > 1 ? 's' : ''} por revisar</span>
+                )}
+              </div>
+              <button onClick={async () => {
+                setLanzandoMensual(true)
+                await supabase.functions.invoke('analizar-cliente-mensual', { body: {} })
+                await cargar()
+                setLanzandoMensual(false)
+              }} disabled={lanzandoMensual}
+                className="text-xs border border-black/10 text-[#6B6B6B] px-3 py-1.5 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
+                {lanzandoMensual ? '⏳' : '↻ Actualizar'}
+              </button>
+            </div>
+          )}
 
           {/* Análisis pendientes de revisar */}
           {analisisMensual.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-bold text-[#0A0A0A]">Pendientes de revisar — {analisisMensual.length}</p>
               {analisisMensual.map(a => {
                 const ICONOS = { actualizar_rutina:'🔄', ajustar_cargas:'⚖️', mensaje_motivacional:'💬', pausa_recomendada:'⚠️' }
                 const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:'#FF5C00', pausa_recomendada:'#ef4444' }
@@ -837,7 +848,7 @@ export default function Seguimiento({ session }) {
                           </span>
                           {a.adherencia_pct != null && <span className="text-xs text-[#9B9B9B]">Adherencia {a.adherencia_pct}%</span>}
                           {a.energia_media != null && <span className="text-xs text-[#9B9B9B]">E:{a.energia_media}/5</span>}
-                          {a.fatiga_media != null && <span className="text-xs text-[#9B9B9B]">F:{a.fatiga_media}/5</span>}
+                          {a.fatiga_media != null && <span className="text-xs text-[#9B9B9B]">F:{a.fatiga_media}/10</span>}
                         </div>
                       </div>
                       <span className="text-[#C0C0C0] text-xs flex-shrink-0">{expandido ? '▲' : '▼'}</span>

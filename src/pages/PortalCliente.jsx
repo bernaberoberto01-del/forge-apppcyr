@@ -76,6 +76,11 @@ export default function PortalCliente() {
   const [notFound, setNotFound] = useState(false)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('inicio')
+  const [registrandoSesion, setRegistrandoSesion] = useState(null) // { dia, ejercicios }
+  const [registroData, setRegistroData] = useState({}) // { ejercicioNombre: [{peso, reps}] }
+  const [registroRPE, setRegistroRPE] = useState(null)
+  const [registroPaso, setRegistroPaso] = useState('ejercicios') // 'ejercicios' | 'rpe'
+  const [guardandoRegistro, setGuardandoRegistro] = useState(false)
   const [rutina, setRutina] = useState(null)
   const [checkins, setCheckins] = useState([])
   const [pagos, setPagos] = useState([])
@@ -96,6 +101,9 @@ export default function PortalCliente() {
   const [rpeVal, setRpeVal] = useState(7)
   const [fatigaVal, setFatigaVal] = useState(2)
   const [sensacionesVal, setSensacionesVal] = useState('')
+  const [pasoValoracion, setPasoValoracion] = useState('ejercicios') // 'ejercicios' | 'rpe'
+  const [ejerciciosSesion, setEjerciciosSesion] = useState([]) // [{nombre, sets:[{peso,reps}]}]
+  const [cargandoEjercicios, setCargandoEjercicios] = useState(false)
   const [guardandoValoracion, setGuardandoValoracion] = useState(false)
   const [entrenadoresSesion, setEntrenadoresSesion] = useState({})
   const [textoMsg, setTextoMsg] = useState('')
@@ -209,7 +217,69 @@ export default function PortalCliente() {
       rpe: rpeVal, fatiga_post: fatigaVal, sensaciones: sensacionesVal||null, completada: true
     }).eq('id', valorando.id)
 
-    // Alerta inmediata si fatiga > 4/5 — sin esperar al check-in semanal
+    // Guardar ejercicios registrados
+    const ejerciciosConDatos = ejerciciosSesion.filter(ej =>
+      ej.sets.some(s => s.peso && String(s.peso).trim() !== '')
+    )
+    if (ejerciciosConDatos.length > 0) {
+      // Insertar en sesion_ejercicios
+      await supabase.from('sesion_ejercicios').insert(
+        ejerciciosConDatos.map((ej, i) => ({
+          sesion_id: valorando.id,
+          cliente_id: clienteId,
+          entrenador_id: cliente?.entrenador_id,
+          ejercicio_nombre: ej.nombre,
+          patron: ej.patron || null,
+          orden: i + 1,
+          sets: ej.sets.map((s, si) => ({
+            set: si + 1,
+            peso: s.peso ? Number(s.peso) : null,
+            reps: s.reps || null,
+            completado: true
+          })),
+        }))
+      ).catch(() => {})
+
+      // Detectar marcas personales automáticamente
+      for (const ej of ejerciciosConDatos) {
+        const setsPeso = ej.sets.filter(s => s.peso && !isNaN(Number(s.peso)))
+        if (!setsPeso.length) continue
+        const maxPeso = Math.max(...setsPeso.map(s => Number(s.peso)))
+        if (!maxPeso) continue
+
+        // Comparar con marca actual
+        const { data: marcaActual } = await supabase.from('marcas_cliente')
+          .select('id,valor')
+          .eq('cliente_id', clienteId)
+          .ilike('ejercicio', ej.nombre)
+          .order('fecha', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const valorActual = marcaActual ? parseFloat(marcaActual.valor) : 0
+        if (maxPeso > valorActual) {
+          // Nueva marca personal 🏆
+          await supabase.from('marcas_cliente').insert({
+            cliente_id: clienteId,
+            entrenador_id: cliente?.entrenador_id,
+            ejercicio: ej.nombre,
+            valor: String(maxPeso) + 'kg',
+            fecha: valorando.fecha,
+            notas: `Registrada automáticamente desde sesión`
+          }).catch(() => {})
+
+          // Registrar en actividad
+          supabase.from('actividad_cliente').insert({
+            cliente_id: clienteId,
+            entrenador_id: cliente?.entrenador_id,
+            tipo: 'marca_personal',
+            descripcion: `🏆 Nueva marca: ${ej.nombre} — ${maxPeso}kg`
+          }).catch(() => {})
+        }
+      }
+    }
+
+    // Alerta si fatiga alta post-sesión
     if (!error && fatigaVal >= 4) {
       await supabase.from('alertas').insert({
         entrenador_id: cliente?.entrenador_id,
@@ -219,14 +289,208 @@ export default function PortalCliente() {
       }).catch(() => {})
     }
 
+    // Registrar actividad
+    supabase.from('actividad_cliente').insert({
+      cliente_id: clienteId,
+      entrenador_id: cliente?.entrenador_id,
+      tipo: 'sesion_completada',
+      descripcion: `Sesión completada · RPE ${rpeVal}/10`
+    }).catch(() => {})
+
     setGuardandoValoracion(false)
     if(!error){
       setPendientesValorar(prev => prev.filter(s => s.id !== valorando.id))
-      setValorando(null); setRpeVal(7); setFatigaVal(2); setSensacionesVal('')
+      setValorando(null)
+      setRpeVal(7); setFatigaVal(2); setSensacionesVal('')
+      setEjerciciosSesion([]); setPasoValoracion('ejercicios')
     }
   }
 
-  async function enviarMensaje(){
+  // Registro de sesión online — el cliente anota pesos y reps reales
+  function abrirRegistroSesion(dia) {
+    const ejerciciosFuerza = (dia.ejercicios || []).filter(e =>
+      e.patron !== 'calentamiento' && e.patron !== 'movilidad' && e.patron !== 'cardio'
+    )
+    const dataInicial = {}
+    ejerciciosFuerza.forEach(ej => {
+      const numSeries = parseInt(ej.series) || 3
+      dataInicial[ej.nombre] = Array.from({ length: numSeries }, (_, i) => ({
+        set: i + 1, peso: '', reps: ej.reps || '', completado: false
+      }))
+    })
+    setRegistrandoSesion({ dia, ejercicios: ejerciciosFuerza })
+    setRegistroData(dataInicial)
+    setRegistroRPE(null)
+    setRegistroPaso('ejercicios')
+  }
+
+  async function guardarRegistroSesion() {
+    if (!clienteId || !registrandoSesion) return
+    setGuardandoRegistro(true)
+
+    try {
+      // 1. Crear la sesión en BD
+      const hoy = new Date().toISOString().split('T')[0]
+      const { data: sesionNueva } = await supabase.from('sesiones').insert({
+        cliente_id: clienteId,
+        entrenador_id: cliente.entrenador_id,
+        fecha: hoy,
+        tipo: 'online',
+        completada: true,
+        rpe_cliente: registroRPE,
+        notas_cliente: `${registrandoSesion.dia.nombre || 'Sesión'} — registrada por el cliente`,
+      }).select('id').single()
+
+      if (!sesionNueva) throw new Error('Error creando sesión')
+
+      // 2. Guardar ejercicios con los datos reales
+      const ejerciciosParaGuardar = Object.entries(registroData)
+        .filter(([_, sets]) => sets.some(s => s.peso || s.reps))
+        .map(([nombre, sets], idx) => {
+          const ejOriginal = registrandoSesion.ejercicios.find(e => e.nombre === nombre)
+          return {
+            sesion_id: sesionNueva.id,
+            cliente_id: clienteId,
+            entrenador_id: cliente.entrenador_id,
+            ejercicio_nombre: nombre,
+            patron: ejOriginal?.patron || 'fuerza',
+            orden: idx + 1,
+            sets: sets.filter(s => s.completado || s.peso || s.reps).map(s => ({
+              set: s.set,
+              peso: s.peso ? parseFloat(s.peso) : null,
+              reps: s.reps,
+              completado: s.completado,
+            })),
+          }
+        })
+
+      if (ejerciciosParaGuardar.length > 0) {
+        await supabase.from('sesion_ejercicios').insert(ejerciciosParaGuardar)
+      }
+
+      // 3. Detectar marcas personales automáticamente
+      for (const [nombre, sets] of Object.entries(registroData)) {
+        const pesosValidos = sets
+          .filter(s => s.completado && s.peso)
+          .map(s => parseFloat(s.peso))
+          .filter(p => !isNaN(p) && p > 0)
+
+        if (pesosValidos.length === 0) continue
+        const maxPeso = Math.max(...pesosValidos)
+
+        // Ver la marca anterior
+        const { data: marcaAnterior } = await supabase.from('marcas_cliente')
+          .select('valor').eq('cliente_id', clienteId).eq('ejercicio', nombre)
+          .order('fecha', { ascending: false }).limit(1).maybeSingle()
+
+        const pesoAnterior = marcaAnterior ? parseFloat(marcaAnterior.valor) : 0
+
+        if (maxPeso > pesoAnterior) {
+          // ¡Nueva marca personal!
+          await supabase.from('marcas_cliente').insert({
+            cliente_id: clienteId,
+            entrenador_id: cliente.entrenador_id,
+            ejercicio: nombre,
+            valor: maxPeso,
+            unidad: 'kg',
+            fecha: hoy,
+            notas: `Marca registrada automáticamente — sesión ${hoy}`,
+          })
+        }
+      }
+
+      // 4. Registrar actividad
+      await supabase.from('actividad_cliente').insert({
+        cliente_id: clienteId,
+        entrenador_id: cliente.entrenador_id,
+        tipo: 'dia_completado',
+        descripcion: `Sesión completada: ${registrandoSesion.dia.nombre || 'Entrenamiento'}`,
+      }).catch(() => {})
+
+      setRegistrandoSesion(null)
+      setRegistroData({})
+      setGuardandoRegistro(false)
+      // Mostrar confirmación en inicio
+      setTab('inicio')
+    } catch (err) {
+      console.error('Error guardando sesión:', err)
+      setGuardandoRegistro(false)
+    }
+  }
+
+  async function abrirValoracion(sesion) {
+    setValorando(sesion)
+    setPasoValoracion('ejercicios')
+    setCargandoEjercicios(true)
+    setEjerciciosSesion([])
+
+    // Cargar ejercicios de la rutina del día correspondiente
+    if (rutina?.borrador?.dias) {
+      // Detectar qué día de la semana es la sesión y buscar el día de rutina
+      const fechaSesion = new Date(sesion.fecha + 'T12:00')
+      const diaSemana = fechaSesion.getDay() || 7 // 1=Lun..7=Dom
+      const dias = rutina.borrador.dias || []
+
+      // Intentar encontrar el día por número de día de semana o simplemente el día del índice
+      // Como no hay un campo de día de semana en el borrador, usamos el índice del día
+      // La sesión tiene tipo que podría indicar el día
+      let diaRutina = dias[0] // fallback al primer día
+
+      // Si la sesión tiene día_numero, usarlo
+      if (sesion.dia_numero && dias[sesion.dia_numero - 1]) {
+        diaRutina = dias[sesion.dia_numero - 1]
+      } else if (dias.length > 0) {
+        // Rotar por semana: calcular semanas desde inicio del plan
+        const inicioRutina = rutina.created_at ? new Date(rutina.created_at) : new Date()
+        const diffDias = Math.floor((fechaSesion.getTime() - inicioRutina.getTime()) / 864e5)
+        const diaIdx = diffDias % dias.length
+        diaRutina = dias[Math.max(0, diaIdx)]
+      }
+
+      if (diaRutina?.ejercicios?.length > 0) {
+        // Ver si ya hay ejercicios registrados para esta sesión
+        const { data: registrados } = await supabase.from('sesion_ejercicios')
+          .select('ejercicio_nombre,sets').eq('sesion_id', sesion.id)
+
+        const mapaRegistrados = {}
+        ;(registrados || []).forEach(r => { mapaRegistrados[r.ejercicio_nombre] = r.sets })
+
+        // Cargar historial de cada ejercicio para mostrar el peso anterior
+        const ejerciciosConHistorial = await Promise.all(
+          diaRutina.ejercicios.map(async (ej) => {
+            const { data: ultimo } = await supabase.from('sesion_ejercicios')
+              .select('sets,created_at')
+              .eq('cliente_id', clienteId)
+              .ilike('ejercicio_nombre', ej.nombre)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
+            const ultimoPeso = ultimo?.sets?.find((s: any) => s.peso)?.peso
+            const numSeries = ej.series || 3
+
+            // Si ya registró esta sesión, prellenar con esos datos
+            const yaSets = mapaRegistrados[ej.nombre]
+
+            return {
+              nombre: ej.nombre,
+              patron: ej.patron,
+              series: numSeries,
+              reps: ej.reps || '8-12',
+              ultimoPeso: ultimoPeso || null,
+              sets: yaSets || Array.from({ length: numSeries }, (_, i) => ({
+                numero: i + 1,
+                peso: ultimoPeso ? String(ultimoPeso) : '',
+                reps: ej.reps || '8-12'
+              }))
+            }
+          })
+        )
+        setEjerciciosSesion(ejerciciosConHistorial)
+      }
+    }
+    setCargandoEjercicios(false)
+  }
     if(!textoMsg.trim()||enviandoMsg) return
     setEnviandoMsg(true)
     await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{contenido:textoMsg.trim()}}}).catch(()=>{})
@@ -800,6 +1064,130 @@ export default function PortalCliente() {
                   </div>
                 )}
 
+                {/* Modal registro de sesión online */}
+                {registrandoSesion && (
+                  <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setRegistrandoSesion(null)}>
+                    <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                      {/* Cabecera */}
+                      <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-black/5 z-10">
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="font-bold text-[#0A0A0A]">Registrar sesión</h3>
+                          <button onClick={() => setRegistrandoSesion(null)} className="text-[#9B9B9B] text-xl">×</button>
+                        </div>
+                        <p className="text-xs text-[#9B9B9B]">{registrandoSesion.dia.nombre}</p>
+                        {/* Pasos */}
+                        <div className="flex gap-2 mt-3">
+                          {['ejercicios', 'rpe'].map((p, i) => (
+                            <div key={p} className={`flex-1 h-1 rounded-full transition-all ${registroPaso === p || (i === 0) ? '' : 'bg-black/10'}`}
+                              style={{background: registroPaso === p ? color : i === 0 && registroPaso === 'rpe' ? color : '#E5E5E5'}}/>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-5">
+                        {registroPaso === 'ejercicios' ? (
+                          <div className="space-y-5">
+                            <p className="text-xs text-[#6B6B6B]">Anota el peso y reps que hiciste en cada serie. Marca las que completaste.</p>
+
+                            {registrandoSesion.ejercicios.map(ej => {
+                              const sets = registroData[ej.nombre] || []
+                              return (
+                                <div key={ej.nombre} className="border border-black/8 rounded-2xl overflow-hidden">
+                                  <div className="px-4 py-3 flex items-center justify-between" style={{background:`${color}10`}}>
+                                    <div>
+                                      <p className="text-sm font-bold text-[#0A0A0A]">{ej.nombre}</p>
+                                      <p className="text-xs text-[#9B9B9B]">{ej.series} series · {ej.reps} reps planificadas</p>
+                                    </div>
+                                  </div>
+                                  <div className="divide-y divide-black/5">
+                                    {sets.map((s, si) => (
+                                      <div key={si} className="flex items-center gap-3 px-4 py-3">
+                                        {/* Tick completado */}
+                                        <button onClick={() => {
+                                          const nuevo = [...sets]
+                                          nuevo[si] = { ...nuevo[si], completado: !nuevo[si].completado }
+                                          setRegistroData(prev => ({ ...prev, [ej.nombre]: nuevo }))
+                                        }}
+                                          className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${s.completado ? 'text-white border-transparent' : 'border-black/20'}`}
+                                          style={s.completado ? {background: color} : {}}>
+                                          {s.completado && <span className="text-xs font-bold">✓</span>}
+                                        </button>
+                                        <span className="text-xs text-[#9B9B9B] w-12 flex-shrink-0">Serie {s.set}</span>
+                                        {/* Peso */}
+                                        <div className="flex items-center gap-1 flex-1">
+                                          <input type="number" placeholder="—"
+                                            value={s.peso} onChange={e => {
+                                              const nuevo = [...sets]
+                                              nuevo[si] = { ...nuevo[si], peso: e.target.value }
+                                              setRegistroData(prev => ({ ...prev, [ej.nombre]: nuevo }))
+                                            }}
+                                            className="w-16 text-center border border-black/10 rounded-xl py-1.5 text-sm font-bold focus:outline-none focus:border-[#FF5C00]"/>
+                                          <span className="text-xs text-[#9B9B9B]">kg</span>
+                                        </div>
+                                        {/* Reps */}
+                                        <div className="flex items-center gap-1 flex-1">
+                                          <input type="text" placeholder={ej.reps}
+                                            value={s.reps} onChange={e => {
+                                              const nuevo = [...sets]
+                                              nuevo[si] = { ...nuevo[si], reps: e.target.value }
+                                              setRegistroData(prev => ({ ...prev, [ej.nombre]: nuevo }))
+                                            }}
+                                            className="w-16 text-center border border-black/10 rounded-xl py-1.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                                          <span className="text-xs text-[#9B9B9B]">reps</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            })}
+
+                            <button onClick={() => setRegistroPaso('rpe')}
+                              className="w-full py-3.5 rounded-xl text-white font-bold text-sm"
+                              style={{background: color}}>
+                              Siguiente →
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-6">
+                            <div className="text-center py-4">
+                              <p className="text-4xl mb-3">💪</p>
+                              <p className="font-bold text-[#0A0A0A] text-lg">¿Cómo ha ido el entreno?</p>
+                              <p className="text-xs text-[#9B9B9B] mt-1">Esfuerzo percibido general — del 1 al 10</p>
+                            </div>
+                            <div className="grid grid-cols-5 gap-2">
+                              {[1,2,3,4,5,6,7,8,9,10].map(v => (
+                                <button key={v} onClick={() => setRegistroRPE(v)}
+                                  className={`aspect-square rounded-xl text-sm font-bold transition-all ${registroRPE === v ? 'text-white scale-105' : 'border border-black/10 text-[#6B6B6B]'}`}
+                                  style={registroRPE === v ? {background: v >= 8 ? '#ef4444' : v >= 5 ? color : '#10b981'} : {}}>
+                                  {v}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2 text-xs text-[#9B9B9B] justify-between px-1">
+                              <span>😊 Fácil</span>
+                              <span>😤 Intenso</span>
+                              <span>💀 Al límite</span>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                              <button onClick={() => setRegistroPaso('ejercicios')}
+                                className="flex-1 border border-black/10 text-[#6B6B6B] py-3 rounded-xl text-sm font-medium">
+                                ← Volver
+                              </button>
+                              <button onClick={guardarRegistroSesion} disabled={guardandoRegistro}
+                                className="flex-1 py-3 rounded-xl text-white font-bold text-sm disabled:opacity-50"
+                                style={{background: color}}>
+                                {guardandoRegistro ? '⏳ Guardando...' : '✓ Guardar sesión'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {valorando&&(
                   <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>setValorando(null)}>
                     <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
@@ -934,6 +1322,14 @@ export default function PortalCliente() {
                             ))
                           })()}
                         </div>
+                      </div>
+                      {/* Botón registrar sesión */}
+                      <div className="px-4 pb-4">
+                        <button onClick={() => abrirRegistroSesion(dia)}
+                          className="w-full py-3 rounded-xl text-white text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+                          style={{background: color}}>
+                          ✓ Registrar esta sesión
+                        </button>
                       </div>
                     ))}
                   </>

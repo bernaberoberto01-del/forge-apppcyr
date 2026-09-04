@@ -1215,41 +1215,7 @@ export default function Clientes({ session }) {
                 </div>
               )}
               {dTab==='sesiones' && (
-                <div className="space-y-1.5">
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {[
-                      ['Este mes', dData.sesiones?.filter(s=>new Date(s.fecha)>new Date(Date.now()-30*864e5)).length||0, '#FF5C00'],
-                      ['RPE medio', dData.sesiones?.length ? (dData.sesiones.slice(0,8).reduce((s,x)=>s+(x.rpe||0),0)/Math.min(dData.sesiones.length,8)).toFixed(1) : '—', '#6366f1'],
-                      ['Total', dData.sesiones?.length||0, '#6B6B6B'],
-                    ].map(([l,v,c])=>(
-                      <div key={l} className="bg-[#F5F5F0] rounded-xl p-2.5 text-center">
-                        <p className="text-lg font-bold" style={{color:c}}>{v}</p>
-                        <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
-                      </div>
-                    ))}
-                  </div>
-                  {!dData.sesiones?.length ? <p className="text-sm text-[#6B6B6B] text-center py-4">Sin sesiones registradas</p> :
-                    dData.sesiones.slice(0,10).map(s => (
-                      <div key={s.id} className="border border-black/5 rounded-xl p-3">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <p className="text-sm font-semibold text-[#0A0A0A]">{new Date(s.fecha).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}</p>
-                          <div className="flex gap-1.5">
-                            {s.rpe && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full">RPE {s.rpe}</span>}
-                            {s.fatiga_post && <span className={`text-xs px-2 py-1 rounded-full ${s.fatiga_post>=4?'bg-red-50 text-red-600':'bg-emerald-50 text-emerald-700'}`}>💪 {s.fatiga_post}/5</span>}
-                          </div>
-                        </div>
-                        {s.ejercicios?.length > 0 && (
-                          <div className="flex gap-1 flex-wrap">
-                            {s.ejercicios.slice(0,4).map((ej,i)=>(
-                              <span key={i} className="text-xs bg-[#F5F5F0] text-[#6B6B6B] px-2 py-0.5 rounded-full">{ej.ejercicio_nombre}</span>
-                            ))}
-                            {s.ejercicios.length > 4 && <span className="text-xs text-[#6B6B6B]">+{s.ejercicios.length-4}</span>}
-                          </div>
-                        )}
-                        {s.sensaciones && <p className="text-xs text-[#6B6B6B] mt-1.5 italic">"{s.sensaciones}"</p>}
-                      </div>
-                    ))}
-                </div>
+                <ProgresoCargas clienteId={detalle.id} />
               )}
               {dTab==='extra' && (
                 <div className="space-y-4">
@@ -2104,6 +2070,135 @@ function GestionHabitos({ clienteId, entrenadorId }) {
           className="w-full border-2 border-dashed border-black/10 rounded-2xl py-3 text-sm text-[#9B9B9B] hover:border-[#FF5C00]/30 hover:text-[#FF5C00] transition-all">
           + Añadir hábito
         </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Progresión de cargas por ejercicio ──────────────────────────────────
+function ProgresoCargas({ clienteId }) {
+  const [datos, setDatos] = useState([]) // [{ ejercicio, registros: [{fecha, peso, reps}] }]
+  const [cargando, setCargando] = useState(true)
+  const [ejercicioSel, setEjercicioSel] = useState(null)
+
+  useEffect(() => {
+    if (!clienteId) return
+    cargarProgreso()
+  }, [clienteId])
+
+  async function cargarProgreso() {
+    setCargando(true)
+    const { data } = await supabase.from('sesion_ejercicios')
+      .select('ejercicio_nombre, sets, created_at, sesiones(fecha)')
+      .eq('cliente_id', clienteId)
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (!data) { setCargando(false); return }
+
+    // Agrupar por ejercicio
+    const mapaEjercicio = {}
+    for (const reg of data) {
+      const nombre = reg.ejercicio_nombre
+      if (!mapaEjercicio[nombre]) mapaEjercicio[nombre] = []
+      const sets = reg.sets || []
+      const pesosValidos = sets.filter(s => s.peso && !isNaN(parseFloat(s.peso))).map(s => parseFloat(s.peso))
+      if (pesosValidos.length === 0) continue
+      const maxPeso = Math.max(...pesosValidos)
+      const fecha = reg.sesiones?.fecha || reg.created_at?.split('T')[0]
+      mapaEjercicio[nombre].push({ fecha, peso: maxPeso, sets })
+    }
+
+    // Ordenar por fecha y construir lista
+    const lista = Object.entries(mapaEjercicio)
+      .filter(([_, registros]) => registros.length >= 2) // solo ejercicios con historial
+      .map(([ejercicio, registros]) => ({
+        ejercicio,
+        registros: registros.sort((a, b) => a.fecha.localeCompare(b.fecha)),
+        ultimoPeso: registros[registros.length - 1]?.peso,
+        primerPeso: registros[0]?.peso,
+      }))
+      .sort((a, b) => b.registros.length - a.registros.length) // más registros primero
+
+    setDatos(lista)
+    if (lista.length > 0) setEjercicioSel(lista[0].ejercicio)
+    setCargando(false)
+  }
+
+  if (cargando) return <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+
+  if (datos.length === 0) return (
+    <div className="text-center py-10">
+      <p className="text-3xl mb-2">📊</p>
+      <p className="text-sm font-bold text-[#0A0A0A]">Sin sesiones registradas</p>
+      <p className="text-xs text-[#9B9B9B] mt-1 leading-relaxed max-w-xs mx-auto">
+        Cuando el cliente registre sus sesiones desde el portal, la progresión de cargas aparecerá aquí automáticamente.
+      </p>
+    </div>
+  )
+
+  const selData = datos.find(d => d.ejercicio === ejercicioSel)
+  const progreso = selData ? selData.ultimoPeso - selData.primerPeso : 0
+
+  return (
+    <div className="space-y-4">
+      {/* Selector de ejercicio */}
+      <div className="flex flex-wrap gap-1.5">
+        {datos.map(d => {
+          const prog = d.ultimoPeso - d.primerPeso
+          return (
+            <button key={d.ejercicio} onClick={() => setEjercicioSel(d.ejercicio)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${ejercicioSel === d.ejercicio ? 'text-white' : 'border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}
+              style={ejercicioSel === d.ejercicio ? {background:'#FF5C00'} : {}}>
+              {d.ejercicio}
+              {prog > 0 && <span className={`text-[10px] font-bold ${ejercicioSel === d.ejercicio ? 'text-white/80' : 'text-emerald-600'}`}>+{prog}kg</span>}
+            </button>
+          )
+        })}
+      </div>
+
+      {selData && (
+        <>
+          {/* Resumen del ejercicio seleccionado */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-[#F7F6F3] rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-[#0A0A0A]">{selData.primerPeso}kg</p>
+              <p className="text-xs text-[#9B9B9B]">Inicio</p>
+            </div>
+            <div className="bg-[#F7F6F3] rounded-xl p-3 text-center">
+              <p className="text-lg font-bold text-[#0A0A0A]">{selData.ultimoPeso}kg</p>
+              <p className="text-xs text-[#9B9B9B]">Ahora</p>
+            </div>
+            <div className={`rounded-xl p-3 text-center ${progreso > 0 ? 'bg-emerald-50' : progreso < 0 ? 'bg-red-50' : 'bg-[#F7F6F3]'}`}>
+              <p className={`text-lg font-bold ${progreso > 0 ? 'text-emerald-600' : progreso < 0 ? 'text-red-500' : 'text-[#6B6B6B]'}`}>
+                {progreso > 0 ? '+' : ''}{progreso}kg
+              </p>
+              <p className="text-xs text-[#9B9B9B]">Progresión</p>
+            </div>
+          </div>
+
+          {/* Historial de registros */}
+          <div className="bg-white border border-black/5 rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-black/5">
+              <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-wide">{selData.ejercicio}</p>
+            </div>
+            <div className="divide-y divide-black/5">
+              {selData.registros.slice().reverse().map((r, i) => {
+                const esMarca = i === 0 && progreso > 0
+                return (
+                  <div key={i} className={`flex items-center gap-3 px-4 py-3 ${esMarca ? 'bg-emerald-50' : ''}`}>
+                    <p className="text-xs text-[#9B9B9B] w-20 flex-shrink-0">
+                      {new Date(r.fecha + 'T12:00').toLocaleDateString('es-ES', {day:'numeric',month:'short'})}
+                    </p>
+                    <p className="text-sm font-bold text-[#0A0A0A] flex-1">{r.peso}kg</p>
+                    <p className="text-xs text-[#9B9B9B]">{r.sets?.filter(s=>s.completado).length || r.sets?.length || 0} series</p>
+                    {esMarca && <span className="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full font-bold">🏆 PR</span>}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </>
       )}
     </div>
   )
