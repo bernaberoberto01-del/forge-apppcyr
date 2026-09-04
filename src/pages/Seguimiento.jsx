@@ -921,3 +921,5 @@ export default function Seguimiento({ session }) {
         </div>
       )}
     </div>
+  )
+}
