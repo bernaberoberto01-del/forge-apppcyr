@@ -256,7 +256,7 @@ export default function PortalCliente() {
           .limit(1)
           .maybeSingle()
 
-        const valorActual = marcaActual ? parseFloat(marcaActual.valor) : 0
+        const valorActual = marcaActual ? parseFloat(marcaActual.peso_kg) : 0
         if (maxPeso > valorActual) {
           // Nueva marca personal 🏆
           await supabase.from('marcas_cliente').insert({
@@ -383,7 +383,7 @@ export default function PortalCliente() {
           .select('valor').eq('cliente_id', clienteId).eq('ejercicio', nombre)
           .order('fecha', { ascending: false }).limit(1).maybeSingle()
 
-        const pesoAnterior = marcaAnterior ? parseFloat(marcaAnterior.valor) : 0
+        const pesoAnterior = marcaAnterior ? parseFloat(marcaAnterior.peso_kg) : 0
 
         if (maxPeso > pesoAnterior) {
           // ¡Nueva marca personal!
@@ -1044,25 +1044,7 @@ export default function PortalCliente() {
                   </div>
                 )}
 
-                {/* Modal cancelar sesión */}
-                {cancelando&&(
-                  <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>{setCancelando(null);setMotivoCancel('')}}>
-                    <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={e=>e.stopPropagation()}>
-                      <h3 className="font-bold text-[#0A0A0A] text-lg mb-1">¿Cancelar sesión?</h3>
-                      <p className="text-sm text-[#6B6B6B] mb-4">{new Date(cancelando.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})} · {cancelando.hora}</p>
-                      <textarea value={motivoCancel} onChange={e=>setMotivoCancel(e.target.value)} rows={2} placeholder="Motivo (opcional)" className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-3 resize-none" style={{'--tw-ring-color':color}}/>
-                      <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5 mb-4">⚠ Tu entrenador recibirá una notificación</p>
-                      <div className="flex gap-2">
-                        <button onClick={()=>{setCancelando(null);setMotivoCancel('')}} className="flex-1 border border-black/10 text-sm py-3 rounded-xl text-[#6B6B6B] font-medium">Volver</button>
-                        <button onClick={async()=>{
-                          await supabase.functions.invoke('portal-accion',{body:{accion:'cancelar_sesion',datos:{sesion_id:cancelando.id,motivo:motivoCancel}}})
-                          setSesionesPortal(prev=>prev.filter(s=>s.id!==cancelando.id))
-                          setCancelando(null);setMotivoCancel('')
-                        }} className="flex-1 text-white text-sm font-semibold py-3 rounded-xl" style={{background:'#ef4444'}}>Confirmar</button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+
 
                 {/* Modal registro de sesión online */}
                 {registrandoSesion && (
@@ -1346,6 +1328,11 @@ export default function PortalCliente() {
                 sesionesPortal={sesionesPortal}
                 color={color}
                 cliente={cliente}
+                cancelando={cancelando}
+                setCancelando={setCancelando}
+                motivoCancel={motivoCancel}
+                setMotivoCancel={setMotivoCancel}
+                onCancelada={(id) => setSesionesPortal(prev => prev.filter(s => s.id !== id))}
               />
             )}
 
@@ -2580,7 +2567,7 @@ function HabitosPortal({ clienteId, color }) {
 
 // ─── Agenda de la semana del cliente ──────────────────────────────────────
 // ─── Agenda del cliente — vista semana y mes ──────────────────────────────
-function AgendaSemana({ clienteId, sesionesPortal, color }) {
+function AgendaSemana({ clienteId, sesionesPortal, color, cliente, cancelando, setCancelando, motivoCancel, setMotivoCancel, onCancelada }) {
   const [vista, setVista] = useState('semana') // 'semana' | 'mes'
   const [offset, setOffset] = useState(0)
   const [sesionesExtra, setSesionesExtra] = useState(null)
@@ -2722,6 +2709,12 @@ function AgendaSemana({ clienteId, sesionesPortal, color }) {
                             {s.completada ? ' · ✓ Completado' : ''}
                           </p>
                         </div>
+                        {!s.completada && new Date(s.fecha + 'T23:59') > new Date() && setCancelando && (
+                          <button onClick={() => setCancelando(s)}
+                            className="text-xs text-[#C0C0C0] hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-50 transition-all flex-shrink-0">
+                            Cancelar
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2811,6 +2804,12 @@ function AgendaSemana({ clienteId, sesionesPortal, color }) {
                       {s.completada ? ' · ✓' : ''}
                     </p>
                   </div>
+                  {!s.completada && new Date(s.fecha + 'T23:59') > new Date() && setCancelando && (
+                    <button onClick={() => setCancelando(s)}
+                      className="text-xs text-[#C0C0C0] hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-50 transition-all flex-shrink-0">
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -2838,6 +2837,48 @@ function AgendaSemana({ clienteId, sesionesPortal, color }) {
               <p className="text-xs text-[#9B9B9B] mt-0.5">{l}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Modal cancelar sesión */}
+      {cancelando && setCancelando && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
+          onClick={() => { setCancelando(null); setMotivoCancel && setMotivoCancel('') }}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[#0A0A0A] text-lg mb-1">¿Cancelar sesión?</h3>
+            <p className="text-sm text-[#6B6B6B] mb-4">
+              {new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'})}
+              {cancelando.hora ? ' · ' + cancelando.hora.slice(0,5) : ''}
+            </p>
+            <textarea
+              value={motivoCancel || ''}
+              onChange={e => setMotivoCancel && setMotivoCancel(e.target.value)}
+              rows={2}
+              placeholder="Motivo (opcional)"
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-3 resize-none"/>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5 mb-4">
+              ⚠ Tu entrenador recibirá una notificación
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setCancelando(null); setMotivoCancel && setMotivoCancel('') }}
+                className="flex-1 border border-black/10 text-sm py-3 rounded-xl text-[#6B6B6B] font-medium">
+                Volver
+              </button>
+              <button
+                onClick={async () => {
+                  await supabase.functions.invoke('portal-accion', {
+                    body: { accion: 'cancelar_sesion', datos: { sesion_id: cancelando.id, motivo: motivoCancel || '' } }
+                  })
+                  onCancelada && onCancelada(cancelando.id)
+                  setCancelando(null)
+                  setMotivoCancel && setMotivoCancel('')
+                }}
+                className="flex-1 text-white text-sm font-semibold py-3 rounded-xl bg-red-500">
+                Confirmar cancelación
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
