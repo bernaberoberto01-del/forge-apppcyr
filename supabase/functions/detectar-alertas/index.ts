@@ -23,7 +23,7 @@ Deno.serve(async (req)=>{
       // ALERTA 1: Fatiga/estres alto 2 semanas seguidas
       const ultimos2 = checkins.slice(0, 2);
       if (ultimos2.length === 2) {
-        const fatigaAlta = ultimos2.every((c)=>c.estres >= 4 || c.energia <= 3 || c.fatiga >= 4);
+        const fatigaAlta = ultimos2.every((c)=>c.estres >= 7 || c.energia <= 2 || c.fatiga >= 7);
         if (fatigaAlta) {
           const yaExiste = await supabase.from('alertas').select('id').eq('cliente_id', cliente.id).eq('tipo', 'fatiga_alta').gte('created_at', hace14).single();
           if (!yaExiste.data) {

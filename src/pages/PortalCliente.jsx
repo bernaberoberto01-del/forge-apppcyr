@@ -1014,7 +1014,7 @@ export default function PortalCliente() {
                         <div className="flex gap-1.5 flex-wrap">
                           {ci.peso&&<span className="text-xs bg-orange-50 text-orange-700 px-2.5 py-1 rounded-full">⚖️ {ci.peso}kg</span>}
                           {ci.energia&&<span className="text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full">⚡ {ci.energia}/10</span>}
-                          {ci.estres&&<span className={`text-xs px-2.5 py-1 rounded-full ${ci.estres>=4?'bg-red-50 text-red-700':'bg-emerald-50 text-emerald-700'}`}>😤 {ci.estres}/5</span>}
+                          {ci.estres&&<span className={`text-xs px-2.5 py-1 rounded-full ${ci.estres>=7?'bg-red-50 text-red-700':ci.estres>=5?'bg-amber-50 text-amber-700':'bg-emerald-50 text-emerald-700'}`}>😤 {ci.estres}/10</span>}
                           {ci.motivacion&&<span className="text-xs bg-yellow-50 text-yellow-700 px-2.5 py-1 rounded-full">💫 {ci.motivacion}/7</span>}
                         </div>
                       </div>

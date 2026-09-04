@@ -215,8 +215,8 @@ export default function CheckinPublico() {
             {[
               { field: 'energia', label: '⚡ Energía esta semana', desc: 'En general, ¿cómo ha estado tu nivel de energía?', opciones: [[1,'💀 Agotado'],[2,'😔 Bajo'],[3,'😐 Normal'],[4,'😊 Bueno'],[5,'🚀 Al 100%']] },
               { field: 'sueno', label: '😴 Calidad del sueño', desc: '¿Cómo has dormido esta semana?', opciones: [[1,'Muy mal'],[2,'Mal'],[3,'Regular'],[4,'Bien'],[5,'Muy bien']] },
-              { field: 'estres', label: '🧠 Estrés o carga mental', desc: 'Trabajo, estudios, vida personal…', opciones: [[1,'Sin estrés'],[2,'Leve'],[3,'Moderado'],[4,'Alto'],[5,'Desbordado']], red: true },
-              { field: 'fatiga', label: '💪 Fatiga muscular', desc: '¿Cómo notas el cuerpo físicamente?', opciones: [[1,'Fresco'],[2,'Algo cansado'],[3,'Cansado'],[4,'Muy cansado'],[5,'Destrozado']], red: true },
+              { field: 'estres', label: '🧠 Estrés o carga mental', desc: 'Trabajo, estudios, vida personal… (1 = sin estrés, 10 = desbordado)', opciones: [[1,'1'],[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8'],[9,'9'],[10,'10']], red: true },
+              { field: 'fatiga', label: '💪 Fatiga muscular', desc: 'Cómo notas el cuerpo físicamente (1 = fresco, 10 = destrozado)', opciones: [[1,'1'],[2,'2'],[3,'3'],[4,'4'],[5,'5'],[6,'6'],[7,'7'],[8,'8'],[9,'9'],[10,'10']], red: true },
             ].map(({ field, label, desc, opciones, red }) => (
               <div key={field} className="bg-white rounded-2xl border border-black/5 p-5">
                 <p className="text-sm font-bold text-[#0A0A0A] mb-1">{label}</p>
@@ -277,8 +277,8 @@ export default function CheckinPublico() {
                 ['🏋️ Cargas', {muy_facil:'Demasiado fácil',bien:'Ajustadas',duro:'Algo duras',muy_duro:'Muy duras'}[form.cargas_sensacion] || '—'],
                 ['⚡ Energía', form.energia ? ['','💀','😔','😐','😊','🚀'][form.energia] + ' ' + form.energia + '/5' : '—'],
                 ['😴 Sueño', form.sueno ? ['','Muy mal','Mal','Regular','Bien','Muy bien'][form.sueno] : '—'],
-                ['🧠 Estrés', form.estres ? ['','Sin estrés','Leve','Moderado','Alto','Desbordado'][form.estres] : '—'],
-                ['💪 Fatiga', form.fatiga ? ['','Fresco','Algo cansado','Cansado','Muy cansado','Destrozado'][form.fatiga] : '—'],
+                ['🧠 Estrés', form.estres ? form.estres + '/10' : '—'],
+                ['💪 Fatiga', form.fatiga ? form.fatiga + '/10' : '—'],
               ].map(([k,v]) => (
                 <div key={k} className="flex items-center justify-between">
                   <p className="text-xs text-[#6B6B6B]">{k}</p>

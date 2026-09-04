@@ -50,7 +50,7 @@ async function analizarCliente(clienteId: string, entrenadorId: string) {
   ])
 
   // Decidir acción
-  const sinergiaProblema = (fatiga != null && fatiga >= 4.2) && (energia != null && energia <= 1.8) && (adherencia != null && adherencia < 50)
+  const sinergiaProblema = (fatiga != null && fatiga >= 7) && (energia != null && energia <= 2) && (adherencia != null && adherencia < 50)
   const bajaAdherencia = adherencia != null && adherencia < 50
   const evolucionPositiva = (adherencia != null && adherencia >= 75) && (bien >= 2 || muyFacil >= 2) && (fatiga == null || fatiga < 3.5)
   const ajusteNecesario = muyFacil >= 2 || muyDuro >= 2 || (energia != null && energia <= 2 && !sinergiaProblema) || (estres != null && estres >= 4)

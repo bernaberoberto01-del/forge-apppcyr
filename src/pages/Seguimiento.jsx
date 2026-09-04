@@ -23,7 +23,7 @@ const initForm = {
 }
 
 const badgeColor = (field, val) => {
-  if (field === 'estres' || field === 'fatiga') return val >= 4 ? 'bg-red-50 text-red-700' : val >= 3 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'
+  if (field === 'estres' || field === 'fatiga') return val >= 7 ? 'bg-red-50 text-red-700' : val >= 5 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'
   if (field === 'energia' || field === 'motivacion' || field === 'calidad_entreno') return val >= 7 ? 'bg-green-50 text-green-700' : val >= 4 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'
   if (field === 'adherencia_entreno' || field === 'adherencia_nutricion') return val >= 7 ? 'bg-green-50 text-green-700' : val >= 4 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
   return 'bg-[#F5F5F0] text-[#6B6B6B]'
@@ -63,7 +63,7 @@ export default function Seguimiento({ session }) {
     let r = [...checkins]
     if (filtroCliente !== 'todos') r = r.filter(x => x.cliente_id === filtroCliente)
     if (busqueda) { const b = busqueda.toLowerCase(); r = r.filter(x => x.clientes?.nombre?.toLowerCase().includes(b)) }
-    if (filtroAlerta === 'fatiga') r = r.filter(x => x.fatiga >= 4 || x.estres >= 4)
+    if (filtroAlerta === 'fatiga') r = r.filter(x => x.fatiga >= 7 || x.estres >= 7)
     if (filtroAlerta === 'energia_baja') r = r.filter(x => x.energia <= 3)
     if (filtroAlerta === 'baja_adherencia') r = r.filter(x => x.adherencia_entreno <= 4)
     return r
@@ -137,7 +137,7 @@ export default function Seguimiento({ session }) {
 
   const Btn = ({ field, val }) => {
     const active = form[field] === val
-    const isRed = (field === 'estres' || field === 'fatiga') && val >= 4
+    const isRed = (field === 'estres' || field === 'fatiga') && val >= 7
     return (
       <button type="button" onClick={() => setForm(f => ({ ...f, [field]: val }))}
         className={`w-9 h-9 rounded-xl text-xs font-semibold transition-all ${active
@@ -193,7 +193,7 @@ export default function Seguimiento({ session }) {
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
         {[
           ['Total CI', checkins.length, '#FF5C00'],
-          ['Con fatiga alta', checkins.filter(x=>x.fatiga>=4||x.estres>=4).length, '#ef4444'],
+          ['Con fatiga alta', checkins.filter(x=>x.fatiga>=7||x.estres>=7).length, '#ef4444'],
           ['Energía baja', checkins.filter(x=>x.energia<=3).length, '#f59e0b'],
         ].map(([l,v,c])=>(
           <div key={l} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-center">
@@ -331,8 +331,8 @@ export default function Seguimiento({ session }) {
             <div className="flex gap-1.5 flex-wrap">
               {ci.energia != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('energia', ci.energia)}`}>⚡ {ci.energia}/5</span>}
               {ci.sueno != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('sueno', ci.sueno)}`}>😴 {ci.sueno}/5</span>}
-              {ci.estres != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('estres', ci.estres)}`}>🧠 {ci.estres}/5</span>}
-              {ci.fatiga != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('fatiga', ci.fatiga)}`}>🔥 {ci.fatiga}/5</span>}
+              {ci.estres != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('estres', ci.estres)}`}>🧠 {ci.estres}/10</span>}
+              {ci.fatiga != null && <span className={`text-xs px-2 py-1 rounded-full font-medium ${badgeColor('fatiga', ci.fatiga)}`}>🔥 {ci.fatiga}/10</span>}
               {ci.peso && <span className="text-xs bg-[#F5F5F0] text-[#6B6B6B] px-2 py-1 rounded-full font-medium">⚖️ {ci.peso}kg</span>}
             </div>
             {/* Logro de la semana */}
@@ -555,7 +555,7 @@ export default function Seguimiento({ session }) {
             {clientes.map(cl => {
               const ultimo = checkins.find(x => x.cliente_id === cl.id)
               const diasSinCI = ultimo?.fecha ? Math.floor((Date.now() - new Date(ultimo.fecha + 'T12:00').getTime()) / 864e5) : null
-              const alertaFatiga = ultimo && (ultimo.fatiga >= 4 || ultimo.estres >= 4)
+              const alertaFatiga = ultimo && (ultimo.fatiga >= 7 || ultimo.estres >= 7)
               return (
                 <div key={cl.id} onClick={() => ultimo && setDetalleCI(ultimo)}
                   className={`flex items-center gap-2.5 py-2.5 px-2 border-b border-black/5 last:border-0 rounded-xl transition-all ${ultimo ? 'cursor-pointer hover:bg-[#F7F6F3]' : ''}`}>
