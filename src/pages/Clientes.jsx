@@ -941,7 +941,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['actividad','📡 Actividad'],['habitos','✅ Hábitos'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -1100,16 +1100,8 @@ export default function Clientes({ session }) {
                   </div>
                 </div>
               )})()}
-              {dTab==='habitos' && (
-                <GestionHabitos clienteId={detalle.id} entrenadorId={uid} />
-              )}
-
-              {dTab==='actividad' && (
-                <ActividadCliente clienteId={detalle.id} />
-              )}
-
-              {dTab==='habitos' && (
-                <HabitosCliente clienteId={detalle.id} entrenadorId={uid} />
+              {dTab==='sesiones' && (
+                <ProgresoCargas clienteId={detalle.id} />
               )}
 
               {dTab==='progreso' && (
