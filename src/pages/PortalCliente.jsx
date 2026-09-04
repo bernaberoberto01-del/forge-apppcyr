@@ -143,7 +143,12 @@ export default function PortalCliente() {
     async function cargar(){
       setLoading(true); setNotFound(false); setCliente(null)
       const {data:cl,error}=await supabase.from('clientes').select('*').eq('auth_user_id',clienteSession.id).maybeSingle()
-      if(error||!cl){setNotFound(true);setLoading(false);return}
+      if(error||!cl){
+        // Comprobar si es un entrenador intentando acceder al portal
+        const {data:cfg}=await supabase.from('configuracion').select('entrenador_id').eq('entrenador_id',clienteSession.id).maybeSingle()
+        if(cfg) { window.location.href='/dashboard'; return }
+        setNotFound(true);setLoading(false);return
+      }
       const cid=cl.id; setCliente(cl); setClienteId(cid)
       // Registrar acceso al portal
       supabase.from('actividad_cliente').insert({
@@ -977,72 +982,27 @@ export default function PortalCliente() {
                   </button>
                 )}
 
-                {/* Card check-ins */}
-                <button onClick={()=>setTab('progreso')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
-                  <p className="text-2xl mb-2">📊</p>
-                  <p className="text-2xl font-bold text-[#0A0A0A]">{checkins.length}</p>
-                  <p className="text-xs text-[#6B6B6B] mt-0.5">Check-ins realizados</p>
-                </button>
-
-                {/* Acciones online */}
-                {cliente?.tipo==='online'&&(() => {
+                {/* Acciones — unificadas online y presencial */}
+                {(() => {
                   const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
                   const urgente = diasSin >= 7
                   return (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                    <a href="/seguimiento"
-                      className={`rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
-                      style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
-                      <span className="text-2xl mb-2">{urgente?'⏰':'📋'}</span>
-                      <p className="text-sm font-bold text-white">Check-in semanal</p>
-                      <p className="text-xs text-white/70 mt-0.5">{urgente ? (diasSin>900?'Aún no has hecho ninguno':`${diasSin} días sin registrar`) : 'Cómo te encuentras'}</p>
-                    </a>
-                    <a href="/sesion"
-                      className="bg-[#111] rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all">
-                      <span className="text-2xl mb-2">🏋️</span>
-                      <p className="text-sm font-bold text-white">Registrar entreno</p>
-                      <p className="text-xs text-white/50 mt-0.5">Apunta el entreno de hoy</p>
-                    </a>
+                      <a href="/seguimiento"
+                        className={`rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all ${urgente?'animate-pulse':''}`}
+                        style={{background: urgente?'#ef4444':color}}>
+                        <span className="text-2xl mb-2">{urgente?'⏰':'📋'}</span>
+                        <p className="text-sm font-bold text-white">Check-in semanal</p>
+                        <p className="text-xs text-white/70 mt-0.5">{urgente ? (diasSin>900?'Aún no has hecho ninguno':`${diasSin} días sin registrar`) : 'Cuéntame cómo va la semana'}</p>
+                      </a>
+                      <button onClick={() => setModalActividad(true)}
+                        className="bg-[#111] rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all">
+                        <span className="text-2xl mb-2">🚶</span>
+                        <p className="text-sm font-bold text-white">Actividad libre</p>
+                        <p className="text-xs text-white/50 mt-0.5">Caminata, carrera, deporte...</p>
+                      </button>
                     </div>
-                    <button onClick={() => setModalActividad(true)}
-                      className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
-                      <span className="text-2xl">🚶</span>
-                      <div>
-                        <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
-                        <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
-                      </div>
-                      <span className="ml-auto text-[#6B6B6B]">+</span>
-                    </button>
-                  </div>
-                  )
-                })()}
-
-                {/* Check-in presencial */}
-                {cliente?.tipo==='presencial'&&(() => {
-                  const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
-                  const urgente = diasSin >= 7
-                  return (
-                  <div className="space-y-3">
-                  <a href="/seguimiento"
-                    className={`flex items-center gap-4 rounded-2xl p-5 active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
-                    style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
-                    <span className="text-3xl">{urgente?'⏰':'📋'}</span>
-                    <div>
-                      <p className="text-sm font-bold text-white">Check-in semanal</p>
-                      <p className="text-xs text-white/70">{urgente ? (diasSin>900?'Aún no has hecho ninguno — ¡empecemos!':`Llevas ${diasSin} días sin contarme cómo vas`) : 'Cuéntame cómo va la semana'}</p>
-                    </div>
-                    <span className="ml-auto text-white/70">→</span>
-                  </a>
-                  <button onClick={() => setModalActividad(true)}
-                    className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
-                    <span className="text-2xl">🚶</span>
-                    <div>
-                      <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
-                      <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
-                    </div>
-                    <span className="ml-auto text-[#6B6B6B]">+</span>
-                  </button>
                   </div>
                   )
                 })()}
