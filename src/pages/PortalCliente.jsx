@@ -143,12 +143,7 @@ export default function PortalCliente() {
     async function cargar(){
       setLoading(true); setNotFound(false); setCliente(null)
       const {data:cl,error}=await supabase.from('clientes').select('*').eq('auth_user_id',clienteSession.id).maybeSingle()
-      if(error||!cl){
-        // Comprobar si es un entrenador intentando acceder al portal
-        const {data:cfg}=await supabase.from('configuracion').select('entrenador_id').eq('entrenador_id',clienteSession.id).maybeSingle()
-        if(cfg) { window.location.href='/dashboard'; return }
-        setNotFound(true);setLoading(false);return
-      }
+      if(error||!cl){setNotFound(true);setLoading(false);return}
       const cid=cl.id; setCliente(cl); setClienteId(cid)
       // Registrar acceso al portal
       supabase.from('actividad_cliente').insert({
@@ -171,15 +166,6 @@ export default function PortalCliente() {
       setMensajes(ms.map(m => m.tipo === 'entrenador' ? {...m, leido: true} : m))
       setFotos(ft); setPlanNutricion(pn); if(cfg)setConfigEntrenador(cfg)
       setMarcas(mc); setHistorialMedidas(meds); setTieneCuestNutricion(tieneCuest)
-
-      // Realtime — actualizar marcas cuando se registra un PR nuevo (protegido)
-      try {
-        supabase.channel(`marcas-${cid}`)
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'marcas_cliente', filter: `cliente_id=eq.${cid}` },
-            (payload) => setMarcas(prev => [payload.new, ...prev.filter(m => m.ejercicio !== payload.new.ejercicio)])
-          ).subscribe()
-      } catch (_) { /* Realtime opcional — no bloquea la carga */ }
-
       const now=new Date(); const hoy=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
       const {data:sesFut}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).gte('fecha',hoy).eq('cancelada',false).order('fecha').order('hora').limit(8)
       setSesionesPortal(sesFut||[])
@@ -209,11 +195,7 @@ export default function PortalCliente() {
       }
       setLoading(false)
     }
-    cargar().catch(err => {
-      console.error('Error cargando portal:', err)
-      setLoading(false)
-      setNotFound(true)
-    })
+    cargar()
   },[clienteSession])
 
   useEffect(()=>{
@@ -544,32 +526,13 @@ export default function PortalCliente() {
       <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin" style={{borderColor:color,borderTopColor:'transparent'}}/>
     </div>
   )
-  if(!clienteSession) return(
+  if(notFound||!clienteSession) return(
     <div className="min-h-screen flex items-center justify-center p-4" style={{background:'#F7F6F3'}}>
-      <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin" style={{borderColor:'#FF5C00',borderTopColor:'transparent'}}/>
-    </div>
-  )
-  if(notFound) return(
-    <div className="min-h-screen flex items-center justify-center p-6" style={{background:'#F7F6F3'}}>
-      <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-sm border border-black/5">
+      <div className="text-center max-w-sm">
         <p className="text-5xl mb-4">🔗</p>
-        <p className="text-[#0A0A0A] font-bold text-xl mb-2">Cuenta no reconocida</p>
-        <p className="text-[#6B6B6B] text-sm mb-5 leading-relaxed">El email con el que has entrado no está vinculado a ningún cliente.</p>
-        <div className="text-left space-y-2 mb-6">
-          <div className="flex items-start gap-3 bg-[#F7F6F3] rounded-2xl p-3">
-            <span className="flex-shrink-0">📧</span>
-            <p className="text-xs text-[#6B6B6B] leading-relaxed">Comprueba que usas el mismo email que le diste a tu entrenador</p>
-          </div>
-          <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-2xl p-3">
-            <span className="flex-shrink-0">🔑</span>
-            <p className="text-xs text-amber-800 leading-relaxed"><strong>Link caducado:</strong> cierra sesión, entra de nuevo y usa "¿Olvidaste tu contraseña?" para recibir un link nuevo</p>
-          </div>
-        </div>
-        <button onClick={()=>supabase.auth.signOut().then(()=>window.location.reload())}
-          className="w-full text-sm font-bold px-4 py-3.5 rounded-2xl text-white mb-2" style={{background:'#FF5C00'}}>
-          Probar con otro email →
-        </button>
-        <p className="text-xs text-[#C0C0C0]">¿Sigues sin poder entrar? Contacta con tu entrenador.</p>
+        <p className="text-[#0A0A0A] font-bold text-lg mb-2">Cuenta no asociada</p>
+        <p className="text-[#6B6B6B] text-sm mb-6">Usa el mismo email que tu entrenador tiene registrado.</p>
+        <button onClick={()=>supabase.auth.signOut()} className="text-sm font-semibold px-4 py-2 rounded-xl text-white" style={{background:color}}>Cerrar sesión</button>
       </div>
     </div>
   )
@@ -1001,27 +964,72 @@ export default function PortalCliente() {
                   </button>
                 )}
 
-                {/* Acciones — unificadas online y presencial */}
-                {(() => {
+                {/* Card check-ins */}
+                <button onClick={()=>setTab('progreso')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
+                  <p className="text-2xl mb-2">📊</p>
+                  <p className="text-2xl font-bold text-[#0A0A0A]">{checkins.length}</p>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Check-ins realizados</p>
+                </button>
+
+                {/* Acciones online */}
+                {cliente?.tipo==='online'&&(() => {
                   const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
                   const urgente = diasSin >= 7
                   return (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
-                      <a href="/seguimiento"
-                        className={`rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all ${urgente?'animate-pulse':''}`}
-                        style={{background: urgente?'#ef4444':color}}>
-                        <span className="text-2xl mb-2">{urgente?'⏰':'📋'}</span>
-                        <p className="text-sm font-bold text-white">Check-in semanal</p>
-                        <p className="text-xs text-white/70 mt-0.5">{urgente ? (diasSin>900?'Aún no has hecho ninguno':`${diasSin} días sin registrar`) : 'Cuéntame cómo va la semana'}</p>
-                      </a>
-                      <button onClick={() => setModalActividad(true)}
-                        className="bg-[#111] rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all">
-                        <span className="text-2xl mb-2">🚶</span>
-                        <p className="text-sm font-bold text-white">Actividad libre</p>
-                        <p className="text-xs text-white/50 mt-0.5">Caminata, carrera, deporte...</p>
-                      </button>
+                    <a href="/seguimiento"
+                      className={`rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
+                      style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
+                      <span className="text-2xl mb-2">{urgente?'⏰':'📋'}</span>
+                      <p className="text-sm font-bold text-white">Check-in semanal</p>
+                      <p className="text-xs text-white/70 mt-0.5">{urgente ? (diasSin>900?'Aún no has hecho ninguno':`${diasSin} días sin registrar`) : 'Cómo te encuentras'}</p>
+                    </a>
+                    <a href="/sesion"
+                      className="bg-[#111] rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all">
+                      <span className="text-2xl mb-2">🏋️</span>
+                      <p className="text-sm font-bold text-white">Registrar entreno</p>
+                      <p className="text-xs text-white/50 mt-0.5">Apunta el entreno de hoy</p>
+                    </a>
                     </div>
+                    <button onClick={() => setModalActividad(true)}
+                      className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
+                      <span className="text-2xl">🚶</span>
+                      <div>
+                        <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
+                      </div>
+                      <span className="ml-auto text-[#6B6B6B]">+</span>
+                    </button>
+                  </div>
+                  )
+                })()}
+
+                {/* Check-in presencial */}
+                {cliente?.tipo==='presencial'&&(() => {
+                  const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
+                  const urgente = diasSin >= 7
+                  return (
+                  <div className="space-y-3">
+                  <a href="/seguimiento"
+                    className={`flex items-center gap-4 rounded-2xl p-5 active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
+                    style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
+                    <span className="text-3xl">{urgente?'⏰':'📋'}</span>
+                    <div>
+                      <p className="text-sm font-bold text-white">Check-in semanal</p>
+                      <p className="text-xs text-white/70">{urgente ? (diasSin>900?'Aún no has hecho ninguno — ¡empecemos!':`Llevas ${diasSin} días sin contarme cómo vas`) : 'Cuéntame cómo va la semana'}</p>
+                    </div>
+                    <span className="ml-auto text-white/70">→</span>
+                  </a>
+                  <button onClick={() => setModalActividad(true)}
+                    className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
+                    <span className="text-2xl">🚶</span>
+                    <div>
+                      <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
+                    </div>
+                    <span className="ml-auto text-[#6B6B6B]">+</span>
+                  </button>
                   </div>
                   )
                 })()}

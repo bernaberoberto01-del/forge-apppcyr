@@ -1090,17 +1090,6 @@ export default function Clientes({ session }) {
                         📧 Bienvenida
                       </button>
                     )}
-                    {detalle.email && detalle.auth_user_id && (
-                      <button onClick={async () => {
-                        const { error } = await supabase.auth.resetPasswordForEmail(detalle.email, {
-                          redirectTo: 'https://forge-studio-os.vercel.app/portal'
-                        })
-                        if (error) showToast('Error enviando acceso', 'error')
-                        else showToast('✓ Link de acceso enviado a ' + detalle.email)
-                      }} className="border border-[#6366f1]/30 text-[#6366f1] text-sm font-medium py-2.5 rounded-xl hover:bg-[#6366f1]/5">
-                        🔑 Reenviar acceso
-                      </button>
-                    )}
                     <button onClick={() => {
                       navigator.clipboard.writeText(`${window.location.origin}`)
                       showToast('✓ Enlace del portal copiado')

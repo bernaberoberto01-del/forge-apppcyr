@@ -216,7 +216,7 @@ export default function Seguimiento({ session }) {
         <button onClick={() => setTabPrincipal('mensual')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all relative ${tabPrincipal==='mensual'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
           🔄 Mensual
-          {analisisMensual.length > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-[#FF5C00] text-white rounded-full text-[9px] font-bold flex items-center justify-center">{analisisMensual.length}</span>}
+          {borradores.length > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-[#FF5C00] text-white rounded-full text-[9px] font-bold flex items-center justify-center">{borradores.length}</span>}
         </button>
       </div>
 
@@ -778,7 +778,7 @@ export default function Seguimiento({ session }) {
         <div className="space-y-4">
 
           {/* Sin pendientes */}
-          {analisisMensual.length === 0 && (
+          {analisisMensual.length === 0 && borradores.length === 0 && (
             <div className="bg-white rounded-2xl border border-black/5 p-8 text-center">
               <p className="text-3xl mb-3">✓</p>
               <p className="text-sm font-bold text-[#0A0A0A]">Todo al día</p>
@@ -798,9 +798,16 @@ export default function Seguimiento({ session }) {
           )}
 
           {/* Botón lanzar cuando hay pendientes */}
-          {analisisMensual.length > 0 && (
+          {(analisisMensual.length > 0 || borradores.length > 0) && (
             <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-semibold text-[#FF5C00]">{analisisMensual.length} análisis pendiente{analisisMensual.length > 1 ? 's' : ''}</span>
+              <div className="flex items-center gap-3">
+                {analisisMensual.length > 0 && (
+                  <span className="text-xs font-semibold text-[#FF5C00]">{analisisMensual.length} análisis pendiente{analisisMensual.length > 1 ? 's' : ''}</span>
+                )}
+                {borradores.length > 0 && (
+                  <span className="text-xs font-semibold text-[#6366f1]">{borradores.length} rutina{borradores.length > 1 ? 's' : ''} por revisar</span>
+                )}
+              </div>
               <button onClick={async () => {
                 setLanzandoMensual(true)
                 await supabase.functions.invoke('analizar-cliente-mensual', { body: {} })
@@ -879,29 +886,24 @@ export default function Seguimiento({ session }) {
 
                         {/* Acciones */}
                         <div className="flex gap-2 flex-wrap">
+                          {/* Ir a rutina si hay una generada */}
                           {a.rutina_generada_id && (
-                            <button onClick={async () => {
-                              setPublicandoBorrador(a.rutina_generada_id)
-                              const clienteNombre = a.clientes?.nombre?.split(' ')[0]
-                              await supabase.from('rutinas').update({ estado: 'archivada' })
-                                .eq('cliente_id', a.cliente_id).eq('estado', 'publicada')
-                              await supabase.from('rutinas').update({ estado: 'publicada' }).eq('id', a.rutina_generada_id)
-                              await supabase.from('analisis_mensual').update({ revisado: true, accion_tomada: 'rutina_publicada' }).eq('id', a.id)
-                              setToast(`✓ Rutina de ${clienteNombre} publicada`)
-                              setTimeout(() => setToast(''), 3000)
-                              setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
-                              setPublicandoBorrador(null)
-                            }} disabled={publicandoBorrador === a.rutina_generada_id}
-                              className="flex-1 bg-[#6366f1] text-white text-xs font-bold py-2.5 rounded-xl disabled:opacity-50">
-                              {publicandoBorrador === a.rutina_generada_id ? '⏳ Publicando...' : '▶ Publicar rutina nueva'}
+                            <button onClick={() => navigate('/rutinas')}
+                              className="flex-1 bg-[#6366f1] text-white text-xs font-bold py-2.5 rounded-xl">
+                              📋 Ver rutina generada
                             </button>
                           )}
+                          {/* Enviar mensaje al cliente */}
                           {a.mensaje_cliente && (
-                            <button onClick={() => navigate('/mensajes', { state: { clienteId: a.cliente_id, mensaje: a.mensaje_cliente } })}
+                            <button onClick={async () => {
+                              // Navegar a mensajes con el texto pre-cargado
+                              navigate('/mensajes', { state: { clienteId: a.cliente_id, mensaje: a.mensaje_cliente } })
+                            }}
                               className="flex-1 bg-[#FF5C00] text-white text-xs font-bold py-2.5 rounded-xl">
                               💬 Enviar mensaje
                             </button>
                           )}
+                          {/* Marcar como revisado */}
                           <button onClick={async () => {
                             await supabase.from('analisis_mensual').update({ revisado: true, accion_tomada: 'revisado' }).eq('id', a.id)
                             setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
@@ -918,6 +920,95 @@ export default function Seguimiento({ session }) {
             </div>
           )}
 
+          {/* Rutinas borrador pendientes */}
+          {borradores.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-[#0A0A0A]">Rutinas por revisar — {borradores.length}</p>
+              {borradores.map(b => {
+                const diasRutina = b.borrador?.dias || b.contenido?.dias || []
+                const expandida = rutinaBorradorExpandida === b.id
+                return (
+                <div key={b.id} className="bg-white rounded-2xl border border-black/6 p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div>
+                      <p className="font-bold text-[#0A0A0A] text-sm">{b.clientes?.nombre}</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">{b.nombre}</p>
+                    </div>
+                    <span className="text-xs bg-amber-50 text-amber-700 font-semibold px-2.5 py-1 rounded-full flex-shrink-0">Borrador</span>
+                  </div>
+                  {b.notas_entrenador && (
+                    <div className="bg-[#F7F6F3] rounded-xl px-3 py-2.5 mb-3">
+                      <p className="text-xs font-semibold text-[#6B6B6B] mb-1">Ajustes aplicados por la IA</p>
+                      <p className="text-sm text-[#0A0A0A] leading-relaxed">{b.notas_entrenador}</p>
+                    </div>
+                  )}
+
+                  {/* Vista previa de la rutina */}
+                  {diasRutina.length > 0 && (
+                    <div className="mb-3">
+                      <button onClick={() => setRutinaBorradorExpandida(expandida ? null : b.id)}
+                        className="w-full flex items-center justify-between text-xs font-semibold text-[#6B6B6B] bg-[#F7F6F3] px-3 py-2 rounded-xl hover:bg-black/5 transition-all">
+                        <span>👁 Ver rutina ({diasRutina.length} días)</span>
+                        <span>{expandida ? '▲' : '▼'}</span>
+                      </button>
+                      {expandida && (
+                        <div className="mt-2 space-y-2 max-h-80 overflow-y-auto">
+                          {diasRutina.map((dia, di) => (
+                            <div key={di} className="border border-black/6 rounded-xl overflow-hidden">
+                              <div className="bg-[#0A0A0A] px-3 py-2 flex items-center justify-between">
+                                <p className="text-white text-xs font-bold">{dia.nombre || `Día ${dia.dia}`}</p>
+                                <p className="text-white/40 text-xs">{dia.patron_principal}</p>
+                              </div>
+                              <div className="divide-y divide-black/5">
+                                {(dia.ejercicios || []).filter((e) => e.patron !== 'calentamiento' && e.patron !== 'movilidad').map((ej, ei) => (
+                                  <div key={ei} className="px-3 py-2 flex items-center justify-between">
+                                    <div>
+                                      <p className="text-xs font-medium text-[#0A0A0A]">{ej.nombre}</p>
+                                      {ej.notas && <p className="text-xs text-[#9B9B9B]">{ej.notas}</p>}
+                                    </div>
+                                    <p className="text-xs font-bold text-[#FF5C00] flex-shrink-0 ml-2">{ej.series}×{ej.reps}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button onClick={() => setQuickView(b.cliente_id)}
+                      className="flex-1 border border-black/10 text-[#6B6B6B] text-sm py-2.5 rounded-xl hover:bg-[#F7F6F3]">
+                      👤 Ver ficha
+                    </button>
+                    <button onClick={async () => {
+                      setPublicandoBorrador(b.id)
+                      await supabase.from('rutinas').update({ estado: 'archivada' })
+                        .eq('cliente_id', b.cliente_id).eq('estado', 'publicada')
+                      await supabase.from('rutinas').update({ estado: 'publicada' }).eq('id', b.id)
+                      setToast(`✓ Rutina de ${b.clientes?.nombre} publicada`)
+                      setTimeout(() => setToast(''), 3000)
+                      cargar()
+                      setPublicandoBorrador(null)
+                    }} disabled={publicandoBorrador === b.id}
+                      className="flex-1 text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50"
+                      style={{background:'#FF5C00'}}>
+                      {publicandoBorrador === b.id ? 'Publicando...' : '▶ Publicar rutina'}
+                    </button>
+                    <button onClick={async () => {
+                      if (!confirm(`¿Descartar la rutina borrador de ${b.clientes?.nombre}?`)) return
+                      await supabase.from('rutinas').delete().eq('id', b.id)
+                      cargar()
+                    }} className="border border-red-100 text-red-400 text-sm px-3 py-2.5 rounded-xl hover:bg-red-50">
+                      🗑
+                    </button>
+                  </div>
+                </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

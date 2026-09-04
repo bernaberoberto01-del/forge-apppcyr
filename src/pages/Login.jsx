@@ -1,40 +1,17 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-const LOGO = (
-  <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
-    <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-    <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-    <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-  </svg>
-)
-
 export default function Login() {
-  const [modo, setModo] = useState('cliente') // cliente | entrenador | registrar
+  const [modo, setModo] = useState('entrar') // entrar | registrar
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [nombre, setNombre] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [enviado, setEnviado] = useState(false) // magic link enviado
   const [registrado, setRegistrado] = useState(false)
   const [recuperar, setRecuperar] = useState(false)
   const [recuperarEnviado, setRecuperarEnviado] = useState(false)
 
-  // ── Magic link para clientes ────────────────────────────────────────────
-  async function handleMagicLink(e) {
-    e.preventDefault()
-    setLoading(true); setError('')
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/portal` }
-    })
-    if (error) setError('No se pudo enviar el link. Comprueba el email.')
-    else setEnviado(true)
-    setLoading(false)
-  }
-
-  // ── Login con contraseña para entrenadores ──────────────────────────────
   async function handleEntrar(e) {
     e.preventDefault()
     setLoading(true); setError('')
@@ -67,27 +44,6 @@ export default function Login() {
     setLoading(false)
   }
 
-  // ── Pantallas de confirmación ────────────────────────────────────────────
-  if (enviado) return (
-    <div className="min-h-screen bg-[#111] flex items-center justify-center p-4">
-      <div className="w-full max-w-sm text-center">
-        <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">📧</div>
-        <h2 className="text-white text-xl font-bold mb-2">Revisa tu email</h2>
-        <p className="text-white/50 text-sm leading-relaxed mb-2">
-          Te hemos enviado un link de acceso a
-        </p>
-        <p className="text-white font-semibold text-sm mb-6">{email}</p>
-        <p className="text-white/30 text-xs leading-relaxed mb-6">
-          Abre el email y pulsa el enlace para entrar directamente a tu portal. El link es válido durante 1 hora.
-        </p>
-        <button onClick={() => { setEnviado(false); setEmail('') }}
-          className="text-[#FF5C00] text-sm font-semibold">
-          ← Usar otro email
-        </button>
-      </div>
-    </div>
-  )
-
   if (registrado) return (
     <div className="min-h-screen bg-[#111] flex items-center justify-center p-4">
       <div className="w-full max-w-sm text-center">
@@ -96,7 +52,7 @@ export default function Login() {
         <p className="text-white/50 text-sm leading-relaxed">
           Revisa tu email para confirmar la cuenta y vuelve aquí para entrar.
         </p>
-        <button onClick={() => { setRegistrado(false); setModo('entrenador') }}
+        <button onClick={() => { setRegistrado(false); setModo('entrar') }}
           className="mt-6 text-[#FF5C00] text-sm font-semibold">
           Ir al login →
         </button>
@@ -112,7 +68,7 @@ export default function Login() {
         <p className="text-white/50 text-sm leading-relaxed">
           Si <strong className="text-white/80">{email}</strong> tiene una cuenta, te hemos mandado un enlace para restablecer la contraseña.
         </p>
-        <button onClick={() => { setRecuperarEnviado(false); setRecuperar(false); setModo('entrenador') }}
+        <button onClick={() => { setRecuperarEnviado(false); setRecuperar(false); setModo('entrar') }}
           className="mt-6 text-[#FF5C00] text-sm font-semibold">
           Ir al login →
         </button>
@@ -133,11 +89,11 @@ export default function Login() {
               <label className="text-white/60 text-xs font-medium mb-1.5 block">Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="tu@email.com" required autoFocus
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00] transition-colors" />
             </div>
             {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</p>}
             <button type="submit" disabled={loading || !email}
-              className="w-full bg-[#FF5C00] text-white font-bold py-3.5 rounded-xl disabled:opacity-40">
+              className="w-full bg-[#FF5C00] hover:bg-[#E05200] text-white font-bold py-3.5 rounded-xl transition-all active:scale-95 disabled:opacity-40 mt-1">
               {loading ? '...' : 'Enviar enlace →'}
             </button>
             <button type="button" onClick={() => { setRecuperar(false); setError('') }}
@@ -153,10 +109,13 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-[#111] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-[#FF5C00] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            {LOGO}
+            <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
+              <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
+              <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
+              <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
+            </svg>
           </div>
           <h1 className="text-white text-2xl font-bold">Forge</h1>
           <p className="text-white/40 text-sm mt-1">Studio OS</p>
@@ -164,7 +123,7 @@ export default function Login() {
 
         {/* Tabs */}
         <div className="flex gap-1 bg-white/5 p-1 rounded-xl mb-4">
-          {[['cliente','Soy cliente'],['entrenador','Soy entrenador']].map(([v,l]) => (
+          {[['entrar','Entrar'],['registrar','Crear cuenta']].map(([v,l]) => (
             <button key={v} onClick={() => { setModo(v); setError('') }}
               className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${modo===v?'bg-white text-[#0A0A0A]':'text-white/50 hover:text-white'}`}>
               {l}
@@ -172,81 +131,43 @@ export default function Login() {
           ))}
         </div>
 
-        {/* Panel cliente — magic link */}
-        {modo === 'cliente' && (
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-            <p className="text-white/60 text-xs text-center mb-4 leading-relaxed">
-              Introduce tu email y te enviamos un link directo a tu portal. Sin contraseñas.
-            </p>
-            <form onSubmit={handleMagicLink} className="space-y-3">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <form onSubmit={modo === 'entrar' ? handleEntrar : handleRegistrar} className="space-y-3">
+            {modo === 'registrar' && (
               <div>
-                <label className="text-white/60 text-xs font-medium mb-1.5 block">Email</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  placeholder="tu@email.com" required autoFocus
-                  className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
+                <label className="text-white/60 text-xs font-medium mb-1.5 block">Nombre</label>
+                <input value={nombre} onChange={e => setNombre(e.target.value)}
+                  placeholder="Tu nombre completo" autoFocus
+                  className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00] transition-colors" />
               </div>
-              {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</p>}
-              <button type="submit" disabled={loading || !email}
-                className="w-full bg-[#FF5C00] text-white font-bold py-3.5 rounded-xl disabled:opacity-40 active:scale-95 transition-all">
-                {loading ? '...' : 'Enviarme el link →'}
-              </button>
-            </form>
-            <p className="text-white/20 text-xs text-center mt-4">
-              El link te llega en segundos y es válido 1 hora
-            </p>
-          </div>
-        )}
-
-        {/* Panel entrenador — contraseña */}
-        {(modo === 'entrenador' || modo === 'registrar') && (
-          <>
-            <div className="flex gap-1 bg-white/5 p-1 rounded-xl mb-4">
-              {[['entrenador','Entrar'],['registrar','Crear cuenta']].map(([v,l]) => (
-                <button key={v} onClick={() => { setModo(v); setError('') }}
-                  className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${modo===v?'bg-white/20 text-white':'text-white/40 hover:text-white'}`}>
-                  {l}
-                </button>
-              ))}
+            )}
+            <div>
+              <label className="text-white/60 text-xs font-medium mb-1.5 block">Email</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="tu@email.com" required autoFocus={modo === 'entrar'}
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00] transition-colors" />
             </div>
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <form onSubmit={modo === 'entrenador' ? handleEntrar : handleRegistrar} className="space-y-3">
-                {modo === 'registrar' && (
-                  <div>
-                    <label className="text-white/60 text-xs font-medium mb-1.5 block">Nombre</label>
-                    <input value={nombre} onChange={e => setNombre(e.target.value)}
-                      placeholder="Tu nombre completo"
-                      className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
-                  </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-white/60 text-xs font-medium block">Contraseña</label>
+                {modo === 'entrar' && (
+                  <button type="button" onClick={() => { setRecuperar(true); setError('') }}
+                    className="text-[#FF5C00] text-xs font-medium hover:underline">
+                    ¿Has olvidado tu contraseña?
+                  </button>
                 )}
-                <div>
-                  <label className="text-white/60 text-xs font-medium mb-1.5 block">Email</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                    placeholder="tu@email.com" required autoFocus
-                    className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-white/60 text-xs font-medium">Contraseña</label>
-                    {modo === 'entrenador' && (
-                      <button type="button" onClick={() => { setRecuperar(true); setError('') }}
-                        className="text-[#FF5C00] text-xs font-medium hover:underline">
-                        ¿Olvidaste tu contraseña?
-                      </button>
-                    )}
-                  </div>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                    placeholder={modo === 'registrar' ? 'Mínimo 6 caracteres' : '••••••••'} required
-                    className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
-                </div>
-                {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</p>}
-                <button type="submit" disabled={loading || !email || !password}
-                  className="w-full bg-[#FF5C00] text-white font-bold py-3.5 rounded-xl disabled:opacity-40 active:scale-95 transition-all">
-                  {loading ? '...' : modo === 'entrenador' ? 'Entrar →' : 'Crear cuenta →'}
-                </button>
-              </form>
+              </div>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder={modo === 'registrar' ? 'Mínimo 6 caracteres' : '••••••••'} required
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00] transition-colors" />
             </div>
-          </>
-        )}
+            {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</p>}
+            <button type="submit" disabled={loading || !email || !password}
+              className="w-full bg-[#FF5C00] hover:bg-[#E05200] text-white font-bold py-3.5 rounded-xl transition-all active:scale-95 disabled:opacity-40 mt-1">
+              {loading ? '...' : modo === 'entrar' ? 'Entrar →' : 'Crear cuenta →'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )
