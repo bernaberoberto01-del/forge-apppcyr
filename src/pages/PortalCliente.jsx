@@ -544,13 +544,32 @@ export default function PortalCliente() {
       <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin" style={{borderColor:color,borderTopColor:'transparent'}}/>
     </div>
   )
-  if(notFound||!clienteSession) return(
+  if(!clienteSession) return(
     <div className="min-h-screen flex items-center justify-center p-4" style={{background:'#F7F6F3'}}>
-      <div className="text-center max-w-sm">
+      <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin" style={{borderColor:'#FF5C00',borderTopColor:'transparent'}}/>
+    </div>
+  )
+  if(notFound) return(
+    <div className="min-h-screen flex items-center justify-center p-6" style={{background:'#F7F6F3'}}>
+      <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-sm border border-black/5">
         <p className="text-5xl mb-4">🔗</p>
-        <p className="text-[#0A0A0A] font-bold text-lg mb-2">Cuenta no asociada</p>
-        <p className="text-[#6B6B6B] text-sm mb-6">Usa el mismo email que tu entrenador tiene registrado.</p>
-        <button onClick={()=>supabase.auth.signOut()} className="text-sm font-semibold px-4 py-2 rounded-xl text-white" style={{background:color}}>Cerrar sesión</button>
+        <p className="text-[#0A0A0A] font-bold text-xl mb-2">Cuenta no reconocida</p>
+        <p className="text-[#6B6B6B] text-sm mb-5 leading-relaxed">El email con el que has entrado no está vinculado a ningún cliente.</p>
+        <div className="text-left space-y-2 mb-6">
+          <div className="flex items-start gap-3 bg-[#F7F6F3] rounded-2xl p-3">
+            <span className="flex-shrink-0">📧</span>
+            <p className="text-xs text-[#6B6B6B] leading-relaxed">Comprueba que usas el mismo email que le diste a tu entrenador</p>
+          </div>
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-2xl p-3">
+            <span className="flex-shrink-0">🔑</span>
+            <p className="text-xs text-amber-800 leading-relaxed"><strong>Link caducado:</strong> cierra sesión, entra de nuevo y usa "¿Olvidaste tu contraseña?" para recibir un link nuevo</p>
+          </div>
+        </div>
+        <button onClick={()=>supabase.auth.signOut().then(()=>window.location.reload())}
+          className="w-full text-sm font-bold px-4 py-3.5 rounded-2xl text-white mb-2" style={{background:'#FF5C00'}}>
+          Probar con otro email →
+        </button>
+        <p className="text-xs text-[#C0C0C0]">¿Sigues sin poder entrar? Contacta con tu entrenador.</p>
       </div>
     </div>
   )
