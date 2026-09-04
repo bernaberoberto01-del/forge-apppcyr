@@ -36,6 +36,8 @@ export default function Pagos({ session }) {
   const [editandoPlan, setEditandoPlan] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [quickView, setQuickView] = useState(null)
+  const [planExpandido, setPlanExpandido] = useState(null)
+  const [mostrarPendientes, setMostrarPendientes] = useState(true)
   const [toast, setToast] = useState('')
   const [form, setForm] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: new Date().toISOString().split('T')[0], periodo:'' })
   const [formPlan, setFormPlan] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', frecuencia:'mensual', dia_cobro:1 })
@@ -295,25 +297,34 @@ export default function Pagos({ session }) {
 
       {/* Alertas cobros próximos */}
       {pendientesMes.length > 0 && (
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-4">
-          <p className="text-xs font-bold text-amber-700 mb-2">⏰ Cobros próximos</p>
-          <div className="space-y-2">
-            {pendientesMes.map(p => {
-              const dias = diasRestantes(p)
-              return (
-                <div key={p.id} className="flex items-center gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{p.clientes?.nombre}</p>
-                    <p className="text-xs text-[#6B6B6B]">{p.importe}€ · {dias === 0 ? 'Hoy' : dias < 0 ? `Vencido hace ${Math.abs(dias)} días` : `En ${dias} días`}</p>
+        <div className="border border-amber-200 rounded-2xl overflow-hidden mb-4">
+          <button onClick={() => setMostrarPendientes(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-all">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">{pendientesMes.length}</span>
+              <p className="text-xs font-semibold text-amber-800">⏰ Cobros próximos esta semana</p>
+            </div>
+            <span className="text-amber-600 text-sm">{mostrarPendientes ? '▲' : '▼'}</span>
+          </button>
+          {mostrarPendientes && (
+            <div className="bg-white p-3 space-y-2">
+              {pendientesMes.map(p => {
+                const dias = diasRestantes(p)
+                return (
+                  <div key={p.id} className="flex items-center gap-3 py-1">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A] truncate">{p.clientes?.nombre}</p>
+                      <p className="text-xs text-[#6B6B6B]">{p.importe}€ · {dias === 0 ? 'Hoy' : dias < 0 ? `Vencido hace ${Math.abs(dias)} días` : `En ${dias} días`}</p>
+                    </div>
+                    <button onClick={() => marcarCobrado(p)}
+                      className="bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0">
+                      ✓ Cobrado
+                    </button>
                   </div>
-                  <button onClick={() => marcarCobrado(p)}
-                    className="bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0">
-                    ✓ Cobrado
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -346,65 +357,65 @@ export default function Pagos({ session }) {
             const dias = diasRestantes(p)
             const urgente = dias !== null && dias <= 3
             const vencido = dias !== null && dias < 0
+            const expandido = planExpandido === p.id
             return (
-              <div key={p.id} className={`bg-white rounded-xl border shadow-sm p-4 ${vencido?'border-red-200':urgente?'border-amber-200':'border-black/5'}`}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-9 h-9 bg-[#6366f1]/10 rounded-xl flex items-center justify-center text-[#6366f1] font-bold text-xs flex-shrink-0">
+              <div key={p.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${vencido?'border-red-200':urgente?'border-amber-200':'border-black/5'}`}>
+                <button onClick={() => setPlanExpandido(expandido ? null : p.id)}
+                  className="w-full flex items-center gap-3 p-3 text-left hover:bg-[#FAFAFA] transition-all">
+                  <div className="w-8 h-8 bg-[#6366f1]/10 rounded-xl flex items-center justify-center text-[#6366f1] font-bold text-xs flex-shrink-0">
                     {ini(p.clientes?.nombre)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <button onClick={() => setQuickView(p.cliente_id)} className="text-sm font-semibold text-[#0A0A0A] hover:text-[#FF5C00] truncate block text-left">{p.clientes?.nombre}</button>
-                    <p className="text-xs text-[#6B6B6B]">{FRECUENCIAS[p.frecuencia]} · día {p.dia_cobro} · {p.importe}€</p>
+                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{p.clientes?.nombre}</p>
+                    <p className="text-xs text-[#9B9B9B]">{p.importe}€ · {FRECUENCIAS[p.frecuencia]}</p>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className={`text-sm font-bold ${vencido?'text-red-500':urgente?'text-amber-500':'text-[#0A0A0A]'}`}>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {p.clientes?.suscripcion_activa && <div className="w-2 h-2 rounded-full bg-emerald-500"/>}
+                    <span className={`text-xs font-bold ${vencido?'text-red-500':urgente?'text-amber-500':'text-[#9B9B9B]'}`}>
                       {dias === null ? '—' : dias < 0 ? `+${Math.abs(dias)}d` : dias === 0 ? 'Hoy' : `${dias}d`}
-                    </p>
-                    <p className="text-xs text-[#6B6B6B]">próximo cobro</p>
+                    </span>
+                    <span className="text-[#C0C0C0] text-xs">{expandido ? '▲' : '▼'}</span>
                   </div>
-                </div>
-                {proximoCobro(p) && (
-                  <p className="text-xs text-[#6B6B6B] mb-3">
-                    Próximo: {proximoCobro(p).toLocaleDateString('es-ES',{day:'numeric',month:'long'})}
-                    {p.ultimo_cobro && ` · Último: ${new Date(p.ultimo_cobro+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`}
-                  </p>
-                )}
-                {/* Estado suscripción Stripe */}
-                {p.clientes?.suscripcion_activa && (
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>
-                    <p className="text-xs text-emerald-600 font-semibold">Cobro automático activo</p>
-                    {p.clientes?.proxima_factura && (
-                      <p className="text-xs text-[#9B9B9B] ml-auto">
-                        Próxima: {new Date(p.clientes.proxima_factura+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
-                      </p>
+                </button>
+                {expandido && (
+                  <div className="px-3 pb-3 border-t border-black/5 pt-3 space-y-3">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#6B6B6B]">
+                      <span>Día {p.dia_cobro} de cada mes</span>
+                      {proximoCobro(p) && <span>Próximo: {proximoCobro(p).toLocaleDateString('es-ES',{day:'numeric',month:'long'})}</span>}
+                      {p.ultimo_cobro && <span>Último: {new Date(p.ultimo_cobro+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</span>}
+                    </div>
+                    {p.clientes?.suscripcion_activa && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>
+                        <p className="text-xs text-emerald-600 font-semibold">Cobro automático activo</p>
+                      </div>
                     )}
+                    <div className="flex gap-1.5 flex-wrap">
+                      {!p.clientes?.suscripcion_activa ? (
+                        <button onClick={() => activarSuscripcion(p.cliente_id, p.importe, p.concepto, p.tarifa_id)}
+                          disabled={generandoStripe===p.cliente_id}
+                          className="flex-1 bg-[#6366f1] text-white text-xs font-semibold py-2 px-3 rounded-lg disabled:opacity-40">
+                          {generandoStripe===p.cliente_id ? '⏳' : '🔄 Activar auto'}
+                        </button>
+                      ) : (
+                        <>
+                          <button onClick={() => marcarCobrado(p)} className="flex-1 bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg">✓ Manual</button>
+                          <button onClick={() => cancelarSuscripcion(p.cliente_id)} className="border border-red-100 text-red-400 text-xs py-2 px-2.5 rounded-lg">Cancelar sub</button>
+                        </>
+                      )}
+                      {!p.clientes?.suscripcion_activa && (
+                        <button onClick={() => marcarCobrado(p)} className="bg-emerald-500 text-white text-xs font-semibold py-2 px-3 rounded-lg">✓ Manual</button>
+                      )}
+                      <button onClick={() => generarEnlaceStripe(p.cliente_id, p.importe, p.concepto, p.tarifa_id)} disabled={generandoStripe===p.cliente_id}
+                        className="border border-[#6B6B6B]/20 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg disabled:opacity-40">
+                        💳 Link
+                      </button>
+                      <button onClick={() => { setEditandoPlan(p); setFormPlan({ cliente_id:p.cliente_id, importe:String(p.importe), concepto:p.concepto, frecuencia:p.frecuencia, dia_cobro:p.dia_cobro }); setModalPlan(true) }}
+                        className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg">✏️</button>
+                      <button onClick={() => eliminarPlan(p.id)} className="border border-red-100 text-red-400 text-xs py-2 px-2.5 rounded-lg">×</button>
+                    </div>
                   </div>
                 )}
-                <div className="flex gap-2 flex-wrap">
-                  {!p.clientes?.suscripcion_activa ? (
-                    <button onClick={() => activarSuscripcion(p.cliente_id, p.importe, p.concepto, p.tarifa_id)}
-                      disabled={generandoStripe===p.cliente_id}
-                      className="flex-1 bg-[#6366f1] text-white text-xs font-semibold py-2 px-3 rounded-lg hover:bg-[#5558e8] disabled:opacity-40 transition-all">
-                      {generandoStripe===p.cliente_id ? '⏳ Creando...' : '🔄 Activar cobro automático'}
-                    </button>
-                  ) : (
-                    <>
-                      <button onClick={() => marcarCobrado(p)} className="flex-1 bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg">✓ Cobrado manual</button>
-                      <button onClick={() => cancelarSuscripcion(p.cliente_id)} className="border border-red-100 text-red-400 text-xs py-2 px-2.5 rounded-lg hover:bg-red-50">Cancelar sub</button>
-                    </>
-                  )}
-                  {!p.clientes?.suscripcion_activa && (
-                    <button onClick={() => marcarCobrado(p)} className="bg-emerald-500 text-white text-xs font-semibold py-2 px-3 rounded-lg">✓ Manual</button>
-                  )}
-                  <button onClick={() => generarEnlaceStripe(p.cliente_id, p.importe, p.concepto, p.tarifa_id)} disabled={generandoStripe===p.cliente_id}
-                    className="border border-[#6B6B6B]/20 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0] disabled:opacity-40 flex items-center gap-1">
-                    {generandoStripe===p.cliente_id?'⏳':'💳'} Link pago
-                  </button>
-                  <button onClick={() => { setEditandoPlan(p); setFormPlan({ cliente_id:p.cliente_id, importe:String(p.importe), concepto:p.concepto, frecuencia:p.frecuencia, dia_cobro:p.dia_cobro }); setModalPlan(true) }}
-                    className="border border-black/10 text-[#6B6B6B] text-xs py-2 px-2.5 rounded-lg hover:bg-[#F5F5F0]">✏️ Editar</button>
-                  <button onClick={() => eliminarPlan(p.id)} className="border border-red-100 text-red-400 text-xs py-2 px-2.5 rounded-lg hover:bg-red-50">× Eliminar</button>
-                </div>
               </div>
             )
           })}
