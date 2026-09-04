@@ -2579,173 +2579,265 @@ function HabitosPortal({ clienteId, color }) {
 }
 
 // ─── Agenda de la semana del cliente ──────────────────────────────────────
-function AgendaSemana({ clienteId, sesionesPortal, color, cliente }) {
-  const [semanaOffset, setSemanaOffset] = useState(0)
-  const [sesiones, setSesiones] = useState(null) // null = usando sesionesPortal
+// ─── Agenda del cliente — vista semana y mes ──────────────────────────────
+function AgendaSemana({ clienteId, sesionesPortal, color }) {
+  const [vista, setVista] = useState('semana') // 'semana' | 'mes'
+  const [offset, setOffset] = useState(0)
+  const [sesionesExtra, setSesionesExtra] = useState(null)
 
-  // Calcular días de la semana con offset
-  const diasSemana = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - ((d.getDay() || 7) - 1) + i + semanaOffset * 7)
-    return d
-  })
+  const hoy = new Date()
+  const hoyStr = hoy.toISOString().split('T')[0]
 
-  const lunes = diasSemana[0]
-  const domingo = diasSemana[6]
-  const hoy = new Date().toISOString().split('T')[0]
+  // ── Cálculos de rango ──────────────────────────────────────────────────
+  function getRango() {
+    if (vista === 'semana') {
+      const lunes = new Date(hoy)
+      lunes.setDate(hoy.getDate() - ((hoy.getDay() || 7) - 1) + offset * 7)
+      const dias = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(lunes)
+        d.setDate(lunes.getDate() + i)
+        return d
+      })
+      return { desde: dias[0], hasta: dias[6], dias }
+    } else {
+      const primerDia = new Date(hoy.getFullYear(), hoy.getMonth() + offset, 1)
+      const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + offset + 1, 0)
+      const dias = []
+      const d = new Date(primerDia)
+      while (d <= ultimoDia) { dias.push(new Date(d)); d.setDate(d.getDate() + 1) }
+      return { desde: primerDia, hasta: ultimoDia, dias, primerDia }
+    }
+  }
+
+  const rango = getRango()
+  const desdeStr = rango.desde.toISOString().split('T')[0]
+  const hastaStr = rango.hasta.toISOString().split('T')[0]
 
   useEffect(() => {
-    if (semanaOffset === 0) { setSesiones(null); return }
-    // Cargar sesiones de otra semana
-    const desde = diasSemana[0].toISOString().split('T')[0]
-    const hasta = diasSemana[6].toISOString().split('T')[0]
-    supabase.from('sesiones')
-      .select('*')
+    const esActual = offset === 0
+    if (esActual && sesionesPortal) { setSesionesExtra(null); return }
+    supabase.from('sesiones').select('*')
       .eq('cliente_id', clienteId)
-      .gte('fecha', desde)
-      .lte('fecha', hasta)
+      .gte('fecha', desdeStr).lte('fecha', hastaStr)
       .eq('cancelada', false)
       .order('fecha').order('hora')
-      .then(({ data }) => setSesiones(data || []))
-  }, [semanaOffset])
+      .then(({ data }) => setSesionesExtra(data || []))
+  }, [offset, vista])
 
-  const sesionesActuales = sesiones !== null ? sesiones : (sesionesPortal || [])
-
-  // Agrupar sesiones por fecha
+  const sesiones = sesionesExtra !== null ? sesionesExtra : (sesionesPortal || [])
   const porFecha = {}
-  sesionesActuales.forEach(s => {
-    if (!porFecha[s.fecha]) porFecha[s.fecha] = []
-    porFecha[s.fecha].push(s)
-  })
+  sesiones.forEach(s => { if (!porFecha[s.fecha]) porFecha[s.fecha] = []; porFecha[s.fecha].push(s) })
 
-  const DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
-  const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+  const DIAS_CORTO = ['L','M','X','J','V','S','D']
+  const DIAS_LARGO = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+  const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
-  const tituloSemana = semanaOffset === 0 ? 'Esta semana'
-    : semanaOffset === 1 ? 'Próxima semana'
-    : semanaOffset === -1 ? 'Semana pasada'
-    : `${lunes.getDate()} ${MESES[lunes.getMonth()]} — ${domingo.getDate()} ${MESES[domingo.getMonth()]}`
+  // Título del periodo
+  const titulo = vista === 'semana'
+    ? offset === 0 ? 'Esta semana'
+      : offset === 1 ? 'Próxima semana'
+      : offset === -1 ? 'Semana pasada'
+      : `${rango.dias[0].getDate()} ${MESES_CORTO[rango.dias[0].getMonth()]} — ${rango.dias[6].getDate()} ${MESES_CORTO[rango.dias[6].getMonth()]}`
+    : offset === 0 ? 'Este mes'
+      : MESES[rango.primerDia.getMonth()] + ' ' + rango.primerDia.getFullYear()
 
   return (
-    <div className="space-y-4">
-      {/* Navegación de semana */}
-      <div className="flex items-center justify-between">
-        <button onClick={() => setSemanaOffset(v => v - 1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] active:scale-95 transition-all">
+    <div className="space-y-3">
+      {/* Selector vista + navegación */}
+      <div className="flex items-center gap-2">
+        <button onClick={() => setOffset(v => v - 1)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] active:scale-95 transition-all flex-shrink-0">
           ←
         </button>
-        <div className="text-center">
-          <p className="text-sm font-bold text-[#0A0A0A]">{tituloSemana}</p>
-          <p className="text-xs text-[#9B9B9B]">
-            {lunes.getDate()} {MESES[lunes.getMonth()]} — {domingo.getDate()} {MESES[domingo.getMonth()]}
-          </p>
+        <div className="flex-1 text-center">
+          <p className="text-sm font-bold text-[#0A0A0A]">{titulo}</p>
         </div>
-        <button onClick={() => setSemanaOffset(v => v + 1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] active:scale-95 transition-all">
+        <button onClick={() => setOffset(v => v + 1)}
+          className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] active:scale-95 transition-all flex-shrink-0">
           →
         </button>
       </div>
 
-      {/* Días de la semana */}
-      <div className="space-y-2">
-        {diasSemana.map((dia, i) => {
-          const fechaStr = dia.toISOString().split('T')[0]
-          const esHoy = fechaStr === hoy
-          const esPasado = fechaStr < hoy
-          const sessDia = porFecha[fechaStr] || []
-
-          return (
-            <div key={fechaStr}
-              className={`rounded-2xl border overflow-hidden ${esHoy ? 'border-[#FF5C00]/30' : 'border-black/5'} ${esPasado && !sessDia.length ? 'opacity-40' : ''}`}
-              style={esHoy ? {background:`${color}08`} : {background:'white'}}>
-              {/* Cabecera del día */}
-              <div className={`px-4 py-2.5 flex items-center justify-between ${esHoy ? '' : 'border-b border-black/4'}`}
-                style={esHoy ? {borderBottom:`1px solid ${color}20`} : {}}>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold ${esHoy ? '' : 'text-[#9B9B9B]'}`}
-                    style={esHoy ? {color} : {}}>
-                    {DIAS[i]}
-                  </span>
-                  <span className={`text-sm font-bold ${esHoy ? 'text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>
-                    {dia.getDate()}
-                  </span>
-                  {esHoy && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
-                      style={{background:color}}>Hoy</span>
-                  )}
-                </div>
-                {sessDia.length > 0 && (
-                  <span className="text-xs font-semibold" style={{color}}>
-                    {sessDia.length} sesión{sessDia.length > 1 ? 'es' : ''}
-                  </span>
-                )}
-              </div>
-
-              {/* Sesiones del día */}
-              {sessDia.length > 0 ? (
-                <div className="divide-y divide-black/4">
-                  {sessDia.map(s => (
-                    <div key={s.id} className="px-4 py-3 flex items-center gap-3">
-                      <div className="w-1 h-10 rounded-full flex-shrink-0"
-                        style={{background: s.completada ? '#10b981' : color}}/>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-[#0A0A0A]">
-                          {s.tipo === 'online' ? 'Entrenamiento online' :
-                           s.tipo === 'grupo' ? `Grupo — ${s.notas || ''}` :
-                           'Entrenamiento personal'}
-                        </p>
-                        <p className="text-xs text-[#9B9B9B] mt-0.5">
-                          {s.hora ? s.hora.slice(0,5) : '—'}
-                          {s.duracion_minutos ? ` · ${s.duracion_minutos}min` : ''}
-                          {s.completada ? ' · Completada ✓' : ''}
-                        </p>
-                      </div>
-                      {!s.completada && !esPasado && (
-                        <div className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{background: color}}/>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="px-4 py-2.5">
-                  <p className="text-xs text-[#C0C0C0]">Sin sesiones</p>
-                </div>
-              )}
-            </div>
-          )
-        })}
+      {/* Toggle semana/mes */}
+      <div className="flex gap-1 bg-black/5 p-1 rounded-xl">
+        {[['semana','Semana'],['mes','Mes']].map(([v,l]) => (
+          <button key={v} onClick={() => { setVista(v); setOffset(0) }}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${vista===v?'bg-white text-[#0A0A0A] shadow-sm':'text-[#6B6B6B]'}`}>
+            {l}
+          </button>
+        ))}
       </div>
 
-      {/* Resumen de la semana */}
-      {sesionesActuales.length > 0 && (
-        <div className="bg-[#F7F6F3] rounded-2xl p-4 flex items-center gap-4">
-          <div className="text-center flex-1">
-            <p className="text-2xl font-bold text-[#0A0A0A]">{sesionesActuales.length}</p>
-            <p className="text-xs text-[#9B9B9B]">Sesiones</p>
-          </div>
-          <div className="w-px h-8 bg-black/10"/>
-          <div className="text-center flex-1">
-            <p className="text-2xl font-bold text-emerald-600">
-              {sesionesActuales.filter(s => s.completada).length}
-            </p>
-            <p className="text-xs text-[#9B9B9B]">Completadas</p>
-          </div>
-          <div className="w-px h-8 bg-black/10"/>
-          <div className="text-center flex-1">
-            <p className="text-2xl font-bold" style={{color}}>
-              {sesionesActuales.filter(s => !s.completada).length}
-            </p>
-            <p className="text-xs text-[#9B9B9B]">Pendientes</p>
-          </div>
+      {/* ── VISTA SEMANA ── */}
+      {vista === 'semana' && (
+        <div className="space-y-2">
+          {rango.dias.map((dia, i) => {
+            const fechaStr = dia.toISOString().split('T')[0]
+            const esHoy = fechaStr === hoyStr
+            const esPasado = fechaStr < hoyStr
+            const sess = porFecha[fechaStr] || []
+
+            return (
+              <div key={fechaStr}
+                className={`rounded-2xl border overflow-hidden ${esHoy ? '' : 'border-black/5'}`}
+                style={{
+                  background: esHoy ? `${color}08` : 'white',
+                  borderColor: esHoy ? `${color}40` : undefined
+                }}>
+                <div className="px-4 py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold w-7" style={{color: esHoy ? color : '#9B9B9B'}}>
+                      {DIAS_LARGO[i]}
+                    </span>
+                    <span className={`text-sm font-bold ${esHoy ? 'text-[#0A0A0A]' : esPasado ? 'text-[#C0C0C0]' : 'text-[#6B6B6B]'}`}>
+                      {dia.getDate()}
+                    </span>
+                    {esHoy && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
+                        style={{background: color}}>Hoy</span>
+                    )}
+                  </div>
+                  {sess.length > 0 && (
+                    <span className="text-xs font-semibold" style={{color}}>
+                      {sess.length} sesión{sess.length > 1 ? 'es' : ''}
+                    </span>
+                  )}
+                </div>
+                {sess.length > 0 ? (
+                  <div className="divide-y divide-black/4">
+                    {sess.map(s => (
+                      <div key={s.id} className="px-4 py-2.5 flex items-center gap-3">
+                        <div className="w-1 h-8 rounded-full flex-shrink-0"
+                          style={{background: s.completada ? '#10b981' : color}}/>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[#0A0A0A]">
+                            {s.tipo === 'online' ? 'Entreno online'
+                              : s.tipo === 'grupo' ? 'Entreno en grupo'
+                              : 'Entrenamiento personal'}
+                          </p>
+                          <p className="text-xs text-[#9B9B9B]">
+                            {s.hora ? s.hora.slice(0,5) : ''}
+                            {s.duracion_minutos ? ` · ${s.duracion_minutos}min` : ''}
+                            {s.completada ? ' · ✓ Completado' : ''}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="px-4 pb-2.5">
+                    <p className="text-xs text-[#E0E0E0]">Sin sesiones</p>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {sesionesActuales.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-3xl mb-2">📅</p>
-          <p className="text-sm font-bold text-[#0A0A0A]">Sin sesiones esta semana</p>
-          <p className="text-xs text-[#9B9B9B] mt-1">Tu entrenador añadirá tus próximas sesiones aquí</p>
+      {/* ── VISTA MES ── */}
+      {vista === 'mes' && (
+        <div>
+          {/* Cabecera días */}
+          <div className="grid grid-cols-7 mb-1">
+            {DIAS_CORTO.map(d => (
+              <div key={d} className="text-center text-[10px] font-bold text-[#9B9B9B] py-1">{d}</div>
+            ))}
+          </div>
+
+          {/* Grid del mes */}
+          {(() => {
+            const primerDia = rango.primerDia
+            const diasOffset = (primerDia.getDay() || 7) - 1 // lunes = 0
+            const totalDias = rango.dias.length
+            const celdas = diasOffset + totalDias
+            const filas = Math.ceil(celdas / 7)
+
+            return Array.from({ length: filas }, (_, fila) => (
+              <div key={fila} className="grid grid-cols-7 gap-1 mb-1">
+                {Array.from({ length: 7 }, (_, col) => {
+                  const idx = fila * 7 + col
+                  const diaIdx = idx - diasOffset
+                  if (diaIdx < 0 || diaIdx >= totalDias) {
+                    return <div key={col} className="aspect-square"/>
+                  }
+                  const dia = rango.dias[diaIdx]
+                  const fechaStr = dia.toISOString().split('T')[0]
+                  const esHoy = fechaStr === hoyStr
+                  const esPasado = fechaStr < hoyStr
+                  const sess = porFecha[fechaStr] || []
+                  const tieneSesion = sess.length > 0
+
+                  return (
+                    <div key={col}
+                      className="aspect-square rounded-xl flex flex-col items-center justify-center relative"
+                      style={{
+                        background: esHoy ? color : tieneSesion ? `${color}15` : 'transparent',
+                      }}>
+                      <span className={`text-xs font-bold ${esHoy ? 'text-white' : esPasado ? 'text-[#C0C0C0]' : tieneSesion ? 'text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>
+                        {dia.getDate()}
+                      </span>
+                      {tieneSesion && !esHoy && (
+                        <div className="w-1 h-1 rounded-full mt-0.5" style={{background: color}}/>
+                      )}
+                      {tieneSesion && esHoy && (
+                        <div className="w-1 h-1 rounded-full mt-0.5 bg-white/60"/>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ))
+          })()}
+
+          {/* Lista de sesiones del mes */}
+          {sesiones.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-wide mb-2">
+                {sesiones.length} sesión{sesiones.length > 1 ? 'es' : ''} este mes
+              </p>
+              {sesiones.slice(0, 8).map(s => (
+                <div key={s.id} className="flex items-center gap-3 bg-white rounded-xl border border-black/5 px-3 py-2.5">
+                  <div className="w-1 h-8 rounded-full flex-shrink-0"
+                    style={{background: s.completada ? '#10b981' : color}}/>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-[#0A0A0A]">
+                      {new Date(s.fecha + 'T12:00').toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short'})}
+                      {s.hora ? ' · ' + s.hora.slice(0,5) : ''}
+                    </p>
+                    <p className="text-xs text-[#9B9B9B]">
+                      {s.tipo === 'online' ? 'Entreno online' : s.tipo === 'grupo' ? 'Grupo' : 'Personal'}
+                      {s.completada ? ' · ✓' : ''}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {sesiones.length === 0 && (
+            <div className="text-center py-6">
+              <p className="text-sm font-bold text-[#0A0A0A]">Sin sesiones este mes</p>
+              <p className="text-xs text-[#9B9B9B] mt-1">Tu entrenador añadirá tus próximas sesiones</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Resumen semana */}
+      {vista === 'semana' && sesiones.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            [sesiones.length, 'Total', '#0A0A0A'],
+            [sesiones.filter(s => s.completada).length, 'Completadas', '#10b981'],
+            [sesiones.filter(s => !s.completada).length, 'Pendientes', color],
+          ].map(([n, l, c]) => (
+            <div key={l} className="bg-white rounded-2xl border border-black/5 p-3 text-center">
+              <p className="text-xl font-bold" style={{color: c}}>{n}</p>
+              <p className="text-xs text-[#9B9B9B] mt-0.5">{l}</p>
+            </div>
+          ))}
         </div>
       )}
     </div>
