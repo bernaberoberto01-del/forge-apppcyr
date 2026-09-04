@@ -173,16 +173,15 @@ export default function PortalCliente() {
       const {data:sesPend}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).eq('tipo','presencial')
         .gte('fecha',hace7Str).lte('fecha',hoy).eq('cancelada',false).is('rpe',null).order('fecha',{ascending:false}).limit(3)
       setPendientesValorar(sesPend||[])
-      // Cargar hábitos del día
+      // Cargar hábitos del día — aislado para que un fallo no bloquee el resto
       const [{ data: habs }, { data: regsHoy }] = await Promise.all([
-        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden'),
-        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy)
+        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden').then(r => r).catch(() => ({ data: [] })),
+        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy).then(r => r).catch(() => ({ data: [] }))
       ])
       setHabitos(habs || [])
       const mapaHoy = {}
       ;(regsHoy || []).forEach(r => { mapaHoy[r.habito_id] = r.completado })
-      setHabitosHoy(mapaHoy)
-      if (cl.tipo === 'presencial') {
+      setHabitosHoy(mapaHoy)      if (cl.tipo === 'presencial') {
         const { data: tareas } = await supabase.from('tareas_extra').select('*').eq('cliente_id', cid).eq('activa', true).order('orden')
         setTareasExtra(tareas||[])
       }
@@ -961,13 +960,6 @@ export default function PortalCliente() {
                     <p className="text-sm text-[#6B6B6B]">Completa tu primer check-in para ver tu evolución aquí</p>
                   </button>
                 )}
-
-                {/* Card check-ins */}
-                <button onClick={()=>setTab('progreso')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
-                  <p className="text-2xl mb-2">📊</p>
-                  <p className="text-2xl font-bold text-[#0A0A0A]">{checkins.length}</p>
-                  <p className="text-xs text-[#6B6B6B] mt-0.5">Check-ins realizados</p>
-                </button>
 
                 {/* Acciones online */}
                 {cliente?.tipo==='online'&&(() => {
