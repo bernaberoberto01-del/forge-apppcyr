@@ -167,11 +167,13 @@ export default function PortalCliente() {
       setFotos(ft); setPlanNutricion(pn); if(cfg)setConfigEntrenador(cfg)
       setMarcas(mc); setHistorialMedidas(meds); setTieneCuestNutricion(tieneCuest)
 
-      // Realtime — actualizar marcas cuando se registra un PR nuevo
-      supabase.channel(`marcas-${cid}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'marcas_cliente', filter: `cliente_id=eq.${cid}` },
-          (payload) => setMarcas(prev => [payload.new, ...prev.filter(m => m.ejercicio !== payload.new.ejercicio)])
-        ).subscribe()
+      // Realtime — actualizar marcas cuando se registra un PR nuevo (protegido)
+      try {
+        supabase.channel(`marcas-${cid}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'marcas_cliente', filter: `cliente_id=eq.${cid}` },
+            (payload) => setMarcas(prev => [payload.new, ...prev.filter(m => m.ejercicio !== payload.new.ejercicio)])
+          ).subscribe()
+      } catch (_) { /* Realtime opcional — no bloquea la carga */ }
 
       const now=new Date(); const hoy=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
       const {data:sesFut}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).gte('fecha',hoy).eq('cancelada',false).order('fecha').order('hora').limit(8)
@@ -202,7 +204,11 @@ export default function PortalCliente() {
       }
       setLoading(false)
     }
-    cargar()
+    cargar().catch(err => {
+      console.error('Error cargando portal:', err)
+      setLoading(false)
+      setNotFound(true)
+    })
   },[clienteSession])
 
   useEffect(()=>{
