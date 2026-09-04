@@ -30,6 +30,7 @@ import PortalCliente from './pages/PortalCliente'
 import RegistroCliente from './pages/RegistroCliente'
 import NutricionCuestionario from './pages/NutricionCuestionario'
 import CheckinPublico from './pages/CheckinPublico'
+import PerfilPublico from './pages/PerfilPublico'
 import SesionCliente from './pages/SesionCliente'
 import ProgresoCliente from './pages/ProgresoCliente'
 import UnirseACentro from './pages/UnirseACentro'
@@ -125,6 +126,7 @@ function AreaPrivada({ session }) {
     <Routes>
       <Route path="/sesion" element={<SesionCliente />} />
       <Route path="/seguimiento" element={<CheckinPublico />} />
+      <Route path="/p/:slug" element={<PerfilPublico />} />
       <Route path="/*" element={<PortalCliente />} />
     </Routes>
   )

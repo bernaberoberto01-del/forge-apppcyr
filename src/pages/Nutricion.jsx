@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 
@@ -21,6 +22,7 @@ const MacroBadge = ({ label, valor, unit, color }) => (
 )
 
 export default function Nutricion({ session }) {
+  const navigate = useNavigate()
   const [clientes, setClientes] = useState([])
   const [planes, setPlanes] = useState([])
   const [cuests, setCuests] = useState([])
@@ -327,9 +329,10 @@ export default function Nutricion({ session }) {
                     style={{background: activo ? '#FF5C00' : '#C0C0C0'}}>{ini(c.nombre)}</div>
                   <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre.split(' ')[0]}</p>
                   {esOnline
-                    ? <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${activo ? 'bg-[#FF5C00]/10 text-[#FF5C00]' : 'bg-black/5 text-[#9B9B9B]'}`}>
-                        {activo ? (c.plan_online === 'completo' ? '⚡ Completo' : '🥗 Online') : 'Sin plan'}
-                      </span>
+                    ? <button onClick={() => { navigate('/clientes', { state: { abrirId: c.id, tab: 'resumen' } }) }}
+                        className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all hover:opacity-75 ${activo ? 'bg-[#FF5C00]/10 text-[#FF5C00]' : 'bg-black/5 text-[#9B9B9B]'}`}>
+                        {activo ? (c.plan_online === 'completo' ? '⚡ Completo' : '🥗 Online') : 'Sin plan →'}
+                      </button>
                     : <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
                         className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
                         <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />

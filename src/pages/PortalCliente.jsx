@@ -90,6 +90,8 @@ export default function PortalCliente() {
   const [motivoCancel, setMotivoCancel] = useState('')
   const [sesionesPortal, setSesionesPortal] = useState([])
   const [pendientesValorar, setPendientesValorar] = useState([])
+  const [habitos, setHabitos] = useState([])
+  const [habitosHoy, setHabitosHoy] = useState({}) // habito_id -> completado
   const [valorando, setValorando] = useState(null)
   const [rpeVal, setRpeVal] = useState(7)
   const [fatigaVal, setFatigaVal] = useState(2)
@@ -163,6 +165,15 @@ export default function PortalCliente() {
       const {data:sesPend}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).eq('tipo','presencial')
         .gte('fecha',hace7Str).lte('fecha',hoy).eq('cancelada',false).is('rpe',null).order('fecha',{ascending:false}).limit(3)
       setPendientesValorar(sesPend||[])
+      // Cargar hábitos del día
+      const [{ data: habs }, { data: regsHoy }] = await Promise.all([
+        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden'),
+        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy)
+      ])
+      setHabitos(habs || [])
+      const mapaHoy = {}
+      ;(regsHoy || []).forEach(r => { mapaHoy[r.habito_id] = r.completado })
+      setHabitosHoy(mapaHoy)
       if (cl.tipo === 'presencial') {
         const { data: tareas } = await supabase.from('tareas_extra').select('*').eq('cliente_id', cid).eq('activa', true).order('orden')
         setTareasExtra(tareas||[])
@@ -283,6 +294,7 @@ export default function PortalCliente() {
     ...(puedeMensajes ? [{id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos}] : []),
     ...(puedeVerNutricion && (planNutricion || tieneCuestNutricion) ? [{id:'nutricion',label:'Nutrición',icon:'🥗'}] : []),
     ...(pagos.length>0?[{id:'pagos',label:'Pagos',icon:'💳'}]:[]),
+    {id:'habitos',label:'Hábitos',icon:'🎯'},
     {id:'ajustes',label:'Ajustes',icon:'⚙️'},
   ]
 
@@ -417,6 +429,70 @@ export default function PortalCliente() {
                     </div>
                   </div>
                 )}
+
+                {/* ── HÁBITOS DEL DÍA ── */}
+                {habitos.length > 0 && (() => {
+                  const hoy = new Date().toISOString().split('T')[0]
+                  const completadosHoy = habitos.filter(h => habitosHoy[h.id]).length
+                  const todos = completadosHoy === habitos.length
+                  return (
+                    <div className={`rounded-2xl border overflow-hidden ${todos ? 'border-emerald-200 bg-emerald-50' : 'border-black/8 bg-white'}`}>
+                      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-[#0A0A0A]">Hábitos de hoy</p>
+                          <p className={`text-xs mt-0.5 ${todos ? 'text-emerald-600 font-semibold' : 'text-[#9B9B9B]'}`}>
+                            {todos ? '¡Todos completados! 🎉' : `${completadosHoy}/${habitos.length} completados`}
+                          </p>
+                        </div>
+                        <div className="relative w-10 h-10">
+                          <svg viewBox="0 0 36 36" className="w-10 h-10 -rotate-90">
+                            <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" strokeWidth="3"/>
+                            <circle cx="18" cy="18" r="15" fill="none" stroke={todos ? '#10b981' : '#FF5C00'}
+                              strokeWidth="3" strokeDasharray={`${(completadosHoy/habitos.length)*94} 94`}
+                              strokeLinecap="round"/>
+                          </svg>
+                          <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[#0A0A0A]">
+                            {Math.round((completadosHoy/habitos.length)*100)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="px-4 pb-4 space-y-2">
+                        {habitos.map(h => {
+                          const done = !!habitosHoy[h.id]
+                          return (
+                            <button key={h.id} onClick={async () => {
+                              const nuevo = !done
+                              setHabitosHoy(prev => ({...prev, [h.id]: nuevo}))
+                              await supabase.from('habitos_registro').upsert({
+                                habito_id: h.id, cliente_id: clienteId,
+                                fecha: hoy, completado: nuevo
+                              }, { onConflict: 'habito_id,fecha' })
+                              // Registrar en actividad si se completa
+                              if (nuevo) {
+                                supabase.from('actividad_cliente').insert({
+                                  cliente_id: clienteId, entrenador_id: cliente.entrenador_id,
+                                  tipo: 'habito_completado',
+                                  descripcion: `Completó hábito: ${h.nombre}`
+                                }).catch(() => {})
+                              }
+                            }}
+                              className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left
+                                ${done ? 'bg-emerald-100' : 'bg-[#F7F6F3] hover:bg-[#F0EEE8]'}`}>
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all
+                                ${done ? 'border-emerald-500 bg-emerald-500' : 'border-black/20'}`}>
+                                {done && <span className="text-white text-xs">✓</span>}
+                              </div>
+                              <span className="text-lg flex-shrink-0">{h.emoji}</span>
+                              <p className={`text-sm font-medium flex-1 ${done ? 'line-through text-[#9B9B9B]' : 'text-[#0A0A0A]'}`}>
+                                {h.nombre}
+                              </p>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* ── RPE PENDIENTE — máxima prioridad ── */}
                 {pendientesValorar.length > 0 && (
@@ -1357,6 +1433,11 @@ export default function PortalCliente() {
             )}
 
             {/* ══ AJUSTES ══════════════════════════════════════════════════ */}
+            {/* ══ HÁBITOS ══════════════════════════════════════════════════════ */}
+            {tab==='habitos'&&(
+              <HabitosPortal clienteId={clienteId} color={color} />
+            )}
+
             {tab==='ajustes'&&(
               <div className="space-y-3">
 
@@ -1917,6 +1998,174 @@ function ClasesCliente({ clienteId, entrenadorId, color }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ─── Hábitos — vista del cliente ──────────────────────────────────────────
+function HabitosPortal({ clienteId, color }) {
+  const [habitos, setHabitos] = useState([])
+  const [registros, setRegistros] = useState({})
+  const [cargando, setCargando] = useState(true)
+  const [marcando, setMarcando] = useState(null)
+
+  const hoy = new Date().toISOString().split('T')[0]
+
+  useEffect(() => {
+    if (!clienteId) return
+    cargar()
+  }, [clienteId])
+
+  async function cargar() {
+    setCargando(true)
+    const lunes = new Date()
+    lunes.setDate(lunes.getDate() - ((lunes.getDay() || 7) - 1))
+    const inicioSemana = lunes.toISOString().split('T')[0]
+
+    const [{ data: h }, { data: r }] = await Promise.all([
+      supabase.from('habitos').select('*').eq('cliente_id', clienteId).eq('activo', true).order('orden'),
+      supabase.from('habitos_registro').select('*').eq('cliente_id', clienteId).gte('fecha', inicioSemana),
+    ])
+    setHabitos(h || [])
+    const mapa = {}
+    ;(r || []).forEach(reg => { mapa[`${reg.habito_id}_${reg.fecha}`] = reg })
+    setRegistros(mapa)
+    setCargando(false)
+  }
+
+  async function toggleHabito(habitoId, fecha) {
+    setMarcando(habitoId)
+    const key = `${habitoId}_${fecha}`
+    const yaCompletado = !!registros[key]
+
+    if (yaCompletado) {
+      await supabase.from('habitos_registro').delete()
+        .eq('habito_id', habitoId).eq('fecha', fecha)
+      setRegistros(prev => { const n = {...prev}; delete n[key]; return n })
+    } else {
+      const { data } = await supabase.from('habitos_registro').insert({
+        habito_id: habitoId, cliente_id: clienteId, fecha, completado: true
+      }).select().single()
+      if (data) setRegistros(prev => ({...prev, [key]: data}))
+      // Registrar actividad
+      supabase.from('actividad_cliente').insert({
+        cliente_id: clienteId, tipo: 'habito_completado',
+        descripcion: `Hábito completado: ${habitos.find(h => h.id === habitoId)?.nombre}`
+      }).catch(() => {})
+    }
+    setMarcando(null)
+  }
+
+  // Días de la semana actual
+  const diasSemana = Array.from({length: 7}, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - ((d.getDay() || 7) - 1) + i)
+    return d.toISOString().split('T')[0]
+  })
+  const DIAS_LABEL = ['L','M','X','J','V','S','D']
+
+  if (cargando) return (
+    <div className="flex items-center justify-center h-32">
+      <div className="w-6 h-6 border-3 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+    </div>
+  )
+
+  if (habitos.length === 0) return (
+    <div className="text-center py-12">
+      <p className="text-4xl mb-3">🎯</p>
+      <p className="font-bold text-[#0A0A0A]">Sin hábitos asignados</p>
+      <p className="text-sm text-[#9B9B9B] mt-1 leading-relaxed max-w-xs mx-auto">
+        Tu entrenador te asignará hábitos diarios para trabajar fuera del entreno.
+      </p>
+    </div>
+  )
+
+  // Calcular racha y % semana
+  const completadosHoy = habitos.filter(h => registros[`${h.id}_${hoy}`]).length
+  const totalSemana = habitos.reduce((sum, h) => {
+    return sum + diasSemana.filter(d => registros[`${h.id}_${d}`]).length
+  }, 0)
+  const maxSemana = habitos.length * 7
+
+  return (
+    <div className="space-y-4">
+      {/* Resumen semana */}
+      <div className="rounded-2xl p-4" style={{background:`${color}12`, border:`1px solid ${color}30`}}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-bold text-[#0A0A0A]">Esta semana</p>
+          <p className="text-sm font-bold" style={{color}}>{totalSemana}/{maxSemana}</p>
+        </div>
+        <div className="w-full bg-black/10 rounded-full h-2 overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{width:`${maxSemana > 0 ? (totalSemana/maxSemana)*100 : 0}%`, background:color}}/>
+        </div>
+        <p className="text-xs text-[#9B9B9B] mt-1.5">
+          Hoy: {completadosHoy}/{habitos.length} hábitos completados
+        </p>
+      </div>
+
+      {/* Lista de hábitos */}
+      <div className="space-y-3">
+        {habitos.map(h => {
+          const completadoHoy = !!registros[`${h.id}_${hoy}`]
+          const completadosSemana = diasSemana.filter(d => registros[`${h.id}_${d}`]).length
+
+          return (
+            <div key={h.id} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+              <div className="flex items-center gap-3 p-4">
+                <span className="text-2xl flex-shrink-0">{h.icono}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-[#0A0A0A]">{h.nombre}</p>
+                  {h.descripcion && <p className="text-xs text-[#9B9B9B] mt-0.5">{h.descripcion}</p>}
+                  <p className="text-xs text-[#9B9B9B] mt-1">{completadosSemana}/7 días esta semana</p>
+                </div>
+                {/* Botón de hoy */}
+                <button
+                  onClick={() => toggleHabito(h.id, hoy)}
+                  disabled={marcando === h.id}
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-95 flex-shrink-0 ${
+                    completadoHoy
+                      ? 'text-white text-xl'
+                      : 'border-2 text-2xl'
+                  } ${marcando === h.id ? 'opacity-50' : ''}`}
+                  style={completadoHoy
+                    ? {background: color}
+                    : {borderColor: `${color}40`}
+                  }>
+                  {completadoHoy ? '✓' : h.icono}
+                </button>
+              </div>
+
+              {/* Mini calendario semana */}
+              <div className="px-4 pb-3 flex gap-1.5">
+                {diasSemana.map((dia, i) => {
+                  const completado = !!registros[`${h.id}_${dia}`]
+                  const esHoy = dia === hoy
+                  const esFuturo = dia > hoy
+                  return (
+                    <button
+                      key={dia}
+                      onClick={() => !esFuturo && toggleHabito(h.id, dia)}
+                      disabled={esFuturo || marcando === h.id}
+                      className={`flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl transition-all ${
+                        esFuturo ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'
+                      } ${esHoy ? 'ring-1' : ''}`}
+                      style={esHoy ? {ringColor: color} : {}}>
+                      <span className="text-[10px] text-[#9B9B9B] font-medium">{DIAS_LABEL[i]}</span>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs transition-all ${
+                        completado ? 'text-white' : 'bg-black/5'
+                      }`}
+                        style={completado ? {background: color} : {}}>
+                        {completado ? '✓' : ''}
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

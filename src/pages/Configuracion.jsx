@@ -137,10 +137,16 @@ export default function Configuracion({ session, onConfigChange }) {
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Configuración</h1>
           <p className="text-sm text-[#6B6B6B] mt-0.5">Personaliza Forge a tu imagen y metodología</p>
         </div>
-        <button onClick={guardar} disabled={saving}
-          className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2.5 rounded-xl disabled:opacity-40 transition-all active:scale-95">
-          {saving ? 'Guardando...' : '💾 Guardar'}
-        </button>
+        <div className="flex gap-2">
+          <a href={`/p/${config.slug_publico || 'mi-perfil'}`} target="_blank" rel="noopener noreferrer"
+            className="border border-black/10 text-[#6B6B6B] text-xs font-medium px-3 py-2.5 rounded-xl hover:bg-[#F5F5F0] transition-all">
+            🔗 Ver perfil público
+          </a>
+          <button onClick={guardar} disabled={saving}
+            className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2.5 rounded-xl disabled:opacity-40 transition-all active:scale-95">
+            {saving ? 'Guardando...' : '💾 Guardar'}
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}

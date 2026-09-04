@@ -941,7 +941,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['actividad','📡 Actividad'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['actividad','📡 Actividad'],['habitos','✅ Hábitos'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -1038,6 +1038,41 @@ export default function Clientes({ session }) {
                   {detalle.lesiones && <div className="bg-red-50 border border-red-100 rounded-xl p-3"><p className="text-xs font-semibold text-red-700 mb-1">⚠ Lesiones / limitaciones</p><p className="text-sm text-red-800">{detalle.lesiones}</p></div>}
                   {detalle.notas && <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs font-semibold text-amber-700 mb-1">📝 Notas internas</p><p className="text-sm text-amber-800">{detalle.notas}</p></div>}
 
+                  {/* Módulos activos — toggle por módulo */}
+                  {detalle.tipo === 'online' && (
+                    <div className="bg-[#F7F6F3] rounded-xl p-3">
+                      <p className="text-xs font-bold text-[#0A0A0A] mb-2">Módulos activos</p>
+                      {[
+                        ['nutricion', '🥗 Nutrición', 'plan_online', ['nutricion','completo']],
+                        ['entrenamiento', '💪 Entrenamiento', 'plan_online', ['entrenamiento','completo']],
+                      ].map(([mod, label, campo, planesConAcceso]) => {
+                        const activo = planesConAcceso.includes(detalle.plan_online)
+                        return (
+                          <div key={mod} className="flex items-center justify-between py-1.5">
+                            <p className="text-sm text-[#0A0A0A]">{label}</p>
+                            <button onClick={async () => {
+                              let nuevoPlan = detalle.plan_online
+                              if (mod === 'nutricion') {
+                                if (activo) nuevoPlan = detalle.plan_online === 'completo' ? 'entrenamiento' : null
+                                else nuevoPlan = detalle.plan_online === 'entrenamiento' ? 'completo' : 'nutricion'
+                              } else {
+                                if (activo) nuevoPlan = detalle.plan_online === 'completo' ? 'nutricion' : null
+                                else nuevoPlan = detalle.plan_online === 'nutricion' ? 'completo' : 'entrenamiento'
+                              }
+                              await supabase.from('clientes').update({ plan_online: nuevoPlan }).eq('id', detalle.id)
+                              setDetalle(d => ({...d, plan_online: nuevoPlan}))
+                              cargar()
+                              showToast(`${label} ${activo ? 'desactivado' : 'activado'}`)
+                            }}
+                              className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                              <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${activo ? 'left-5' : 'left-0.5'}`}/>
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
                   {/* Acciones */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
@@ -1065,8 +1100,16 @@ export default function Clientes({ session }) {
                   </div>
                 </div>
               )})()}
+              {dTab==='habitos' && (
+                <GestionHabitos clienteId={detalle.id} entrenadorId={uid} />
+              )}
+
               {dTab==='actividad' && (
                 <ActividadCliente clienteId={detalle.id} />
+              )}
+
+              {dTab==='habitos' && (
+                <HabitosCliente clienteId={detalle.id} entrenadorId={uid} />
               )}
 
               {dTab==='progreso' && (
@@ -1818,6 +1861,250 @@ function ActividadCliente({ clienteId }) {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ─── Gestión de hábitos del cliente ────────────────────────────────────────
+function HabitosCliente({ clienteId, entrenadorId }) {
+  const [habitos, setHabitos] = useState([])
+  const [nuevoNombre, setNuevoNombre] = useState('')
+  const [nuevoEmoji, setNuevoEmoji] = useState('✅')
+  const [guardando, setGuardando] = useState(false)
+  const EMOJIS = ['✅','💧','😴','🥗','🏃','🧘','💊','📖','🚶','🍎','🧴','☀️']
+
+  useEffect(() => {
+    cargar()
+  }, [clienteId])
+
+  async function cargar() {
+    const { data } = await supabase.from('habitos')
+      .select('*').eq('cliente_id', clienteId).order('orden')
+    setHabitos(data || [])
+  }
+
+  async function crear() {
+    if (!nuevoNombre.trim()) return
+    setGuardando(true)
+    await supabase.from('habitos').insert({
+      cliente_id: clienteId, entrenador_id: entrenadorId,
+      nombre: nuevoNombre.trim(), emoji: nuevoEmoji,
+      frecuencia: 'diario', orden: habitos.length
+    })
+    setNuevoNombre('')
+    await cargar()
+    setGuardando(false)
+  }
+
+  async function toggleActivo(h) {
+    await supabase.from('habitos').update({ activo: !h.activo }).eq('id', h.id)
+    await cargar()
+  }
+
+  async function eliminar(id) {
+    if (!confirm('¿Eliminar este hábito?')) return
+    await supabase.from('habitos').delete().eq('id', id)
+    await cargar()
+  }
+
+  // Ver adherencia de los últimos 7 días
+  const [adherencia, setAdherencia] = useState({})
+  useEffect(() => {
+    if (!habitos.length) return
+    const hace7 = new Date(Date.now()-7*864e5).toISOString().split('T')[0]
+    supabase.from('habitos_registro')
+      .select('habito_id,fecha,completado')
+      .eq('cliente_id', clienteId)
+      .gte('fecha', hace7)
+      .eq('completado', true)
+      .then(({ data }) => {
+        const map = {}
+        ;(data || []).forEach(r => {
+          map[r.habito_id] = (map[r.habito_id] || 0) + 1
+        })
+        setAdherencia(map)
+      })
+  }, [habitos])
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-[#F7F6F3] rounded-2xl p-4">
+        <p className="text-xs font-bold text-[#0A0A0A] mb-3">Hábitos activos</p>
+        {habitos.length === 0 ? (
+          <p className="text-xs text-[#9B9B9B] text-center py-4">Sin hábitos configurados. Añade el primero abajo.</p>
+        ) : (
+          <div className="space-y-2">
+            {habitos.map(h => (
+              <div key={h.id} className={`flex items-center gap-3 bg-white rounded-xl px-3 py-2.5 ${!h.activo ? 'opacity-50' : ''}`}>
+                <span className="text-lg">{h.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#0A0A0A]">{h.nombre}</p>
+                  <p className="text-xs text-[#9B9B9B]">
+                    {adherencia[h.id] || 0}/7 días esta semana
+                    <span className="ml-2 font-medium" style={{color: (adherencia[h.id]||0)>=5 ? '#10b981' : (adherencia[h.id]||0)>=3 ? '#f59e0b' : '#ef4444'}}>
+                      {Math.round(((adherencia[h.id]||0)/7)*100)}%
+                    </span>
+                  </p>
+                </div>
+                <div className="flex gap-1.5">
+                  <button onClick={() => toggleActivo(h)}
+                    className={`w-8 h-4 rounded-full transition-all relative ${h.activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                    <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${h.activo ? 'left-4' : 'left-0.5'}`}/>
+                  </button>
+                  <button onClick={() => eliminar(h.id)} className="text-red-400 hover:text-red-600 text-xs p-1">🗑</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white border border-black/8 rounded-2xl p-4">
+        <p className="text-xs font-bold text-[#0A0A0A] mb-3">Añadir hábito</p>
+        <div className="flex gap-2 flex-wrap mb-3">
+          {EMOJIS.map(e => (
+            <button key={e} onClick={() => setNuevoEmoji(e)}
+              className={`text-xl p-1.5 rounded-lg transition-all ${nuevoEmoji===e ? 'bg-[#FF5C00]/10 ring-2 ring-[#FF5C00]' : 'hover:bg-[#F7F6F3]'}`}>
+              {e}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && crear()}
+            placeholder="Ej: Beber 2L de agua, Dormir 8h..."
+            className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+          <button onClick={crear} disabled={!nuevoNombre.trim() || guardando}
+            className="bg-[#FF5C00] text-white text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-40">
+            + Añadir
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Gestión de hábitos (entrenador) ─────────────────────────────────────
+function GestionHabitos({ clienteId, entrenadorId }) {
+  const [habitos, setHabitos] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [form, setForm] = useState({ nombre:'', descripcion:'', icono:'⭐', frecuencia:'diario', meta_semanal:7 })
+  const [guardando, setGuardando] = useState(false)
+  const [mostrarForm, setMostrarForm] = useState(false)
+
+  const ICONOS_RAPIDOS = ['💧','🥗','😴','🚶','🧘','📖','🍎','🏃','💊','🧘‍♂️','🌅','🚫']
+
+  useEffect(() => { cargar() }, [clienteId])
+
+  async function cargar() {
+    const { data } = await supabase.from('habitos').select('*')
+      .eq('cliente_id', clienteId).order('orden').order('created_at')
+    setHabitos(data || [])
+    setCargando(false)
+  }
+
+  async function crear() {
+    if (!form.nombre.trim()) return
+    setGuardando(true)
+    await supabase.from('habitos').insert({
+      entrenador_id: entrenadorId, cliente_id: clienteId,
+      nombre: form.nombre.trim(), descripcion: form.descripcion || null,
+      icono: form.icono, frecuencia: form.frecuencia,
+      meta_semanal: Number(form.meta_semanal), orden: habitos.length
+    })
+    setForm({ nombre:'', descripcion:'', icono:'⭐', frecuencia:'diario', meta_semanal:7 })
+    setMostrarForm(false)
+    setGuardando(false)
+    cargar()
+  }
+
+  async function toggleActivo(id, activo) {
+    await supabase.from('habitos').update({ activo }).eq('id', id)
+    setHabitos(prev => prev.map(h => h.id === id ? {...h, activo} : h))
+  }
+
+  async function eliminar(id) {
+    if (!confirm('¿Eliminar este hábito?')) return
+    await supabase.from('habitos').delete().eq('id', id)
+    cargar()
+  }
+
+  // Ver cumplimiento semana actual
+  const [registrosSemana, setRegistrosSemana] = useState([])
+  useEffect(() => {
+    const lunes = new Date()
+    lunes.setDate(lunes.getDate() - ((lunes.getDay() || 7) - 1))
+    supabase.from('habitos_registro').select('habito_id,fecha')
+      .eq('cliente_id', clienteId).gte('fecha', lunes.toISOString().split('T')[0])
+      .then(({data}) => setRegistrosSemana(data || []))
+  }, [clienteId, habitos.length])
+
+  if (cargando) return <div className="h-24 flex items-center justify-center"><div className="w-5 h-5 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+
+  return (
+    <div className="space-y-3">
+      {habitos.length === 0 && !mostrarForm && (
+        <div className="text-center py-8">
+          <p className="text-3xl mb-2">🎯</p>
+          <p className="text-sm font-bold text-[#0A0A0A]">Sin hábitos asignados</p>
+          <p className="text-xs text-[#9B9B9B] mt-1">Añade hábitos diarios para que el cliente trabaje fuera del entreno</p>
+        </div>
+      )}
+
+      {habitos.map(h => {
+        const completadosSemana = registrosSemana.filter(r => r.habito_id === h.id).length
+        return (
+          <div key={h.id} className={`bg-white rounded-2xl border p-3 flex items-center gap-3 ${!h.activo ? 'opacity-50' : 'border-black/5'}`}>
+            <span className="text-xl flex-shrink-0">{h.icono}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-[#0A0A0A]">{h.nombre}</p>
+              <p className="text-xs text-[#9B9B9B]">{h.descripcion || h.frecuencia} · Esta semana: {completadosSemana}/7 días</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button onClick={() => toggleActivo(h.id, !h.activo)}
+                className={`w-9 h-5 rounded-full transition-all relative ${h.activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${h.activo ? 'left-4' : 'left-0.5'}`}/>
+              </button>
+              <button onClick={() => eliminar(h.id)} className="text-[#C0C0C0] hover:text-red-400 text-sm p-1 transition-all">🗑</button>
+            </div>
+          </div>
+        )
+      })}
+
+      {mostrarForm ? (
+        <div className="bg-[#F7F6F3] rounded-2xl p-4 space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Icono</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {ICONOS_RAPIDOS.map(ic => (
+                <button key={ic} type="button" onClick={() => setForm(f=>({...f,icono:ic}))}
+                  className={`text-lg w-9 h-9 rounded-xl transition-all ${form.icono===ic ? 'bg-[#FF5C00]/20 ring-1 ring-[#FF5C00]' : 'bg-white hover:bg-[#F0EEE8]'}`}>
+                  {ic}
+                </button>
+              ))}
+            </div>
+          </div>
+          <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))}
+            placeholder="Nombre del hábito (ej: Beber 2L de agua)"
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+          <input value={form.descripcion} onChange={e=>setForm(f=>({...f,descripcion:e.target.value}))}
+            placeholder="Descripción opcional"
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+          <div className="flex gap-2">
+            <button onClick={() => setMostrarForm(false)}
+              className="flex-1 border border-black/10 text-[#6B6B6B] text-sm py-2 rounded-xl">Cancelar</button>
+            <button onClick={crear} disabled={!form.nombre.trim() || guardando}
+              className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2 rounded-xl disabled:opacity-40">
+              {guardando ? '...' : 'Añadir hábito'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setMostrarForm(true)}
+          className="w-full border-2 border-dashed border-black/10 rounded-2xl py-3 text-sm text-[#9B9B9B] hover:border-[#FF5C00]/30 hover:text-[#FF5C00] transition-all">
+          + Añadir hábito
+        </button>
+      )}
     </div>
   )
 }
