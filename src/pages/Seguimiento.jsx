@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
@@ -36,10 +37,13 @@ export default function Seguimiento({ session }) {
   const [loading, setLoading] = useState(false)
   const [filtroCliente, setFiltroCliente] = useState('todos')
   const uid = session.user.id
+  const navigate = useNavigate()
+  const [analisisExpandido, setAnalisisExpandido] = useState(null)
   const { completar, completado } = useOnboarding(uid)
   const [tabPrincipal, setTabPrincipal] = useState('checkins') // checkins | sesiones | mensual
   const [lanzandoMensual, setLanzandoMensual] = useState(false)
   const [borradores, setBorradores] = useState([])
+  const [analisisMensual, setAnalisisMensual] = useState([])
   const [publicandoBorrador, setPublicandoBorrador] = useState(null)
   const [rutinaBorradorExpandida, setRutinaBorradorExpandida] = useState(null)
   const [busqueda, setBusqueda] = useState('')
@@ -68,16 +72,18 @@ export default function Seguimiento({ session }) {
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
-    const [{ data: ci }, { data: cl }, { data: se }, { data: bors }] = await Promise.all([
+    const [{ data: ci }, { data: cl }, { data: se }, { data: bors }, { data: an }] = await Promise.all([
       supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(200),
       supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(300),
       supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'por revisar').order('created_at', { ascending: false }),
+      supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('revisado', false).order('created_at', { ascending: false }).limit(20),
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
     setSesiones(se || [])
     setBorradores(bors || [])
+    setAnalisisMensual(an || [])
   }
 
   async function lanzarMensual() {
@@ -770,43 +776,143 @@ export default function Seguimiento({ session }) {
       {/* ── TAB MENSUAL ── */}
       {tabPrincipal === 'mensual' && (
         <div className="space-y-4">
-          {/* Botón lanzar análisis */}
+          {/* Cabecera */}
           <div className="bg-[#111] rounded-2xl p-5">
-            <p className="text-white font-bold text-lg mb-1">🔄 Actualización mensual</p>
-            <p className="text-white/50 text-sm mb-4">Analiza los check-ins del último mes de todos tus clientes y genera una nueva rutina adaptada para cada uno. Tú revisas y publicas.</p>
+            <p className="text-white font-bold text-lg mb-1">🔄 Análisis mensual automático</p>
+            <p className="text-white/50 text-sm mb-4">Cada domingo, tras el 4º check-in de cada cliente, Forge analiza su progreso y prepara la acción adecuada. Tú revisas y decides.</p>
             <div className="bg-white/5 rounded-xl p-3 mb-4 space-y-1.5">
               <div className="flex justify-between text-sm">
-                <span className="text-white/60">Clientes con datos suficientes (2+ check-ins)</span>
-                <span className="text-white font-bold">
-                  {clientes.filter(c => checkins.filter(ci => ci.cliente_id === c.id).length >= 2).length} / {clientes.length}
-                </span>
+                <span className="text-white/60">Pendientes de revisar</span>
+                <span className="font-bold" style={{color: analisisMensual.length > 0 ? '#FF5C00' : 'white'}}>{analisisMensual.length}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-white/60">Borradores pendientes de revisar</span>
+                <span className="text-white/60">Rutinas borrador generadas</span>
                 <span className="font-bold" style={{color: borradores.length > 0 ? '#FF5C00' : 'white'}}>{borradores.length}</span>
               </div>
             </div>
-            <button onClick={lanzarMensual} disabled={lanzandoMensual}
+            <button onClick={async () => {
+              setLanzandoMensual(true)
+              await supabase.functions.invoke('analizar-cliente-mensual', { body: {} })
+              await cargar()
+              setLanzandoMensual(false)
+              setToast('✓ Análisis completado')
+              setTimeout(() => setToast(''), 3000)
+            }} disabled={lanzandoMensual}
               className="w-full py-3 rounded-xl text-white font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               style={{background:'#FF5C00'}}>
               {lanzandoMensual
                 ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"/>Analizando clientes...</>
-                : '✨ Lanzar análisis mensual con IA'
+                : '✨ Lanzar análisis manual ahora'
               }
             </button>
-            <p className="text-white/30 text-xs text-center mt-2">Solo procesa clientes con 2+ check-ins en los últimos 30 días</p>
+            <p className="text-white/30 text-xs text-center mt-2">Se ejecuta automáticamente cada domingo. Usa este botón para forzarlo.</p>
           </div>
 
-          {/* Borradores pendientes */}
-          {borradores.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-black/6 p-8 text-center">
-              <p className="text-3xl mb-3">✓</p>
-              <p className="text-sm font-semibold text-[#0A0A0A]">Sin borradores pendientes</p>
-              <p className="text-xs text-[#6B6B6B] mt-1">Lanza el análisis mensual para generar nuevas rutinas</p>
+          {/* Análisis pendientes de revisar */}
+          {analisisMensual.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-[#0A0A0A]">Pendientes de revisar — {analisisMensual.length}</p>
+              {analisisMensual.map(a => {
+                const ICONOS = { actualizar_rutina:'🔄', ajustar_cargas:'⚖️', mensaje_motivacional:'💬', pausa_recomendada:'⚠️' }
+                const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:'#FF5C00', pausa_recomendada:'#ef4444' }
+                const ETIQUETAS = { actualizar_rutina:'Nueva rutina', ajustar_cargas:'Ajustar cargas', mensaje_motivacional:'Mensaje', pausa_recomendada:'Pausa ⚠️' }
+                const color = COLORES[a.accion] || '#6B6B6B'
+                const expandido = analisisExpandido === a.id
+                const setExpandido = (v) => setAnalisisExpandido(v ? a.id : null)
+
+                return (
+                  <div key={a.id} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+                    {/* Cabecera compacta */}
+                    <button onClick={() => setExpandido(v => !v)}
+                      className="w-full flex items-center gap-3 p-4 text-left hover:bg-[#FAFAFA] transition-all">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-base flex-shrink-0"
+                        style={{background: color}}>
+                        {ICONOS[a.accion]}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-[#0A0A0A]">{a.clientes?.nombre?.split(' ')[0]}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded-full text-white" style={{background:color}}>
+                            {ETIQUETAS[a.accion]}
+                          </span>
+                          {a.adherencia_pct != null && <span className="text-xs text-[#9B9B9B]">Adherencia {a.adherencia_pct}%</span>}
+                          {a.energia_media != null && <span className="text-xs text-[#9B9B9B]">E:{a.energia_media}/5</span>}
+                          {a.fatiga_media != null && <span className="text-xs text-[#9B9B9B]">F:{a.fatiga_media}/5</span>}
+                        </div>
+                      </div>
+                      <span className="text-[#C0C0C0] text-xs flex-shrink-0">{expandido ? '▲' : '▼'}</span>
+                    </button>
+
+                    {/* Detalle expandido */}
+                    {expandido && (
+                      <div className="border-t border-black/5 p-4 space-y-4">
+                        {/* Resumen para el entrenador */}
+                        <div className="bg-[#F7F6F3] rounded-xl p-3">
+                          <p className="text-xs font-bold text-[#6B6B6B] mb-1">📊 Resumen del mes</p>
+                          <p className="text-sm text-[#0A0A0A] leading-relaxed">{a.resumen}</p>
+                        </div>
+
+                        {/* Indicaciones */}
+                        {a.indicaciones && (
+                          <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                            <p className="text-xs font-bold text-blue-700 mb-1">
+                              {a.accion === 'actualizar_rutina' ? '📋 Indicaciones para la nueva rutina' :
+                               a.accion === 'ajustar_cargas' ? '⚖️ Ajustes a aplicar' :
+                               a.accion === 'pausa_recomendada' ? '🔍 Qué explorar con el cliente' :
+                               '💡 Sugerencias'}
+                            </p>
+                            <p className="text-sm text-blue-900 leading-relaxed">{a.indicaciones}</p>
+                          </div>
+                        )}
+
+                        {/* Mensaje listo para enviar */}
+                        {a.mensaje_cliente && (
+                          <div className="border border-[#FF5C00]/20 rounded-xl p-3">
+                            <p className="text-xs font-bold text-[#FF5C00] mb-2">💬 Mensaje listo para enviar</p>
+                            <p className="text-sm text-[#0A0A0A] leading-relaxed whitespace-pre-line">{a.mensaje_cliente}</p>
+                          </div>
+                        )}
+
+                        {/* Acciones */}
+                        <div className="flex gap-2 flex-wrap">
+                          {/* Ir a rutina si hay una generada */}
+                          {a.rutina_generada_id && (
+                            <button onClick={() => navigate('/rutinas')}
+                              className="flex-1 bg-[#6366f1] text-white text-xs font-bold py-2.5 rounded-xl">
+                              📋 Ver rutina generada
+                            </button>
+                          )}
+                          {/* Enviar mensaje al cliente */}
+                          {a.mensaje_cliente && (
+                            <button onClick={async () => {
+                              // Navegar a mensajes con el texto pre-cargado
+                              navigate('/mensajes', { state: { clienteId: a.cliente_id, mensaje: a.mensaje_cliente } })
+                            }}
+                              className="flex-1 bg-[#FF5C00] text-white text-xs font-bold py-2.5 rounded-xl">
+                              💬 Enviar mensaje
+                            </button>
+                          )}
+                          {/* Marcar como revisado */}
+                          <button onClick={async () => {
+                            await supabase.from('analisis_mensual').update({ revisado: true, accion_tomada: 'revisado' }).eq('id', a.id)
+                            setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
+                          }}
+                            className="border border-black/10 text-[#6B6B6B] text-xs font-medium py-2.5 px-3 rounded-xl hover:bg-[#F5F5F0]">
+                            ✓ Revisado
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-          ) : (
-            <>
-              <p className="text-sm font-bold text-[#0A0A0A]">{borradores.length} rutina{borradores.length > 1 ? 's' : ''} pendiente{borradores.length > 1 ? 's' : ''} de revisión</p>
+          )}
+
+          {/* Rutinas borrador pendientes */}
+          {borradores.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-bold text-[#0A0A0A]">Rutinas por revisar — {borradores.length}</p>
               {borradores.map(b => {
                 const diasRutina = b.borrador?.dias || b.contenido?.dias || []
                 const expandida = rutinaBorradorExpandida === b.id
@@ -890,7 +996,7 @@ export default function Seguimiento({ session }) {
                 </div>
                 )
               })}
-            </>
+            </div>
           )}
         </div>
       )}
