@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import ClienteQuickView from '../components/ClienteQuickView'
@@ -21,6 +22,19 @@ const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCas
 
 export default function Mensajes({ session }) {
   const uid = session.user.id
+  const location = useLocation()
+
+  // Recoger state cuando viene desde análisis mensual
+  useEffect(() => {
+    if (location.state?.clienteId && clientes.length > 0) {
+      const c = clientes.find(x => x.id === location.state.clienteId)
+      if (c) {
+        setSeleccionado(c)
+        if (location.state.mensaje) setTexto(location.state.mensaje)
+        window.history.replaceState({}, '') // limpiar state para no recargar
+      }
+    }
+  }, [location.state, clientes])
   const { completar, completado } = useOnboarding(uid)
   const [clientes, setClientes] = useState([])
   const [seleccionado, setSeleccionado] = useState(null)
