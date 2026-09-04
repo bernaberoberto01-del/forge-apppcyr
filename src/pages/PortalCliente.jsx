@@ -466,7 +466,7 @@ export default function PortalCliente() {
               .limit(1)
               .maybeSingle()
 
-            const ultimoPeso = ultimo?.sets?.find((s: any) => s.peso)?.peso
+            const ultimoPeso = ultimo?.sets?.find((s) => s.peso)?.peso
             const numSeries = ej.series || 3
 
             // Si ya registró esta sesión, prellenar con esos datos
@@ -491,6 +491,8 @@ export default function PortalCliente() {
     }
     setCargandoEjercicios(false)
   }
+
+  async function enviarMensaje() {
     if(!textoMsg.trim()||enviandoMsg) return
     setEnviandoMsg(true)
     await supabase.functions.invoke('portal-accion',{body:{accion:'enviar_mensaje',datos:{contenido:textoMsg.trim()}}}).catch(()=>{})
@@ -1270,7 +1272,8 @@ export default function PortalCliente() {
                       </p>
                     </div>
                     {(rutina.borrador?.dias||rutina.contenido?.dias||[]).map((dia,di)=>(
-                      <div key={di} className="bg-white rounded-2xl border border-black/6 overflow-hidden">
+                      <div key={di}>
+                      <div className="bg-white rounded-2xl border border-black/6 overflow-hidden">
                         <div className="px-5 py-3.5 border-b border-black/6 bg-[#F7F6F3]">
                           <p className="font-semibold text-[#0A0A0A] text-sm">{dia.nombre||dia.dia}</p>
                         </div>
@@ -1330,6 +1333,7 @@ export default function PortalCliente() {
                           style={{background: color}}>
                           ✓ Registrar esta sesión
                         </button>
+                      </div>
                       </div>
                     ))}
                   </>
