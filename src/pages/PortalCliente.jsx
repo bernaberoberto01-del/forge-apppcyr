@@ -181,7 +181,8 @@ export default function PortalCliente() {
       setHabitos(habs || [])
       const mapaHoy = {}
       ;(regsHoy || []).forEach(r => { mapaHoy[r.habito_id] = r.completado })
-      setHabitosHoy(mapaHoy)      if (cl.tipo === 'presencial') {
+      setHabitosHoy(mapaHoy)
+      if (cl.tipo === 'presencial') {
         const { data: tareas } = await supabase.from('tareas_extra').select('*').eq('cliente_id', cid).eq('activa', true).order('orden')
         setTareasExtra(tareas||[])
       }
