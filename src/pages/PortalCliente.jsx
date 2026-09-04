@@ -195,7 +195,7 @@ export default function PortalCliente() {
       }
       setLoading(false)
     }
-    cargar()
+    cargar().catch(() => setLoading(false))
   },[clienteSession])
 
   useEffect(()=>{
