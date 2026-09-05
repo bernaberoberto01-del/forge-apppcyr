@@ -399,6 +399,47 @@ export default function Dashboard({ session }) {
             </div>
 
             {/* Agenda — hoy y mañana */}
+            {/* Análisis mensuales pendientes */}
+            {(() => {
+              const [analisis, setAnalisis] = useState([])
+              useEffect(() => {
+                supabase.from('analisis_mensual')
+                  .select('id,cliente_id,accion,mensaje_cliente,clientes(nombre)')
+                  .eq('entrenador_id', datos?.activos?.[0]?.id ? uid : uid)
+                  .eq('revisado', false)
+                  .order('created_at', {ascending: false})
+                  .limit(3)
+                  .then(({data}) => setAnalisis(data || []))
+              }, [])
+              if (!analisis.length) return null
+              return (
+                <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+                  <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
+                    <p className="text-sm font-bold text-[#0A0A0A]">🔄 Análisis mensuales — {analisis.length} pendiente{analisis.length > 1 ? 's' : ''}</p>
+                    <button onClick={() => navigate('/seguimiento')} className="text-xs text-[#FF5C00] font-medium">Ver todo →</button>
+                  </div>
+                  <div className="divide-y divide-black/4">
+                    {analisis.map(a => (
+                      <div key={a.id} className="flex items-center gap-3 px-5 py-3">
+                        <div className="w-8 h-8 bg-[#6366f1]/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm">📊</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[#0A0A0A] truncate">{a.clientes?.nombre}</p>
+                          <p className="text-xs text-[#9B9B9B]">{a.accion === 'actualizar_rutina' ? 'Rutina nueva generada' : a.accion === 'ajustar_cargas' ? 'Ajuste de cargas' : 'Mensaje motivacional'}</p>
+                        </div>
+                        <button onClick={() => navigate('/seguimiento')}
+                          className="text-xs bg-[#6366f1] text-white px-3 py-1.5 rounded-xl font-medium flex-shrink-0">
+                          Revisar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Agenda — hoy y mañana */}
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
                 <p className="text-sm font-bold text-[#0A0A0A]">
