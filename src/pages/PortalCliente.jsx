@@ -114,6 +114,9 @@ export default function PortalCliente() {
   const [errorFoto, setErrorFoto] = useState('')
   const [fotos, setFotos] = useState([])
   const [subTabProgreso, setSubTabProgreso] = useState('peso')
+  const [modalCheckin, setModalCheckin] = useState(false)
+  const [checkinForm, setCheckinForm] = useState({ energia: null, fatiga: null, sueno: null, estres: null, peso: '', comentario: '' })
+  const [enviandoCheckin, setEnviandoCheckin] = useState(false)
   const [medidas, setMedidas] = useState({})
   const [historialMedidas, setHistorialMedidas] = useState([])
   const [marcas, setMarcas] = useState([])
@@ -209,6 +212,45 @@ export default function PortalCliente() {
 
   const color = configEntrenador?.color_acento||'#FF5C00'
   const mensajesNoLeidos = mensajes.filter(m=>!m.leido&&m.tipo==='entrenador').length
+
+  async function enviarCheckinInline() {
+    if (!checkinForm.energia || !checkinForm.fatiga || !checkinForm.sueno || !checkinForm.estres) return
+    setEnviandoCheckin(true)
+    const hoy = new Date().toISOString().split('T')[0]
+    const { error } = await supabase.from('checkins').insert({
+      cliente_id: clienteId,
+      entrenador_id: cliente.entrenador_id,
+      fecha: hoy,
+      energia: checkinForm.energia,
+      fatiga: checkinForm.fatiga,
+      sueno: checkinForm.sueno,
+      estres: checkinForm.estres,
+      peso: checkinForm.peso ? parseFloat(checkinForm.peso) : null,
+      comentario: checkinForm.comentario || null,
+      adherencia_entreno: 5, // default
+    })
+    if (!error) {
+      // Actualizar checkins localmente para que el Inicio refleje el nuevo
+      const nuevo = {
+        id: Date.now().toString(),
+        fecha: hoy,
+        energia: checkinForm.energia,
+        fatiga: checkinForm.fatiga,
+        sueno: checkinForm.sueno,
+        estres: checkinForm.estres,
+        peso: checkinForm.peso ? parseFloat(checkinForm.peso) : null,
+        comentario: checkinForm.comentario,
+      }
+      setCheckins(prev => [nuevo, ...prev])
+      setModalCheckin(false)
+      setCheckinForm({ energia: null, fatiga: null, sueno: null, estres: null, peso: '', comentario: '' })
+      // Notificar al entrenador
+      supabase.functions.invoke('portal-accion', {
+        body: { accion: 'enviar_mensaje', datos: { contenido: `✅ Check-in semanal completado` } }
+      }).catch(() => {})
+    }
+    setEnviandoCheckin(false)
+  }
 
   async function guardarValoracion(){
     if(!valorando) return
@@ -670,6 +712,7 @@ export default function PortalCliente() {
                 valorando={valorando}
                 setValorando={setValorando}
                 setSesionesPortal={setSesionesPortal}
+                onAbrirCheckin={() => setModalCheckin(true)}
               />
             )}
             {tab==='rutina'&&(
@@ -2298,6 +2341,77 @@ function AgendaSemana({ clienteId, sesionesPortal, color, cliente, cancelando, s
         </div>
       )}
 
+      {/* Modal check-in semanal inline */}
+      {modalCheckin && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4"
+          onClick={() => setModalCheckin(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-6 pb-4 border-b border-black/5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p>
+                  <p className="text-xs text-[#9B9B9B] mt-0.5">Cuéntame cómo ha ido la semana</p>
+                </div>
+                <button onClick={() => setModalCheckin(false)} className="text-[#9B9B9B] text-2xl leading-none">×</button>
+              </div>
+            </div>
+            <div className="px-6 py-5 space-y-5">
+              {[
+                { key: 'energia', label: '⚡ Energía', max: 5, lo: 'Agotado', hi: 'Excelente' },
+                { key: 'sueno', label: '😴 Sueño', max: 5, lo: 'Muy mal', hi: 'Muy bien' },
+                { key: 'fatiga', label: '🏋️ Fatiga', max: 10, lo: 'Sin fatiga', hi: 'Al límite' },
+                { key: 'estres', label: '🧠 Estrés', max: 10, lo: 'Sin estrés', hi: 'Al límite' },
+              ].map(({ key, label, max, lo, hi }) => (
+                <div key={key}>
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">{label}</p>
+                  <div className="grid gap-1.5" style={{gridTemplateColumns: `repeat(${max}, 1fr)`}}>
+                    {Array.from({length: max}, (_, i) => i + 1).map(v => {
+                      const sel = checkinForm[key] === v
+                      const hot = (key === 'fatiga' || key === 'estres') && v >= 7
+                      const med = (key === 'fatiga' || key === 'estres') && v >= 5 && v < 7
+                      return (
+                        <button key={v} onClick={() => setCheckinForm(f => ({...f, [key]: v}))}
+                          className={`py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white scale-105' : 'border border-black/10 text-[#6B6B6B]'}`}
+                          style={sel ? {background: hot ? '#ef4444' : med ? '#f59e0b' : color} : {}}>
+                          {v}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <p className="text-[10px] text-[#C0C0C0]">{lo}</p>
+                    <p className="text-[10px] text-[#C0C0C0]">{hi}</p>
+                  </div>
+                </div>
+              ))}
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-1">⚖️ Peso <span className="font-normal text-xs text-[#9B9B9B]">(opcional)</span></p>
+                <div className="flex items-center gap-2">
+                  <input type="number" step="0.1" placeholder="75.0" value={checkinForm.peso}
+                    onChange={e => setCheckinForm(f => ({...f, peso: e.target.value}))}
+                    className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                  <span className="text-sm text-[#9B9B9B]">kg</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-1">💬 Comentario <span className="font-normal text-xs text-[#9B9B9B]">(opcional)</span></p>
+                <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={checkinForm.comentario}
+                  onChange={e => setCheckinForm(f => ({...f, comentario: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none"/>
+              </div>
+              <button onClick={enviarCheckinInline}
+                disabled={!checkinForm.energia || !checkinForm.fatiga || !checkinForm.sueno || !checkinForm.estres || enviandoCheckin}
+                className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
+                style={{background: color}}>
+                {enviandoCheckin ? '⏳ Enviando...' : '✓ Enviar check-in'}
+              </button>
+              <p className="text-xs text-[#C0C0C0] text-center">Tu entrenador lo recibe automáticamente</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal cancelar sesión */}
       {cancelando && setCancelando && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
@@ -2349,7 +2463,7 @@ function TarjetasHoy({
   pendientesValorar, tareasExtra, fotos, marcas, puedeVerNutricion,
   tieneCuestNutricion, clienteId, setTab, setSubTabProgreso,
   configEntrenador, mostrarToast, abrirRegistroSesion,
-  valorando, setValorando, setSesionesPortal
+  valorando, setValorando, setSesionesPortal, onAbrirCheckin
 }) {
   const hoy = new Date()
   const hoyStr = hoy.toISOString().split('T')[0]
@@ -2476,8 +2590,8 @@ function TarjetasHoy({
 
       {/* ── 4. CHECK-IN SEMANAL ── */}
       {checkinUrgente && (
-        <a href={`https://forge-studio-os.vercel.app/seguimiento?c=${clienteId}`}
-          className="flex items-center gap-3 bg-red-500 rounded-2xl p-4 active:scale-95 transition-all animate-pulse">
+        <button onClick={onAbrirCheckin}
+          className="w-full flex items-center gap-3 bg-red-500 rounded-2xl p-4 active:scale-95 transition-all animate-pulse text-left">
           <span className="text-2xl flex-shrink-0">⏰</span>
           <div className="flex-1">
             <p className="text-sm font-bold text-white">
@@ -2486,7 +2600,7 @@ function TarjetasHoy({
             <p className="text-xs text-white/70 mt-0.5">Tu entrenador necesita saber cómo estás</p>
           </div>
           <span className="text-white/70">→</span>
-        </a>
+        </button>
       )}
 
       {/* ── 5. PROGRESO — gráfica motivacional ── */}
@@ -2657,11 +2771,11 @@ function TarjetasHoy({
             <p className="text-xs font-semibold text-[#0A0A0A]">Check-in al día</p>
             <p className="text-xs text-[#9B9B9B]">Último hace {diasSinCheckin === 0 ? 'hoy' : `${diasSinCheckin} días`} · {sesionesUltimas4} sesiones este mes</p>
           </div>
-          <a href={`https://forge-studio-os.vercel.app/seguimiento?c=${clienteId}`}
+          <button onClick={onAbrirCheckin}
             className="text-xs font-bold px-3 py-1.5 rounded-lg text-white flex-shrink-0"
             style={{background: color}}>
             Nuevo
-          </a>
+          </button>
         </div>
       )}
 
