@@ -2341,6 +2341,52 @@ function AgendaSemana({ clienteId, sesionesPortal, color, cliente, cancelando, s
         </div>
       )}
 
+
+            {/* Modal cancelar sesión */}
+      {cancelando && setCancelando && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
+          onClick={() => { setCancelando(null); setMotivoCancel && setMotivoCancel('') }}>
+          <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[#0A0A0A] text-lg mb-1">¿Cancelar sesión?</h3>
+            <p className="text-sm text-[#6B6B6B] mb-4">
+              {new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'})}
+              {cancelando.hora ? ' · ' + cancelando.hora.slice(0,5) : ''}
+            </p>
+            <textarea
+              value={motivoCancel || ''}
+              onChange={e => setMotivoCancel && setMotivoCancel(e.target.value)}
+              rows={2}
+              placeholder="Motivo (opcional)"
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-3 resize-none"/>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5 mb-4">
+              ⚠ Tu entrenador recibirá una notificación
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setCancelando(null); setMotivoCancel && setMotivoCancel('') }}
+                className="flex-1 border border-black/10 text-sm py-3 rounded-xl text-[#6B6B6B] font-medium">
+                Volver
+              </button>
+              <button
+                onClick={async () => {
+                  await supabase.functions.invoke('portal-accion', {
+                    body: { accion: 'cancelar_sesion', datos: { sesion_id: cancelando.id, motivo: motivoCancel || '' } }
+                  })
+                  onCancelada && onCancelada(cancelando.id)
+                  setCancelando(null)
+                  setMotivoCancel && setMotivoCancel('')
+                }}
+                className="flex-1 text-white text-sm font-semibold py-3 rounded-xl bg-red-500">
+                Confirmar cancelación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
       {/* Modal check-in semanal inline */}
       {modalCheckin && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4"
@@ -2412,50 +2458,7 @@ function AgendaSemana({ clienteId, sesionesPortal, color, cliente, cancelando, s
         </div>
       )}
 
-      {/* Modal cancelar sesión */}
-      {cancelando && setCancelando && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
-          onClick={() => { setCancelando(null); setMotivoCancel && setMotivoCancel('') }}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-[#0A0A0A] text-lg mb-1">¿Cancelar sesión?</h3>
-            <p className="text-sm text-[#6B6B6B] mb-4">
-              {new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'})}
-              {cancelando.hora ? ' · ' + cancelando.hora.slice(0,5) : ''}
-            </p>
-            <textarea
-              value={motivoCancel || ''}
-              onChange={e => setMotivoCancel && setMotivoCancel(e.target.value)}
-              rows={2}
-              placeholder="Motivo (opcional)"
-              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-3 resize-none"/>
-            <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5 mb-4">
-              ⚠ Tu entrenador recibirá una notificación
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setCancelando(null); setMotivoCancel && setMotivoCancel('') }}
-                className="flex-1 border border-black/10 text-sm py-3 rounded-xl text-[#6B6B6B] font-medium">
-                Volver
-              </button>
-              <button
-                onClick={async () => {
-                  await supabase.functions.invoke('portal-accion', {
-                    body: { accion: 'cancelar_sesion', datos: { sesion_id: cancelando.id, motivo: motivoCancel || '' } }
-                  })
-                  onCancelada && onCancelada(cancelando.id)
-                  setCancelando(null)
-                  setMotivoCancel && setMotivoCancel('')
-                }}
-                className="flex-1 text-white text-sm font-semibold py-3 rounded-xl bg-red-500">
-                Confirmar cancelación
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+
 
 // ─── Centro de mando del día ──────────────────────────────────────────────
 function TarjetasHoy({
@@ -2523,7 +2526,7 @@ function TarjetasHoy({
       </div>
 
       {/* ── 1. CUESTIONARIO NUTRICIÓN URGENTE ── */}
-      {puedeVerNutricion && !planNutricion && !tieneCuestNutricion && (
+      {puedeVerNutricion && !planNutricion && !tieneCuestNutricion && !rutina && checkins.length === 0 && (
         <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
           className="flex items-center gap-3 bg-emerald-500 rounded-2xl p-4 active:scale-95 transition-all">
           <span className="text-2xl flex-shrink-0">🥗</span>
@@ -2731,8 +2734,8 @@ function TarjetasHoy({
         </div>
       )}
 
-      {/* ── 10. ESTADO VACÍO — cliente nuevo ── */}
-      {!sesionHoy && !proximaSesion && !rutina && !planNutricion && checkins.length === 0 && (
+      {/* ── 10. ESTADO VACÍO — cliente nuevo sin nada ── */}
+      {!sesionHoy && !proximaSesion && !rutina && !planNutricion && checkins.length === 0 && marcas.length === 0 && tareasExtra.length === 0 && (
         <div className="text-center py-10">
           <p className="text-5xl mb-3">🚀</p>
           <p className="text-sm font-bold text-[#0A0A0A]">¡Bienvenido a tu portal!</p>
