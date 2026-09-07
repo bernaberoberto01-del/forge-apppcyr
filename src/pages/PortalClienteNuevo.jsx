@@ -814,8 +814,7 @@ function SubTabPeso({ checkins, color }) {
                     style={{ height: `${h}%`, background: isLast ? color : `${color}25`,
                       minHeight: 16 }} />
                   <p className="text-[8px] text-[#C0C0C0]">
-                    {new Date(c.fecha).toLocaleDateString('es-ES', { day:'numeric', month:'short' }).replace(' ', '
-')}
+                    {new Date(c.fecha).toLocaleDateString('es-ES', { day:'numeric', month:'short' })}
                   </p>
                 </div>
               )
