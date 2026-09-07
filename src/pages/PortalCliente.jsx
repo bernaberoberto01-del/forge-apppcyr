@@ -173,19 +173,23 @@ export default function PortalCliente() {
       const {data:sesPend}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).eq('tipo','presencial')
         .gte('fecha',hace7Str).lte('fecha',hoy).eq('cancelada',false).is('rpe',null).order('fecha',{ascending:false}).limit(3)
       setPendientesValorar(sesPend||[])
-      // Cargar hábitos del día
-      const [{ data: habs }, { data: regsHoy }] = await Promise.all([
-        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden'),
-        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy)
-      ])
-      setHabitos(habs || [])
-      const mapaHoy = {}
-      ;(regsHoy || []).forEach(r => { mapaHoy[r.habito_id] = r.completado })
-      setHabitosHoy(mapaHoy)
-      if (cl.tipo === 'presencial') {
-        const { data: tareas } = await supabase.from('tareas_extra').select('*').eq('cliente_id', cid).eq('activa', true).order('orden')
-        setTareasExtra(tareas||[])
-      }
+      // Cargar hábitos del día — aislado para que un fallo no bloquee el portal
+      try {
+        const [{ data: habs }, { data: regsHoy }] = await Promise.all([
+          supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden'),
+          supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy)
+        ])
+        setHabitos(habs || [])
+        const mapaHoy = {}
+        ;(regsHoy || []).forEach(r => { mapaHoy[r.habito_id] = r.completado })
+        setHabitosHoy(mapaHoy)
+      } catch (_) {}
+      try {
+        if (cl.tipo === 'presencial') {
+          const { data: tareas } = await supabase.from('tareas_extra').select('*').eq('cliente_id', cid).eq('activa', true).order('orden')
+          setTareasExtra(tareas||[])
+        }
+      } catch (_) {}
       const idsEntrenadores=[...new Set((sesFut||[]).map(s=>s.entrenador_id).filter(id=>id&&id!==cl.entrenador_id))]
       if(idsEntrenadores.length){
         const {data:otrosCfg}=await supabase.from('configuracion').select('entrenador_id,nombre_entrenador,color_acento').in('entrenador_id',idsEntrenadores)
