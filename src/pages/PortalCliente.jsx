@@ -145,11 +145,13 @@ export default function PortalCliente() {
       const {data:cl,error}=await supabase.from('clientes').select('*').eq('auth_user_id',clienteSession.id).maybeSingle()
       if(error||!cl){setNotFound(true);setLoading(false);return}
       const cid=cl.id; setCliente(cl); setClienteId(cid)
-      // Registrar acceso al portal
-      supabase.from('actividad_cliente').insert({
-        cliente_id: cid, entrenador_id: cl.entrenador_id,
-        tipo: 'portal_acceso', descripcion: 'Entró al portal'
-      }).catch(() => {})
+      // Registrar acceso — completamente aislado, no bloquea nada
+      setTimeout(() => {
+        supabase.from('actividad_cliente').insert({
+          cliente_id: cid, entrenador_id: cl.entrenador_id,
+          tipo: 'portal_acceso', descripcion: 'Entró al portal'
+        }).catch(() => {})
+      }, 2000)
       const [ru,ci,pg,ms,ft,pn,cfg,mc,meds,tieneCuest]=await Promise.all([
         supabase.from('rutinas').select('*').eq('cliente_id',cid).eq('estado','publicada').order('created_at',{ascending:false}).limit(1).then(r=>r.data||[]).catch(()=>[]),
         supabase.from('checkins').select('*').eq('cliente_id',cid).order('fecha',{ascending:false}).limit(12).then(r=>r.data||[]).catch(()=>[]),
@@ -173,10 +175,10 @@ export default function PortalCliente() {
       const {data:sesPend}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).eq('tipo','presencial')
         .gte('fecha',hace7Str).lte('fecha',hoy).eq('cancelada',false).is('rpe',null).order('fecha',{ascending:false}).limit(3)
       setPendientesValorar(sesPend||[])
-      // Cargar hábitos del día
+      // Cargar hábitos del día — aislado, no bloquea datos principales
       const [{ data: habs }, { data: regsHoy }] = await Promise.all([
-        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden'),
-        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy)
+        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden').catch(() => ({ data: [] })),
+        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy).catch(() => ({ data: [] }))
       ])
       setHabitos(habs || [])
       const mapaHoy = {}
