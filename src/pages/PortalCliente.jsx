@@ -135,7 +135,14 @@ export default function PortalCliente() {
   const mensajesEndRef = useRef(null)
 
   useEffect(()=>{
-    supabase.auth.getSession().then(({data:{session}})=>setClienteSession(session?.user||null))
+    supabase.auth.getSession().then(({data:{session}, error})=>{
+      if(error || !session) {
+        // Token caducado o sesión inválida — limpiar y pedir login de nuevo
+        supabase.auth.signOut().then(() => setClienteSession(null))
+      } else {
+        setClienteSession(session?.user||null)
+      }
+    })
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setClienteSession(s?.user||null))
     return ()=>subscription.unsubscribe()
   },[])
