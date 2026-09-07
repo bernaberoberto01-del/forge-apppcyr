@@ -2549,8 +2549,8 @@ function TarjetasHoy({
 
       {/* ── 4. CHECK-IN SEMANAL ── */}
       {checkinUrgente && (
-        <a onClick={onAbrirCheckin}
-          className="w-full flex items-center gap-3 bg-red-500 rounded-2xl p-4 active:scale-95 transition-all animate-pulse">
+        <button onClick={onAbrirCheckin}
+          className="w-full flex items-center gap-3 bg-red-500 rounded-2xl p-4 active:scale-95 transition-all animate-pulse text-left">
           <span className="text-2xl flex-shrink-0">⏰</span>
           <div className="flex-1">
             <p className="text-sm font-bold text-white">
