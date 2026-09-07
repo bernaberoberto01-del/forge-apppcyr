@@ -173,23 +173,19 @@ export default function PortalCliente() {
       const {data:sesPend}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).eq('tipo','presencial')
         .gte('fecha',hace7Str).lte('fecha',hoy).eq('cancelada',false).is('rpe',null).order('fecha',{ascending:false}).limit(3)
       setPendientesValorar(sesPend||[])
-      // Cargar hábitos del día — aislado para que un fallo no bloquee el portal
-      try {
-        const [{ data: habs }, { data: regsHoy }] = await Promise.all([
-          supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden'),
-          supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy)
-        ])
-        setHabitos(habs || [])
-        const mapaHoy = {}
-        ;(regsHoy || []).forEach(r => { mapaHoy[r.habito_id] = r.completado })
-        setHabitosHoy(mapaHoy)
-      } catch (_) {}
-      try {
-        if (cl.tipo === 'presencial') {
-          const { data: tareas } = await supabase.from('tareas_extra').select('*').eq('cliente_id', cid).eq('activa', true).order('orden')
-          setTareasExtra(tareas||[])
-        }
-      } catch (_) {}
+      // Cargar hábitos del día
+      const [{ data: habs }, { data: regsHoy }] = await Promise.all([
+        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden'),
+        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy)
+      ])
+      setHabitos(habs || [])
+      const mapaHoy = {}
+      ;(regsHoy || []).forEach(r => { mapaHoy[r.habito_id] = r.completado })
+      setHabitosHoy(mapaHoy)
+      if (cl.tipo === 'presencial') {
+        const { data: tareas } = await supabase.from('tareas_extra').select('*').eq('cliente_id', cid).eq('activa', true).order('orden')
+        setTareasExtra(tareas||[])
+      }
       const idsEntrenadores=[...new Set((sesFut||[]).map(s=>s.entrenador_id).filter(id=>id&&id!==cl.entrenador_id))]
       if(idsEntrenadores.length){
         const {data:otrosCfg}=await supabase.from('configuracion').select('entrenador_id,nombre_entrenador,color_acento').in('entrenador_id',idsEntrenadores)
@@ -554,17 +550,14 @@ export default function PortalCliente() {
   const puedeVerRutina = !esOnline || !plan || plan === 'entrenamiento' || plan === 'completo'
   const puedeVerNutricion = !esOnline || !plan || plan === 'nutricion' || plan === 'completo'
   const puedeMensajes = !esOnline || !plan || plan === 'completo'
-  const puedeVerClases = !esOnline // solo presenciales por ahora
 
   const TABS=[
     {id:'inicio',label:'Inicio',icon:'⊞'},
     ...(puedeVerRutina ? [{id:'rutina',label:'Rutina',icon:'💪'}] : []),
-    ...(puedeVerClases ? [{id:'clases',label:'Clases',icon:'👥'}] : []),
     {id:'progreso',label:'Progreso',icon:'📈'},
     ...(puedeMensajes ? [{id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos}] : []),
     ...(puedeVerNutricion && (planNutricion || tieneCuestNutricion) ? [{id:'nutricion',label:'Nutrición',icon:'🥗'}] : []),
     ...(pagos.length>0?[{id:'pagos',label:'Pagos',icon:'💳'}]:[]),
-    {id:'habitos',label:'Hábitos',icon:'🎯'},
     {id:'ajustes',label:'Ajustes',icon:'⚙️'},
   ]
 
