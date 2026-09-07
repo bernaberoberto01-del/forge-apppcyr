@@ -18,31 +18,95 @@ Deno.serve(async (req) => {
     if (!cliente?.email) return new Response(JSON.stringify({ error: 'Cliente sin email' }), { status: 404, headers: CORS })
     if (cliente.entrenador_id !== user.id) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
 
-    const { data: config } = await sb.from('configuracion').select('nombre_entrenador, nombre_negocio, color_acento').eq('entrenador_id', cliente.entrenador_id).maybeSingle()
+    const { data: config } = await sb.from('configuracion').select('nombre_entrenador,nombre_negocio,color_acento').eq('entrenador_id', cliente.entrenador_id).maybeSingle()
     const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
     const nombreNegocio = config?.nombre_negocio || nombreEntrenador
     const color = config?.color_acento || '#FF5C00'
-    const portalUrl = `https://forge-studio-os.vercel.app/portal/${cliente_id}`
     const nombre = cliente.nombre.split(' ')[0]
+
+    // Generar link de acceso directo con Supabase Admin API
+    // Esto crea un link que permite al cliente entrar directamente y establecer contraseña
+    const { data: linkData, error: linkError } = await sb.auth.admin.generateLink({
+      type: 'recovery',
+      email: cliente.email,
+      options: {
+        redirectTo: 'https://forge-studio-os.vercel.app/portal'
+      }
+    })
+
+    if (linkError || !linkData?.properties?.action_link) {
+      // Si falla generateLink, intentar con inviteUserByEmail
+      const { data: inviteData, error: inviteError } = await sb.auth.admin.generateLink({
+        type: 'magiclink',
+        email: cliente.email,
+        options: {
+          redirectTo: 'https://forge-studio-os.vercel.app/portal'
+        }
+      })
+      if (inviteError) {
+        console.error('Error generando link:', inviteError)
+        return new Response(JSON.stringify({ error: 'No se pudo generar el link de acceso' }), { status: 500, headers: CORS })
+      }
+      var accessLink = inviteData?.properties?.action_link || 'https://forge-studio-os.vercel.app/portal'
+    } else {
+      var accessLink = linkData.properties.action_link
+    }
 
     const gmailUser = Deno.env.get('GMAIL_USER')
     const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD')
     if (!gmailUser || !gmailPass) {
-      return new Response(JSON.stringify({ error: 'GMAIL_USER o GMAIL_APP_PASSWORD no configurados' }), { status: 500, headers: CORS })
+      return new Response(JSON.stringify({ error: 'GMAIL no configurado' }), { status: 500, headers: CORS })
     }
 
-    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0}.w{max-width:560px;margin:0 auto;padding:24px 16px}.c{background:#fff;border-radius:16px;overflow:hidden}.h{background:#111;padding:28px}.hl{font-size:20px;font-weight:800;color:${color}}.hs{font-size:13px;color:rgba(255,255,255,.4);margin-top:4px}.b{padding:28px}.hi{font-size:22px;font-weight:700;margin-bottom:16px}.t{font-size:15px;line-height:1.65;color:#444;margin-bottom:16px}.cta{text-align:center;margin:28px 0}.btn{display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 32px;border-radius:12px}.url{font-size:12px;color:#999;text-align:center;margin-top:8px;word-break:break-all}.div{height:1px;background:#f0f0f0;margin:24px 0}.sec{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}.pn{font-size:13px;font-weight:700;margin:12px 0 6px}.s{font-size:14px;color:#555;line-height:1.6;padding-left:20px;position:relative;margin-bottom:2px}.s::before{content:attr(data-n);position:absolute;left:0;color:${color};font-weight:700;font-size:12px}.f{padding:20px 28px;background:#f5f5f0;font-size:13px;color:#888}.fi{font-size:15px;font-weight:600;color:#0A0A0A;margin-top:20px}</style></head><body><div class="w"><div class="c"><div class="h"><div class="hl">${nombreNegocio}</div><div class="hs">Tu portal personal</div></div><div class="b"><div class="hi">Hola ${nombre} &#x1F44B;</div><p class="t">Bienvenido/a. Me alegra tenerte aqui.</p><p class="t">Ya tienes tu portal personal listo: rutinas, seguimiento semanal y mensajes directos conmigo.</p><div class="cta"><a href="${portalUrl}" class="btn">Abrir mi portal &rarr;</a></div><div class="url">${portalUrl}</div><div class="div"></div><div class="sec">&#x1F4F1; Instalalo como app</div><p class="t" style="font-size:14px">Para tenerlo siempre a mano en tu pantalla de inicio:</p><div class="pn">&#x1F34E; iPhone &mdash; Safari</div><div class="s" data-n="1.">Abre el enlace en Safari</div><div class="s" data-n="2.">Pulsa el boton compartir &#x2191;</div><div class="s" data-n="3.">Selecciona Anadir a pantalla de inicio</div><div class="s" data-n="4.">Ponle nombre y pulsa Anadir</div><div class="pn">&#x1F916; Android &mdash; Chrome</div><div class="s" data-n="1.">Abre el enlace en Chrome</div><div class="s" data-n="2.">Pulsa los tres puntos &#x22EE;</div><div class="s" data-n="3.">Selecciona Anadir a pantalla de inicio</div><div class="s" data-n="4.">Confirma y listo</div><div class="div"></div><p class="t">Cualquier duda, escribeme desde el portal.</p><div class="fi">${nombreEntrenador}</div></div><div class="f">Este mensaje va dirigido a ti como cliente de ${nombreNegocio}.</div></div></div></body></html>`
+    const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f0}
+.w{max-width:560px;margin:0 auto;padding:24px 16px}.c{background:#fff;border-radius:16px;overflow:hidden}
+.h{background:#111;padding:28px}.hl{font-size:20px;font-weight:800;color:${color}}.hs{font-size:13px;color:rgba(255,255,255,.4);margin-top:4px}
+.b{padding:28px}.hi{font-size:22px;font-weight:700;margin-bottom:16px}.t{font-size:15px;line-height:1.65;color:#444;margin-bottom:16px}
+.cta{text-align:center;margin:28px 0}.btn{display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 32px;border-radius:12px}
+.note{font-size:12px;color:#999;text-align:center;margin-top:12px}.div{height:1px;background:#f0f0f0;margin:24px 0}
+.f{padding:20px 28px;background:#f5f5f0;font-size:13px;color:#888}.fi{font-size:15px;font-weight:600;color:#0A0A0A;margin-top:20px}
+.box{background:#f7f6f3;border-radius:12px;padding:16px;margin:16px 0}
+</style></head><body><div class="w"><div class="c">
+<div class="h"><div class="hl">${nombreNegocio}</div><div class="hs">Tu portal personal</div></div>
+<div class="b">
+<div class="hi">Hola ${nombre} 👋</div>
+<p class="t">Ya tienes tu portal personal listo con tu rutina, plan de alimentación y seguimiento.</p>
+
+<div class="cta">
+  <a href="${accessLink}" class="btn">Acceder a mi portal →</a>
+</div>
+<p class="note">Pulsa el enlace para crear tu contraseña y entrar. Válido 7 días.</p>
+
+<div class="div"></div>
+<div class="box">
+  <p style="font-size:13px;color:#555;margin-bottom:8px"><strong>La próxima vez</strong> que quieras entrar:</p>
+  <p style="font-size:13px;color:#555">Ve a <strong>forge-studio-os.vercel.app</strong> y usa tu email y la contraseña que hayas elegido.</p>
+  <p style="font-size:13px;color:#555;margin-top:8px">Si olvidas la contraseña, pulsa "¿Has olvidado tu contraseña?" en el login.</p>
+</div>
+
+<div class="div"></div>
+<p class="t">Cualquier duda, escríbeme desde el portal.</p>
+<div class="fi">${nombreEntrenador}</div>
+</div>
+<div class="f">Este mensaje va dirigido a ti como cliente de ${nombreNegocio}.</div>
+</div></div></body></html>`
 
     const { SMTPClient } = await import('https://deno.land/x/denomailer@1.6.0/mod.ts')
     const client = new SMTPClient({
       connection: { hostname: 'smtp.gmail.com', port: 465, tls: true, auth: { username: gmailUser, password: gmailPass } }
     })
-    await client.send({ from: `${nombreEntrenador} <${gmailUser}>`, to: cliente.email, subject: `Ya tienes tu acceso, ${nombre}!`, html })
+    await client.send({
+      from: `${nombreEntrenador} <${gmailUser}>`,
+      to: cliente.email,
+      subject: `Accede a tu portal, ${nombre}`,
+      html
+    })
     await client.close()
 
     await sb.from('mensajes_cliente').insert({
       entrenador_id: cliente.entrenador_id, cliente_id,
-      contenido: `Email de bienvenida enviado a ${cliente.email}`, tipo: 'sistema', leido: true, leido_entrenador: true
+      contenido: `✅ Link de acceso enviado a ${cliente.email}`, tipo: 'sistema', leido: true, leido_entrenador: true
     })
 
     return new Response(JSON.stringify({ ok: true, email: cliente.email }), { headers: CORS })
