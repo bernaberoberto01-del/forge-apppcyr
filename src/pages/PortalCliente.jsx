@@ -556,9 +556,9 @@ export default function PortalCliente() {
   const TABS=[
     {id:'inicio',label:'Inicio',icon:'⊞'},
     ...(puedeVerRutina ? [{id:'rutina',label:'Rutina',icon:'💪'}] : []),
+    ...(puedeVerNutricion && (planNutricion || tieneCuestNutricion) ? [{id:'nutricion',label:'Nutrición',icon:'🥗'}] : []),
     {id:'progreso',label:'Progreso',icon:'📈'},
     ...(puedeMensajes ? [{id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos}] : []),
-    ...(puedeVerNutricion && (planNutricion || tieneCuestNutricion) ? [{id:'nutricion',label:'Nutrición',icon:'🥗'}] : []),
     ...(pagos.length>0?[{id:'pagos',label:'Pagos',icon:'💳'}]:[]),
     {id:'ajustes',label:'Ajustes',icon:'⚙️'},
   ]
