@@ -153,9 +153,11 @@ export default function PortalCliente() {
   }
 
   async function cargarPagos(cid) {
-    const pagos = await qa(supabase.from('pagos').select('*')
-      .eq('cliente_id', cid).order('fecha_pago', { ascending: false }))
-    setDatosPagos({ pagos })
+    const [pagos, planes] = await Promise.all([
+      qa(supabase.from('pagos').select('*').eq('cliente_id', cid).order('fecha_pago', { ascending: false })),
+      qa(supabase.from('planes_cobro').select('*').eq('cliente_id', cid).eq('activo', true).limit(1)),
+    ])
+    setDatosPagos({ pagos, planActivo: planes[0] || null })
   }
 
   // ── Guards ───────────────────────────────────────────────────────────────────
@@ -289,24 +291,33 @@ export default function PortalCliente() {
         </div>
 
         {/* Bottom bar móvil */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-black/5 flex z-20"
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-black/8 z-20"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-          {TABS.filter(t => ['inicio','rutina','nutricion','progreso','mensajes'].includes(t.id)).map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium relative transition-all ${
-                tab === t.id ? 'text-[#FF5C00]' : 'text-[#9B9B9B]'
-              }`}
-              style={tab === t.id ? { color } : {}}>
-              <span className="text-base leading-none">{t.icon}</span>
-              <span>{t.label}</span>
-              {t.badge > 0 && (
-                <span className="absolute top-1.5 right-1/4 w-3.5 h-3.5 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
-                  style={{ background: color }}>
-                  {t.badge}
+          <div className="flex">
+            {TABS.filter(t => ['inicio','rutina','nutricion','progreso','mensajes'].includes(t.id)).map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-3 relative transition-all active:scale-95"
+                style={{ minHeight: 60 }}>
+                <span className={`text-xl leading-none transition-all ${tab === t.id ? 'scale-110' : ''}`}>
+                  {t.icon}
                 </span>
-              )}
-            </button>
-          ))}
+                <span className={`text-[10px] font-semibold ${tab === t.id ? '' : 'text-[#9B9B9B]'}`}
+                  style={tab === t.id ? { color } : {}}>
+                  {t.label}
+                </span>
+                {tab === t.id && (
+                  <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 rounded-full"
+                    style={{ background: color }} />
+                )}
+                {t.badge > 0 && (
+                  <span className="absolute top-2 right-1/4 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
+                    style={{ background: color }}>
+                    {t.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </nav>
       </main>
     </div>
@@ -521,14 +532,15 @@ function TabInicio({ datos, cliente, color, setTab }) {
               <span className="text-xs bg-emerald-50 text-emerald-600 font-bold px-2 py-1 rounded-full">✓ Al día</span>
             )}
           </div>
-          <div className="flex items-end gap-1 h-10">
+          <div className="flex items-end gap-1 h-16 mt-1">
             {pesos.slice(-8).map((c, i, arr) => {
               const min = Math.min(...arr.map(x => x.peso))
               const max = Math.max(...arr.map(x => x.peso))
-              const h = max === min ? 60 : ((c.peso - min) / (max - min)) * 65 + 35
+              const h = max === min ? 60 : Math.max(20, ((c.peso - min) / (max - min)) * 80 + 20)
+              const isLast = i === arr.length - 1
               return (
-                <div key={i} className="flex-1 rounded-sm transition-all"
-                  style={{ height: `${h}%`, background: i === arr.length - 1 ? color : `${color}30` }} />
+                <div key={i} className="flex-1 rounded-md transition-all"
+                  style={{ height: `${h}%`, background: isLast ? color : `${color}35`, minHeight: 8 }} />
               )
             })}
           </div>
@@ -786,15 +798,25 @@ function SubTabPeso({ checkins, color }) {
       {pesos.length > 1 && (
         <div className="bg-white rounded-2xl border border-black/5 p-4">
           <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wider mb-3">Evolución del peso</p>
-          <div className="flex items-end gap-1.5 h-24">
-            {pesos.slice(-12).map((c, i, arr) => {
+          <div className="flex items-end gap-2 h-32 px-2">
+            {pesos.slice(-10).map((c, i, arr) => {
               const min = Math.min(...arr.map(x => x.peso))
               const max = Math.max(...arr.map(x => x.peso))
-              const h = max === min ? 50 : ((c.peso - min) / (max - min)) * 70 + 30
+              const h = max === min ? 60 : Math.max(20, ((c.peso - min) / (max - min)) * 75 + 25)
+              const isLast = i === arr.length - 1
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full rounded-sm" style={{ height: `${h}%`, background: i === arr.length-1 ? color : `${color}30` }} />
-                  <p className="text-[9px] text-[#9B9B9B]">{c.peso}</p>
+                <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1.5">
+                  <p className={`text-[9px] font-semibold ${isLast ? '' : 'text-[#C0C0C0]'}`}
+                    style={isLast ? { color } : {}}>
+                    {c.peso}
+                  </p>
+                  <div className="w-full rounded-lg transition-all"
+                    style={{ height: `${h}%`, background: isLast ? color : `${color}25`,
+                      minHeight: 16 }} />
+                  <p className="text-[8px] text-[#C0C0C0]">
+                    {new Date(c.fecha).toLocaleDateString('es-ES', { day:'numeric', month:'short' }).replace(' ', '
+')}
+                  </p>
                 </div>
               )
             })}
@@ -978,32 +1000,83 @@ function TabMensajes({ datos, setDatos, cliente, clienteId, color }) {
 
 // ─── TAB PAGOS ────────────────────────────────────────────────────────────────
 function TabPagos({ datos, cliente, color }) {
+  const [abriendoStripe, setAbriendoStripe] = useState(false)
   if (!datos) return <Spinner color={color} />
-  const { pagos } = datos
-  if (!pagos?.length) return (
-    <div className="text-center py-10">
-      <p className="text-3xl mb-2">💳</p>
-      <p className="text-sm font-bold text-[#0A0A0A]">Sin pagos registrados</p>
-    </div>
-  )
+  const { pagos, planActivo } = datos
+
+  async function abrirPortalStripe() {
+    setAbriendoStripe(true)
+    const { data } = await supabase.functions.invoke('stripe-portal-cliente', {
+      body: { cliente_id: cliente?.id }
+    }).catch(() => ({ data: null }))
+    if (data?.url) window.open(data.url, '_blank')
+    setAbriendoStripe(false)
+  }
+
   return (
-    <div className="space-y-2">
-      {pagos.map((p, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-black/5 p-4 flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A]">{p.concepto || 'Pago'}</p>
-            <p className="text-xs text-[#9B9B9B]">
-              {p.fecha_pago ? new Date(p.fecha_pago + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' }) : ''}
+    <div className="space-y-4">
+      <p className="text-xl font-bold text-[#0A0A0A]">Pagos</p>
+
+      {/* Plan activo */}
+      {planActivo && (
+        <div className="rounded-2xl p-5 text-white" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-1">Plan activo</p>
+          <p className="text-2xl font-bold">{planActivo.importe}€<span className="text-sm font-normal text-white/70">/mes</span></p>
+          <p className="text-sm text-white/80 mt-1">{planActivo.concepto || 'Suscripción mensual'}</p>
+          {planActivo.proximo_cobro && (
+            <p className="text-xs text-white/60 mt-2">
+              Próximo cobro: {new Date(planActivo.proximo_cobro + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}
             </p>
+          )}
+          {cliente?.stripe_customer_id && (
+            <button onClick={abrirPortalStripe} disabled={abriendoStripe}
+              className="mt-4 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-4 py-2 rounded-xl transition-all">
+              {abriendoStripe ? '...' : 'Gestionar suscripción →'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Sin plan activo */}
+      {!planActivo && !pagos?.length && (
+        <div className="text-center py-10">
+          <p className="text-3xl mb-2">💳</p>
+          <p className="text-sm font-bold text-[#0A0A0A]">Sin pagos registrados</p>
+          <p className="text-xs text-[#9B9B9B] mt-1">Tu entrenador te informará cuando haya algo aquí.</p>
+        </div>
+      )}
+
+      {/* Historial */}
+      {pagos?.length > 0 && (
+        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
+          <div className="px-5 py-3 border-b border-black/5">
+            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wider">Historial de pagos</p>
           </div>
-          <div className="text-right">
-            <p className="text-lg font-bold text-[#0A0A0A]">{p.importe}€</p>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-              p.estado === 'cobrado' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
-            }`}>{p.estado === 'cobrado' ? '✓ Cobrado' : 'Pendiente'}</span>
+          <div className="divide-y divide-black/5">
+            {pagos.map((p, i) => (
+              <div key={i} className="flex items-center gap-3 px-5 py-3.5">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-sm ${
+                  p.estado === 'cobrado' ? 'bg-emerald-50' : 'bg-amber-50'
+                }`}>
+                  {p.estado === 'cobrado' ? '✓' : '⏳'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-[#0A0A0A]">{p.concepto || 'Pago'}</p>
+                  <p className="text-xs text-[#9B9B9B]">
+                    {p.fecha_pago ? new Date(p.fecha_pago + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-[#0A0A0A]">{p.importe}€</p>
+                  <span className={`text-[10px] font-bold ${p.estado === 'cobrado' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {p.estado === 'cobrado' ? 'Cobrado' : 'Pendiente'}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
+      )}
     </div>
   )
 }
