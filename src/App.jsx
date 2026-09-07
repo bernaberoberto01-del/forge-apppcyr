@@ -26,7 +26,7 @@ import PortalEntrenador from './pages/PortalEntrenador'
 import NotFound from './pages/NotFound'
 
 // Páginas públicas (sin sesión)
-import PortalCliente from './pages/PortalCliente'
+import PortalCliente from './pages/PortalClienteNuevo'
 import RegistroCliente from './pages/RegistroCliente'
 import NutricionCuestionario from './pages/NutricionCuestionario'
 import CheckinPublico from './pages/CheckinPublico'
