@@ -114,9 +114,6 @@ export default function PortalCliente() {
   const [errorFoto, setErrorFoto] = useState('')
   const [fotos, setFotos] = useState([])
   const [subTabProgreso, setSubTabProgreso] = useState('peso')
-  const [modalCheckin, setModalCheckin] = useState(false)
-  const [checkinForm, setCheckinForm] = useState({energia:null,fatiga:null,sueno:null,estres:null,peso:'',comentario:''})
-  const [enviandoCheckin, setEnviandoCheckin] = useState(false)
   const [medidas, setMedidas] = useState({})
   const [historialMedidas, setHistorialMedidas] = useState([])
   const [marcas, setMarcas] = useState([])
@@ -135,14 +132,7 @@ export default function PortalCliente() {
   const mensajesEndRef = useRef(null)
 
   useEffect(()=>{
-    supabase.auth.getSession().then(({data:{session}, error})=>{
-      if(error || !session) {
-        // Token caducado o sesión inválida — limpiar y pedir login de nuevo
-        supabase.auth.signOut().then(() => setClienteSession(null))
-      } else {
-        setClienteSession(session?.user||null)
-      }
-    })
+    supabase.auth.getSession().then(({data:{session}})=>setClienteSession(session?.user||null))
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_e,s)=>setClienteSession(s?.user||null))
     return ()=>subscription.unsubscribe()
   },[])
@@ -183,10 +173,10 @@ export default function PortalCliente() {
       const {data:sesPend}=await supabase.from('sesiones').select('*').eq('cliente_id',cid).eq('tipo','presencial')
         .gte('fecha',hace7Str).lte('fecha',hoy).eq('cancelada',false).is('rpe',null).order('fecha',{ascending:false}).limit(3)
       setPendientesValorar(sesPend||[])
-      // Cargar hábitos del día — aislado para que un fallo no bloquee el resto
+      // Cargar hábitos del día
       const [{ data: habs }, { data: regsHoy }] = await Promise.all([
-        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden').then(r => r).catch(() => ({ data: [] })),
-        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy).then(r => r).catch(() => ({ data: [] }))
+        supabase.from('habitos').select('*').eq('cliente_id', cid).eq('activo', true).order('orden'),
+        supabase.from('habitos_registro').select('habito_id,completado').eq('cliente_id', cid).eq('fecha', hoy)
       ])
       setHabitos(habs || [])
       const mapaHoy = {}
@@ -219,23 +209,6 @@ export default function PortalCliente() {
 
   const color = configEntrenador?.color_acento||'#FF5C00'
   const mensajesNoLeidos = mensajes.filter(m=>!m.leido&&m.tipo==='entrenador').length
-
-  async function enviarCheckinInline() {
-    if(!checkinForm.energia||!checkinForm.fatiga||!checkinForm.sueno||!checkinForm.estres) return
-    setEnviandoCheckin(true)
-    const hoy=new Date().toISOString().split('T')[0]
-    const {error}=await supabase.from('checkins').insert({
-      cliente_id:clienteId, entrenador_id:cliente.entrenador_id, fecha:hoy,
-      energia:checkinForm.energia, fatiga:checkinForm.fatiga, sueno:checkinForm.sueno, estres:checkinForm.estres,
-      peso:checkinForm.peso?parseFloat(checkinForm.peso):null, comentario:checkinForm.comentario||null, adherencia_entreno:5,
-    })
-    if(!error){
-      setCheckins(prev=>[{id:Date.now()+'',fecha:hoy,...checkinForm,peso:checkinForm.peso?parseFloat(checkinForm.peso):null},...prev])
-      setModalCheckin(false)
-      setCheckinForm({energia:null,fatiga:null,sueno:null,estres:null,peso:'',comentario:''})
-    }
-    setEnviandoCheckin(false)
-  }
 
   async function guardarValoracion(){
     if(!valorando) return
@@ -283,7 +256,7 @@ export default function PortalCliente() {
           .limit(1)
           .maybeSingle()
 
-        const valorActual = marcaActual ? parseFloat(marcaActual.peso_kg) : 0
+        const valorActual = marcaActual ? parseFloat(marcaActual.valor) : 0
         if (maxPeso > valorActual) {
           // Nueva marca personal 🏆
           await supabase.from('marcas_cliente').insert({
@@ -410,7 +383,7 @@ export default function PortalCliente() {
           .select('valor').eq('cliente_id', clienteId).eq('ejercicio', nombre)
           .order('fecha', { ascending: false }).limit(1).maybeSingle()
 
-        const pesoAnterior = marcaAnterior ? parseFloat(marcaAnterior.peso_kg) : 0
+        const pesoAnterior = marcaAnterior ? parseFloat(marcaAnterior.valor) : 0
 
         if (maxPeso > pesoAnterior) {
           // ¡Nueva marca personal!
@@ -577,15 +550,17 @@ export default function PortalCliente() {
   const puedeVerRutina = !esOnline || !plan || plan === 'entrenamiento' || plan === 'completo'
   const puedeVerNutricion = !esOnline || !plan || plan === 'nutricion' || plan === 'completo'
   const puedeMensajes = !esOnline || !plan || plan === 'completo'
+  const puedeVerClases = !esOnline // solo presenciales por ahora
 
   const TABS=[
     {id:'inicio',label:'Inicio',icon:'⊞'},
     ...(puedeVerRutina ? [{id:'rutina',label:'Rutina',icon:'💪'}] : []),
-    {id:'agenda',label:'Agenda',icon:'📅'},
+    ...(puedeVerClases ? [{id:'clases',label:'Clases',icon:'👥'}] : []),
     {id:'progreso',label:'Progreso',icon:'📈'},
     ...(puedeMensajes ? [{id:'mensajes',label:'Mensajes',icon:'✉️',badge:mensajesNoLeidos}] : []),
     ...(puedeVerNutricion && (planNutricion || tieneCuestNutricion) ? [{id:'nutricion',label:'Nutrición',icon:'🥗'}] : []),
     ...(pagos.length>0?[{id:'pagos',label:'Pagos',icon:'💳'}]:[]),
+    {id:'habitos',label:'Hábitos',icon:'🎯'},
     {id:'ajustes',label:'Ajustes',icon:'⚙️'},
   ]
 
@@ -675,19 +650,590 @@ export default function PortalCliente() {
 
             {/* ══ INICIO ══════════════════════════════════════════════════════ */}
             {tab==='inicio'&&(
-              <TarjetasHoy
-                cliente={cliente} color={color} checkins={checkins}
-                rutina={rutina} planNutricion={planNutricion}
-                sesionesPortal={sesionesPortal} pendientesValorar={pendientesValorar}
-                tareasExtra={tareasExtra} fotos={fotos} marcas={marcas}
-                puedeVerNutricion={puedeVerNutricion} tieneCuestNutricion={tieneCuestNutricion}
-                clienteId={clienteId} setTab={setTab} setSubTabProgreso={setSubTabProgreso}
-                configEntrenador={configEntrenador} abrirRegistroSesion={abrirRegistroSesion}
-                valorando={valorando} setValorando={setValorando}
-                setSesionesPortal={setSesionesPortal}
-                onAbrirCheckin={()=>setModalCheckin(true)}
-              />
+              <>
+                {/* ── CUESTIONARIO NUTRICIÓN PENDIENTE — acción urgente ── */}
+                {puedeVerNutricion && !planNutricion && !tieneCuestNutricion && (
+                  <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-4 mb-1">
+                    <div className="flex items-start gap-3">
+                      <span className="text-2xl flex-shrink-0">🥗</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold text-[#0A0A0A]">Cuestionario de alimentación pendiente</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">Tu entrenador necesita conocer tus hábitos alimentarios para crear tu plan de nutrición personalizado.</p>
+                        <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+                          className="mt-2 inline-block bg-emerald-600 text-white text-xs font-bold px-4 py-2 rounded-xl">
+                          📋 Rellenar cuestionario ahora
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── ONBOARDING: cliente sin rutina ni plan ── */}
+                {!rutina && !planNutricion && pendientesValorar.length === 0 && (
+                  <div className="rounded-2xl overflow-hidden" style={{background:`linear-gradient(135deg, ${color}, ${color}bb)`}}>
+                    <div className="p-6 text-white">
+                      <p className="text-white/70 text-xs font-semibold uppercase tracking-wide mb-3">Bienvenido/a a Forge</p>
+                      <p className="text-2xl font-bold mb-1">{cliente?.nombre?.split(' ')[0]} 👋</p>
+                      <p className="text-white/80 text-sm leading-relaxed mt-2">
+                        Tu entrenador está preparando tu plan personalizado. En las próximas 24-48h tendrás tu rutina lista aquí.
+                      </p>
+                    </div>
+                    <div className="bg-black/20 px-6 py-4 space-y-2.5">
+                      {[
+                        ['✓','Tu cuestionario ha llegado correctamente'],
+                        ['⏳','Tu entrenador está analizando tus datos'],
+                        ['📋','Pronto recibirás tu plan personalizado'],
+                      ].map(([ic,txt]) => (
+                        <div key={txt} className="flex items-center gap-3">
+                          <span className="text-base flex-shrink-0">{ic}</span>
+                          <p className="text-white/80 text-sm">{txt}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-6 py-4 border-t border-white/10">
+                      <p className="text-white/50 text-xs">¿Tienes alguna duda? Escríbenos en la pestaña Mensajes.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── HÁBITOS DEL DÍA ── */}
+                {habitos.length > 0 && (() => {
+                  const hoy = new Date().toISOString().split('T')[0]
+                  const completadosHoy = habitos.filter(h => habitosHoy[h.id]).length
+                  const todos = completadosHoy === habitos.length
+                  return (
+                    <div className={`rounded-2xl border overflow-hidden ${todos ? 'border-emerald-200 bg-emerald-50' : 'border-black/8 bg-white'}`}>
+                      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-[#0A0A0A]">Hábitos de hoy</p>
+                          <p className={`text-xs mt-0.5 ${todos ? 'text-emerald-600 font-semibold' : 'text-[#9B9B9B]'}`}>
+                            {todos ? '¡Todos completados! 🎉' : `${completadosHoy}/${habitos.length} completados`}
+                          </p>
+                        </div>
+                        <div className="relative w-10 h-10">
+                          <svg viewBox="0 0 36 36" className="w-10 h-10 -rotate-90">
+                            <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" strokeWidth="3"/>
+                            <circle cx="18" cy="18" r="15" fill="none" stroke={todos ? '#10b981' : '#FF5C00'}
+                              strokeWidth="3" strokeDasharray={`${(completadosHoy/habitos.length)*94} 94`}
+                              strokeLinecap="round"/>
+                          </svg>
+                          <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-[#0A0A0A]">
+                            {Math.round((completadosHoy/habitos.length)*100)}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="px-4 pb-4 space-y-2">
+                        {habitos.map(h => {
+                          const done = !!habitosHoy[h.id]
+                          return (
+                            <button key={h.id} onClick={async () => {
+                              const nuevo = !done
+                              setHabitosHoy(prev => ({...prev, [h.id]: nuevo}))
+                              await supabase.from('habitos_registro').upsert({
+                                habito_id: h.id, cliente_id: clienteId,
+                                fecha: hoy, completado: nuevo
+                              }, { onConflict: 'habito_id,fecha' })
+                              // Registrar en actividad si se completa
+                              if (nuevo) {
+                                supabase.from('actividad_cliente').insert({
+                                  cliente_id: clienteId, entrenador_id: cliente.entrenador_id,
+                                  tipo: 'habito_completado',
+                                  descripcion: `Completó hábito: ${h.nombre}`
+                                }).catch(() => {})
+                              }
+                            }}
+                              className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all text-left
+                                ${done ? 'bg-emerald-100' : 'bg-[#F7F6F3] hover:bg-[#F0EEE8]'}`}>
+                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all
+                                ${done ? 'border-emerald-500 bg-emerald-500' : 'border-black/20'}`}>
+                                {done && <span className="text-white text-xs">✓</span>}
+                              </div>
+                              <span className="text-lg flex-shrink-0">{h.emoji}</span>
+                              <p className={`text-sm font-medium flex-1 ${done ? 'line-through text-[#9B9B9B]' : 'text-[#0A0A0A]'}`}>
+                                {h.nombre}
+                              </p>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* ── RPE PENDIENTE — máxima prioridad ── */}
+                {pendientesValorar.length > 0 && (
+                  <div className="rounded-2xl border-2 overflow-hidden" style={{borderColor:color}}>
+                    <div className="p-1" style={{background:`${color}12`}}>
+                      {pendientesValorar.map(s=>(
+                        <button key={s.id} onClick={()=>setValorando(s)}
+                          className="w-full p-4 text-left flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{background:`${color}20`}}>💪</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold uppercase tracking-wide mb-0.5" style={{color}}>Pendiente de valorar</p>
+                            <p className="text-sm font-bold text-[#0A0A0A]">¿Cómo fue tu entreno del {new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}?</p>
+                            <p className="text-xs text-[#6B6B6B] mt-0.5">Esfuerzo y fatiga · 20 segundos</p>
+                          </div>
+                          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-lg flex-shrink-0" style={{background:color}}>→</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── QUÉ HACER HOY ── */}
+                {(rutina || sesionesPortal.length > 0 || planNutricion) && (
+                  <div className="bg-white rounded-2xl border border-black/6 overflow-hidden">
+                    <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
+                      <p className="text-sm font-bold text-[#0A0A0A]">Hoy</p>
+                      <p className="text-xs text-[#9B9B9B] capitalize">{new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</p>
+                    </div>
+                    <div className="divide-y divide-black/5">
+                      {/* Sesión de hoy */}
+                      {sesionesPortal.filter(s=>s.fecha===new Date().toISOString().split('T')[0]).map(s=>(
+                        <div key={s.id} className="flex items-center gap-3 px-5 py-3.5">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{background:`${color}15`}}>📅</div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-[#0A0A0A]">Sesión hoy a las {s.hora?.slice(0,5)}</p>
+                            <p className="text-xs text-[#6B6B6B]">{s.duracion_minutos||60} minutos · Presencial</p>
+                          </div>
+                          {s.asistencia_confirmada
+                            ? <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium">Confirmada ✓</span>
+                            : <button onClick={async()=>{
+                                await supabase.from('sesiones').update({asistencia_confirmada:true,asistencia_confirmada_at:new Date().toISOString()}).eq('id',s.id)
+                                const {data}=await supabase.from('sesiones').select('*').eq('cliente_id',clienteId).gte('fecha',new Date().toISOString().split('T')[0]).lte('fecha',new Date(Date.now()+7*864e5).toISOString().split('T')[0]).eq('cancelada',false).order('fecha').limit(5)
+                                setSesionesPortal(data||[])
+                              }} className="text-xs font-semibold px-3 py-1.5 rounded-xl text-white flex-shrink-0" style={{background:color}}>
+                                Confirmar
+                              </button>
+                          }
+                        </div>
+                      ))}
+                      {/* Rutina activa */}
+                      {rutina && (
+                        <button onClick={()=>setTab('rutina')} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#F7F6F3] transition-all text-left">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{background:`${color}15`}}>💪</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0A0A0A]">Tu rutina activa</p>
+                            <p className="text-xs text-[#6B6B6B] truncate">{rutina.nombre||'Ver plan de entrenamiento'}</p>
+                          </div>
+                          <span className="text-xs font-semibold flex-shrink-0" style={{color}}>Ver →</span>
+                        </button>
+                      )}
+                      {/* Plan de nutrición */}
+                      {planNutricion && (
+                        <button onClick={()=>setTab('nutricion')} className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#F7F6F3] transition-all text-left">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0" style={{background:`${color}15`}}>🥗</div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0A0A0A]">Tu plan nutricional</p>
+                            <p className="text-xs text-[#6B6B6B] truncate">{planNutricion.nombre||'Ver guía de alimentación'}</p>
+                          </div>
+                          <span className="text-xs font-semibold flex-shrink-0" style={{color}}>Ver →</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Cabecera cuando hay plan ── */}
+                {(rutina || planNutricion) && (
+                  <div className="rounded-2xl p-5 text-white" style={{background:`linear-gradient(135deg, ${color}, ${color}cc)`}}>
+                    <p className="text-white/70 text-sm mb-0.5">{configEntrenador?.nombre_negocio||'Tu entrenador'}</p>
+                    <p className="text-xl font-bold">{cliente?.nombre?.split(' ')[0]} 👋</p>
+                    <p className="text-white/70 text-xs mt-1.5">{OBJ[cliente?.objetivo]||'Sigue con tu plan'}</p>
+                  </div>
+                )}
+
+                {/* Aviso fotos */}
+                {(rutina || planNutricion) && (()=>{
+                  const ultimaFoto=fotos[0]?.fecha
+                  const diasSinFoto=ultimaFoto?Math.floor((Date.now()-new Date(ultimaFoto+'T12:00').getTime())/864e5):999
+                  if(diasSinFoto<30) return null
+                  return(
+                    <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                      <span className="text-lg flex-shrink-0">📸</span>
+                      <p className="text-xs text-amber-700 flex-1">{diasSinFoto>900?'Aún no has subido ninguna foto de progreso':`Llevas ${diasSinFoto} días sin subir foto de progreso`} — ayuda a ver los cambios reales.</p>
+                      <button onClick={()=>{setTab('progreso');setSubTabProgreso('fotos')}} className="text-xs font-semibold text-amber-700 flex-shrink-0">Subir →</button>
+                    </div>
+                  )
+                })()}
+
+                {/* Trabajo extra (presencial) */}
+                {cliente?.tipo==='presencial'&&tareasExtra.length>0&&(
+                  <div className="bg-white rounded-2xl border border-black/6 p-5">
+                    <p className="text-sm font-bold text-[#0A0A0A] mb-3">💡 Tu trabajo extra</p>
+                    <div className="space-y-2">
+                      {tareasExtra.map(t=>(
+                        <div key={t.id} className="flex items-center gap-3 bg-[#F7F6F3] rounded-xl px-3.5 py-2.5">
+                          <span className="text-lg flex-shrink-0">✓</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#0A0A0A]">{t.texto}</p>
+                            {t.frecuencia&&<p className="text-xs text-[#6B6B6B]">{t.frecuencia}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Próximas sesiones (mañana en adelante) */}
+                {cliente?.tipo==='presencial'&&sesionesPortal.filter(s=>s.fecha>new Date().toISOString().split('T')[0]).length>0&&(
+                  <div className="bg-white rounded-2xl border border-black/6 p-5">
+                    <p className="text-sm font-bold text-[#0A0A0A] mb-3">📅 Próximas sesiones</p>
+                    <div className="space-y-2">
+                      {sesionesPortal.filter(s=>s.fecha>new Date().toISOString().split('T')[0]).slice(0,3).map(s=>{
+                        const esMañana=s.fecha===new Date(Date.now()+864e5).toISOString().split('T')[0]
+                        const label=esMañana?'Mañana':new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})
+                        return(
+                          <div key={s.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${esMañana?'bg-orange-50 border-orange-100':'bg-[#F7F6F3] border-transparent'}`}>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-[#0A0A0A]">{label}</p>
+                              <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos||60}min</p>
+                            </div>
+                            {!s.asistencia_confirmada&&esMañana&&(
+                              <button onClick={async()=>{
+                                await supabase.from('sesiones').update({asistencia_confirmada:true,asistencia_confirmada_at:new Date().toISOString()}).eq('id',s.id)
+                                const {data}=await supabase.from('sesiones').select('*').eq('cliente_id',clienteId).gte('fecha',new Date().toISOString().split('T')[0]).lte('fecha',new Date(Date.now()+7*864e5).toISOString().split('T')[0]).eq('cancelada',false).order('fecha').limit(5)
+                                setSesionesPortal(data||[])
+                              }} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex-shrink-0" style={{background:color}}>
+                                Confirmar
+                              </button>
+                            )}
+                            {s.asistencia_confirmada&&<span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium flex-shrink-0">✓</span>}
+                            <button onClick={()=>setCancelando(s)} className="text-xs text-[#6B6B6B] border border-black/10 px-3 py-1.5 rounded-lg hover:border-red-300 hover:text-red-500 transition-all bg-white">Cancelar</button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Gráfica de progreso — motivación principal */}
+                {checkins.length >= 2 ? (() => {
+                  const pesosConFecha = checkins.slice().reverse().filter(c => c.peso)
+                  const primero = checkins[checkins.length - 1]
+                  const ultimo = checkins[0]
+                  const diff = primero.peso && ultimo.peso ? +(ultimo.peso - primero.peso).toFixed(1) : null
+                  const bajando = diff !== null && diff < 0
+                  const subiendo = diff !== null && diff > 0
+                  const sem = primero.fecha && ultimo.fecha
+                    ? Math.ceil((new Date(ultimo.fecha) - new Date(primero.fecha)) / (7 * 864e5))
+                    : null
+                  return (
+                    <button onClick={() => setTab('progreso')}
+                      className="w-full bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-widest mb-1">Tu progreso</p>
+                          {diff !== null && (
+                            <p className="text-3xl font-bold" style={{color: bajando ? '#10b981' : subiendo ? '#6366f1' : '#0A0A0A'}}>
+                              {bajando ? '' : '+'}{diff}kg
+                            </p>
+                          )}
+                          {sem && <p className="text-xs text-[#6B6B6B] mt-0.5">en {sem} semana{sem !== 1 ? 's' : ''}</p>}
+                        </div>
+                        <span className="text-[#6B6B6B] text-sm">Ver todo →</span>
+                      </div>
+                      {/* Mini gráfica de barras */}
+                      {pesosConFecha.length > 1 && (
+                        <div className="flex items-end gap-1 h-14">
+                          {pesosConFecha.map((c, i) => {
+                            const min = Math.min(...pesosConFecha.map(x => x.peso))
+                            const max = Math.max(...pesosConFecha.map(x => x.peso))
+                            const h = max === min ? 60 : ((c.peso - min) / (max - min)) * 70 + 30
+                            const isLast = i === pesosConFecha.length - 1
+                            return (
+                              <div key={c.id} className="flex-1 flex flex-col items-center gap-1">
+                                <div className="w-full rounded-sm transition-all"
+                                  style={{ height: `${h}%`, background: isLast ? color : `${color}35` }} />
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                      <div className="flex justify-between mt-2">
+                        <p className="text-xs text-[#6B6B6B]">{primero.peso && `${primero.peso}kg`}</p>
+                        <p className="text-xs font-semibold" style={{color}}>{ultimo.peso && `${ultimo.peso}kg`}</p>
+                      </div>
+                    </button>
+                  )
+                })() : (
+                  <button onClick={() => setTab('progreso')}
+                    className="w-full bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
+                    <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-widest mb-2">Tu progreso</p>
+                    <p className="text-sm text-[#6B6B6B]">Completa tu primer check-in para ver tu evolución aquí</p>
+                  </button>
+                )}
+
+                {/* Card check-ins */}
+                <button onClick={()=>setTab('progreso')} className="bg-white rounded-2xl border border-black/6 p-5 text-left hover:border-black/12 hover:shadow-sm transition-all">
+                  <p className="text-2xl mb-2">📊</p>
+                  <p className="text-2xl font-bold text-[#0A0A0A]">{checkins.length}</p>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Check-ins realizados</p>
+                </button>
+
+                {/* Acciones online */}
+                {cliente?.tipo==='online'&&(() => {
+                  const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
+                  const urgente = diasSin >= 7
+                  return (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                    <a href="/seguimiento"
+                      className={`rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
+                      style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
+                      <span className="text-2xl mb-2">{urgente?'⏰':'📋'}</span>
+                      <p className="text-sm font-bold text-white">Check-in semanal</p>
+                      <p className="text-xs text-white/70 mt-0.5">{urgente ? (diasSin>900?'Aún no has hecho ninguno':`${diasSin} días sin registrar`) : 'Cómo te encuentras'}</p>
+                    </a>
+                    <a href="/sesion"
+                      className="bg-[#111] rounded-2xl p-5 flex flex-col items-start active:scale-95 transition-all">
+                      <span className="text-2xl mb-2">🏋️</span>
+                      <p className="text-sm font-bold text-white">Registrar entreno</p>
+                      <p className="text-xs text-white/50 mt-0.5">Apunta el entreno de hoy</p>
+                    </a>
+                    </div>
+                    <button onClick={() => setModalActividad(true)}
+                      className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
+                      <span className="text-2xl">🚶</span>
+                      <div>
+                        <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
+                        <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
+                      </div>
+                      <span className="ml-auto text-[#6B6B6B]">+</span>
+                    </button>
+                  </div>
+                  )
+                })()}
+
+                {/* Check-in presencial */}
+                {cliente?.tipo==='presencial'&&(() => {
+                  const diasSin = checkins[0]?.fecha ? Math.floor((Date.now()-new Date(checkins[0].fecha+'T12:00').getTime())/864e5) : 999
+                  const urgente = diasSin >= 7
+                  return (
+                  <div className="space-y-3">
+                  <a href="/seguimiento"
+                    className={`flex items-center gap-4 rounded-2xl p-5 active:scale-95 transition-all ${urgente?'ring-2 ring-offset-2 animate-pulse':''}`}
+                    style={{background: urgente?'#ef4444':color, ...(urgente?{'--tw-ring-color':'#ef4444'}:{})}}>
+                    <span className="text-3xl">{urgente?'⏰':'📋'}</span>
+                    <div>
+                      <p className="text-sm font-bold text-white">Check-in semanal</p>
+                      <p className="text-xs text-white/70">{urgente ? (diasSin>900?'Aún no has hecho ninguno — ¡empecemos!':`Llevas ${diasSin} días sin contarme cómo vas`) : 'Cuéntame cómo va la semana'}</p>
+                    </div>
+                    <span className="ml-auto text-white/70">→</span>
+                  </a>
+                  <button onClick={() => setModalActividad(true)}
+                    className="w-full bg-white border border-black/8 rounded-2xl p-4 flex items-center gap-3 active:scale-95 transition-all text-left hover:shadow-sm">
+                    <span className="text-2xl">🚶</span>
+                    <div>
+                      <p className="text-sm font-bold text-[#0A0A0A]">Registrar actividad libre</p>
+                      <p className="text-xs text-[#6B6B6B] mt-0.5">Caminata, carrera, deporte, cualquier cosa extra</p>
+                    </div>
+                    <span className="ml-auto text-[#6B6B6B]">+</span>
+                  </button>
+                  </div>
+                  )
+                })()}
+
+                {/* Último check-in */}
+                {checkins[0]&&(
+                  <div className="bg-white rounded-2xl border border-black/6 p-5">
+                    <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-widest mb-3">Último check-in · {new Date(checkins[0].fecha).toLocaleDateString('es-ES',{day:'numeric',month:'long'})}</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {checkins[0].peso&&<span className="text-xs bg-orange-50 text-orange-700 px-3 py-1.5 rounded-full font-medium">⚖️ {checkins[0].peso}kg</span>}
+                      {checkins[0].energia&&<span className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full font-medium">⚡ Energía {checkins[0].energia}/10</span>}
+                      {checkins[0].motivacion&&<span className="text-xs bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-full font-medium">💫 Motivación {checkins[0].motivacion}/7</span>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Modal cancelar sesión */}
+                {cancelando&&(
+                  <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>{setCancelando(null);setMotivoCancel('')}}>
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={e=>e.stopPropagation()}>
+                      <h3 className="font-bold text-[#0A0A0A] text-lg mb-1">¿Cancelar sesión?</h3>
+                      <p className="text-sm text-[#6B6B6B] mb-4">{new Date(cancelando.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})} · {cancelando.hora}</p>
+                      <textarea value={motivoCancel} onChange={e=>setMotivoCancel(e.target.value)} rows={2} placeholder="Motivo (opcional)" className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-3 resize-none" style={{'--tw-ring-color':color}}/>
+                      <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5 mb-4">⚠ Tu entrenador recibirá una notificación</p>
+                      <div className="flex gap-2">
+                        <button onClick={()=>{setCancelando(null);setMotivoCancel('')}} className="flex-1 border border-black/10 text-sm py-3 rounded-xl text-[#6B6B6B] font-medium">Volver</button>
+                        <button onClick={async()=>{
+                          await supabase.functions.invoke('portal-accion',{body:{accion:'cancelar_sesion',datos:{sesion_id:cancelando.id,motivo:motivoCancel}}})
+                          setSesionesPortal(prev=>prev.filter(s=>s.id!==cancelando.id))
+                          setCancelando(null);setMotivoCancel('')
+                        }} className="flex-1 text-white text-sm font-semibold py-3 rounded-xl" style={{background:'#ef4444'}}>Confirmar</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Modal registro de sesión online */}
+                {registrandoSesion && (
+                  <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setRegistrandoSesion(null)}>
+                    <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                      {/* Cabecera */}
+                      <div className="sticky top-0 bg-white px-5 pt-5 pb-3 border-b border-black/5 z-10">
+                        <div className="flex items-center justify-between mb-1">
+                          <h3 className="font-bold text-[#0A0A0A]">Registrar sesión</h3>
+                          <button onClick={() => setRegistrandoSesion(null)} className="text-[#9B9B9B] text-xl">×</button>
+                        </div>
+                        <p className="text-xs text-[#9B9B9B]">{registrandoSesion.dia.nombre}</p>
+                        {/* Pasos */}
+                        <div className="flex gap-2 mt-3">
+                          {['ejercicios', 'rpe'].map((p, i) => (
+                            <div key={p} className={`flex-1 h-1 rounded-full transition-all ${registroPaso === p || (i === 0) ? '' : 'bg-black/10'}`}
+                              style={{background: registroPaso === p ? color : i === 0 && registroPaso === 'rpe' ? color : '#E5E5E5'}}/>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-5">
+                        {registroPaso === 'ejercicios' ? (
+                          <div className="space-y-5">
+                            <p className="text-xs text-[#6B6B6B]">Anota el peso y reps que hiciste en cada serie. Marca las que completaste.</p>
+
+                            {registrandoSesion.ejercicios.map(ej => {
+                              const sets = registroData[ej.nombre] || []
+                              return (
+                                <div key={ej.nombre} className="border border-black/8 rounded-2xl overflow-hidden">
+                                  <div className="px-4 py-3 flex items-center justify-between" style={{background:`${color}10`}}>
+                                    <div>
+                                      <p className="text-sm font-bold text-[#0A0A0A]">{ej.nombre}</p>
+                                      <p className="text-xs text-[#9B9B9B]">{ej.series} series · {ej.reps} reps planificadas</p>
+                                    </div>
+                                  </div>
+                                  <div className="divide-y divide-black/5">
+                                    {sets.map((s, si) => (
+                                      <div key={si} className="flex items-center gap-3 px-4 py-3">
+                                        {/* Tick completado */}
+                                        <button onClick={() => {
+                                          const nuevo = [...sets]
+                                          nuevo[si] = { ...nuevo[si], completado: !nuevo[si].completado }
+                                          setRegistroData(prev => ({ ...prev, [ej.nombre]: nuevo }))
+                                        }}
+                                          className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${s.completado ? 'text-white border-transparent' : 'border-black/20'}`}
+                                          style={s.completado ? {background: color} : {}}>
+                                          {s.completado && <span className="text-xs font-bold">✓</span>}
+                                        </button>
+                                        <span className="text-xs text-[#9B9B9B] w-12 flex-shrink-0">Serie {s.set}</span>
+                                        {/* Peso */}
+                                        <div className="flex items-center gap-1 flex-1">
+                                          <input type="number" placeholder="—"
+                                            value={s.peso} onChange={e => {
+                                              const nuevo = [...sets]
+                                              nuevo[si] = { ...nuevo[si], peso: e.target.value }
+                                              setRegistroData(prev => ({ ...prev, [ej.nombre]: nuevo }))
+                                            }}
+                                            className="w-16 text-center border border-black/10 rounded-xl py-1.5 text-sm font-bold focus:outline-none focus:border-[#FF5C00]"/>
+                                          <span className="text-xs text-[#9B9B9B]">kg</span>
+                                        </div>
+                                        {/* Reps */}
+                                        <div className="flex items-center gap-1 flex-1">
+                                          <input type="text" placeholder={ej.reps}
+                                            value={s.reps} onChange={e => {
+                                              const nuevo = [...sets]
+                                              nuevo[si] = { ...nuevo[si], reps: e.target.value }
+                                              setRegistroData(prev => ({ ...prev, [ej.nombre]: nuevo }))
+                                            }}
+                                            className="w-16 text-center border border-black/10 rounded-xl py-1.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                                          <span className="text-xs text-[#9B9B9B]">reps</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )
+                            })}
+
+                            <button onClick={() => setRegistroPaso('rpe')}
+                              className="w-full py-3.5 rounded-xl text-white font-bold text-sm"
+                              style={{background: color}}>
+                              Siguiente →
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-6">
+                            <div className="text-center py-4">
+                              <p className="text-4xl mb-3">💪</p>
+                              <p className="font-bold text-[#0A0A0A] text-lg">¿Cómo ha ido el entreno?</p>
+                              <p className="text-xs text-[#9B9B9B] mt-1">Esfuerzo percibido general — del 1 al 10</p>
+                            </div>
+                            <div className="grid grid-cols-5 gap-2">
+                              {[1,2,3,4,5,6,7,8,9,10].map(v => (
+                                <button key={v} onClick={() => setRegistroRPE(v)}
+                                  className={`aspect-square rounded-xl text-sm font-bold transition-all ${registroRPE === v ? 'text-white scale-105' : 'border border-black/10 text-[#6B6B6B]'}`}
+                                  style={registroRPE === v ? {background: v >= 8 ? '#ef4444' : v >= 5 ? color : '#10b981'} : {}}>
+                                  {v}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="flex gap-2 text-xs text-[#9B9B9B] justify-between px-1">
+                              <span>😊 Fácil</span>
+                              <span>😤 Intenso</span>
+                              <span>💀 Al límite</span>
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                              <button onClick={() => setRegistroPaso('ejercicios')}
+                                className="flex-1 border border-black/10 text-[#6B6B6B] py-3 rounded-xl text-sm font-medium">
+                                ← Volver
+                              </button>
+                              <button onClick={guardarRegistroSesion} disabled={guardandoRegistro}
+                                className="flex-1 py-3 rounded-xl text-white font-bold text-sm disabled:opacity-50"
+                                style={{background: color}}>
+                                {guardandoRegistro ? '⏳ Guardando...' : '✓ Guardar sesión'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {valorando&&(
+                  <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>setValorando(null)}>
+                    <div className="bg-white rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+                      <h3 className="font-bold text-[#0A0A0A] text-lg mb-1">¿Cómo fue tu entreno?</h3>
+                      <p className="text-sm text-[#6B6B6B] mb-5">{new Date(valorando.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</p>
+
+                      <p className="text-sm font-bold text-[#0A0A0A] mb-1">Esfuerzo percibido (RPE): <span style={{color}}>{rpeVal}/10</span></p>
+                      <p className="text-xs text-[#6B6B6B] mb-3">1 = Muy suave · 10 = Al máximo</p>
+                      <div className="flex gap-1.5 flex-wrap mb-5">
+                        {[1,2,3,4,5,6,7,8,9,10].map(v=>(
+                          <button key={v} type="button" onClick={()=>setRpeVal(v)}
+                            className="w-8 h-8 rounded-lg text-xs font-bold transition-all"
+                            style={rpeVal===v?{background:color,color:'white'}:{background:'#F5F5F0',color:'#6B6B6B'}}>{v}</button>
+                        ))}
+                      </div>
+
+                      <p className="text-sm font-bold text-[#0A0A0A] mb-1">Fatiga muscular: <span style={{color}}>{fatigaVal}/5</span></p>
+                      <p className="text-xs text-[#6B6B6B] mb-3">1 = Fresco · 5 = Muy fatigado</p>
+                      <div className="flex gap-1.5 mb-5">
+                        {[1,2,3,4,5].map(v=>(
+                          <button key={v} type="button" onClick={()=>setFatigaVal(v)}
+                            className="flex-1 h-10 rounded-lg text-sm font-bold transition-all"
+                            style={fatigaVal===v?{background: v>=4?'#ef4444':color,color:'white'}:{background:'#F5F5F0',color:'#6B6B6B'}}>{v}</button>
+                        ))}
+                      </div>
+
+                      <textarea value={sensacionesVal} onChange={e=>setSensacionesVal(e.target.value)} rows={2}
+                        placeholder="¿Alguna sensación o molestia que contar? (opcional)"
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-5 resize-none"/>
+
+                      <div className="flex gap-2">
+                        <button onClick={()=>setValorando(null)} className="flex-1 border border-black/10 text-sm py-3 rounded-xl text-[#6B6B6B] font-medium">Ahora no</button>
+                        <button onClick={guardarValoracion} disabled={guardandoValoracion}
+                          className="flex-1 text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-50" style={{background:color}}>
+                          {guardandoValoracion?'Guardando...':'Guardar'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
+
+            {/* ══ RUTINA ══════════════════════════════════════════════════════ */}
             {tab==='rutina'&&(
               <>
                 {/* Tutorial primer acceso */}
@@ -793,21 +1339,6 @@ export default function PortalCliente() {
                   </>
                 )}
               </>
-            )}
-
-            {/* ══ AGENDA ═══════════════════════════════════════════════════════ */}
-            {tab==='agenda'&&(
-              <AgendaSemana
-                clienteId={clienteId}
-                sesionesPortal={sesionesPortal}
-                color={color}
-                cliente={cliente}
-                cancelando={cancelando}
-                setCancelando={setCancelando}
-                motivoCancel={motivoCancel}
-                setMotivoCancel={setMotivoCancel}
-                onCancelada={(id) => setSesionesPortal(prev => prev.filter(s => s.id !== id))}
-              />
             )}
 
             {/* ══ PROGRESO ════════════════════════════════════════════════════ */}
@@ -1584,70 +2115,6 @@ export default function PortalCliente() {
           </div>
         </div>
       )}
-
-      {/* Modal check-in inline */}
-      {modalCheckin&&(
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>setModalCheckin(false)}>
-          <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
-            <div className="px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
-              <div>
-                <p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p>
-                <p className="text-xs text-[#9B9B9B] mt-0.5">Cuéntame cómo ha ido la semana</p>
-              </div>
-              <button onClick={()=>setModalCheckin(false)} className="text-[#9B9B9B] text-2xl">×</button>
-            </div>
-            <div className="px-6 py-5 space-y-5">
-              {[
-                {key:'energia',label:'⚡ Energía',max:5,lo:'Agotado',hi:'Excelente'},
-                {key:'sueno',label:'😴 Sueño',max:5,lo:'Muy mal',hi:'Muy bien'},
-                {key:'fatiga',label:'🏋️ Fatiga',max:10,lo:'Sin fatiga',hi:'Al límite'},
-                {key:'estres',label:'🧠 Estrés',max:10,lo:'Sin estrés',hi:'Al límite'},
-              ].map(({key,label,max,lo,hi})=>(
-                <div key={key}>
-                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">{label}</p>
-                  <div className="grid gap-1" style={{gridTemplateColumns:`repeat(${max},1fr)`}}>
-                    {Array.from({length:max},(_,i)=>i+1).map(v=>{
-                      const sel=checkinForm[key]===v
-                      const hot=(key==='fatiga'||key==='estres')&&v>=7
-                      const med=(key==='fatiga'||key==='estres')&&v>=5&&v<7
-                      return <button key={v} onClick={()=>setCheckinForm(f=>({...f,[key]:v}))}
-                        className={`py-2.5 rounded-xl text-sm font-bold transition-all ${sel?'text-white scale-105':'border border-black/10 text-[#6B6B6B]'}`}
-                        style={sel?{background:hot?'#ef4444':med?'#f59e0b':color}:{}}>{v}</button>
-                    })}
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <p className="text-[10px] text-[#C0C0C0]">{lo}</p>
-                    <p className="text-[10px] text-[#C0C0C0]">{hi}</p>
-                  </div>
-                </div>
-              ))}
-              <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-1">⚖️ Peso <span className="font-normal text-xs text-[#9B9B9B]">(opcional)</span></p>
-                <div className="flex items-center gap-2">
-                  <input type="number" step="0.1" placeholder="75.0" value={checkinForm.peso}
-                    onChange={e=>setCheckinForm(f=>({...f,peso:e.target.value}))}
-                    className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00]"/>
-                  <span className="text-sm text-[#9B9B9B]">kg</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-1">💬 Comentario <span className="font-normal text-xs text-[#9B9B9B]">(opcional)</span></p>
-                <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={checkinForm.comentario}
-                  onChange={e=>setCheckinForm(f=>({...f,comentario:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none"/>
-              </div>
-              <button onClick={enviarCheckinInline}
-                disabled={!checkinForm.energia||!checkinForm.fatiga||!checkinForm.sueno||!checkinForm.estres||enviandoCheckin}
-                className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
-                style={{background:color}}>
-                {enviandoCheckin?'⏳ Enviando...':'✓ Enviar check-in'}
-              </button>
-              <p className="text-xs text-[#C0C0C0] text-center">Tu entrenador lo recibe automáticamente</p>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   )
 }
@@ -2099,652 +2566,6 @@ function HabitosPortal({ clienteId, color }) {
           )
         })}
       </div>
-    </div>
-  )
-}
-
-// ─── Agenda de la semana del cliente ──────────────────────────────────────
-// ─── Agenda del cliente — vista semana y mes ──────────────────────────────
-function AgendaSemana({ clienteId, sesionesPortal, color, cliente, cancelando, setCancelando, motivoCancel, setMotivoCancel, onCancelada }) {
-  const [vista, setVista] = useState('semana') // 'semana' | 'mes'
-  const [offset, setOffset] = useState(0)
-  const [sesionesExtra, setSesionesExtra] = useState(null)
-
-  const hoy = new Date()
-  const hoyStr = hoy.toISOString().split('T')[0]
-
-  // ── Cálculos de rango ──────────────────────────────────────────────────
-  function getRango() {
-    if (vista === 'semana') {
-      const lunes = new Date(hoy)
-      lunes.setDate(hoy.getDate() - ((hoy.getDay() || 7) - 1) + offset * 7)
-      const dias = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(lunes)
-        d.setDate(lunes.getDate() + i)
-        return d
-      })
-      return { desde: dias[0], hasta: dias[6], dias }
-    } else {
-      const primerDia = new Date(hoy.getFullYear(), hoy.getMonth() + offset, 1)
-      const ultimoDia = new Date(hoy.getFullYear(), hoy.getMonth() + offset + 1, 0)
-      const dias = []
-      const d = new Date(primerDia)
-      while (d <= ultimoDia) { dias.push(new Date(d)); d.setDate(d.getDate() + 1) }
-      return { desde: primerDia, hasta: ultimoDia, dias, primerDia }
-    }
-  }
-
-  const rango = getRango()
-  const desdeStr = rango.desde.toISOString().split('T')[0]
-  const hastaStr = rango.hasta.toISOString().split('T')[0]
-
-  useEffect(() => {
-    const esActual = offset === 0
-    if (esActual && sesionesPortal) { setSesionesExtra(null); return }
-    supabase.from('sesiones').select('*')
-      .eq('cliente_id', clienteId)
-      .gte('fecha', desdeStr).lte('fecha', hastaStr)
-      .eq('cancelada', false)
-      .order('fecha').order('hora')
-      .then(({ data }) => setSesionesExtra(data || []))
-  }, [offset, vista])
-
-  const sesiones = sesionesExtra !== null ? sesionesExtra : (sesionesPortal || [])
-  const porFecha = {}
-  sesiones.forEach(s => { if (!porFecha[s.fecha]) porFecha[s.fecha] = []; porFecha[s.fecha].push(s) })
-
-  const DIAS_CORTO = ['L','M','X','J','V','S','D']
-  const DIAS_LARGO = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
-  const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
-  const MESES_CORTO = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
-
-  // Título del periodo
-  const titulo = vista === 'semana'
-    ? offset === 0 ? 'Esta semana'
-      : offset === 1 ? 'Próxima semana'
-      : offset === -1 ? 'Semana pasada'
-      : `${rango.dias[0].getDate()} ${MESES_CORTO[rango.dias[0].getMonth()]} — ${rango.dias[6].getDate()} ${MESES_CORTO[rango.dias[6].getMonth()]}`
-    : offset === 0 ? 'Este mes'
-      : MESES[rango.primerDia.getMonth()] + ' ' + rango.primerDia.getFullYear()
-
-  return (
-    <div className="space-y-3">
-      {/* Selector vista + navegación */}
-      <div className="flex items-center gap-2">
-        <button onClick={() => setOffset(v => v - 1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] active:scale-95 transition-all flex-shrink-0">
-          ←
-        </button>
-        <div className="flex-1 text-center">
-          <p className="text-sm font-bold text-[#0A0A0A]">{titulo}</p>
-        </div>
-        <button onClick={() => setOffset(v => v + 1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] active:scale-95 transition-all flex-shrink-0">
-          →
-        </button>
-      </div>
-
-      {/* Toggle semana/mes */}
-      <div className="flex gap-1 bg-black/5 p-1 rounded-xl">
-        {[['semana','Semana'],['mes','Mes']].map(([v,l]) => (
-          <button key={v} onClick={() => { setVista(v); setOffset(0) }}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${vista===v?'bg-white text-[#0A0A0A] shadow-sm':'text-[#6B6B6B]'}`}>
-            {l}
-          </button>
-        ))}
-      </div>
-
-      {/* ── VISTA SEMANA ── */}
-      {vista === 'semana' && (
-        <div className="space-y-2">
-          {rango.dias.map((dia, i) => {
-            const fechaStr = dia.toISOString().split('T')[0]
-            const esHoy = fechaStr === hoyStr
-            const esPasado = fechaStr < hoyStr
-            const sess = porFecha[fechaStr] || []
-
-            return (
-              <div key={fechaStr}
-                className={`rounded-2xl border overflow-hidden ${esHoy ? '' : 'border-black/5'}`}
-                style={{
-                  background: esHoy ? `${color}08` : 'white',
-                  borderColor: esHoy ? `${color}40` : undefined
-                }}>
-                <div className="px-4 py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold w-7" style={{color: esHoy ? color : '#9B9B9B'}}>
-                      {DIAS_LARGO[i]}
-                    </span>
-                    <span className={`text-sm font-bold ${esHoy ? 'text-[#0A0A0A]' : esPasado ? 'text-[#C0C0C0]' : 'text-[#6B6B6B]'}`}>
-                      {dia.getDate()}
-                    </span>
-                    {esHoy && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white"
-                        style={{background: color}}>Hoy</span>
-                    )}
-                  </div>
-                  {sess.length > 0 && (
-                    <span className="text-xs font-semibold" style={{color}}>
-                      {sess.length} sesión{sess.length > 1 ? 'es' : ''}
-                    </span>
-                  )}
-                </div>
-                {sess.length > 0 ? (
-                  <div className="divide-y divide-black/4">
-                    {sess.map(s => (
-                      <div key={s.id} className="px-4 py-2.5 flex items-center gap-3">
-                        <div className="w-1 h-8 rounded-full flex-shrink-0"
-                          style={{background: s.completada ? '#10b981' : color}}/>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-[#0A0A0A]">
-                            {s.tipo === 'online' ? 'Entreno online'
-                              : s.tipo === 'grupo' ? 'Entreno en grupo'
-                              : 'Entrenamiento personal'}
-                          </p>
-                          <p className="text-xs text-[#9B9B9B]">
-                            {s.hora ? s.hora.slice(0,5) : ''}
-                            {s.duracion_minutos ? ` · ${s.duracion_minutos}min` : ''}
-                            {s.completada ? ' · ✓ Completado' : ''}
-                          </p>
-                        </div>
-                        {!s.completada && new Date(s.fecha + 'T23:59') > new Date() && setCancelando && (
-                          <button onClick={() => setCancelando(s)}
-                            className="text-xs text-[#C0C0C0] hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-50 transition-all flex-shrink-0">
-                            Cancelar
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="px-4 pb-2.5">
-                    <p className="text-xs text-[#E0E0E0]">Sin sesiones</p>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* ── VISTA MES ── */}
-      {vista === 'mes' && (
-        <div>
-          {/* Cabecera días */}
-          <div className="grid grid-cols-7 mb-1">
-            {DIAS_CORTO.map(d => (
-              <div key={d} className="text-center text-[10px] font-bold text-[#9B9B9B] py-1">{d}</div>
-            ))}
-          </div>
-
-          {/* Grid del mes */}
-          {(() => {
-            const primerDia = rango.primerDia
-            const diasOffset = (primerDia.getDay() || 7) - 1 // lunes = 0
-            const totalDias = rango.dias.length
-            const celdas = diasOffset + totalDias
-            const filas = Math.ceil(celdas / 7)
-
-            return Array.from({ length: filas }, (_, fila) => (
-              <div key={fila} className="grid grid-cols-7 gap-1 mb-1">
-                {Array.from({ length: 7 }, (_, col) => {
-                  const idx = fila * 7 + col
-                  const diaIdx = idx - diasOffset
-                  if (diaIdx < 0 || diaIdx >= totalDias) {
-                    return <div key={col} className="aspect-square"/>
-                  }
-                  const dia = rango.dias[diaIdx]
-                  const fechaStr = dia.toISOString().split('T')[0]
-                  const esHoy = fechaStr === hoyStr
-                  const esPasado = fechaStr < hoyStr
-                  const sess = porFecha[fechaStr] || []
-                  const tieneSesion = sess.length > 0
-
-                  return (
-                    <div key={col}
-                      className="aspect-square rounded-xl flex flex-col items-center justify-center relative"
-                      style={{
-                        background: esHoy ? color : tieneSesion ? `${color}15` : 'transparent',
-                      }}>
-                      <span className={`text-xs font-bold ${esHoy ? 'text-white' : esPasado ? 'text-[#C0C0C0]' : tieneSesion ? 'text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>
-                        {dia.getDate()}
-                      </span>
-                      {tieneSesion && !esHoy && (
-                        <div className="w-1 h-1 rounded-full mt-0.5" style={{background: color}}/>
-                      )}
-                      {tieneSesion && esHoy && (
-                        <div className="w-1 h-1 rounded-full mt-0.5 bg-white/60"/>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            ))
-          })()}
-
-          {/* Lista de sesiones del mes */}
-          {sesiones.length > 0 && (
-            <div className="mt-3 space-y-1.5">
-              <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-wide mb-2">
-                {sesiones.length} sesión{sesiones.length > 1 ? 'es' : ''} este mes
-              </p>
-              {sesiones.slice(0, 8).map(s => (
-                <div key={s.id} className="flex items-center gap-3 bg-white rounded-xl border border-black/5 px-3 py-2.5">
-                  <div className="w-1 h-8 rounded-full flex-shrink-0"
-                    style={{background: s.completada ? '#10b981' : color}}/>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[#0A0A0A]">
-                      {new Date(s.fecha + 'T12:00').toLocaleDateString('es-ES', {weekday:'short', day:'numeric', month:'short'})}
-                      {s.hora ? ' · ' + s.hora.slice(0,5) : ''}
-                    </p>
-                    <p className="text-xs text-[#9B9B9B]">
-                      {s.tipo === 'online' ? 'Entreno online' : s.tipo === 'grupo' ? 'Grupo' : 'Personal'}
-                      {s.completada ? ' · ✓' : ''}
-                    </p>
-                  </div>
-                  {!s.completada && new Date(s.fecha + 'T23:59') > new Date() && setCancelando && (
-                    <button onClick={() => setCancelando(s)}
-                      className="text-xs text-[#C0C0C0] hover:text-red-400 px-2 py-1 rounded-lg hover:bg-red-50 transition-all flex-shrink-0">
-                      Cancelar
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {sesiones.length === 0 && (
-            <div className="text-center py-6">
-              <p className="text-sm font-bold text-[#0A0A0A]">Sin sesiones este mes</p>
-              <p className="text-xs text-[#9B9B9B] mt-1">Tu entrenador añadirá tus próximas sesiones</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Resumen semana */}
-      {vista === 'semana' && sesiones.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          {[
-            [sesiones.length, 'Total', '#0A0A0A'],
-            [sesiones.filter(s => s.completada).length, 'Completadas', '#10b981'],
-            [sesiones.filter(s => !s.completada).length, 'Pendientes', color],
-          ].map(([n, l, c]) => (
-            <div key={l} className="bg-white rounded-2xl border border-black/5 p-3 text-center">
-              <p className="text-xl font-bold" style={{color: c}}>{n}</p>
-              <p className="text-xs text-[#9B9B9B] mt-0.5">{l}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Modal cancelar sesión */}
-      {cancelando && setCancelando && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
-          onClick={() => { setCancelando(null); setMotivoCancel && setMotivoCancel('') }}>
-          <div className="bg-white rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-[#0A0A0A] text-lg mb-1">¿Cancelar sesión?</h3>
-            <p className="text-sm text-[#6B6B6B] mb-4">
-              {new Date(cancelando.fecha + 'T12:00').toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'long'})}
-              {cancelando.hora ? ' · ' + cancelando.hora.slice(0,5) : ''}
-            </p>
-            <textarea
-              value={motivoCancel || ''}
-              onChange={e => setMotivoCancel && setMotivoCancel(e.target.value)}
-              rows={2}
-              placeholder="Motivo (opcional)"
-              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none mb-3 resize-none"/>
-            <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5 mb-4">
-              ⚠ Tu entrenador recibirá una notificación
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setCancelando(null); setMotivoCancel && setMotivoCancel('') }}
-                className="flex-1 border border-black/10 text-sm py-3 rounded-xl text-[#6B6B6B] font-medium">
-                Volver
-              </button>
-              <button
-                onClick={async () => {
-                  await supabase.functions.invoke('portal-accion', {
-                    body: { accion: 'cancelar_sesion', datos: { sesion_id: cancelando.id, motivo: motivoCancel || '' } }
-                  })
-                  onCancelada && onCancelada(cancelando.id)
-                  setCancelando(null)
-                  setMotivoCancel && setMotivoCancel('')
-                }}
-                className="flex-1 text-white text-sm font-semibold py-3 rounded-xl bg-red-500">
-                Confirmar cancelación
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Centro de mando del día ──────────────────────────────────────────────
-function TarjetasHoy({
-  cliente, color, checkins, rutina, planNutricion, sesionesPortal,
-  pendientesValorar, tareasExtra, fotos, marcas, puedeVerNutricion,
-  tieneCuestNutricion, clienteId, setTab, setSubTabProgreso,
-  configEntrenador, abrirRegistroSesion, valorando, setValorando,
-  setSesionesPortal, onAbrirCheckin
-}) {
-  const hoy = new Date()
-  const hoyStr = hoy.toISOString().split('T')[0]
-  const nombre = cliente?.nombre?.split(' ')[0] || ''
-
-  // Sesión de hoy
-  const sesionHoy = sesionesPortal.find(s => s.fecha === hoyStr && !s.completada)
-  // Próxima sesión futura
-  const proximaSesion = sesionesPortal.find(s => s.fecha > hoyStr)
-  // Días sin check-in
-  const diasSinCheckin = checkins[0]?.fecha
-    ? Math.floor((Date.now() - new Date(checkins[0].fecha).getTime()) / 864e5)
-    : 999
-  const checkinUrgente = diasSinCheckin >= 7
-  const checkinHecho = diasSinCheckin < 7
-
-  // Sesión pendiente de valorar
-  const sesionPendiente = pendientesValorar[0]
-
-  // Día de rutina que toca hoy (por día de semana)
-  const diasSemana = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
-  const diaHoy = diasSemana[hoy.getDay()]
-  const diasRutina = rutina?.borrador?.dias || rutina?.contenido?.dias || []
-  const rutinaHoy = diasRutina.find(d =>
-    d.nombre?.toLowerCase().includes(diaHoy) ||
-    d.dia?.toLowerCase().includes(diaHoy)
-  ) || (sesionHoy && diasRutina[0]) // fallback: primer día si hay sesión hoy
-
-  // Último peso
-  const ultimoPeso = checkins.find(c => c.peso)?.peso
-  const primerPeso = [...checkins].reverse().find(c => c.peso)?.peso
-  const diffPeso = ultimoPeso && primerPeso ? +(ultimoPeso - primerPeso).toFixed(1) : null
-  const bajando = diffPeso !== null && diffPeso < 0
-
-  // Streak de sesiones (últimas 4 semanas)
-  const haceN = (n) => new Date(Date.now() - n * 864e5).toISOString().split('T')[0]
-  const sesionesUltimas4 = checkins.filter(c => c.fecha >= haceN(28)).length
-
-  const DIAS_ES = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
-  const MESES_ES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
-
-  // ── Saludo dinámico ───────────────────────────────────────────────────
-  const horaActual = hoy.getHours()
-  const saludo = horaActual < 13 ? '☀️ Buenos días' : horaActual < 20 ? '👋 Buenas tardes' : '🌙 Buenas noches'
-
-  return (
-    <div className="space-y-3 pb-4">
-
-      {/* ── Cabecera — saludo + fecha ── */}
-      <div className="pt-1 pb-2">
-        <p className="text-xs text-[#9B9B9B]">{saludo}</p>
-        <p className="text-2xl font-bold text-[#0A0A0A] mt-0.5">{nombre} 👊</p>
-        <p className="text-xs text-[#9B9B9B] mt-1">
-          {DIAS_ES[hoy.getDay()]} {hoy.getDate()} {MESES_ES[hoy.getMonth()]}
-          {configEntrenador?.nombre_negocio ? ` · ${configEntrenador.nombre_negocio}` : ''}
-        </p>
-      </div>
-
-      {/* ── 1. CUESTIONARIO NUTRICIÓN URGENTE ── */}
-      {puedeVerNutricion && !planNutricion && !tieneCuestNutricion && (
-        <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
-          className="flex items-center gap-3 bg-emerald-500 rounded-2xl p-4 active:scale-95 transition-all">
-          <span className="text-2xl flex-shrink-0">🥗</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white">Rellena tu cuestionario de nutrición</p>
-            <p className="text-xs text-white/70 mt-0.5">Tu entrenador lo necesita para crear tu plan</p>
-          </div>
-          <span className="text-white/70 flex-shrink-0">→</span>
-        </a>
-      )}
-
-      {/* ── 2. SESIÓN PENDIENTE DE VALORAR ── */}
-      {sesionPendiente && !valorando && (
-        <button onClick={() => setValorando(sesionPendiente)}
-          className="w-full flex items-center gap-3 rounded-2xl p-4 border-2 active:scale-95 transition-all text-left"
-          style={{borderColor: color, background: `${color}08`}}>
-          <span className="text-2xl flex-shrink-0">⭐</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A]">¿Cómo fue tu sesión del {new Date(sesionPendiente.fecha + 'T12:00').toLocaleDateString('es-ES', {weekday:'long'})}?</p>
-            <p className="text-xs text-[#6B6B6B] mt-0.5">Tarda 10 segundos · Ayuda a tu entrenador</p>
-          </div>
-          <span className="text-sm font-bold flex-shrink-0" style={{color}}>Valorar →</span>
-        </button>
-      )}
-
-      {/* ── 3. SESIÓN DE HOY ── */}
-      {sesionHoy && (
-        <div className="rounded-2xl overflow-hidden border border-black/5"
-          style={{background: `linear-gradient(135deg, ${color}, ${color}cc)`}}>
-          <div className="px-4 pt-4 pb-3">
-            <p className="text-white/70 text-xs font-semibold uppercase tracking-wider mb-1">Hoy toca</p>
-            <p className="text-white font-bold text-lg">
-              {sesionHoy.tipo === 'online' ? 'Entrenamiento online'
-                : sesionHoy.tipo === 'grupo' ? 'Entrenamiento en grupo'
-                : 'Entrenamiento personal'}
-            </p>
-            {sesionHoy.hora && (
-              <p className="text-white/70 text-sm mt-0.5">🕐 {sesionHoy.hora.slice(0,5)}{sesionHoy.duracion_minutos ? ` · ${sesionHoy.duracion_minutos}min` : ''}</p>
-            )}
-          </div>
-          {rutinaHoy && (
-            <div className="px-4 py-3 bg-black/10 flex items-center justify-between">
-              <div>
-                <p className="text-white/60 text-xs">Rutina del día</p>
-                <p className="text-white text-sm font-semibold">{rutinaHoy.nombre || rutinaHoy.dia}</p>
-                <p className="text-white/60 text-xs mt-0.5">{(rutinaHoy.ejercicios||[]).length} ejercicios</p>
-              </div>
-              <button
-                onClick={() => abrirRegistroSesion(rutinaHoy)}
-                className="bg-white text-sm font-bold px-4 py-2 rounded-xl active:scale-95 transition-all"
-                style={{color}}>
-                ✓ Registrar
-              </button>
-            </div>
-          )}
-          {!rutinaHoy && (
-            <div className="px-4 py-3 bg-black/10">
-              <button onClick={() => setTab('agenda')}
-                className="text-white/80 text-xs font-medium">Ver agenda →</button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── 4. CHECK-IN SEMANAL ── */}
-      {checkinUrgente && (
-        <button onClick={onAbrirCheckin}
-          className="w-full flex items-center gap-3 bg-red-500 rounded-2xl p-4 active:scale-95 transition-all animate-pulse text-left">
-          <span className="text-2xl flex-shrink-0">⏰</span>
-          <div className="flex-1">
-            <p className="text-sm font-bold text-white">
-              {diasSinCheckin > 900 ? 'Haz tu primer check-in' : `${diasSinCheckin} días sin check-in`}
-            </p>
-            <p className="text-xs text-white/70 mt-0.5">Tu entrenador necesita saber cómo estás</p>
-          </div>
-          <span className="text-white/70">→</span>
-        </button>
-      )}
-
-      {/* ── 5. PROGRESO — gráfica motivacional ── */}
-      {checkins.length >= 2 && (() => {
-        const pesos = checkins.filter(c => c.peso).slice().reverse()
-        return (
-          <button onClick={() => setTab('progreso')}
-            className="w-full bg-white rounded-2xl border border-black/5 p-4 text-left active:scale-95 transition-all hover:shadow-sm">
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wider">Tu progreso</p>
-                {diffPeso !== null && (
-                  <p className="text-2xl font-bold mt-0.5" style={{color: bajando ? '#10b981' : '#6366f1'}}>
-                    {bajando ? '' : '+'}{diffPeso} kg
-                  </p>
-                )}
-                <p className="text-xs text-[#9B9B9B] mt-0.5">
-                  {checkins.length} check-ins · último hace {diasSinCheckin === 0 ? 'hoy' : `${diasSinCheckin}d`}
-                </p>
-              </div>
-              <div className="flex items-center gap-1">
-                {checkinHecho && (
-                  <span className="text-xs bg-emerald-50 text-emerald-600 font-bold px-2 py-1 rounded-full">✓ Al día</span>
-                )}
-                <span className="text-[#9B9B9B] text-sm ml-1">→</span>
-              </div>
-            </div>
-            {/* Mini gráfica */}
-            {pesos.length > 1 && (
-              <div className="flex items-end gap-1 h-12">
-                {pesos.slice(-8).map((c, i, arr) => {
-                  const min = Math.min(...arr.map(x => x.peso))
-                  const max = Math.max(...arr.map(x => x.peso))
-                  const h = max === min ? 60 : ((c.peso - min) / (max - min)) * 65 + 35
-                  const isLast = i === arr.length - 1
-                  return (
-                    <div key={c.id || i} className="flex-1 rounded-sm transition-all"
-                      style={{height: `${h}%`, background: isLast ? color : `${color}30`}}/>
-                  )
-                })}
-              </div>
-            )}
-            {pesos.length > 1 && (
-              <div className="flex justify-between mt-1.5">
-                <p className="text-xs text-[#9B9B9B]">{pesos[0].peso}kg</p>
-                <p className="text-xs font-bold" style={{color}}>{pesos[pesos.length-1].peso}kg</p>
-              </div>
-            )}
-          </button>
-        )
-      })()}
-
-      {/* ── 6. PRÓXIMA SESIÓN (si no hay hoy) ── */}
-      {!sesionHoy && proximaSesion && (
-        <button onClick={() => setTab('agenda')}
-          className="w-full flex items-center gap-3 bg-white rounded-2xl border border-black/5 p-4 text-left active:scale-95 transition-all hover:shadow-sm">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{background: `${color}15`}}>
-            <span className="text-lg">📅</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-[#9B9B9B]">Próxima sesión</p>
-            <p className="text-sm font-bold text-[#0A0A0A]">
-              {new Date(proximaSesion.fecha + 'T12:00').toLocaleDateString('es-ES', {weekday:'long', day:'numeric', month:'short'})}
-              {proximaSesion.hora ? ' · ' + proximaSesion.hora.slice(0,5) : ''}
-            </p>
-          </div>
-          <span className="text-[#9B9B9B] text-sm">→</span>
-        </button>
-      )}
-
-      {/* ── 7. PLAN ACTIVO — rutina + nutrición ── */}
-      {(rutina || planNutricion) && (
-        <div className="grid grid-cols-2 gap-2">
-          {rutina && (
-            <button onClick={() => setTab('rutina')}
-              className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95 transition-all hover:shadow-sm">
-              <span className="text-xl mb-2 block">💪</span>
-              <p className="text-xs font-bold text-[#0A0A0A] leading-tight">{rutina.nombre || 'Tu rutina'}</p>
-              <p className="text-xs text-[#9B9B9B] mt-1">{diasRutina.length} días</p>
-            </button>
-          )}
-          {planNutricion && (
-            <button onClick={() => setTab('nutricion')}
-              className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95 transition-all hover:shadow-sm">
-              <span className="text-xl mb-2 block">🥗</span>
-              <p className="text-xs font-bold text-[#0A0A0A] leading-tight">{planNutricion.nombre || 'Tu nutrición'}</p>
-              <p className="text-xs text-[#9B9B9B] mt-1">{planNutricion.calorias_dia ? `${planNutricion.calorias_dia} kcal` : 'Ver plan'}</p>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── 8. MARCAS PERSONALES — si hay ── */}
-      {marcas.length > 0 && (
-        <button onClick={() => { setTab('progreso'); setSubTabProgreso && setSubTabProgreso('marcas') }}
-          className="w-full bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95 transition-all hover:shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wider">🏆 Marcas personales</p>
-            <span className="text-[#9B9B9B] text-sm">→</span>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {marcas.slice(0, 4).map((m, i) => (
-              <div key={i} className="flex-shrink-0 bg-[#F7F6F3] rounded-xl px-3 py-2">
-                <p className="text-xs text-[#9B9B9B] truncate max-w-24">{m.ejercicio}</p>
-                <p className="text-sm font-bold text-[#0A0A0A]">{m.peso_kg}kg</p>
-              </div>
-            ))}
-          </div>
-        </button>
-      )}
-
-      {/* ── 9. TRABAJO EXTRA — presencial ── */}
-      {cliente?.tipo === 'presencial' && tareasExtra.length > 0 && (
-        <div className="bg-white border border-black/5 rounded-2xl p-4">
-          <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wider mb-3">💡 Tu trabajo extra</p>
-          <div className="space-y-2">
-            {tareasExtra.map(t => (
-              <div key={t.id} className="flex items-center gap-3 bg-[#F7F6F3] rounded-xl px-3 py-2.5">
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{background: color}}/>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[#0A0A0A]">{t.texto}</p>
-                  {t.frecuencia && <p className="text-xs text-[#9B9B9B]">{t.frecuencia}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── 10. ESTADO VACÍO — cliente nuevo ── */}
-      {!sesionHoy && !proximaSesion && !rutina && !planNutricion && checkins.length === 0 && (
-        <div className="text-center py-10">
-          <p className="text-5xl mb-3">🚀</p>
-          <p className="text-sm font-bold text-[#0A0A0A]">¡Bienvenido a tu portal!</p>
-          <p className="text-xs text-[#9B9B9B] mt-1 leading-relaxed max-w-xs mx-auto">
-            Tu entrenador está preparando tu plan. En breve tendrás aquí tu rutina, tus sesiones y tu progreso.
-          </p>
-        </div>
-      )}
-
-      {/* ── 11. AVISO FOTO PROGRESO ── */}
-      {(rutina || planNutricion) && (() => {
-        const diasSinFoto = fotos[0]?.fecha
-          ? Math.floor((Date.now() - new Date(fotos[0].fecha + 'T12:00').getTime()) / 864e5)
-          : 999
-        if (diasSinFoto < 30) return null
-        return (
-          <button onClick={() => { setTab('progreso'); setSubTabProgreso && setSubTabProgreso('fotos') }}
-            className="w-full flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl px-4 py-3 active:scale-95 transition-all text-left">
-            <span className="text-lg flex-shrink-0">📸</span>
-            <p className="text-xs text-amber-700 flex-1 leading-relaxed">
-              {diasSinFoto > 900 ? 'Aún no has subido fotos de progreso' : `${diasSinFoto} días sin fotos de progreso`}
-              {' '}— ayuda a ver los cambios reales
-            </p>
-            <span className="text-amber-600 text-xs font-bold flex-shrink-0">Subir →</span>
-          </button>
-        )
-      })()}
-
-      {/* ── 12. CHECK-IN AL DÍA — motivación ── */}
-      {!checkinUrgente && checkins.length > 0 && (
-        <div className="flex items-center gap-3 bg-white border border-black/5 rounded-2xl px-4 py-3">
-          <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <span className="text-sm">✓</span>
-          </div>
-          <div className="flex-1">
-            <p className="text-xs font-semibold text-[#0A0A0A]">Check-in al día</p>
-            <p className="text-xs text-[#9B9B9B]">Último hace {diasSinCheckin === 0 ? 'hoy' : `${diasSinCheckin} días`} · {sesionesUltimas4} sesiones este mes</p>
-          </div>
-          <button onClick={onAbrirCheckin}
-            className="text-xs font-bold px-3 py-1.5 rounded-lg text-white flex-shrink-0"
-            style={{background: color}}>
-            Nuevo
-          </button>
-        </div>
-      )}
-
     </div>
   )
 }
