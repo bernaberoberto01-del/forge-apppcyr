@@ -101,8 +101,8 @@ export default function PortalCliente() {
       q(supabase.from('rutinas').select('id,nombre,contenido,borrador,semanas')
         .eq('cliente_id', cid).eq('estado', 'publicada')
         .order('created_at', { ascending: false }).limit(1)),
-      q(supabase.from('planes_nutricion').select('id,nombre,calorias_dia,proteinas_dia,carbos_dia,grasas_dia')
-        .eq('cliente_id', cid).eq('estado', 'publicado')
+      q(supabase.from('planes_nutricion').select('id,nombre,calorias_dia,proteinas_dia,carbos_dia,grasas_dia,contenido,borrador')
+        .eq('cliente_id', cid).in('estado', ['publicado','publicada'])
         .order('created_at', { ascending: false }).limit(1)),
       cl.tipo === 'presencial'
         ? qa(supabase.from('sesiones').select('*').eq('cliente_id', cid)
@@ -114,7 +114,7 @@ export default function PortalCliente() {
   }
 
   async function cargarRutina(cid, cl) {
-    const rutina = await q(supabase.from('rutinas').select('*')
+    const rutina = await q(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador')
       .eq('cliente_id', cid).eq('estado', 'publicada')
       .order('created_at', { ascending: false }).limit(1))
     setDatosRutina({ rutina })
@@ -122,11 +122,11 @@ export default function PortalCliente() {
 
   async function cargarNutricion(cid) {
     const plan = await q(supabase.from('planes_nutricion').select('*')
-      .eq('cliente_id', cid).eq('estado', 'publicado')
+      .eq('cliente_id', cid).in('estado', ['publicado','publicada'])
       .order('created_at', { ascending: false }).limit(1))
-    const tieneCuest = await q(supabase.from('cuestionarios_nutricion')
+    const cuestArr = await qa(supabase.from('cuestionarios_nutricion')
       .select('id').eq('cliente_id', cid).limit(1))
-    setDatosNutricion({ plan, tieneCuest: !!(tieneCuest?.length || (Array.isArray(tieneCuest) && tieneCuest.length)) })
+    setDatosNutricion({ plan, tieneCuest: cuestArr.length > 0 })
   }
 
   async function cargarProgreso(cid) {
