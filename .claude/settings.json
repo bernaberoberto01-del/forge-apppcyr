@@ -1,0 +1,49 @@
+{
+  "model": "claude-opus-4-5",
+  "skills": [
+    ".claude/skills/forge-context.md",
+    ".claude/skills/forge-portal.md",
+    ".claude/skills/forge-supabase.md",
+    ".claude/skills/forge-deploy.md",
+    ".claude/skills/forge-session-start.md"
+  ],
+  "context_files": [
+    "CLAUDE.md"
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npm run dev)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push)",
+      "Bash(git log *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(npx playwright test *)",
+      "Bash(curl *supabase.co*)",
+      "Bash(curl *forge-studio-os.vercel.app*)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(grep *)",
+      "Bash(sed *)",
+      "Bash(python3 *)",
+      "Bash(wc *)",
+      "Bash(sleep *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(echo *)",
+      "Read(**)",
+      "Write(src/**)",
+      "Write(supabase/functions/**)",
+      "Write(tests/**)",
+      "Write(CLAUDE.md)",
+      "Write(.claude/**)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(rm -rf *)",
+      "Bash(supabase migration *)"
+    ]
+  }
+}
