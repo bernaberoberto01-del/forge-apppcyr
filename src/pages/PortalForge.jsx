@@ -20,6 +20,9 @@ export default function PortalForge() {
 
   // modales
   const [modalCI, setModalCI] = useState(false)
+  const [modalActividad, setModalActividad] = useState(false)
+  const [actForm, setActForm] = useState({ tipo: '', duracion: '', rpe: null, nota: '' })
+  const [guardandoAct, setGuardandoAct] = useState(false)
   const [ciForm, setCiForm] = useState({ energia: null, sueno: null, fatiga: null, estres: null, peso: '', nota: '' })
   const [enviandoCI, setEnviandoCI] = useState(false)
   const [valorando, setValorando] = useState(null)
@@ -132,6 +135,39 @@ export default function PortalForge() {
     setDatos(d => ({ ...d, mensajes: msgs }))
     setEnviandoMsg(false)
     setTimeout(() => mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  const ACTIVIDADES_LIBRES = [
+    { id: 'footing', label: '🏃 Footing / Caminar' },
+    { id: 'ciclismo', label: '🚴 Ciclismo' },
+    { id: 'natacion', label: '🏊 Natación' },
+    { id: 'futbol', label: '⚽ Fútbol' },
+    { id: 'padel', label: '🎾 Pádel / Tenis' },
+    { id: 'basketball', label: '🏀 Baloncesto' },
+    { id: 'yoga', label: '🧘 Yoga / Pilates' },
+    { id: 'otro', label: '💪 Otro' },
+  ]
+
+  async function guardarActividad() {
+    if (!actForm.tipo || !actForm.duracion) return
+    setGuardandoAct(true)
+    const hoy = hoyStr()
+    const nombreAct = ACTIVIDADES_LIBRES.find(a => a.id === actForm.tipo)?.label?.split(' ').slice(1).join(' ') || actForm.tipo
+    const { error } = await supabase.from('sesiones').insert({
+      cliente_id: cliente.id,
+      entrenador_id: cliente.entrenador_id,
+      fecha: hoy, tipo: 'libre', completada: true,
+      duracion_minutos: parseInt(actForm.duracion) || null,
+      rpe: actForm.rpe || null,
+      notas: `${nombreAct}${actForm.nota ? ` · ${actForm.nota}` : ''}`,
+      cancelada: false,
+    })
+    if (!error) {
+      setModalActividad(false)
+      setActForm({ tipo: '', duracion: '', rpe: null, nota: '' })
+      showToast('✓ Actividad registrada')
+    }
+    setGuardandoAct(false)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500) }
@@ -421,6 +457,99 @@ export default function PortalForge() {
                 style={{ background: color }}>
                 {guardandoVal ? '⏳ Guardando...' : '✓ Guardar valoración'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal actividad libre */}
+        {modalActividad && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4"
+            onClick={() => setModalActividad(false)}>
+            <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}>
+              <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-[#0A0A0A] text-lg">Registrar actividad</p>
+                  <p className="text-xs text-[#9B9B9B] mt-0.5">Tu entrenador lo verá en tu historial</p>
+                </div>
+                <button onClick={() => setModalActividad(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F7F6F3] text-[#6B6B6B] text-xl">×</button>
+              </div>
+              <div className="px-6 py-5 space-y-5">
+
+                {/* Tipo de actividad */}
+                <div>
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-3">¿Qué has hecho?</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ACTIVIDADES_LIBRES.map(a => (
+                      <button key={a.id} onClick={() => setActForm(f => ({ ...f, tipo: a.id }))}
+                        className={`py-2.5 px-3 rounded-xl text-xs font-medium text-left border transition-all active:scale-95 ${
+                          actForm.tipo === a.id ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B]'
+                        }`}
+                        style={actForm.tipo === a.id ? { background: color } : {}}>
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Duración */}
+                <div>
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">⏱ ¿Cuánto tiempo?</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[30, 45, 60, 90].map(min => (
+                      <button key={min} onClick={() => setActForm(f => ({ ...f, duracion: String(min) }))}
+                        className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${
+                          actForm.duracion === String(min) ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'
+                        }`}
+                        style={actForm.duracion === String(min) ? { background: color } : {}}>
+                        {min}'
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <input type="number" placeholder="Otro (min)" value={[30,45,60,90].includes(+actForm.duracion) ? '' : actForm.duracion}
+                      onChange={e => setActForm(f => ({ ...f, duracion: e.target.value }))}
+                      className="flex-1 border border-black/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    <span className="text-sm text-[#9B9B9B]">min</span>
+                  </div>
+                </div>
+
+                {/* Intensidad */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-bold text-[#0A0A0A]">💓 Intensidad percibida</p>
+                    {actForm.rpe && <span className="text-sm font-bold" style={{ color }}>{actForm.rpe}/10</span>}
+                  </div>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[2, 4, 6, 8, 10].map(v => (
+                      <button key={v} onClick={() => setActForm(f => ({ ...f, rpe: v }))}
+                        className={`py-3 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+                          actForm.rpe === v ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'
+                        }`}
+                        style={actForm.rpe === v ? { background: v >= 8 ? '#ef4444' : v >= 6 ? '#f59e0b' : color } : {}}>
+                        {v === 2 ? 'Suave' : v === 4 ? 'Fácil' : v === 6 ? 'Moderado' : v === 8 ? 'Duro' : 'Máximo'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Nota */}
+                <div>
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">📝 Nota <span className="font-normal text-xs text-[#9B9B9B]">(opcional)</span></p>
+                  <input type="text" placeholder="Ej: 5km en el parque, me sentí bien…"
+                    value={actForm.nota}
+                    onChange={e => setActForm(f => ({ ...f, nota: e.target.value }))}
+                    className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                </div>
+
+                <button onClick={guardarActividad}
+                  disabled={!actForm.tipo || !actForm.duracion || guardandoAct}
+                  className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
+                  style={{ background: color }}>
+                  {guardandoAct ? '⏳ Guardando...' : '✓ Registrar actividad'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -839,7 +968,7 @@ function TabInicio({ cliente, color, config, checkins, rutina, nutricion, sesion
         </button>
 
         {/* Actividad libre */}
-        <button onClick={() => setTab('progreso')}
+        <button onClick={() => setModalActividad(true)}
           className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95 transition-all">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
             style={{ background: '#6366f115' }}>
