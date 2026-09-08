@@ -33,6 +33,9 @@ export default function PortalCliente() {
   const [valorando, setValorando]           = useState(null)
   const [rpeVal, setRpeVal]                 = useState(null)
   const [fatigaVal, setFatigaVal]           = useState(null)
+  const [modalCheckin, setModalCheckin]     = useState(false)
+  const [checkinForm, setCheckinForm]       = useState({ energia: null, sueno: null, fatiga: null, estres: null, peso: '', comentario: '' })
+  const [enviandoCI, setEnviandoCI]         = useState(false)
   const [guardandoValoracion, setGuardandoValoracion] = useState(false)
   const [textoMsg, setTextoMsg]             = useState('')
   const [enviandoMsg, setEnviandoMsg]       = useState(false)
@@ -100,7 +103,7 @@ export default function PortalCliente() {
         supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).eq('estado', 'publicado').order('created_at', { ascending: false }).limit(1),
         supabase.from('cuestionarios_nutricion').select('id').eq('cliente_id', cid).limit(1).then(r => !!(r.data?.length)).catch(() => false),
         supabase.from('sesiones').select('*').eq('cliente_id', cid).gte('fecha', new Date().toISOString().split('T')[0]).eq('cancelada', false).order('fecha').order('hora').limit(8),
-        supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('tipo', 'presencial').gte('fecha', new Date(Date.now() - 7 * 864e5).toISOString().split('T')[0]).lte('fecha', new Date().toISOString().split('T')[0]).eq('cancelada', false).is('rpe', null).order('fecha', { ascending: false }).limit(3),
+        supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('completada', true).eq('cancelada', false).is('rpe', null).gte('fecha', new Date(Date.now() - 14 * 864e5).toISOString().split('T')[0]).lte('fecha', new Date().toISOString().split('T')[0]).order('fecha', { ascending: false }).limit(3),
       ])
 
       setRutina(ru?.[0] || null)
@@ -211,6 +214,25 @@ export default function PortalCliente() {
   const inicialEntrenador = (configEntrenador?.nombre_entrenador || 'E')[0].toUpperCase()
   const inicialCliente = (cliente.nombre || 'C')[0].toUpperCase()
 
+  async function enviarCheckin() {
+    if (!checkinForm.energia || !checkinForm.sueno || !checkinForm.fatiga || !checkinForm.estres) return
+    setEnviandoCI(true)
+    const hoy = new Date().toISOString().split('T')[0]
+    const { error } = await supabase.from('checkins').insert({
+      cliente_id: clienteId, entrenador_id: cliente.entrenador_id, fecha: hoy,
+      energia: checkinForm.energia, sueno: checkinForm.sueno,
+      fatiga: checkinForm.fatiga, estres: checkinForm.estres,
+      peso: checkinForm.peso ? parseFloat(checkinForm.peso) : null,
+      comentario: checkinForm.comentario || null, adherencia_entreno: 5,
+    })
+    if (!error) {
+      setCheckins(prev => [{ id: Date.now()+'', fecha: hoy, ...checkinForm, peso: checkinForm.peso ? parseFloat(checkinForm.peso) : null }, ...prev])
+      setModalCheckin(false)
+      setCheckinForm({ energia: null, sueno: null, fatiga: null, estres: null, peso: '', comentario: '' })
+    }
+    setEnviandoCI(false)
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen" style={{ background: '#F7F6F3' }}>
@@ -298,6 +320,7 @@ export default function PortalCliente() {
                   puedeVerNutricion={puedeVerNutricion} tieneCuestNutricion={tieneCuestNutricion}
                   clienteId={clienteId} setTab={setTab}
                   valorando={valorando} setValorando={setValorando}
+                  onAbrirCheckin={() => setModalCheckin(true)}
                 />
               )}
 
@@ -471,6 +494,67 @@ export default function PortalCliente() {
         </div>
       )}
 
+      {/* Modal check-in semanal */}
+      {modalCheckin && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalCheckin(false)}>
+          <div className="bg-white rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
+              <div><p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p><p className="text-xs text-[#9B9B9B]">Cuéntame cómo ha ido la semana</p></div>
+              <button onClick={() => setModalCheckin(false)} className="text-[#9B9B9B] text-2xl leading-none w-8 h-8 flex items-center justify-center">×</button>
+            </div>
+            <div className="px-6 py-5 space-y-5">
+              {[
+                { key: 'energia', label: '⚡ Energía', max: 5, lo: 'Agotado', hi: 'Excelente' },
+                { key: 'sueno', label: '😴 Sueño', max: 5, lo: 'Muy mal', hi: 'Muy bien' },
+                { key: 'fatiga', label: '🏋️ Fatiga muscular', max: 10, lo: 'Sin fatiga', hi: 'Al límite' },
+                { key: 'estres', label: '🧠 Estrés', max: 10, lo: 'Sin estrés', hi: 'Al límite' },
+              ].map(({ key, label, max, lo, hi }) => (
+                <div key={key}>
+                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">{label}</p>
+                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${max}, 1fr)` }}>
+                    {Array.from({ length: max }, (_, i) => i + 1).map(v => {
+                      const sel = checkinForm[key] === v
+                      const hot = (key === 'fatiga' || key === 'estres') && v >= 7
+                      const med = (key === 'fatiga' || key === 'estres') && v >= 5 && v < 7
+                      return (
+                        <button key={v} onClick={() => setCheckinForm(f => ({ ...f, [key]: v }))}
+                          className={`py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'}`}
+                          style={sel ? { background: hot ? '#ef4444' : med ? '#f59e0b' : color } : {}}>
+                          {v}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex justify-between mt-1"><p className="text-[10px] text-[#C0C0C0]">{lo}</p><p className="text-[10px] text-[#C0C0C0]">{hi}</p></div>
+                </div>
+              ))}
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-1">⚖️ Peso <span className="font-normal text-xs text-[#9B9B9B]">(opcional)</span></p>
+                <div className="flex items-center gap-2">
+                  <input type="number" step="0.1" placeholder="75.0" value={checkinForm.peso}
+                    onChange={e => setCheckinForm(f => ({ ...f, peso: e.target.value }))}
+                    className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  <span className="text-sm text-[#9B9B9B]">kg</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-1">💬 Comentario <span className="font-normal text-xs text-[#9B9B9B]">(opcional)</span></p>
+                <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={checkinForm.comentario}
+                  onChange={e => setCheckinForm(f => ({ ...f, comentario: e.target.value }))}
+                  className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
+              </div>
+              <button onClick={enviarCheckin}
+                disabled={!checkinForm.energia || !checkinForm.sueno || !checkinForm.fatiga || !checkinForm.estres || enviandoCI}
+                className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
+                style={{ background: color }}>
+                {enviandoCI ? '⏳ Enviando...' : '✓ Enviar check-in'}
+              </button>
+              <p className="text-xs text-[#C0C0C0] text-center">Tu entrenador lo recibe automáticamente</p>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
@@ -478,7 +562,7 @@ export default function PortalCliente() {
 // ─── Tab Inicio ──────────────────────────────────────────────────────────────
 function TabInicio({ cliente, color, checkins, rutina, planNutricion, sesionesPortal,
   pendientesValorar, puedeVerNutricion, tieneCuestNutricion, clienteId, setTab,
-  valorando, setValorando }) {
+  valorando, setValorando, onAbrirCheckin }) {
 
   const hoy = new Date()
   const hoyStr = hoy.toISOString().split('T')[0]
@@ -552,7 +636,7 @@ function TabInicio({ cliente, color, checkins, rutina, planNutricion, sesionesPo
 
       {/* Check-in urgente */}
       {diasSinCI >= 7 && (
-        <a href={`https://forge-studio-os.vercel.app/seguimiento?c=${clienteId}`}
+        <button onClick={onAbrirCheckin}
           className="flex items-center gap-3 bg-red-500 rounded-2xl p-4 active:scale-95 transition-all">
           <span className="text-2xl">⏰</span>
           <div className="flex-1">
@@ -562,7 +646,7 @@ function TabInicio({ cliente, color, checkins, rutina, planNutricion, sesionesPo
             <p className="text-xs text-white/70 mt-0.5">Tu entrenador necesita saber cómo estás</p>
           </div>
           <span className="text-white/70">→</span>
-        </a>
+        </button>
       )}
 
       {/* Progreso de peso */}
@@ -653,10 +737,10 @@ function TabInicio({ cliente, color, checkins, rutina, planNutricion, sesionesPo
             <p className="text-xs font-semibold text-[#0A0A0A]">Check-in al día</p>
             <p className="text-xs text-[#9B9B9B]">Hace {diasSinCI === 0 ? 'hoy' : `${diasSinCI} días`} · {checkins.length} registros</p>
           </div>
-          <a href={`https://forge-studio-os.vercel.app/seguimiento?c=${clienteId}`}
+          <button onClick={onAbrirCheckin}
             className="text-xs font-bold px-3 py-1.5 rounded-lg text-white" style={{ background: color }}>
             Nuevo
-          </a>
+          </button>
         </div>
       )}
     </div>
