@@ -623,12 +623,17 @@ export default function Seguimiento({ session }) {
                         </button>
                         <p className="text-xs text-[#6B6B6B]">
                           {new Date(s.fecha).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}
-                          {s.hora ? ` · ${s.hora}` : ''} · {s.tipo}
+                          {s.hora ? ` · ${s.hora}` : ''} · {s.tipo === 'libre' ? '🏃 Actividad libre' : s.tipo}
                           {s.duracion_minutos ? ` · ${s.duracion_minutos}min` : ''}
+                          {s.notas && s.tipo === 'libre' ? ` · ${s.notas}` : ''}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {s.rpe && <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">RPE {s.rpe}</span>}
+                        {s.rpe
+                          ? <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">RPE {s.rpe}</span>
+                          : s.completada && <span className="text-xs bg-[#F7F6F3] text-[#C0C0C0] px-2 py-1 rounded-full font-medium">Sin valorar</span>
+                        }
+                        {s.fatiga_post && <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.fatiga_post >= 4 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>💪 {s.fatiga_post}/5</span>}
                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.completada?'bg-emerald-50 text-emerald-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
                           {s.completada ? '✓' : 'Pendiente'}
                         </span>
