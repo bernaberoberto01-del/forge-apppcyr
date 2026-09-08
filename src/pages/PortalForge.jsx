@@ -58,7 +58,7 @@ export default function PortalForge() {
     const hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
-           mensajes, pagos, marcas, medidas, fotos, cuest] = await Promise.all([
+           mensajes, pagos, marcas, medidas, fotos, cuest, sesionesEstaSemana] = await Promise.all([
       q1(supabase.from('configuracion').select('nombre_entrenador,foto_url,nombre_negocio,color_acento').eq('entrenador_id', eid)),
       q1(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
@@ -72,10 +72,13 @@ export default function PortalForge() {
       qa(supabase.from('medidas_cliente').select('*').eq('cliente_id', cid).order('fecha', { ascending: false })),
       qa(supabase.from('fotos_progreso').select('*').eq('cliente_id', cid).eq('visible_cliente', true).order('fecha', { ascending: false })),
       supabase.from('cuestionarios_nutricion').select('id').eq('cliente_id', cid).limit(1).then(r => !!(r.data?.length)).catch(() => false),
+      // Sesiones completadas esta semana (para clientes online que las registran ellos)
+      // Sesiones de esta semana para online (lunes a domingo actual)
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(7)).lte('fecha', new Date(Date.now() + 7*864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
     ])
 
     setConfig(cfg)
-    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest })
+    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, sesionesEstaSemana })
 
     // Marcar mensajes como leídos
     supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
@@ -162,7 +165,7 @@ export default function PortalForge() {
     </div>
   )
 
-  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest } = datos
+  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, sesionesEstaSemana } = datos
   const esOnline = cliente.tipo === 'online'
   const plan = cliente.plan_online
   const verRutina = !esOnline || ['entrenamiento', 'completo'].includes(plan)
@@ -252,7 +255,8 @@ export default function PortalForge() {
             <TabInicio cliente={cliente} color={color} config={config} checkins={checkins}
               rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy}
               pendientes={pendientes} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion}
-              setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} />
+              setTab={setTab} setModalCI={setModalCI} setValorando={setValorando}
+              sesionesEstaSemana={sesionesEstaSemana} />
           )}
           {tab === 'rutina' && <TabRutina rutina={rutina} color={color} />}
           {tab === 'nutricion' && <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} />}
@@ -511,7 +515,8 @@ function LoginPortal() {
 
 // ─── Tab Inicio ───────────────────────────────────────────────────────────────
 function TabInicio({ cliente, color, config, checkins, rutina, nutricion, sesiones,
-  sesionesHoy, pendientes, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando }) {
+  sesionesHoy, pendientes, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando,
+  sesionesEstaSemana }) {
 
   const hoy = hoyStr()
   const ahora = new Date()
@@ -521,6 +526,7 @@ function TabInicio({ cliente, color, config, checkins, rutina, nutricion, sesion
   const DIAS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
   const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 
+  const esOnline = cliente?.tipo === 'online'
   const sesionHoy = sesionesHoy?.[0]
   const pesos = checkins?.filter(c => c.peso).slice().reverse() || []
   const diasSinCI = checkins?.[0]?.fecha
@@ -529,18 +535,31 @@ function TabInicio({ cliente, color, config, checkins, rutina, nutricion, sesion
   const diffPeso = pesos.length >= 2 ? +(pesos[pesos.length-1].peso - pesos[0].peso).toFixed(1) : null
   const diasRutina = rutina?.borrador?.dias || rutina?.contenido?.dias || []
 
-  // Agenda semanal — calcular los 7 días desde hoy
-  const diasSemana = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(ahora)
-    d.setDate(ahora.getDate() + i)
+  // ── Agenda: lunes a sábado de esta semana ──────────────────────────────
+  const lunesEsta = new Date(ahora)
+  const dSemana = ahora.getDay() || 7 // 1=Lun..7=Dom
+  lunesEsta.setDate(ahora.getDate() - dSemana + 1)
+
+  const diasAgenda = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(lunesEsta)
+    d.setDate(lunesEsta.getDate() + i)
     const fechaStr = d.toISOString().split('T')[0]
-    const sesionDia = sesiones?.filter(s => s.fecha === fechaStr) || []
-    return { fecha: fechaStr, d, sesiones: sesionDia, esHoy: i === 0 }
+    const esHoy = fechaStr === hoy
+    const esPasado = fechaStr < hoy
+    // Presencial: sesiones programadas. Online: sesiones registradas esta semana
+    const sesionsDia = esOnline
+      ? (sesionesEstaSemana || []).filter(s => s.fecha === fechaStr)
+      : (sesiones || []).filter(s => s.fecha === fechaStr)
+    return { fecha: fechaStr, d, sesiones: sesionsDia, esHoy, esPasado }
   })
-  const hayAgenda = sesiones && sesiones.length > 0
+
+  const hayAgenda = esOnline
+    ? sesionesEstaSemana && sesionesEstaSemana.length > 0
+    : sesiones && sesiones.filter(s => s.fecha >= lunesEsta.toISOString().split('T')[0]).length > 0
 
   // Estado vacío real
   const esNuevo = !rutina && !nutricion && !checkins?.length && !hayAgenda
+
 
   return (
     <div className="space-y-3 pb-2">
@@ -666,18 +685,21 @@ function TabInicio({ cliente, color, config, checkins, rutina, nutricion, sesion
         <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
           <div className="px-4 py-3 border-b border-black/4 flex items-center justify-between">
             <p className="text-xs font-bold text-[#0A0A0A]">📅 Tu semana</p>
-            <p className="text-[10px] text-[#9B9B9B]">Próximas sesiones</p>
+            <p className="text-[10px] text-[#9B9B9B]">
+              {esOnline ? 'Sesiones registradas' : 'Sesiones programadas'}
+            </p>
           </div>
           <div className="divide-y divide-black/4">
-            {diasSemana.filter(d => d.sesiones.length > 0 || d.esHoy).slice(0, 6).map((dia, i) => (
+            {diasAgenda.map((dia, i) => (
               <div key={i} className={`px-4 py-3 flex items-center gap-3 ${dia.esHoy ? 'bg-[#F7F6F3]' : ''}`}>
-                <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${
-                  dia.esHoy ? 'text-white' : 'bg-[#F7F6F3]'
-                }`} style={dia.esHoy ? { background: color } : {}}>
-                  <span className="text-[9px] font-bold leading-none" style={dia.esHoy ? { color: 'rgba(255,255,255,0.8)' } : { color: '#9B9B9B' }}>
+                <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center flex-shrink-0`}
+                  style={dia.esHoy ? { background: color } : { background: '#F7F6F3' }}>
+                  <span className="text-[9px] font-bold leading-none"
+                    style={{ color: dia.esHoy ? 'rgba(255,255,255,0.8)' : '#9B9B9B' }}>
                     {DIAS_SHORT[dia.d.getDay()]}
                   </span>
-                  <span className={`text-sm font-bold leading-none mt-0.5 ${dia.esHoy ? 'text-white' : 'text-[#0A0A0A]'}`}>
+                  <span className="text-sm font-bold leading-none mt-0.5"
+                    style={{ color: dia.esHoy ? 'white' : dia.esPasado ? '#C0C0C0' : '#0A0A0A' }}>
                     {dia.d.getDate()}
                   </span>
                 </div>
@@ -686,14 +708,19 @@ function TabInicio({ cliente, color, config, checkins, rutina, nutricion, sesion
                     dia.sesiones.map((s, si) => (
                       <div key={si} className={si > 0 ? 'mt-1' : ''}>
                         <p className="text-xs font-semibold text-[#0A0A0A]">
-                          {s.tipo === 'online' ? '🖥 Online' : s.tipo === 'grupo' ? '👥 Grupo' : '🏋️ Personal'}
+                          {s.tipo === 'online' ? '🖥 Online'
+                            : s.tipo === 'grupo' ? '👥 Grupo'
+                            : '🏋️ Personal'}
                           {s.hora ? ` · ${s.hora.slice(0,5)}` : ''}
                           {s.duracion_minutos ? ` · ${s.duracion_minutos}min` : ''}
+                          {esOnline && s.completada ? ' ✓' : ''}
                         </p>
                       </div>
                     ))
                   ) : (
-                    <p className="text-xs text-[#C0C0C0]">Sin sesión</p>
+                    <p className="text-xs" style={{ color: dia.esPasado ? '#D0D0D0' : '#C0C0C0' }}>
+                      {dia.esPasado ? 'Descanso' : 'Sin sesión'}
+                    </p>
                   )}
                 </div>
                 {dia.esHoy && dia.sesiones.length > 0 && (
@@ -703,6 +730,15 @@ function TabInicio({ cliente, color, config, checkins, rutina, nutricion, sesion
               </div>
             ))}
           </div>
+          {esOnline && (
+            <div className="px-4 py-3 border-t border-black/4">
+              <button onClick={() => setTab('rutina')}
+                className="w-full text-xs font-bold py-2 rounded-xl text-white active:scale-95 transition-all"
+                style={{ background: color }}>
+                + Registrar sesión de hoy
+              </button>
+            </div>
+          )}
         </div>
       )}
 
