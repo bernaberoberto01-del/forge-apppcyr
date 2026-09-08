@@ -1101,7 +1101,45 @@ export default function Clientes({ session }) {
                 </div>
               )})()}
               {dTab==='sesiones' && (
-                <ProgresoCargas clienteId={detalle.id} />
+                <div className="space-y-4">
+                  {/* Historial de sesiones con feedback */}
+                  <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-black/5 flex items-center justify-between">
+                      <p className="text-sm font-bold text-[#0A0A0A]">Historial de sesiones</p>
+                      <p className="text-xs text-[#9B9B9B]">
+                        {(dData.sesiones || []).filter(s => s.rpe).length}/{(dData.sesiones || []).filter(s => s.completada).length} valoradas
+                      </p>
+                    </div>
+                    <div className="divide-y divide-black/4 max-h-80 overflow-y-auto">
+                      {(dData.sesiones || []).filter(s => !s.cancelada).slice(0, 20).map(s => (
+                        <div key={s.id} className="px-4 py-3 flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-[#0A0A0A]">
+                              {new Date(s.fecha).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                              {s.hora ? ` · ${s.hora.slice(0,5)}` : ''}
+                              {s.tipo === 'libre' ? ' · 🏃 Actividad libre' : ''}
+                            </p>
+                            {s.sensaciones && <p className="text-[10px] text-[#9B9B9B] mt-0.5 italic">"{s.sensaciones}"</p>}
+                            {s.notas && s.tipo === 'libre' && <p className="text-[10px] text-[#9B9B9B] mt-0.5">{s.notas}</p>}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {s.rpe
+                              ? <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${s.rpe >= 8 ? 'bg-red-50 text-red-600' : s.rpe >= 6 ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>RPE {s.rpe}</span>
+                              : s.completada && <span className="text-[10px] text-[#C0C0C0] px-2 py-1 rounded-full border border-black/8">—</span>
+                            }
+                            {s.fatiga_post && <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${s.fatiga_post >= 4 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>💪 {s.fatiga_post}/5</span>}
+                            {s.duracion_minutos && <span className="text-[10px] text-[#9B9B9B]">{s.duracion_minutos}'</span>}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${s.completada ? 'bg-emerald-50 text-emerald-600' : 'text-[#C0C0C0]'}`}>{s.completada ? '✓' : '○'}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {!(dData.sesiones || []).filter(s => !s.cancelada).length && (
+                        <div className="px-4 py-6 text-center"><p className="text-sm text-[#9B9B9B]">Sin sesiones registradas</p></div>
+                      )}
+                    </div>
+                  </div>
+                  <ProgresoCargas clienteId={detalle.id} />
+                </div>
               )}
 
               {dTab==='progreso' && (
@@ -1207,7 +1245,45 @@ export default function Clientes({ session }) {
                 </div>
               )}
               {dTab==='sesiones' && (
-                <ProgresoCargas clienteId={detalle.id} />
+                <div className="space-y-4">
+                  {/* Historial de sesiones con feedback */}
+                  <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-black/5 flex items-center justify-between">
+                      <p className="text-sm font-bold text-[#0A0A0A]">Historial de sesiones</p>
+                      <p className="text-xs text-[#9B9B9B]">
+                        {(dData.sesiones || []).filter(s => s.rpe).length}/{(dData.sesiones || []).filter(s => s.completada).length} valoradas
+                      </p>
+                    </div>
+                    <div className="divide-y divide-black/4 max-h-80 overflow-y-auto">
+                      {(dData.sesiones || []).filter(s => !s.cancelada).slice(0, 20).map(s => (
+                        <div key={s.id} className="px-4 py-3 flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold text-[#0A0A0A]">
+                              {new Date(s.fecha).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                              {s.hora ? ` · ${s.hora.slice(0,5)}` : ''}
+                              {s.tipo === 'libre' ? ' · 🏃 Actividad libre' : ''}
+                            </p>
+                            {s.sensaciones && <p className="text-[10px] text-[#9B9B9B] mt-0.5 italic">"{s.sensaciones}"</p>}
+                            {s.notas && s.tipo === 'libre' && <p className="text-[10px] text-[#9B9B9B] mt-0.5">{s.notas}</p>}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {s.rpe
+                              ? <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${s.rpe >= 8 ? 'bg-red-50 text-red-600' : s.rpe >= 6 ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>RPE {s.rpe}</span>
+                              : s.completada && <span className="text-[10px] text-[#C0C0C0] px-2 py-1 rounded-full border border-black/8">—</span>
+                            }
+                            {s.fatiga_post && <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${s.fatiga_post >= 4 ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>💪 {s.fatiga_post}/5</span>}
+                            {s.duracion_minutos && <span className="text-[10px] text-[#9B9B9B]">{s.duracion_minutos}'</span>}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${s.completada ? 'bg-emerald-50 text-emerald-600' : 'text-[#C0C0C0]'}`}>{s.completada ? '✓' : '○'}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {!(dData.sesiones || []).filter(s => !s.cancelada).length && (
+                        <div className="px-4 py-6 text-center"><p className="text-sm text-[#9B9B9B]">Sin sesiones registradas</p></div>
+                      )}
+                    </div>
+                  </div>
+                  <ProgresoCargas clienteId={detalle.id} />
+                </div>
               )}
               {dTab==='extra' && (
                 <div className="space-y-4">
