@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { useOnboardingPortal } from '../hooks/useOnboarding'
 
 // ─── Componente principal ────────────────────────────────────────────────────
 export default function PortalCliente() {
@@ -51,7 +50,8 @@ export default function PortalCliente() {
   const [toastPortal, setToastPortal]       = useState('')
   const mensajesEndRef                      = useRef(null)
 
-  const { marcarVisto, esNuevo } = useOnboardingPortal(clienteId)
+  const marcarVisto = () => {}
+  const esNuevo = () => false
 
   // ── Sesión ────────────────────────────────────────────────────────────────
   useEffect(() => {
