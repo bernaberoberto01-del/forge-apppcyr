@@ -7,6 +7,7 @@ const q1 = p => p.then(r => r.data?.[0] || r.data || null).catch(() => null)
 const hoyStr = () => new Date().toISOString().split('T')[0]
 const hace = d => new Date(Date.now() - d * 864e5).toISOString().split('T')[0]
 const rmEpley = (peso, reps) => reps <= 1 ? peso : +(peso * (1 + reps / 30)).toFixed(1)
+const parseReps = (r) => { if (!r) return 1; const n = parseInt(String(r).split('-')[0]); return isNaN(n) ? 1 : n }
 
 // ─── Portal principal ─────────────────────────────────────────────────────────
 export default function PortalForge() {
@@ -81,7 +82,7 @@ export default function PortalForge() {
       qa(supabase.from('medidas_cliente').select('*').eq('cliente_id', cid).order('fecha', { ascending: false })),
       qa(supabase.from('fotos_progreso').select('*').eq('cliente_id', cid).eq('visible_cliente', true).order('fecha', { ascending: false })),
       supabase.from('cuestionarios_nutricion').select('id').eq('cliente_id', cid).limit(1).then(r => !!(r.data?.length)).catch(() => false),
-      qa(supabase.from('sesion_ejercicios').select('ejercicio_nombre,sets,sesiones(fecha)').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(500)),
+      qa(supabase.from('sesion_ejercicios').select('ejercicio_nombre,sets,patron,sesion_id').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(500)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(7)).lte('fecha', new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
     ])
 
@@ -230,6 +231,24 @@ export default function PortalForge() {
     { id: 'mas', label: 'Más', icon: '⚙️' },
   ]
 
+  // Bottom bar: siempre exactamente 5 slots
+  // Prioridad: Hoy, Entrena (si existe), Nutrición (si existe), Progreso, Mensajes, Más
+  // Si hay 6 tabs, Progreso va dentro de Más
+  const BOTTOM_TABS = (() => {
+    const prioridad = ['hoy', 'entrena', 'nutricion', 'progreso', 'mensajes']
+    const disponibles = TABS.filter(t => t.id !== 'mas' && prioridad.includes(t.id))
+      .sort((a, b) => prioridad.indexOf(a.id) - prioridad.indexOf(b.id))
+    if (disponibles.length <= 4) {
+      return [...disponibles, { id: 'mas', label: 'Más', icon: '⚙️' }]
+    }
+    // 5 o más: coger los 4 primeros + Más
+    return [...disponibles.slice(0, 4), { id: 'mas', label: 'Más', icon: '⚙️' }]
+  })()
+
+  // Tabs que van dentro del menú Más (los que no están en la bottom bar)
+  const BOTTOM_IDS = new Set(BOTTOM_TABS.map(t => t.id))
+  const TABS_EN_MAS = TABS.filter(t => !BOTTOM_IDS.has(t.id) && t.id !== 'mas')
+
   return (
     <div className="min-h-screen flex" style={{ background: '#F2F1EE', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
@@ -295,22 +314,31 @@ export default function PortalForge() {
           {tab === 'nutricion' && <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} />}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} />}
           {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />}
-          {tab === 'mas' && <TabMas pagos={pagos} cliente={cliente} setCliente={setCliente} color={color} />}
+          {tab === 'mas' && <TabMas pagos={pagos} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={TABS_EN_MAS} setTab={setTab} />}
         </div>
 
         {/* Bottom bar */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-black/6 z-20" style={{ paddingBottom: 'max(env(safe-area-inset-bottom),8px)' }}>
           <div className="flex">
-            {TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className="flex-1 flex flex-col items-center justify-center pt-2.5 pb-2 min-h-[58px] relative active:scale-95 transition-transform"
-                style={{ color: tab === t.id ? color : '#B0B0B0' }}>
-                {tab === t.id && <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-7 rounded-full" style={{ background: color }} />}
-                <span className="text-[19px] leading-none mb-1">{t.icon}</span>
-                <span className="text-[9px] font-bold">{t.label}</span>
-                {t.badge > 0 && <span className="absolute top-1.5 right-[16%] w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center text-white" style={{ background: color }}>{t.badge}</span>}
-              </button>
-            ))}
+            {BOTTOM_TABS.map(t => {
+              const esMas = t.id === 'mas'
+              const activo = esMas
+                ? tab === 'mas' || TABS_EN_MAS.some(x => x.id === tab)
+                : tab === t.id
+              const badge = esMas
+                ? TABS_EN_MAS.reduce((acc, x) => acc + (x.badge || 0), 0) + (tab === 'mas' ? 0 : 0)
+                : t.badge
+              return (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className="flex-1 flex flex-col items-center justify-center pt-2.5 pb-2 min-h-[58px] relative active:scale-95 transition-transform"
+                  style={{ color: activo ? color : '#B0B0B0' }}>
+                  {activo && <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-7 rounded-full" style={{ background: color }} />}
+                  <span className="text-[19px] leading-none mb-1">{t.icon}</span>
+                  <span className="text-[9px] font-bold">{t.label}</span>
+                  {badge > 0 && <span className="absolute top-1.5 right-[16%] w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center text-white" style={{ background: color }}>{badge}</span>}
+                </button>
+              )
+            })}
           </div>
         </nav>
 
@@ -708,7 +736,7 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline 
     const sets = (reg.sets || []).filter(s => s.peso && !isNaN(+s.peso))
     if (!sets.length) continue
     const maxPeso = Math.max(...sets.map(s => +s.peso))
-    const rmMax = Math.max(...sets.map(s => rmEpley(+s.peso, +s.reps || 1)))
+    const rmMax = Math.max(...sets.map(s => rmEpley(+s.peso, parseReps(s.reps))))
     histPorEj[nombre] = { maxPeso, rmMax: +rmMax.toFixed(1), fecha: reg.sesiones?.fecha, sets }
   }
 
@@ -1112,7 +1140,7 @@ function TabPagos({ pagos, color }) {
 }
 
 // ─── Tab Ajustes ──────────────────────────────────────────────────────────────
-function TabMas({ pagos, cliente, setCliente, color }) {
+function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab }) {
   const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
   const [guardando, setGuardando] = useState(false)
   const [ok, setOk] = useState(false)
@@ -1136,7 +1164,31 @@ function TabMas({ pagos, cliente, setCliente, color }) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-[#0A0A0A]">Ajustes</h2>
+      <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">Más</h2>
+
+      {/* Tabs que no caben en la bottom bar */}
+      {tabsExtra.length > 0 && (
+        <div className="space-y-2">
+          {tabsExtra.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)}
+              className="w-full bg-white rounded-2xl border border-black/5 p-4 flex items-center gap-4 text-left active:scale-95 transition-all">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}12` }}>
+                <span className="text-xl">{t.icon}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-[#0A0A0A]">{t.label}</p>
+              </div>
+              {t.badge > 0 && (
+                <span className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center text-white flex-shrink-0"
+                  style={{ background: color }}>{t.badge}</span>
+              )}
+              <span className="text-[#C0C0C0] flex-shrink-0">›</span>
+            </button>
+          ))}
+          <div className="border-t border-black/5 pt-2" />
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-black/5 p-4">
         <p className="text-sm font-bold text-[#0A0A0A]">{cliente?.nombre}</p>
         <p className="text-xs text-[#9B9B9B] mt-0.5">{cliente?.email}</p>
@@ -1201,7 +1253,7 @@ function SubFuerza({ ejerciciosHist, color }) {
     if (!mapa[nombre]) mapa[nombre] = []
     const sets = (reg.sets || []).filter(s => s.peso && !isNaN(+s.peso))
     if (sets.length) {
-      const maxRM = Math.max(...sets.map(s => rmEpley(+s.peso, +s.reps || 1)))
+      const maxRM = Math.max(...sets.map(s => rmEpley(+s.peso, parseReps(s.reps))))
       const maxPeso = Math.max(...sets.map(s => +s.peso))
       mapa[nombre].push({ fecha: reg.sesiones?.fecha, maxRM: +maxRM.toFixed(1), maxPeso: +maxPeso.toFixed(1) })
     }
