@@ -38,9 +38,12 @@ export default function Dashboard({ session }) {
   const [sesionesManana, setSesionesManana] = useState([])
   const [cuestPendientes, setCuestPendientes] = useState([])
   const [clientesIAPendiente, setClientesIAPendiente] = useState([])
+  const [toast, setToast] = useState('')
   const navigate = useNavigate()
   const uid = session.user.id
   const { completar, completado, porcentaje } = useOnboarding(uid)
+
+  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   useEffect(() => { cargar() }, [uid])
 
@@ -182,6 +185,11 @@ export default function Dashboard({ session }) {
 
   return (
     <div className="flex-1 overflow-y-auto">
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl bg-[#FF5C00] whitespace-nowrap">
+          {toast}
+        </div>
+      )}
       <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto space-y-4">
 
         {/* Tutorial primer acceso */}
@@ -338,24 +346,40 @@ export default function Dashboard({ session }) {
                   </div>
                 )}
 
-                {/* Check-ins sin hacer */}
-                {d.clientesSinCI.length > 0 && (
-                  <div className="flex items-center gap-3 px-5 py-3.5">
-                    <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700 text-sm flex-shrink-0">📋</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#0A0A0A]">
-                        {d.clientesSinCI.length} sin check-in esta semana
-                      </p>
-                      <p className="text-xs text-[#6B6B6B] truncate">
-                        {d.clientesSinCI.slice(0,3).map(c=>c.nombre.split(' ')[0]).join(', ')}
-                      </p>
+                {/* Check-ins sin hacer — con urgencia y días */}
+                {d.clientesSinCI.length > 0 && (() => {
+                  const criticos = d.clientesSinCI.filter(c => {
+                    const ci = (ciRecientes||[]).filter(r=>r.cliente_id===c.id).sort((a,b)=>b.fecha?.localeCompare(a.fecha))[0]
+                    return !ci || (new Date() - new Date(ci.fecha)) / 864e5 >= 14
+                  })
+                  const normales = d.clientesSinCI.filter(c => !criticos.includes(c))
+                  return (
+                    <div className={`px-5 py-3.5 ${criticos.length > 0 ? 'bg-red-50' : ''}`}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 ${criticos.length > 0 ? 'bg-red-500 text-white' : 'bg-amber-100 text-amber-700'}`}>📋</div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-bold ${criticos.length > 0 ? 'text-red-700' : 'text-[#0A0A0A]'}`}>
+                            {d.clientesSinCI.length} sin check-in
+                            {criticos.length > 0 && ` · ${criticos.length} crítico${criticos.length>1?'s':''}`}
+                          </p>
+                          <p className="text-xs text-[#6B6B6B] truncate">
+                            {d.clientesSinCI.slice(0,4).map(c=>c.nombre.split(' ')[0]).join(', ')}
+                            {d.clientesSinCI.length > 4 && ` +${d.clientesSinCI.length-4}`}
+                          </p>
+                        </div>
+                        <button onClick={async () => {
+                          try {
+                            const r = await supabase.functions.invoke('checkin-semanal', { body: { dias_umbral: 7 } })
+                            const enviados = r.data?.enviados || 0
+                            showToast(`✓ Recordatorio enviado a ${enviados} cliente${enviados!==1?'s':''}`)
+                          } catch(e) { showToast('Error al enviar') }
+                        }} className={`text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 text-white ${criticos.length > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
+                          Recordar →
+                        </button>
+                      </div>
                     </div>
-                    <button onClick={() => navigate('/seguimiento')}
-                      className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
-                      Ver →
-                    </button>
-                  </div>
-                )}
+                  )
+                })()}
 
                 {/* Alertas extra (fatiga, etc.) */}
                 {d.alertasExtra.slice(0,2).map(a => (
