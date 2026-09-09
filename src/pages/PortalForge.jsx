@@ -250,7 +250,7 @@ export default function PortalForge() {
   const TABS_EN_MAS = TABS.filter(t => !BOTTOM_IDS.has(t.id) && t.id !== 'mas')
 
   return (
-    <div className="min-h-screen flex" style={{ background: '#F2F1EE', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+    <div className="min-h-screen flex" style={{ background: '#F0EFEc', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
       {/* Sidebar desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-black/6 fixed h-full z-20">
@@ -298,13 +298,23 @@ export default function PortalForge() {
       {/* Main */}
       <main className="flex-1 md:ml-64 flex flex-col min-h-screen">
         {/* Header móvil */}
-        <div className="md:hidden sticky top-0 z-20 border-b border-black/5 px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(242,241,238,0.93)', backdropFilter: 'blur(12px)' }}>
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: color }}>{iniciales}</div>
+        <div className="md:hidden sticky top-0 z-20 border-b border-black/6 px-4 py-3 flex items-center gap-3"
+          style={{ background: 'rgba(242,241,238,0.95)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}>
+          {/* Avatar entrenador si hay foto, si no iniciales del cliente */}
+          {config?.foto_url
+            ? <img src={config.foto_url} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0 ring-2 ring-white" />
+            : <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0"
+                style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>{iniciales}</div>
+          }
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A] truncate">{nombre}</p>
-            {semanasActivas > 0 && <p className="text-[10px] text-[#9B9B9B]">🔥 {semanasActivas} semanas seguidas</p>}
+            <p className="text-sm font-bold text-[#0A0A0A] truncate leading-tight">{nombre}</p>
+            {semanasActivas > 0
+              ? <p className="text-[10px] font-medium" style={{ color }}>🔥 {semanasActivas} semanas seguidas</p>
+              : <p className="text-[10px] text-[#9B9B9B] truncate">con {config?.nombre_entrenador || 'tu entrenador'}</p>
+            }
           </div>
-          <button onClick={() => supabase.auth.signOut()} className="text-[10px] text-[#9B9B9B] px-2.5 py-1.5 rounded-lg border border-black/10">Salir</button>
+          <button onClick={() => supabase.auth.signOut()}
+            className="text-[10px] text-[#9B9B9B] px-2.5 py-1.5 rounded-lg border border-black/10 font-medium">Salir</button>
         </div>
 
         {/* Contenido */}
@@ -502,10 +512,10 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
   return (
     <div className="space-y-3 pb-2">
       {/* Saludo */}
-      <div className="pt-1 pb-1">
-        <p className="text-xs text-[#9B9B9B]">{saludo}</p>
-        <h1 className="text-2xl font-bold text-[#0A0A0A] mt-0.5 tracking-tight">{nombre} 👊</h1>
-        <p className="text-xs text-[#9B9B9B] mt-1">{DIAS[ahora.getDay()]} {ahora.getDate()} {MESES[ahora.getMonth()]}</p>
+      <div className="pt-1 pb-2">
+        <p className="text-xs text-[#9B9B9B] font-medium">{saludo}</p>
+        <h1 className="text-3xl font-black text-[#0A0A0A] mt-0.5 tracking-tight">{nombre} 👊</h1>
+        <p className="text-xs text-[#B0B0B0] mt-1 font-medium">{DIAS[ahora.getDay()]} {ahora.getDate()} {MESES[ahora.getMonth()]}</p>
       </div>
 
       {/* Bienvenida nuevo */}
@@ -596,21 +606,26 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
       {(pesos.length>=2||semanasActivas>0||checkins.length>0) && (
         <div className="grid grid-cols-3 gap-2">
           {pesos.length>=2&&diffPeso!==null&&(
-            <button onClick={() => setTab('progreso')} className="bg-white rounded-2xl border border-black/5 p-3.5 text-center active:scale-95">
-              <p className="text-xl font-bold" style={{ color: diffPeso<0?'#10b981':diffPeso>0?'#6366f1':'#9B9B9B' }}>{diffPeso>0?'+':''}{diffPeso}</p>
-              <p className="text-[10px] text-[#9B9B9B] mt-0.5">kg desde inicio</p>
+            <button onClick={() => setTab('progreso')}
+              className="bg-white rounded-2xl p-3.5 text-center active:scale-95 transition-all shadow-sm">
+              <p className="text-2xl font-black tracking-tight leading-none"
+                style={{ color: diffPeso<0?'#10b981':diffPeso>0?'#6366f1':'#9B9B9B' }}>
+                {diffPeso>0?'+':''}{diffPeso}
+              </p>
+              <p className="text-[10px] text-[#9B9B9B] mt-1 font-medium">kg cambio</p>
             </button>
           )}
           {semanasActivas>0&&(
-            <div className="bg-white rounded-2xl border border-black/5 p-3.5 text-center">
-              <p className="text-xl font-bold" style={{ color }}>🔥{semanasActivas}</p>
-              <p className="text-[10px] text-[#9B9B9B] mt-0.5">semanas seguidas</p>
+            <div className="rounded-2xl p-3.5 text-center shadow-sm"
+              style={{ background: `linear-gradient(135deg, ${color}15, ${color}08)`, border: `1.5px solid ${color}20` }}>
+              <p className="text-2xl font-black tracking-tight leading-none" style={{ color }}>🔥{semanasActivas}</p>
+              <p className="text-[10px] mt-1 font-semibold" style={{ color: `${color}80` }}>semanas</p>
             </div>
           )}
           {checkins.length>0&&(
-            <div className="bg-white rounded-2xl border border-black/5 p-3.5 text-center">
-              <p className="text-xl font-bold text-[#0A0A0A]">{checkins.length}</p>
-              <p className="text-[10px] text-[#9B9B9B] mt-0.5">check-ins</p>
+            <div className="bg-white rounded-2xl p-3.5 text-center shadow-sm">
+              <p className="text-2xl font-black tracking-tight leading-none text-[#0A0A0A]">{checkins.length}</p>
+              <p className="text-[10px] text-[#9B9B9B] mt-1 font-medium">check-ins</p>
             </div>
           )}
         </div>
@@ -618,21 +633,37 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
 
       {/* Gráfica de progreso */}
       {pesos.length>=2&&(
-        <button onClick={() => setTab('progreso')} className="w-full bg-white rounded-2xl border border-black/5 p-4 text-left active:scale-95">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-bold text-[#0A0A0A]">Evolución del peso</p>
-            {!ciUrgente&&<span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">✓ Al día</span>}
+        <button onClick={() => setTab('progreso')} className="w-full bg-white rounded-2xl p-4 text-left active:scale-95 transition-all shadow-sm">
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-widest">Progreso de peso</p>
+              {diffPeso!==null&&(
+                <p className="text-xl font-black tracking-tight mt-0.5"
+                  style={{ color: diffPeso<0?'#10b981':diffPeso>0?'#6366f1':'#9B9B9B' }}>
+                  {diffPeso>0?'+':''}{diffPeso} kg
+                </p>
+              )}
+            </div>
+            <div className="text-right">
+              {!ciUrgente&&<span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-1 rounded-full block">✓ Al día</span>}
+              <p className="text-[10px] text-[#9B9B9B] mt-1">{pesos[pesos.length-1].peso} kg ahora</p>
+            </div>
           </div>
-          <div className="flex items-end gap-1 h-14">
+          <div className="flex items-end gap-1.5 h-16 mt-3">
             {pesos.slice(-10).map((c,i,arr)=>{
               const min=Math.min(...arr.map(x=>x.peso)),max=Math.max(...arr.map(x=>x.peso))
-              const h=max===min?55:Math.max(18,((c.peso-min)/(max-min))*75+25)
-              return <div key={i} className="flex-1 rounded-md" style={{ height:`${h}%`, background:i===arr.length-1?color:`${color}25`, minHeight:5 }} />
+              const h=max===min?60:Math.max(20,((c.peso-min)/(max-min))*70+30)
+              const isLast=i===arr.length-1
+              return (
+                <div key={i} className="flex-1 rounded-lg transition-all"
+                  style={{ height:`${h}%`, background:isLast?color:`${color}20`, minHeight:6,
+                    boxShadow: isLast?`0 2px 8px ${color}40`:undefined }} />
+              )
             })}
           </div>
           <div className="flex justify-between mt-2">
-            <span className="text-[10px] text-[#C0C0C0]">{pesos[0].peso} kg</span>
-            <span className="text-[10px] font-bold" style={{ color }}>{pesos[pesos.length-1].peso} kg hoy</span>
+            <span className="text-[10px] text-[#C0C0C0] font-medium">{pesos[0].peso} kg</span>
+            <span className="text-[10px] font-bold" style={{ color }}>{pesos[pesos.length-1].peso} kg</span>
           </div>
         </button>
       )}
@@ -680,32 +711,47 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
       {/* Accesos rápidos */}
       <div className="grid grid-cols-2 gap-2">
         {verRutina&&(
-          <button onClick={() => setTab('entrena')} className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background:`${color}12` }}><span className="text-xl">💪</span></div>
-            <p className="text-xs font-bold text-[#0A0A0A] leading-tight">{rutina?rutina.nombre:'Rutina'}</p>
-            <p className="text-[10px] text-[#9B9B9B] mt-1">{rutina?`${diasRutina.length} días`:'En preparación'}</p>
+          <button onClick={() => setTab('entrena')}
+            className="bg-white rounded-2xl p-4 text-left active:scale-95 transition-all shadow-sm hover:shadow-md">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3"
+              style={{ background:`linear-gradient(135deg, ${color}20, ${color}10)` }}>
+              <span className="text-2xl">💪</span>
+            </div>
+            <p className="text-sm font-bold text-[#0A0A0A] leading-tight">{rutina?rutina.nombre:'Rutina'}</p>
+            <p className="text-[10px] text-[#9B9B9B] mt-1 font-medium">{rutina?`${diasRutina.length} días`:'En preparación'}</p>
           </button>
         )}
         {verNutricion&&(
-          <button onClick={() => setTab('nutricion')} className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background:'#10b98112' }}><span className="text-xl">🥗</span></div>
-            <p className="text-xs font-bold text-[#0A0A0A] leading-tight">{nutricion?nutricion.nombre:'Nutrición'}</p>
-            <p className="text-[10px] text-[#9B9B9B] mt-1">{nutricion?.calorias_dia?`${nutricion.calorias_dia} kcal/día`:cuest?'En preparación':'Pendiente'}</p>
+          <button onClick={() => setTab('nutricion')}
+            className="bg-white rounded-2xl p-4 text-left active:scale-95 transition-all shadow-sm hover:shadow-md">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3"
+              style={{ background:'linear-gradient(135deg, #10b98120, #10b98110)' }}>
+              <span className="text-2xl">🥗</span>
+            </div>
+            <p className="text-sm font-bold text-[#0A0A0A] leading-tight">{nutricion?nutricion.nombre:'Nutrición'}</p>
+            <p className="text-[10px] text-[#9B9B9B] mt-1 font-medium">{nutricion?.calorias_dia?`${nutricion.calorias_dia} kcal/día`:cuest?'En preparación':'Pendiente'}</p>
           </button>
         )}
         <button onClick={() => setModalCI(true)}
-          className="border border-black/5 rounded-2xl p-4 text-left active:scale-95"
-          style={{ background:ciUrgente?`${color}08`:'white', borderColor:ciUrgente?color:undefined }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background:ciUrgente?`${color}15`:'#F2F1EE' }}><span className="text-xl">📋</span></div>
-          <p className="text-xs font-bold text-[#0A0A0A]">Check-in semanal</p>
-          <p className="text-[10px] mt-1" style={{ color:ciUrgente?color:'#9B9B9B' }}>
-            {ciUrgente?diasSinCI>900?'¡Primero!': `${diasSinCI}d sin registrar`:checkins.length?`Hace ${diasSinCI===0?'hoy':diasSinCI+'d'}`:'Cuéntame cómo estás'}
+          className="rounded-2xl p-4 text-left active:scale-95 transition-all shadow-sm"
+          style={{ background:ciUrgente?`${color}08`:'white', border: ciUrgente?`1.5px solid ${color}30`:undefined }}>
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3"
+            style={{ background:ciUrgente?`linear-gradient(135deg, ${color}25, ${color}15)`:'linear-gradient(135deg, #F2F1EE, #E8E7E4)' }}>
+            <span className="text-2xl">📋</span>
+          </div>
+          <p className="text-sm font-bold text-[#0A0A0A]">Check-in</p>
+          <p className="text-[10px] mt-1 font-medium" style={{ color:ciUrgente?color:'#9B9B9B' }}>
+            {ciUrgente?diasSinCI>900?'¡Primero!': `${diasSinCI}d pendiente`:checkins.length?`Hace ${diasSinCI===0?'hoy':diasSinCI+'d'}`:'Esta semana'}
           </p>
         </button>
-        <button onClick={() => setModalActividad(true)} className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background:'#6366f112' }}><span className="text-xl">🏃</span></div>
-          <p className="text-xs font-bold text-[#0A0A0A]">Actividad libre</p>
-          <p className="text-[10px] text-[#9B9B9B] mt-1">Footing, fútbol, natación…</p>
+        <button onClick={() => setModalActividad(true)}
+          className="bg-white rounded-2xl p-4 text-left active:scale-95 transition-all shadow-sm">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3"
+            style={{ background:'linear-gradient(135deg, #6366f120, #6366f110)' }}>
+            <span className="text-2xl">🏃</span>
+          </div>
+          <p className="text-sm font-bold text-[#0A0A0A]">Actividad libre</p>
+          <p className="text-[10px] text-[#9B9B9B] mt-1 font-medium">Footing, fútbol…</p>
         </button>
       </div>
     </div>
