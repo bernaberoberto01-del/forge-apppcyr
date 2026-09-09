@@ -688,52 +688,126 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
 
 
 function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline }) {
+  const [diaAbierto, setDiaAbierto] = useState(null) // null = todos cerrados
+
   if (!rutina) return (
     <div className="text-center py-16">
-      <div className="text-4xl mb-3">💪</div>
-      <p className="text-sm font-bold text-[#0A0A0A]">Rutina en preparación</p>
-      <p className="text-xs text-[#9B9B9B] mt-1 leading-relaxed max-w-xs mx-auto">Tu entrenador está diseñando tu plan de entrenamiento personalizado.</p>
+      <div className="text-5xl mb-4">💪</div>
+      <p className="text-lg font-bold text-[#0A0A0A]">Rutina en preparación</p>
+      <p className="text-sm text-[#9B9B9B] mt-2 leading-relaxed max-w-xs mx-auto">Tu entrenador está diseñando tu plan personalizado.</p>
     </div>
   )
+
   const dias = rutina.borrador?.dias || rutina.contenido?.dias || []
+
+  // Índice de último peso por ejercicio (primera entrada = más reciente por el order desc)
+  const histPorEj = {}
+  for (const reg of ejerciciosHist || []) {
+    const nombre = reg.ejercicio_nombre
+    if (histPorEj[nombre]) continue // solo el más reciente
+    const sets = (reg.sets || []).filter(s => s.peso && !isNaN(+s.peso))
+    if (!sets.length) continue
+    const maxPeso = Math.max(...sets.map(s => +s.peso))
+    const rmMax = Math.max(...sets.map(s => rmEpley(+s.peso, +s.reps || 1)))
+    histPorEj[nombre] = { maxPeso, rmMax: +rmMax.toFixed(1), fecha: reg.sesiones?.fecha, sets }
+  }
+
   return (
     <div className="space-y-3">
-      <div className="pb-1">
-        <h2 className="text-xl font-bold text-[#0A0A0A]">{rutina.nombre}</h2>
-        <p className="text-xs text-[#9B9B9B] mt-0.5">{dias.length} días · {rutina.semanas || 4} semanas</p>
-      </div>
-      {dias.map((dia, di) => (
-        <div key={di} className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-          <div className="px-4 py-3 border-b border-black/5 flex items-center gap-2" style={{ background: `${color}08` }}>
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0" style={{ background: color }}>
-              {di + 1}
-            </div>
-            <p className="font-bold text-[#0A0A0A] text-sm">{dia.nombre || dia.dia || `Día ${di + 1}`}</p>
-            <span className="ml-auto text-xs text-[#9B9B9B]">{(dia.ejercicios || []).length} ejercicios</span>
-          </div>
-          <div className="divide-y divide-black/4">
-            {(dia.ejercicios || []).map((ej, ei) => (
-              <div key={ei} className="px-4 py-3">
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#0A0A0A]">{ej.nombre}</p>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                      {ej.series && <span className="text-xs text-[#9B9B9B]">{ej.series} series</span>}
-                      {ej.reps && <span className="text-xs text-[#9B9B9B]">· {ej.reps} reps</span>}
-                      {ej.peso && <span className="text-xs text-[#9B9B9B]">· {ej.peso}</span>}
-                      {ej.descanso && ej.descanso !== '-' && <span className="text-xs text-[#9B9B9B]">· 💤 {ej.descanso}</span>}
-                    </div>
-                  </div>
-                  {ej.patron && (
-                    <span className="text-[9px] bg-[#F7F6F3] text-[#9B9B9B] px-1.5 py-0.5 rounded-md font-medium mt-0.5 flex-shrink-0">{ej.patron}</span>
-                  )}
-                </div>
-                {ej.notas && <p className="text-xs text-[#9B9B9B] mt-1.5 italic border-l-2 pl-2" style={{ borderColor: `${color}40` }}>{ej.notas}</p>}
-              </div>
-            ))}
-          </div>
+      <div className="pb-1 flex items-end justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">{rutina.nombre}</h2>
+          <p className="text-xs text-[#9B9B9B] mt-0.5">{dias.length} días · {rutina.semanas || 4} semanas</p>
         </div>
-      ))}
+        {diaAbierto !== null && (
+          <button onClick={() => setDiaAbierto(null)}
+            className="text-xs text-[#9B9B9B] active:scale-95">Cerrar todo</button>
+        )}
+      </div>
+
+      {dias.map((dia, di) => {
+        const abierto = diaAbierto === di
+        const ejercicios = dia.ejercicios || []
+        const conHistorico = ejercicios.filter(ej => histPorEj[ej.nombre]).length
+
+        return (
+          <div key={di} className="bg-white rounded-2xl border border-black/5 overflow-hidden">
+            {/* Header del día — siempre visible, clickable */}
+            <button
+              className="w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors active:bg-black/2"
+              onClick={() => setDiaAbierto(abierto ? null : di)}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                style={{ background: color }}>{di + 1}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-[#0A0A0A] truncate">{dia.nombre || `Día ${di + 1}`}</p>
+                <p className="text-[10px] text-[#9B9B9B] mt-0.5">
+                  {ejercicios.length} ejercicios
+                  {conHistorico > 0 && <span style={{ color }}> · {conHistorico} con historial</span>}
+                </p>
+              </div>
+              <span className="text-[#C0C0C0] text-sm transition-transform duration-200 flex-shrink-0"
+                style={{ transform: abierto ? 'rotate(180deg)' : 'none' }}>▾</span>
+            </button>
+
+            {/* Contenido colapsable */}
+            {abierto && (
+              <>
+                <div className="divide-y divide-black/4 border-t border-black/5">
+                  {ejercicios.map((ej, ei) => {
+                    const hist = histPorEj[ej.nombre]
+                    return (
+                      <div key={ei} className="px-4 py-3.5">
+                        <div className="flex items-start gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0A0A0A]">{ej.nombre}</p>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
+                              {ej.series && <span className="text-xs text-[#9B9B9B]">{ej.series} series</span>}
+                              {ej.reps && <span className="text-xs text-[#9B9B9B]">· {ej.reps} reps</span>}
+                              {ej.peso && <span className="text-xs text-[#9B9B9B]">· {ej.peso}</span>}
+                              {ej.descanso && ej.descanso !== '-' && (
+                                <span className="text-xs text-[#9B9B9B]">· 💤 {ej.descanso}</span>
+                              )}
+                            </div>
+                            {ej.notas && (
+                              <p className="text-[10px] text-[#9B9B9B] mt-1.5 italic leading-relaxed border-l-2 pl-2"
+                                style={{ borderColor: `${color}40` }}>{ej.notas}</p>
+                            )}
+                          </div>
+                          {/* Histórico de cargas */}
+                          {hist ? (
+                            <div className="text-right flex-shrink-0 ml-1">
+                              <p className="text-base font-bold tracking-tight" style={{ color }}>{hist.maxPeso}<span className="text-[10px] font-normal text-[#9B9B9B] ml-0.5">kg</span></p>
+                              {hist.rmMax > hist.maxPeso && (
+                                <p className="text-[9px] text-[#9B9B9B]">RM ~{hist.rmMax}kg</p>
+                              )}
+                              <p className="text-[9px] text-[#C0C0C0]">última vez</p>
+                            </div>
+                          ) : (
+                            ej.patron && (
+                              <span className="text-[9px] bg-[#F2F1EE] text-[#9B9B9B] px-1.5 py-0.5 rounded-md font-medium mt-0.5 flex-shrink-0">{ej.patron}</span>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Botón registrar (solo online) */}
+                {esOnline && (
+                  <div className="px-4 py-3 border-t border-black/5" style={{ background: `${color}04` }}>
+                    <button onClick={() => setModalRegistro(dia)}
+                      className="w-full py-3 rounded-xl text-sm font-bold text-white active:scale-95 transition-all"
+                      style={{ background: color }}>
+                      ✓ Registrar esta sesión
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
