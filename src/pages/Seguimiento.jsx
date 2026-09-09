@@ -40,7 +40,7 @@ export default function Seguimiento({ session }) {
   const navigate = useNavigate()
   const [analisisExpandido, setAnalisisExpandido] = useState(null)
   const { completar, completado } = useOnboarding(uid)
-  const [tabPrincipal, setTabPrincipal] = useState('checkins') // checkins | sesiones | mensual
+  const [tabPrincipal, setTabPrincipal] = useState('semana') // semana | checkins | sesiones | mensual
   const [lanzandoMensual, setLanzandoMensual] = useState(false)
   const [borradores, setBorradores] = useState([])
   const [analisisMensual, setAnalisisMensual] = useState([])
@@ -205,20 +205,111 @@ export default function Seguimiento({ session }) {
 
       {/* Tabs principales */}
       <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-4">
+        <button onClick={() => setTabPrincipal('semana')}
+          className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${tabPrincipal==='semana'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
+          📊 Semana
+        </button>
         <button onClick={() => setTabPrincipal('checkins')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${tabPrincipal==='checkins'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
-          📋 Check-ins ({checkins.length})
+          📋 Check-ins
         </button>
         <button onClick={() => setTabPrincipal('sesiones')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${tabPrincipal==='sesiones'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
-          🏋️ Sesiones ({sesiones.length})
+          🏋️ Sesiones
         </button>
         <button onClick={() => setTabPrincipal('mensual')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all relative ${tabPrincipal==='mensual'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
-          🔄 Mensual
+          🔄 IA
           {borradores.length > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-[#FF5C00] text-white rounded-full text-[9px] font-bold flex items-center justify-center">{borradores.length}</span>}
         </button>
       </div>
+
+      {tabPrincipal === 'semana' && (() => {
+        const hoy = new Date()
+        const lunesEsta = new Date(hoy); lunesEsta.setDate(hoy.getDate() - (hoy.getDay()||7) + 1)
+        const lunesStr = lunesEsta.toISOString().split('T')[0]
+        const hace7 = new Date(hoy.getTime() - 7*864e5).toISOString().split('T')[0]
+
+        // Estado de cada cliente esta semana
+        const estadoClientes = clientes.map(c => {
+          const sessSem = sesiones.filter(s => s.cliente_id === c.id && s.fecha >= lunesStr && !s.cancelada)
+          const sesCompletadas = sessSem.filter(s => s.completada)
+          const sesValorTodas = sesCompletadas.every(s => s.rpe)
+          const sinValorar = sesCompletadas.filter(s => !s.rpe).length
+          const ciSem = checkins.filter(ci => ci.cliente_id === c.id && ci.fecha >= lunesStr)
+          const ciUltimo = checkins.filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha.localeCompare(a.fecha))[0]
+          const diasSinCI = ciUltimo ? Math.floor((Date.now() - new Date(ciUltimo.fecha).getTime()) / 864e5) : 999
+          const rpePromedio = sesCompletadas.filter(s=>s.rpe).length
+            ? (sesCompletadas.filter(s=>s.rpe).reduce((sum,s) => sum+s.rpe, 0) / sesCompletadas.filter(s=>s.rpe).length).toFixed(1)
+            : null
+          const fatigaMax = sesCompletadas.reduce((max,s) => s.fatiga_post > max ? s.fatiga_post : max, 0) || null
+
+          // Nivel de alerta
+          let alerta = 'ok' // ok | warning | critical
+          if (diasSinCI >= 14 || (sesCompletadas.length > 0 && sinValorar > 0 && sesCompletadas.length === sinValorar)) alerta = 'critical'
+          else if (diasSinCI >= 7 || sinValorar > 0) alerta = 'warning'
+
+          return { ...c, sessSem, sesCompletadas, sinValorar, ciSem, ciUltimo, diasSinCI, rpePromedio, fatigaMax, alerta }
+        }).sort((a,b) => {
+          const orden = { critical: 0, warning: 1, ok: 2 }
+          return orden[a.alerta] - orden[b.alerta]
+        })
+
+        const criticos = estadoClientes.filter(c => c.alerta === 'critical')
+        const warnings = estadoClientes.filter(c => c.alerta === 'warning')
+        const okClientes = estadoClientes.filter(c => c.alerta === 'ok')
+
+        return (
+          <div className="space-y-4">
+            {/* Resumen rápido */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Sin check-in', val: estadoClientes.filter(c=>c.diasSinCI>=7).length, color: '#ef4444', icon: '⏰' },
+                { label: 'Sin valorar', val: estadoClientes.reduce((sum,c)=>sum+c.sinValorar,0), color: '#f59e0b', icon: '⭐' },
+                { label: 'Al día', val: okClientes.length, color: '#10b981', icon: '✓' },
+              ].map(k => (
+                <div key={k.label} className="bg-white rounded-2xl border border-black/5 p-3 text-center">
+                  <p className="text-2xl font-bold" style={{ color: k.color }}>{k.icon} {k.val}</p>
+                  <p className="text-[10px] text-[#9B9B9B] mt-0.5">{k.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Críticos */}
+            {criticos.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-red-600 mb-2 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse" />
+                  Requieren atención ({criticos.length})
+                </p>
+                <div className="space-y-2">
+                  {criticos.map(c => <TarjetaClienteSemana key={c.id} c={c} color="#ef4444" onVerCheckins={() => { setTabPrincipal('checkins'); setFiltroCliente(c.id) }} onVerSesiones={() => setTabPrincipal('sesiones')} />)}
+                </div>
+              </div>
+            )}
+
+            {/* Warnings */}
+            {warnings.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-amber-600 mb-2">⚠️ Pendiente ({warnings.length})</p>
+                <div className="space-y-2">
+                  {warnings.map(c => <TarjetaClienteSemana key={c.id} c={c} color="#f59e0b" onVerCheckins={() => { setTabPrincipal('checkins'); setFiltroCliente(c.id) }} onVerSesiones={() => setTabPrincipal('sesiones')} />)}
+                </div>
+              </div>
+            )}
+
+            {/* OK */}
+            {okClientes.length > 0 && (
+              <div>
+                <p className="text-xs font-bold text-emerald-600 mb-2">✓ Al día ({okClientes.length})</p>
+                <div className="space-y-2">
+                  {okClientes.map(c => <TarjetaClienteSemana key={c.id} c={c} color="#10b981" onVerCheckins={() => { setTabPrincipal('checkins'); setFiltroCliente(c.id) }} onVerSesiones={() => setTabPrincipal('sesiones')} />)}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {tabPrincipal === 'checkins' && <>
       <div className="lg:grid lg:grid-cols-3 lg:gap-5">
@@ -1013,6 +1104,87 @@ export default function Seguimiento({ session }) {
                 )
               })}
             </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Tarjeta cliente semana ────────────────────────────────────────────────────
+function TarjetaClienteSemana({ c, color, onVerCheckins, onVerSesiones }) {
+  const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+
+  return (
+    <div className="bg-white rounded-2xl border border-black/5 p-4"
+      style={c.alerta === 'critical' ? { borderColor: '#fecaca', background: '#fff5f5' } : {}}>
+      <div className="flex items-center gap-3 mb-3">
+        {/* Avatar */}
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+          style={{ background: color }}>
+          {ini(c.nombre)}
+        </div>
+        {/* Nombre + tipo */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-[#0A0A0A] truncate">{c.nombre.trim()}</p>
+          <p className="text-[10px] text-[#9B9B9B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}</p>
+        </div>
+      </div>
+
+      {/* Indicadores de la semana */}
+      <div className="grid grid-cols-3 gap-2">
+        {/* Check-in */}
+        <div className={`rounded-xl p-2.5 text-center ${c.ciSem?.length > 0 ? 'bg-emerald-50' : c.diasSinCI >= 14 ? 'bg-red-50' : 'bg-amber-50'}`}>
+          <p className="text-sm font-bold" style={{ color: c.ciSem?.length > 0 ? '#10b981' : c.diasSinCI >= 14 ? '#ef4444' : '#f59e0b' }}>
+            {c.ciSem?.length > 0 ? '✓' : c.diasSinCI === 999 ? '—' : `${c.diasSinCI}d`}
+          </p>
+          <p className="text-[9px] text-[#9B9B9B] mt-0.5">Check-in</p>
+        </div>
+
+        {/* Sesiones */}
+        <div className={`rounded-xl p-2.5 text-center ${c.sesCompletadas.length > 0 ? 'bg-emerald-50' : 'bg-[#F7F6F3]'}`}>
+          <p className="text-sm font-bold" style={{ color: c.sesCompletadas.length > 0 ? '#10b981' : '#9B9B9B' }}>
+            {c.sesCompletadas.length > 0 ? c.sesCompletadas.length : '—'}
+          </p>
+          <p className="text-[9px] text-[#9B9B9B] mt-0.5">Sesiones</p>
+        </div>
+
+        {/* RPE / valoración */}
+        <div className={`rounded-xl p-2.5 text-center ${
+          c.sinValorar > 0 ? 'bg-amber-50' :
+          c.rpePromedio ? 'bg-emerald-50' : 'bg-[#F7F6F3]'
+        }`}>
+          <p className="text-sm font-bold" style={{
+            color: c.sinValorar > 0 ? '#f59e0b' : c.rpePromedio ? '#10b981' : '#9B9B9B'
+          }}>
+            {c.sinValorar > 0 ? `${c.sinValorar}⚠️` : c.rpePromedio ? `RPE ${c.rpePromedio}` : '—'}
+          </p>
+          <p className="text-[9px] text-[#9B9B9B] mt-0.5">Valoración</p>
+        </div>
+      </div>
+
+      {/* Fatiga si es alta */}
+      {c.fatigaMax >= 4 && (
+        <div className="mt-2 bg-red-50 rounded-xl px-3 py-2 flex items-center gap-2">
+          <span className="text-xs">⚠️</span>
+          <p className="text-xs font-medium text-red-700">Fatiga alta: {c.fatigaMax}/5 — ajusta la carga</p>
+        </div>
+      )}
+
+      {/* Acciones rápidas si hay algo pendiente */}
+      {(c.sinValorar > 0 || c.diasSinCI >= 7) && (
+        <div className="flex gap-2 mt-3">
+          {c.sinValorar > 0 && (
+            <button onClick={onVerSesiones}
+              className="flex-1 text-[10px] font-bold py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all">
+              {c.sinValorar} sin valorar →
+            </button>
+          )}
+          {c.diasSinCI >= 7 && (
+            <button onClick={onVerCheckins}
+              className="flex-1 text-[10px] font-bold py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all">
+              {c.diasSinCI === 999 ? 'Sin check-in' : `${c.diasSinCI}d sin CI`} →
+            </button>
           )}
         </div>
       )}
