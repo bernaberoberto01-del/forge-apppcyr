@@ -194,6 +194,17 @@ export default function Clientes({ session }) {
         { onConflict: 'grupo_id,cliente_id' }
       )
     }
+    // Si es cliente nuevo con email → enviar acceso automáticamente
+    if (!editId && clienteId && form.email) {
+      supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: clienteId } })
+        .then(({ data }) => {
+          if (data?.ok) showToast(`✓ ${form.nombre.split(' ')[0]} creado · Email de acceso enviado`)
+          else showToast(`✓ ${form.nombre.split(' ')[0]} creado · Envía el acceso desde su ficha`)
+        })
+        .catch(() => showToast(`✓ ${form.nombre.split(' ')[0]} creado`))
+    } else if (!editId) {
+      showToast(`✓ ${form.nombre.split(' ')[0]} creado`)
+    }
     setModal(false); setEditId(null); setForm(initForm)
     await cargar(); setLoading(false)
   }
@@ -937,6 +948,12 @@ export default function Clientes({ session }) {
                 <div className="flex-1">
                   <p className="font-bold text-[#0A0A0A]">{detalle.nombre}</p>
                   <p className="text-xs text-[#6B6B6B]">{OBJ[detalle.objetivo]?.label} · {detalle.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}</p>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {detalle.auth_user_id
+                      ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">✓ Portal activo</span>
+                      : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">⏳ Sin acceso</span>
+                    }
+                  </div>
                 </div>
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
@@ -1075,19 +1092,32 @@ export default function Clientes({ session }) {
 
                   {/* Acciones */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
-                    {detalle.email && (
+                    {/* Si no tiene acceso al portal, CTA prominente */}
+                    {!detalle.auth_user_id && detalle.email && (
                       <button onClick={async () => {
                         try {
                           const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
                           if (error) throw error
-                          if (data.ok) showToast('✓ Email de bienvenida enviado a ' + detalle.email)
-                          else showToast('Error: ' + (data.error || 'inténtalo de nuevo'), 'error')
-                        } catch(e) {
-                          showToast('Error de conexión', 'error')
-                        }
+                          if (data?.ok) {
+                            showToast('✓ Email de acceso enviado a ' + detalle.email)
+                            setDetalle(d => ({ ...d, ultimo_acceso_enviado: new Date().toISOString() }))
+                          } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
+                        } catch(e) { showToast('Error de conexión') }
+                      }} className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-[#FF5C00] hover:bg-[#E54E00] active:scale-95 transition-all">
+                        📧 Enviar acceso al portal
+                      </button>
+                    )}
+                    <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
+                    {detalle.email && detalle.auth_user_id && (
+                      <button onClick={async () => {
+                        try {
+                          const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
+                          if (error) throw error
+                          if (data?.ok) showToast('✓ Email de acceso reenviado a ' + detalle.email)
+                          else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
+                        } catch(e) { showToast('Error de conexión') }
                       }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">
-                        📧 Bienvenida
+                        📧 Reenviar acceso
                       </button>
                     )}
                     <button onClick={() => {
