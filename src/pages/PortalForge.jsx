@@ -1,49 +1,58 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
-// ─── helpers ────────────────────────────────────────────────────────────────
+// ─── helpers ─────────────────────────────────────────────────────────────────
 const qa = p => p.then(r => r.data || []).catch(() => [])
 const q1 = p => p.then(r => r.data?.[0] || r.data || null).catch(() => null)
 const hoyStr = () => new Date().toISOString().split('T')[0]
-const hace = days => new Date(Date.now() - days * 864e5).toISOString().split('T')[0]
+const hace = d => new Date(Date.now() - d * 864e5).toISOString().split('T')[0]
+const rmEpley = (peso, reps) => reps <= 1 ? peso : +(peso * (1 + reps / 30)).toFixed(1)
 
-// ─── Portal principal ────────────────────────────────────────────────────────
+// ─── Portal principal ─────────────────────────────────────────────────────────
 export default function PortalForge() {
   const [sesion, setSesion] = useState(undefined)
   const [cliente, setCliente] = useState(null)
-  const [datos, setDatos] = useState(null) // todos los datos de una vez
+  const [datos, setDatos] = useState(null)
   const [cargando, setCargando] = useState(true)
   const [sinCuenta, setSinCuenta] = useState(false)
-  const [tab, setTab] = useState('inicio')
+  const [tab, setTab] = useState('hoy')
   const [subTab, setSubTab] = useState('peso')
   const [config, setConfig] = useState(null)
 
-  // modales
+  // Modales
   const [modalCI, setModalCI] = useState(false)
-  const [modalActividad, setModalActividad] = useState(false)
-  const [actForm, setActForm] = useState({ tipo: '', duracion: '', rpe: null, nota: '' })
-  const [guardandoAct, setGuardandoAct] = useState(false)
   const [ciForm, setCiForm] = useState({ energia: null, sueno: null, fatiga: null, estres: null, peso: '', nota: '' })
   const [enviandoCI, setEnviandoCI] = useState(false)
   const [valorando, setValorando] = useState(null)
   const [rpe, setRpe] = useState(null)
-  const [fatiga, setFatiga] = useState(null)
+  const [fatigaVal, setFatigaVal] = useState(null)
   const [guardandoVal, setGuardandoVal] = useState(false)
-  const [toast, setToast] = useState('')
+  const [modalActividad, setModalActividad] = useState(false)
+  const [actForm, setActForm] = useState({ tipo: '', duracion: '', rpe: null, nota: '' })
+  const [guardandoAct, setGuardandoAct] = useState(false)
+  const [modalRegistro, setModalRegistro] = useState(null)
+  const [registroSets, setRegistroSets] = useState({})
+  const [guardandoRegistro, setGuardandoRegistro] = useState(false)
   const [textoMsg, setTextoMsg] = useState('')
   const [enviandoMsg, setEnviandoMsg] = useState(false)
+  const [toast, setToast] = useState('')
   const mensajesEndRef = useRef(null)
 
   const color = config?.color_acento || '#FF5C00'
 
-  // ── Auth ─────────────────────────────────────────────────────────────────
+  const ACTIVIDADES = [
+    { id: 'footing', label: '🏃 Footing' }, { id: 'ciclismo', label: '🚴 Ciclismo' },
+    { id: 'natacion', label: '🏊 Natación' }, { id: 'futbol', label: '⚽ Fútbol' },
+    { id: 'padel', label: '🎾 Pádel' }, { id: 'yoga', label: '🧘 Yoga' },
+    { id: 'escalada', label: '🧗 Escalada' }, { id: 'otro', label: '💪 Otro' },
+  ]
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSesion(session?.user || null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSesion(s?.user || null))
     return () => subscription.unsubscribe()
   }, [])
 
-  // ── Carga completa de datos ───────────────────────────────────────────────
   useEffect(() => {
     if (sesion === undefined) return
     if (!sesion) { setCargando(false); return }
@@ -55,18 +64,15 @@ export default function PortalForge() {
     const { data: cl, error } = await supabase.from('clientes').select('*').eq('auth_user_id', sesion.id).maybeSingle()
     if (error || !cl) { setSinCuenta(true); setCargando(false); return }
     setCliente(cl)
-
-    const cid = cl.id
-    const eid = cl.entrenador_id
-    const hoy = hoyStr()
+    const cid = cl.id, eid = cl.entrenador_id, hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
-           mensajes, pagos, marcas, medidas, fotos, cuest, sesionesEstaSemana] = await Promise.all([
-      q1(supabase.from('configuracion').select('nombre_entrenador,foto_url,nombre_negocio,color_acento').eq('entrenador_id', eid)),
+      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana] = await Promise.all([
+      q1(supabase.from('configuracion').select('*').eq('entrenador_id', eid)),
       q1(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
-      qa(supabase.from('checkins').select('*').eq('cliente_id', cid).order('fecha', { ascending: false }).limit(24)),
-      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).gte('fecha', hoy).eq('cancelada', false).order('fecha').order('hora').limit(8)),
+      qa(supabase.from('checkins').select('*').eq('cliente_id', cid).order('fecha', { ascending: false }).limit(52)),
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).gte('fecha', hoy).eq('cancelada', false).order('fecha').order('hora').limit(10)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('fecha', hoy).eq('cancelada', false)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('completada', true).eq('cancelada', false).is('rpe', null).gte('fecha', hace(14)).lte('fecha', hoy).order('fecha', { ascending: false }).limit(3)),
       qa(supabase.from('mensajes_cliente').select('*').eq('cliente_id', cid).order('created_at', { ascending: true })),
@@ -75,61 +81,84 @@ export default function PortalForge() {
       qa(supabase.from('medidas_cliente').select('*').eq('cliente_id', cid).order('fecha', { ascending: false })),
       qa(supabase.from('fotos_progreso').select('*').eq('cliente_id', cid).eq('visible_cliente', true).order('fecha', { ascending: false })),
       supabase.from('cuestionarios_nutricion').select('id').eq('cliente_id', cid).limit(1).then(r => !!(r.data?.length)).catch(() => false),
-      // Sesiones completadas esta semana (para clientes online que las registran ellos)
-      // Sesiones de esta semana para online (lunes a domingo actual)
-      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(7)).lte('fecha', new Date(Date.now() + 7*864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
+      qa(supabase.from('sesion_ejercicios').select('ejercicio_nombre,sets,sesiones(fecha)').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(500)),
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(7)).lte('fecha', new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
     ])
 
     setConfig(cfg)
-    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, sesionesEstaSemana })
-
-    // Marcar mensajes como leídos
+    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana })
     supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
-
-    // Registrar acceso
     setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
-
     setCargando(false)
   }
 
-  // ── Enviar check-in ──────────────────────────────────────────────────────
   async function enviarCheckin() {
     if (!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres) return
     setEnviandoCI(true)
-    const hoy = hoyStr()
     const { error } = await supabase.from('checkins').insert({
-      cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoy,
+      cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
       energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
-      peso: ciForm.peso ? parseFloat(ciForm.peso) : null, comentario: ciForm.nota || null, adherencia_entreno: 5
+      peso: ciForm.peso ? parseFloat(ciForm.peso) : null, comentario: ciForm.nota || null, adherencia_entreno: 5,
     })
     if (!error) {
-      const nuevo = { id: Date.now() + '', fecha: hoy, ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null }
-      setDatos(d => ({ ...d, checkins: [nuevo, ...d.checkins] }))
-      setModalCI(false)
-      setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, peso: '', nota: '' })
+      setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null }, ...d.checkins] }))
+      setModalCI(false); setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, peso: '', nota: '' })
       showToast('✓ Check-in enviado')
     }
     setEnviandoCI(false)
   }
 
-  // ── Valorar sesión ───────────────────────────────────────────────────────
   async function guardarValoracion() {
-    if (!rpe || !fatiga || !valorando) return
+    if (!rpe || !fatigaVal || !valorando) return
     setGuardandoVal(true)
-    await supabase.from('sesiones').update({ rpe, fatiga_post: fatiga }).eq('id', valorando.id)
+    await supabase.from('sesiones').update({ rpe, fatiga_post: fatigaVal }).eq('id', valorando.id)
     setDatos(d => ({ ...d, pendientes: d.pendientes.filter(s => s.id !== valorando.id) }))
-    setValorando(null); setRpe(null); setFatiga(null)
-    showToast('✓ Valoración guardada')
+    setValorando(null); setRpe(null); setFatigaVal(null)
+    showToast('✓ Sesión valorada')
     setGuardandoVal(false)
   }
 
-  // ── Enviar mensaje ───────────────────────────────────────────────────────
+  async function guardarActividad() {
+    if (!actForm.tipo || !actForm.duracion) return
+    setGuardandoAct(true)
+    const nombreAct = ACTIVIDADES.find(a => a.id === actForm.tipo)?.label?.split(' ').slice(1).join(' ') || actForm.tipo
+    await supabase.from('sesiones').insert({
+      cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
+      fecha: hoyStr(), tipo: 'libre', completada: true,
+      duracion_minutos: parseInt(actForm.duracion) || null, rpe: actForm.rpe || null,
+      notas: `${nombreAct}${actForm.nota ? ' · ' + actForm.nota : ''}`, cancelada: false,
+    })
+    setModalActividad(false); setActForm({ tipo: '', duracion: '', rpe: null, nota: '' })
+    showToast('✓ Actividad registrada')
+    setGuardandoAct(false)
+  }
+
+  async function guardarRegistroSesion() {
+    if (!modalRegistro) return
+    setGuardandoRegistro(true)
+    const { data: sesNueva } = await supabase.from('sesiones').insert({
+      cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
+      fecha: hoyStr(), tipo: 'online', completada: true, cancelada: false, notas: modalRegistro.nombre,
+    }).select().single()
+    if (sesNueva) {
+      const rows = (modalRegistro.ejercicios || []).map((ej, i) => ({
+        sesion_id: sesNueva.id, cliente_id: cliente.id,
+        ejercicio_nombre: ej.nombre, patron: ej.patron || null, orden: i,
+        sets: (registroSets[i] || []).filter(s => s.peso || s.reps),
+      })).filter(r => r.sets.length > 0)
+      if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
+    }
+    setModalRegistro(null); setRegistroSets({})
+    showToast('✓ Sesión registrada')
+    setGuardandoRegistro(false)
+    cargarTodo()
+  }
+
   async function enviarMensaje(e) {
     e.preventDefault()
     if (!textoMsg.trim() || enviandoMsg) return
     setEnviandoMsg(true)
-    const texto = textoMsg.trim()
-    setTextoMsg('')
+    const texto = textoMsg.trim(); setTextoMsg('')
     await supabase.functions.invoke('portal-accion', { body: { accion: 'enviar_mensaje', datos: { contenido: texto } } }).catch(() => {})
     const msgs = await qa(supabase.from('mensajes_cliente').select('*').eq('cliente_id', cliente.id).order('created_at', { ascending: true }))
     setDatos(d => ({ ...d, mensajes: msgs }))
@@ -137,71 +166,37 @@ export default function PortalForge() {
     setTimeout(() => mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
   }
 
-  const ACTIVIDADES_LIBRES = [
-    { id: 'footing', label: '🏃 Footing / Caminar' },
-    { id: 'ciclismo', label: '🚴 Ciclismo' },
-    { id: 'natacion', label: '🏊 Natación' },
-    { id: 'futbol', label: '⚽ Fútbol' },
-    { id: 'padel', label: '🎾 Pádel / Tenis' },
-    { id: 'basketball', label: '🏀 Baloncesto' },
-    { id: 'yoga', label: '🧘 Yoga / Pilates' },
-    { id: 'otro', label: '💪 Otro' },
-  ]
-
-  async function guardarActividad() {
-    if (!actForm.tipo || !actForm.duracion) return
-    setGuardandoAct(true)
-    const hoy = hoyStr()
-    const nombreAct = ACTIVIDADES_LIBRES.find(a => a.id === actForm.tipo)?.label?.split(' ').slice(1).join(' ') || actForm.tipo
-    const { error } = await supabase.from('sesiones').insert({
-      cliente_id: cliente.id,
-      entrenador_id: cliente.entrenador_id,
-      fecha: hoy, tipo: 'libre', completada: true,
-      duracion_minutos: parseInt(actForm.duracion) || null,
-      rpe: actForm.rpe || null,
-      notas: `${nombreAct}${actForm.nota ? ` · ${actForm.nota}` : ''}`,
-      cancelada: false,
-    })
-    if (!error) {
-      setModalActividad(false)
-      setActForm({ tipo: '', duracion: '', rpe: null, nota: '' })
-      showToast('✓ Actividad registrada')
-    }
-    setGuardandoAct(false)
-  }
-
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500) }
 
-  // ── Loading / guards ──────────────────────────────────────────────────────
+  // ── Guards ────────────────────────────────────────────────────────────────
   if (sesion === undefined || cargando) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#F7F6F3' }}>
-      <div className="w-8 h-8 border-[3px] border-t-transparent rounded-full animate-spin" style={{ borderColor: '#FF5C00', borderTopColor: 'transparent' }} />
+    <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0A0A' }}>
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#FF5C00' }}>
+          <svg width="24" height="24" viewBox="0 0 28 28" fill="none"><rect x="5" y="5" width="4" height="18" rx="1" fill="white"/><rect x="5" y="5" width="13" height="4" rx="1" fill="white"/><rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/></svg>
+        </div>
+        <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#FF5C00', borderTopColor: 'transparent' }} />
+      </div>
     </div>
   )
 
   if (!sesion) return <LoginPortal />
 
   if (sinCuenta || !cliente) return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F7F6F3' }}>
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
       <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
         <p className="text-5xl mb-4">🔗</p>
-        <p className="font-bold text-xl mb-2 text-[#0A0A0A]">Cuenta no reconocida</p>
-        <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">El email con el que has entrado no está vinculado a ningún cliente. Contacta con tu entrenador.</p>
+        <p className="font-bold text-xl mb-2 text-[#0A0A0A]">Cuenta no vinculada</p>
+        <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">Este email no está asociado a ningún cliente. Contacta con tu entrenador.</p>
         <button onClick={() => supabase.auth.signOut().then(() => window.location.reload())}
-          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: '#FF5C00' }}>
-          Probar con otro email
-        </button>
+          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: color }}>Probar con otro email</button>
       </div>
     </div>
   )
 
-  if (!datos) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#F7F6F3' }}>
-      <div className="w-8 h-8 border-[3px] border-t-transparent rounded-full animate-spin" style={{ borderColor: color, borderTopColor: 'transparent' }} />
-    </div>
-  )
+  if (!datos) return <div className="min-h-screen" style={{ background: '#F2F1EE' }} />
 
-  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, sesionesEstaSemana } = datos
+  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana } = datos
   const esOnline = cliente.tipo === 'online'
   const plan = cliente.plan_online
   const verRutina = !esOnline || ['entrenamiento', 'completo'].includes(plan)
@@ -210,356 +205,168 @@ export default function PortalForge() {
   const iniciales = cliente.nombre?.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || '?'
   const msgNoLeidos = mensajes.filter(m => !m.leido && m.tipo === 'entrenador').length
 
+  // Racha de semanas activas
+  const semanasActivas = (() => {
+    if (!checkins.length && !(sesionesEstaSemana || []).length) return 0
+    let streak = 0
+    const ahora = new Date()
+    for (let i = 0; i < 20; i++) {
+      const lunesW = new Date(ahora); lunesW.setDate(ahora.getDate() - (ahora.getDay() || 7) + 1 - i * 7)
+      const domW = new Date(lunesW); domW.setDate(lunesW.getDate() + 6)
+      const ok = checkins.some(c => { const f = new Date(c.fecha); return f >= lunesW && f <= domW })
+        || (sesionesEstaSemana || []).some(s => { const f = new Date(s.fecha); return f >= lunesW && f <= domW && s.completada })
+      if (ok) streak++
+      else if (i > 0) break
+    }
+    return streak
+  })()
+
   const TABS = [
-    { id: 'inicio', label: 'Inicio', icon: '⊞' },
-    ...(verRutina && rutina ? [{ id: 'rutina', label: 'Rutina', icon: '💪' }] : []),
-    ...(verNutricion && (nutricion || cuest) ? [{ id: 'nutricion', label: 'Nutrición', icon: '🥗' }] : []),
+    { id: 'hoy', label: 'Hoy', icon: '⊞' },
+    ...(verRutina ? [{ id: 'entrena', label: 'Entrena', icon: '💪' }] : []),
+    ...(verNutricion ? [{ id: 'nutricion', label: 'Nutrición', icon: '🥗' }] : []),
     { id: 'progreso', label: 'Progreso', icon: '📈' },
     { id: 'mensajes', label: 'Mensajes', icon: '✉️', badge: msgNoLeidos },
-    ...(pagos.length ? [{ id: 'pagos', label: 'Pagos', icon: '💳' }] : []),
-    { id: 'ajustes', label: 'Ajustes', icon: '⚙️' },
+    { id: 'mas', label: 'Más', icon: '⚙️' },
   ]
 
-  const TABS_BOTTOM = TABS.slice(0, 5)
-
   return (
-    <div className="min-h-screen flex" style={{ background: '#F7F6F3', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
+    <div className="min-h-screen flex" style={{ background: '#F2F1EE', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif' }}>
 
-      {/* ── Sidebar desktop ── */}
-      <aside className="hidden md:flex flex-col w-60 bg-white border-r border-black/6 fixed h-full z-20">
-        <div className="px-5 py-5 border-b border-black/5">
+      {/* Sidebar desktop */}
+      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-black/6 fixed h-full z-20">
+        <div className="px-5 py-6 border-b border-black/5">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: color }}>
+              <svg width="18" height="18" viewBox="0 0 28 28" fill="none"><rect x="5" y="5" width="4" height="18" rx="1" fill="white"/><rect x="5" y="5" width="13" height="4" rx="1" fill="white"/><rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/></svg>
+            </div>
+            <div><p className="text-xs font-bold text-[#0A0A0A]">Forge</p><p className="text-[10px] text-[#9B9B9B]">Tu portal</p></div>
+          </div>
           <div className="flex items-center gap-3">
             {config?.foto_url
-              ? <img src={config.foto_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
-              : <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-                  style={{ background: color }}>
-                  {(config?.nombre_entrenador || 'E').slice(0, 2).toUpperCase()}
-                </div>
+              ? <img src={config.foto_url} alt="" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
+              : <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: `${color}15`, color }}>{(config?.nombre_entrenador || 'E').slice(0,2).toUpperCase()}</div>
             }
             <div className="min-w-0">
-              <p className="text-xs font-bold text-[#0A0A0A] truncate">{config?.nombre_entrenador || 'Tu entrenador'}</p>
-              <p className="text-[10px] text-[#9B9B9B] truncate">{config?.nombre_negocio || ''}</p>
+              <p className="text-sm font-semibold text-[#0A0A0A] truncate">{nombre}</p>
+              <p className="text-[10px] text-[#9B9B9B] truncate">con {config?.nombre_entrenador || 'tu entrenador'}</p>
             </div>
           </div>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all relative ${tab === t.id ? 'text-white' : 'text-[#6B6B6B] hover:bg-[#F7F6F3] hover:text-[#0A0A0A]'}`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'text-white' : 'text-[#6B6B6B] hover:bg-[#F2F1EE] hover:text-[#0A0A0A]'}`}
               style={tab === t.id ? { background: color } : {}}>
-              <span className="text-base">{t.icon}</span>
-              <span>{t.label}</span>
-              {t.badge > 0 && (
-                <span className="ml-auto w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center"
-                  style={{ background: tab === t.id ? 'rgba(255,255,255,0.3)' : color, color: 'white' }}>
-                  {t.badge}
-                </span>
-              )}
+              <span>{t.icon}</span><span>{t.label}</span>
+              {t.badge > 0 && <span className="ml-auto w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: tab === t.id ? 'rgba(255,255,255,0.3)' : color, color: 'white' }}>{t.badge}</span>}
             </button>
           ))}
         </nav>
-        <div className="px-3 py-4 border-t border-black/5">
-          <button onClick={() => supabase.auth.signOut()}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#9B9B9B] hover:text-[#0A0A0A] hover:bg-[#F7F6F3] transition-all">
+        {semanasActivas > 0 && (
+          <div className="px-5 py-4 border-t border-black/5 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15` }}><span>🔥</span></div>
+            <div><p className="text-xs font-bold text-[#0A0A0A]">{semanasActivas} sem. seguidas</p><p className="text-[10px] text-[#9B9B9B]">Racha activa</p></div>
+          </div>
+        )}
+        <div className="px-3 pb-4">
+          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[#9B9B9B] hover:bg-[#F2F1EE] transition-all">
             <span>↩</span><span>Cerrar sesión</span>
           </button>
         </div>
       </aside>
 
-      {/* ── Contenido ── */}
-      <main className="flex-1 md:ml-60 flex flex-col min-h-screen">
-
+      {/* Main */}
+      <main className="flex-1 md:ml-64 flex flex-col min-h-screen">
         {/* Header móvil */}
-        <div className="md:hidden sticky top-0 z-20 bg-white/90 backdrop-blur-sm border-b border-black/5 px-4 py-3 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-            style={{ background: color }}>
-            {iniciales}
-          </div>
+        <div className="md:hidden sticky top-0 z-20 border-b border-black/5 px-4 py-3 flex items-center gap-3" style={{ background: 'rgba(242,241,238,0.93)', backdropFilter: 'blur(12px)' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: color }}>{iniciales}</div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-[#0A0A0A] truncate">{nombre}</p>
-            <p className="text-[10px] text-[#9B9B9B] truncate">{config?.nombre_negocio || config?.nombre_entrenador || ''}</p>
+            {semanasActivas > 0 && <p className="text-[10px] text-[#9B9B9B]">🔥 {semanasActivas} semanas seguidas</p>}
           </div>
-          <button onClick={() => supabase.auth.signOut()}
-            className="text-[10px] text-[#9B9B9B] px-2.5 py-1.5 rounded-lg border border-black/8 font-medium">
-            Salir
-          </button>
+          <button onClick={() => supabase.auth.signOut()} className="text-[10px] text-[#9B9B9B] px-2.5 py-1.5 rounded-lg border border-black/10">Salir</button>
         </div>
 
-        {/* Tab activo */}
-        <div className="flex-1 px-4 md:px-8 py-5 md:py-7 max-w-2xl w-full mx-auto pb-28 md:pb-10">
-          {tab === 'inicio' && (
-            <TabInicio cliente={cliente} color={color} config={config} checkins={checkins}
-              rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy}
-              pendientes={pendientes} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion}
-              setTab={setTab} setModalCI={setModalCI} setValorando={setValorando}
-              sesionesEstaSemana={sesionesEstaSemana} />
-          )}
-          {tab === 'rutina' && <TabRutina rutina={rutina} color={color} />}
+        {/* Contenido */}
+        <div className="flex-1 px-4 md:px-8 py-5 max-w-2xl w-full mx-auto pb-28 md:pb-10">
+          {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={setModalActividad} setModalRegistro={setModalRegistro} ejerciciosHist={ejerciciosHist} />}
+          {tab === 'entrena' && <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={setModalRegistro} esOnline={esOnline} />}
           {tab === 'nutricion' && <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} />}
-          {tab === 'progreso' && (
-            <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos}
-              color={color} subTab={subTab} setSubTab={setSubTab} />
-          )}
-          {tab === 'mensajes' && (
-            <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg}
-              enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />
-          )}
-          {tab === 'pagos' && <TabPagos pagos={pagos} color={color} />}
-          {tab === 'ajustes' && <TabAjustes cliente={cliente} setCliente={setCliente} color={color} />}
+          {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} />}
+          {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />}
+          {tab === 'mas' && <TabMas pagos={pagos} cliente={cliente} setCliente={setCliente} color={color} />}
         </div>
 
-        {/* Bottom bar móvil */}
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-black/6 z-20"
-          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}>
+        {/* Bottom bar */}
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-black/6 z-20" style={{ paddingBottom: 'max(env(safe-area-inset-bottom),8px)' }}>
           <div className="flex">
-            {TABS_BOTTOM.map(t => (
+            {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
-                className="flex-1 flex flex-col items-center justify-center pt-2 pb-2 min-h-[56px] relative active:scale-95 transition-transform"
+                className="flex-1 flex flex-col items-center justify-center pt-2.5 pb-2 min-h-[58px] relative active:scale-95 transition-transform"
                 style={{ color: tab === t.id ? color : '#B0B0B0' }}>
-                {tab === t.id && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[2.5px] w-8 rounded-full" style={{ background: color }} />
-                )}
-                <span className="text-[20px] leading-none mb-1">{t.icon}</span>
-                <span className="text-[9px] font-bold tracking-tight">{t.label}</span>
-                {t.badge > 0 && (
-                  <span className="absolute top-1.5 right-[18%] w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
-                    style={{ background: color }}>
-                    {t.badge}
-                  </span>
-                )}
+                {tab === t.id && <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-7 rounded-full" style={{ background: color }} />}
+                <span className="text-[19px] leading-none mb-1">{t.icon}</span>
+                <span className="text-[9px] font-bold">{t.label}</span>
+                {t.badge > 0 && <span className="absolute top-1.5 right-[16%] w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center text-white" style={{ background: color }}>{t.badge}</span>}
               </button>
             ))}
-            {TABS.length > 5 && (
-              <button onClick={() => setTab('ajustes')}
-                className="flex-1 flex flex-col items-center justify-center pt-2 pb-2 min-h-[56px] active:scale-95 transition-transform"
-                style={{ color: ['ajustes', 'pagos'].includes(tab) ? color : '#B0B0B0' }}>
-                <span className="text-[20px] leading-none mb-1">⚙️</span>
-                <span className="text-[9px] font-bold tracking-tight">Más</span>
-              </button>
-            )}
           </div>
         </nav>
 
         {/* Toast */}
-        {toast && (
-          <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-lg"
-            style={{ background: color }}>
-            {toast}
-          </div>
-        )}
+        {toast && <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl whitespace-nowrap" style={{ background: color }}>{toast}</div>}
 
         {/* Modal check-in */}
-        {modalCI && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalCI(false)}>
-            <div className="bg-white rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-              <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p>
-                  <p className="text-xs text-[#9B9B9B] mt-0.5">Cuéntame cómo ha ido la semana</p>
-                </div>
-                <button onClick={() => setModalCI(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F7F6F3] text-[#6B6B6B] text-xl font-light">×</button>
-              </div>
-              <div className="px-6 py-5 space-y-6">
-                {[
-                  { k: 'energia', icon: '⚡', label: 'Energía', max: 5, lo: 'Agotado', hi: 'Excelente' },
-                  { k: 'sueno', icon: '😴', label: 'Sueño', max: 5, lo: 'Muy mal', hi: 'Muy bien' },
-                  { k: 'fatiga', icon: '🏋️', label: 'Fatiga muscular', max: 10, lo: 'Sin fatiga', hi: 'Al límite' },
-                  { k: 'estres', icon: '🧠', label: 'Estrés', max: 10, lo: 'Sin estrés', hi: 'Al límite' },
-                ].map(({ k, icon, label, max, lo, hi }) => (
-                  <div key={k}>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span>{icon}</span>
-                      <p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
-                      {ciForm[k] && <span className="ml-auto text-sm font-bold" style={{ color }}>{ciForm[k]}/{max}</span>}
-                    </div>
-                    <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max}, 1fr)` }}>
-                      {Array.from({ length: max }, (_, i) => i + 1).map(v => {
-                        const sel = ciForm[k] === v
-                        const bg = sel ? ((k === 'fatiga' || k === 'estres') && v >= 7 ? '#ef4444' : (k === 'fatiga' || k === 'estres') && v >= 5 ? '#f59e0b' : color) : undefined
-                        return (
-                          <button key={v} onClick={() => setCiForm(f => ({ ...f, [k]: v }))}
-                            className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
-                            style={sel ? { background: bg } : {}}>
-                            {v}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <div className="flex justify-between mt-1.5 px-0.5">
-                      <span className="text-[10px] text-[#C0C0C0]">{lo}</span>
-                      <span className="text-[10px] text-[#C0C0C0]">{hi}</span>
-                    </div>
-                  </div>
-                ))}
-                <div>
-                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">⚖️ Peso <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
-                  <div className="flex items-center gap-2">
-                    <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso}
-                      onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
-                      className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00]" />
-                    <span className="text-sm text-[#9B9B9B] font-medium">kg</span>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">💬 Nota <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
-                  <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={ciForm.nota}
-                    onChange={e => setCiForm(f => ({ ...f, nota: e.target.value }))}
-                    className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
-                </div>
-                <button onClick={enviarCheckin}
-                  disabled={!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres || enviandoCI}
-                  className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
-                  style={{ background: color }}>
-                  {enviandoCI ? '⏳ Enviando...' : '✓ Enviar check-in'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {modalCI && <ModalCheckin color={color} ciForm={ciForm} setCiForm={setCiForm} enviandoCI={enviandoCI} enviarCheckin={enviarCheckin} onClose={() => setModalCI(false)} />}
 
-        {/* Modal valorar sesión */}
+        {/* Modal valorar */}
         {valorando && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setValorando(null)}>
             <div className="bg-white rounded-3xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-1">
-                <p className="font-bold text-[#0A0A0A] text-lg">¿Cómo fue tu sesión?</p>
-                <button onClick={() => setValorando(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F7F6F3] text-[#6B6B6B] text-xl">×</button>
+                <p className="font-bold text-[#0A0A0A] text-lg">¿Cómo fue la sesión?</p>
+                <button onClick={() => setValorando(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl">×</button>
               </div>
-              <p className="text-sm text-[#9B9B9B] mb-6">
-                {new Date(valorando.fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </p>
+              <p className="text-sm text-[#9B9B9B] mb-5">{new Date(valorando.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</p>
               {[
-                { label: '💪 Esfuerzo percibido (RPE)', val: rpe, set: setRpe, max: 10, lo: 'Muy suave', hi: 'Al límite' },
-                { label: '🏋️ Fatiga muscular', val: fatiga, set: setFatiga, max: 5, lo: 'Sin fatiga', hi: 'Muy alta' },
+                { label: '💪 Esfuerzo percibido (RPE)', val: rpe, set: setRpe, max: 10, lo: 'Suave', hi: 'Máximo' },
+                { label: '🏋️ Fatiga muscular', val: fatigaVal, set: setFatigaVal, max: 5, lo: 'Ninguna', hi: 'Muy alta' },
               ].map(({ label, val, set, max, lo, hi }) => (
-                <div key={label} className="mb-5">
+                <div key={label} className="mb-4">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
                     {val && <span className="text-sm font-bold" style={{ color }}>{val}/{max}</span>}
                   </div>
-                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max}, 1fr)` }}>
-                    {Array.from({ length: max }, (_, i) => i + 1).map(v => (
+                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max},1fr)` }}>
+                    {Array.from({length:max},(_,i)=>i+1).map(v => (
                       <button key={v} onClick={() => set(v)}
-                        className={`py-3 rounded-xl text-sm font-bold transition-all ${val === v ? 'text-white' : 'border border-black/10 text-[#9B9B9B]'}`}
-                        style={val === v ? { background: v >= (max * 0.7) ? '#ef4444' : v >= (max * 0.4) ? '#f59e0b' : color } : {}}>
-                        {v}
-                      </button>
+                        className={`py-3 rounded-xl text-sm font-bold transition-all ${val===v?'text-white':'border border-black/10 text-[#9B9B9B]'}`}
+                        style={val===v?{background:v>=(max*.7)?'#ef4444':v>=(max*.4)?'#f59e0b':color}:{}}>{v}</button>
                     ))}
                   </div>
-                  <div className="flex justify-between mt-1.5 px-0.5">
-                    <span className="text-[10px] text-[#C0C0C0]">{lo}</span>
-                    <span className="text-[10px] text-[#C0C0C0]">{hi}</span>
-                  </div>
+                  <div className="flex justify-between mt-1.5"><span className="text-[10px] text-[#C0C0C0]">{lo}</span><span className="text-[10px] text-[#C0C0C0]">{hi}</span></div>
                 </div>
               ))}
-              <button onClick={guardarValoracion} disabled={!rpe || !fatiga || guardandoVal}
-                className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
-                style={{ background: color }}>
-                {guardandoVal ? '⏳ Guardando...' : '✓ Guardar valoración'}
-              </button>
+              <button onClick={guardarValoracion} disabled={!rpe||!fatigaVal||guardandoVal}
+                className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
+                style={{ background: color }}>{guardandoVal?'⏳...':'✓ Guardar valoración'}</button>
             </div>
           </div>
         )}
 
-        {/* Modal actividad libre */}
-        {modalActividad && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4"
-            onClick={() => setModalActividad(false)}>
-            <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-              onClick={e => e.stopPropagation()}>
-              <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-[#0A0A0A] text-lg">Registrar actividad</p>
-                  <p className="text-xs text-[#9B9B9B] mt-0.5">Tu entrenador lo verá en tu historial</p>
-                </div>
-                <button onClick={() => setModalActividad(false)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F7F6F3] text-[#6B6B6B] text-xl">×</button>
-              </div>
-              <div className="px-6 py-5 space-y-5">
+        {/* Modal actividad */}
+        {modalActividad && <ModalActividad color={color} actForm={actForm} setActForm={setActForm} guardandoAct={guardandoAct} guardarActividad={guardarActividad} onClose={() => setModalActividad(false)} ACTIVIDADES={ACTIVIDADES} />}
 
-                {/* Tipo de actividad */}
-                <div>
-                  <p className="text-sm font-bold text-[#0A0A0A] mb-3">¿Qué has hecho?</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {ACTIVIDADES_LIBRES.map(a => (
-                      <button key={a.id} onClick={() => setActForm(f => ({ ...f, tipo: a.id }))}
-                        className={`py-2.5 px-3 rounded-xl text-xs font-medium text-left border transition-all active:scale-95 ${
-                          actForm.tipo === a.id ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B]'
-                        }`}
-                        style={actForm.tipo === a.id ? { background: color } : {}}>
-                        {a.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Duración */}
-                <div>
-                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">⏱ ¿Cuánto tiempo?</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[30, 45, 60, 90].map(min => (
-                      <button key={min} onClick={() => setActForm(f => ({ ...f, duracion: String(min) }))}
-                        className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${
-                          actForm.duracion === String(min) ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'
-                        }`}
-                        style={actForm.duracion === String(min) ? { background: color } : {}}>
-                        {min}'
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 mt-2">
-                    <input type="number" placeholder="Otro (min)" value={[30,45,60,90].includes(+actForm.duracion) ? '' : actForm.duracion}
-                      onChange={e => setActForm(f => ({ ...f, duracion: e.target.value }))}
-                      className="flex-1 border border-black/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
-                    <span className="text-sm text-[#9B9B9B]">min</span>
-                  </div>
-                </div>
-
-                {/* Intensidad */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-bold text-[#0A0A0A]">💓 Intensidad percibida</p>
-                    {actForm.rpe && <span className="text-sm font-bold" style={{ color }}>{actForm.rpe}/10</span>}
-                  </div>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {[2, 4, 6, 8, 10].map(v => (
-                      <button key={v} onClick={() => setActForm(f => ({ ...f, rpe: v }))}
-                        className={`py-3 rounded-xl text-xs font-bold transition-all active:scale-95 ${
-                          actForm.rpe === v ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'
-                        }`}
-                        style={actForm.rpe === v ? { background: v >= 8 ? '#ef4444' : v >= 6 ? '#f59e0b' : color } : {}}>
-                        {v === 2 ? 'Suave' : v === 4 ? 'Fácil' : v === 6 ? 'Moderado' : v === 8 ? 'Duro' : 'Máximo'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Nota */}
-                <div>
-                  <p className="text-sm font-bold text-[#0A0A0A] mb-2">📝 Nota <span className="font-normal text-xs text-[#9B9B9B]">(opcional)</span></p>
-                  <input type="text" placeholder="Ej: 5km en el parque, me sentí bien…"
-                    value={actForm.nota}
-                    onChange={e => setActForm(f => ({ ...f, nota: e.target.value }))}
-                    className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00]" />
-                </div>
-
-                <button onClick={guardarActividad}
-                  disabled={!actForm.tipo || !actForm.duracion || guardandoAct}
-                  className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
-                  style={{ background: color }}>
-                  {guardandoAct ? '⏳ Guardando...' : '✓ Registrar actividad'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Modal registro sesión */}
+        {modalRegistro && <ModalRegistroSesion dia={modalRegistro} color={color} registroSets={registroSets} setRegistroSets={setRegistroSets} ejerciciosHist={ejerciciosHist} guardandoRegistro={guardandoRegistro} guardarRegistroSesion={guardarRegistroSesion} onClose={() => { setModalRegistro(null); setRegistroSets({}) }} />}
 
       </main>
     </div>
   )
 }
 
-// ─── LoginPortal ─────────────────────────────────────────────────────────────
+// ─── Login ────────────────────────────────────────────────────────────────────
 function LoginPortal() {
   const [email, setEmail] = useState('')
   const [pass, setPass] = useState('')
@@ -574,7 +381,6 @@ function LoginPortal() {
     if (error) setError('Email o contraseña incorrectos')
     setLoading(false)
   }
-
   async function resetPass(e) {
     e.preventDefault(); setLoading(true); setError('')
     const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/portal` })
@@ -584,37 +390,33 @@ function LoginPortal() {
   }
 
   if (enviado) return (
-    <div className="min-h-screen bg-[#111] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4">
       <div className="w-full max-w-sm text-center">
         <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">✓</div>
-        <p className="text-white font-bold text-xl mb-2">Email enviado</p>
-        <p className="text-white/50 text-sm mb-6">Revisa tu bandeja y pulsa el enlace para entrar.</p>
+        <p className="text-white font-bold text-xl mb-2">Revisa tu email</p>
+        <p className="text-white/50 text-sm mb-6">Te enviamos un enlace para entrar directamente.</p>
         <button onClick={() => { setEnviado(false); setRecuperar(false) }} className="text-[#FF5C00] text-sm font-semibold">← Volver</button>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[#111] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#FF5C00] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
-              <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-              <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-              <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-            </svg>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#FF5C00' }}>
+            <svg width="32" height="32" viewBox="0 0 28 28" fill="none"><rect x="5" y="5" width="4" height="18" rx="1" fill="white"/><rect x="5" y="5" width="13" height="4" rx="1" fill="white"/><rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/></svg>
           </div>
-          <h1 className="text-white text-2xl font-bold">Forge</h1>
-          <p className="text-white/40 text-sm mt-1">Tu portal personal</p>
+          <h1 className="text-white text-2xl font-bold tracking-tight">Forge</h1>
+          <p className="text-white/40 text-sm mt-1">Tu portal de entrenamiento</p>
         </div>
-        <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="rounded-2xl p-6 border border-white/8" style={{ background: 'rgba(255,255,255,0.05)' }}>
           <form onSubmit={recuperar ? resetPass : entrar} className="space-y-3">
             <div>
               <label className="text-white/50 text-xs font-medium block mb-1.5">Email</label>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus
-                placeholder="tu@email.com"
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="tu@email.com"
+                className="w-full rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 focus:outline-none border border-white/10"
+                style={{ background: 'rgba(255,255,255,0.08)' }} />
             </div>
             {!recuperar && (
               <div>
@@ -622,19 +424,16 @@ function LoginPortal() {
                   <label className="text-white/50 text-xs font-medium">Contraseña</label>
                   <button type="button" onClick={() => setRecuperar(true)} className="text-[#FF5C00] text-xs font-medium">¿La olvidaste?</button>
                 </div>
-                <input type="password" value={pass} onChange={e => setPass(e.target.value)} required
-                  placeholder="••••••••"
-                  className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
+                <input type="password" value={pass} onChange={e => setPass(e.target.value)} required placeholder="••••••••"
+                  className="w-full rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 focus:outline-none border border-white/10"
+                  style={{ background: 'rgba(255,255,255,0.08)' }} />
               </div>
             )}
-            {error && <p className="text-red-400 text-xs bg-red-500/10 rounded-xl px-4 py-3">{error}</p>}
+            {error && <p className="text-red-400 text-xs rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.1)' }}>{error}</p>}
             <button type="submit" disabled={loading || !email || (!recuperar && !pass)}
-              className="w-full bg-[#FF5C00] text-white font-bold py-3.5 rounded-xl disabled:opacity-40 active:scale-95 transition-all">
-              {loading ? '...' : recuperar ? 'Enviar enlace →' : 'Entrar →'}
-            </button>
-            {recuperar && (
-              <button type="button" onClick={() => setRecuperar(false)} className="w-full text-white/40 text-sm py-2">← Volver</button>
-            )}
+              className="w-full font-bold py-3.5 rounded-xl text-white disabled:opacity-40 active:scale-95 transition-all"
+              style={{ background: '#FF5C00' }}>{loading ? '...' : recuperar ? 'Enviar enlace' : 'Entrar'}</button>
+            {recuperar && <button type="button" onClick={() => setRecuperar(false)} className="w-full text-white/40 text-sm py-2">← Volver</button>}
           </form>
         </div>
       </div>
@@ -642,349 +441,253 @@ function LoginPortal() {
   )
 }
 
-// ─── Tab Inicio ───────────────────────────────────────────────────────────────
-function TabInicio({ cliente, color, config, checkins, rutina, nutricion, sesiones,
-  sesionesHoy, pendientes, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando,
-  sesionesEstaSemana }) {
-
+// ─── TAB HOY ──────────────────────────────────────────────────────────────────
+function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones, sesionesHoy, pendientes, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando, sesionesEstaSemana, semanasActivas, setModalActividad, setModalRegistro, ejerciciosHist }) {
   const hoy = hoyStr()
   const ahora = new Date()
   const hora = ahora.getHours()
-  const saludo = hora < 13 ? '☀️ Buenos días' : hora < 20 ? '👋 Buenas tardes' : '🌙 Buenas noches'
+  const saludo = hora < 6 ? 'Buenas noches' : hora < 13 ? 'Buenos días' : hora < 20 ? 'Buenas tardes' : 'Buenas noches'
   const nombre = cliente?.nombre?.split(' ')[0] || ''
-  const DIAS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+  const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
   const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
-
   const esOnline = cliente?.tipo === 'online'
   const sesionHoy = sesionesHoy?.[0]
   const pesos = checkins?.filter(c => c.peso).slice().reverse() || []
-  const diasSinCI = checkins?.[0]?.fecha
-    ? Math.floor((Date.now() - new Date(checkins[0].fecha).getTime()) / 864e5) : 999
+  const diasSinCI = checkins?.[0]?.fecha ? Math.floor((Date.now() - new Date(checkins[0].fecha).getTime()) / 864e5) : 999
   const ciUrgente = diasSinCI >= 7
   const diffPeso = pesos.length >= 2 ? +(pesos[pesos.length-1].peso - pesos[0].peso).toFixed(1) : null
   const diasRutina = rutina?.borrador?.dias || rutina?.contenido?.dias || []
+  const sesCompletadas = (sesionesEstaSemana || []).filter(s => s.completada && s.fecha <= hoy).length
+  const diaHoy = diasRutina.length > 0 ? diasRutina[sesCompletadas % diasRutina.length] : null
 
-  // ── Agenda: lunes a sábado de esta semana ──────────────────────────────
-  const lunesEsta = new Date(ahora)
-  const dSemana = ahora.getDay() || 7 // 1=Lun..7=Dom
-  lunesEsta.setDate(ahora.getDate() - dSemana + 1)
-
-  const diasAgenda = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(lunesEsta)
-    d.setDate(lunesEsta.getDate() + i)
-    const fechaStr = d.toISOString().split('T')[0]
-    const esHoy = fechaStr === hoy
-    const esPasado = fechaStr < hoy
-    // Presencial: sesiones programadas. Online: sesiones registradas esta semana
-    const sesionsDia = esOnline
-      ? (sesionesEstaSemana || []).filter(s => s.fecha === fechaStr)
-      : (sesiones || []).filter(s => s.fecha === fechaStr)
-    return { fecha: fechaStr, d, sesiones: sesionsDia, esHoy, esPasado }
+  // Agenda semana
+  const lunesEsta = new Date(ahora); lunesEsta.setDate(ahora.getDate() - (ahora.getDay()||7) + 1)
+  const diasAgenda = Array.from({length:6}, (_,i) => {
+    const d = new Date(lunesEsta); d.setDate(lunesEsta.getDate() + i)
+    const fs = d.toISOString().split('T')[0]
+    const sesDia = esOnline ? (sesionesEstaSemana||[]).filter(s=>s.fecha===fs) : (sesiones||[]).filter(s=>s.fecha===fs)
+    return { fecha: fs, d, sesiones: sesDia, esHoy: fs===hoy, esPasado: fs<hoy }
   })
-
-  const hayAgenda = esOnline
-    ? sesionesEstaSemana && sesionesEstaSemana.length > 0
-    : sesiones && sesiones.filter(s => s.fecha >= lunesEsta.toISOString().split('T')[0]).length > 0
-
-  // Estado vacío real
+  const hayAgenda = esOnline ? (sesionesEstaSemana||[]).length>0 : (sesiones||[]).filter(s=>s.fecha>=lunesEsta.toISOString().split('T')[0]).length>0
   const esNuevo = !rutina && !nutricion && !checkins?.length && !hayAgenda
-
 
   return (
     <div className="space-y-3 pb-2">
-
-      {/* ── Saludo ── */}
+      {/* Saludo */}
       <div className="pt-1 pb-1">
         <p className="text-xs text-[#9B9B9B]">{saludo}</p>
-        <h1 className="text-2xl font-bold text-[#0A0A0A] mt-0.5">{nombre} 👊</h1>
-        <p className="text-xs text-[#9B9B9B] mt-1">{DIAS_SHORT[ahora.getDay()]} {ahora.getDate()} {MESES[ahora.getMonth()]}</p>
+        <h1 className="text-2xl font-bold text-[#0A0A0A] mt-0.5 tracking-tight">{nombre} 👊</h1>
+        <p className="text-xs text-[#9B9B9B] mt-1">{DIAS[ahora.getDay()]} {ahora.getDate()} {MESES[ahora.getMonth()]}</p>
       </div>
 
-      {/* ── Panel bienvenida cliente nuevo ── */}
+      {/* Bienvenida nuevo */}
       {esNuevo && (
-        <div className="rounded-3xl overflow-hidden"
-          style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
+        <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
           <div className="px-5 py-6">
-            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mb-2">Bienvenido a Forge</p>
-            <p className="text-white font-bold text-xl leading-snug mb-1">
-              {config?.nombre_entrenador || 'Tu entrenador'} está preparando tu plan
-            </p>
-            <p className="text-white/60 text-sm leading-relaxed">
-              En breve tendrás aquí tu rutina, tu plan de nutrición y podrás hacer seguimiento de tu progreso.
-            </p>
+            <p className="text-white/60 text-xs font-semibold mb-1.5">Bienvenido a Forge</p>
+            <p className="text-white font-bold text-xl leading-snug">{config?.nombre_entrenador||'Tu entrenador'} está preparando tu plan</p>
+            <p className="text-white/60 text-sm mt-2">En breve tendrás tu rutina, plan de nutrición y progreso.</p>
           </div>
-          <div className="px-5 py-4 bg-black/15 flex items-center gap-3">
-            <span className="text-2xl">📋</span>
-            <p className="text-white/80 text-sm">Mientras tanto, puedes escribirle un mensaje</p>
-            <button onClick={() => setTab('mensajes')}
-              className="ml-auto text-xs font-bold px-3 py-1.5 rounded-lg bg-white/20 text-white active:scale-95 flex-shrink-0">
-              Escribir →
-            </button>
+          <div className="px-5 py-3.5 bg-black/15 flex items-center justify-between">
+            <p className="text-white/60 text-xs">¿Alguna duda?</p>
+            <button onClick={() => setTab('mensajes')} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-white/20 text-white active:scale-95">Escribir →</button>
           </div>
         </div>
       )}
 
-      {/* ── Cuestionario nutrición urgente ── */}
+      {/* Cuestionario nutrición */}
       {verNutricion && !nutricion && !cuest && !esNuevo && (
         <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
-          className="flex items-center gap-3 rounded-2xl p-4 active:scale-95 transition-all"
-          style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-          <span className="text-2xl flex-shrink-0">🥗</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white">Cuestionario de nutrición pendiente</p>
-            <p className="text-xs text-white/70 mt-0.5">Tu entrenador lo necesita para crear tu plan</p>
-          </div>
-          <span className="text-white/70 flex-shrink-0">→</span>
+          className="flex items-center gap-4 rounded-2xl p-4 active:scale-95 transition-all"
+          style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><span className="text-xl">🥗</span></div>
+          <div className="flex-1"><p className="text-sm font-bold text-white">Cuestionario de nutrición</p><p className="text-xs text-white/70 mt-0.5">Necesario para crear tu plan personalizado</p></div>
+          <span className="text-white/70 text-xl flex-shrink-0">→</span>
         </a>
       )}
 
-      {/* ── Valoración sesión pendiente ── */}
+      {/* Valoración pendiente */}
       {pendientes?.[0] && (
         <button onClick={() => setValorando(pendientes[0])}
-          className="w-full flex items-center gap-3 rounded-2xl p-4 border-2 text-left active:scale-95 transition-all"
-          style={{ borderColor: color, background: `${color}08` }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: `${color}20` }}>
-            <span className="text-xl">⭐</span>
-          </div>
+          className="w-full flex items-center gap-4 rounded-2xl p-4 border-2 text-left active:scale-95 transition-all"
+          style={{ borderColor: color, background: `${color}06` }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}><span className="text-xl">⭐</span></div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A]">¿Cómo fue tu sesión del {
-              new Date(pendientes[0].fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long' })
-            }?</p>
-            <p className="text-xs text-[#6B6B6B] mt-0.5">Tarda 30 segundos · Tu entrenador lo agradece</p>
+            <p className="text-sm font-bold text-[#0A0A0A]">¿Cómo fue el {new Date(pendientes[0].fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long'})}?</p>
+            <p className="text-xs text-[#6B6B6B] mt-0.5">30 seg · ayuda a ajustar la carga</p>
           </div>
-          <span className="text-sm font-bold flex-shrink-0" style={{ color }}>Valorar →</span>
+          <span className="text-sm font-bold" style={{ color }}>Valorar →</span>
         </button>
       )}
 
-      {/* ── Sesión de hoy — tarjeta grande naranja ── */}
+      {/* Sesión de hoy */}
       {sesionHoy && (
-        <div className="rounded-3xl overflow-hidden shadow-sm"
-          style={{ background: `linear-gradient(135deg, ${color}, ${color}dd)` }}>
+        <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg,${color},${color}e0)` }}>
           <div className="px-5 py-5">
-            <p className="text-white/60 text-[10px] font-bold uppercase tracking-widest mb-1.5">Hoy toca 💪</p>
-            <p className="text-white font-bold text-xl leading-tight">
-              {sesionHoy.tipo === 'online' ? 'Entrenamiento online'
-                : sesionHoy.tipo === 'grupo' ? 'Entrenamiento en grupo'
-                : 'Entrenamiento personal'}
-            </p>
-            {sesionHoy.hora && (
-              <p className="text-white/70 text-sm mt-1.5">
-                🕐 {sesionHoy.hora.slice(0,5)}
-                {sesionHoy.duracion_minutos ? ` · ${sesionHoy.duracion_minutos} min` : ''}
-              </p>
-            )}
-            {rutina && (
-              <p className="text-white/50 text-xs mt-1">{rutina.nombre}</p>
-            )}
+            <p className="text-white/60 text-[10px] font-bold tracking-widest mb-1.5">HOY TOCA</p>
+            <p className="text-white font-bold text-xl">{sesionHoy.tipo==='online'?'Entrenamiento online':sesionHoy.tipo==='grupo'?'Sesión en grupo':'Entrenamiento personal'}</p>
+            {sesionHoy.hora && <p className="text-white/70 text-sm mt-1.5">🕐 {sesionHoy.hora.slice(0,5)}{sesionHoy.duracion_minutos?` · ${sesionHoy.duracion_minutos} min`:''}</p>}
+            {diaHoy && <p className="text-white/50 text-xs mt-1">{diaHoy.nombre} · {(diaHoy.ejercicios||[]).length} ejercicios</p>}
           </div>
           <div className="px-4 py-3 bg-black/15 grid grid-cols-2 gap-2">
-            <button onClick={() => setTab('rutina')}
-              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/15 text-white text-xs font-bold active:scale-95 transition-all">
-              💪 Ver rutina
-            </button>
-            <button onClick={() => setTab('rutina')}
-              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/25 text-white text-xs font-bold active:scale-95 transition-all">
-              ✓ Registrar sesión
-            </button>
+            <button onClick={() => setTab('entrena')} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/15 text-white text-xs font-bold active:scale-95">💪 Ver rutina</button>
+            <button onClick={() => diaHoy && setModalRegistro(diaHoy)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/25 text-white text-xs font-bold active:scale-95">✓ Registrar sesión</button>
           </div>
         </div>
       )}
 
-      {/* ── Check-in urgente (pulsante) ── */}
+      {/* Hoy toca (online sin sesión programada) */}
+      {!sesionHoy && diaHoy && esOnline && (
+        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
+          <div className="px-4 py-3.5 flex items-center gap-3 border-b border-black/4" style={{ background: `${color}06` }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: color }}>{sesCompletadas%diasRutina.length+1}</div>
+            <div className="flex-1"><p className="text-xs font-bold text-[#0A0A0A]">{diaHoy.nombre}</p><p className="text-[10px] text-[#9B9B9B]">{(diaHoy.ejercicios||[]).length} ejercicios · {rutina?.nombre}</p></div>
+          </div>
+          <div className="px-4 py-3 flex gap-2">
+            <button onClick={() => setTab('entrena')} className="flex-1 py-2.5 rounded-xl text-xs font-bold border border-black/10 text-[#0A0A0A] active:scale-95">Ver ejercicios</button>
+            <button onClick={() => setModalRegistro(diaHoy)} className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white active:scale-95" style={{ background: color }}>✓ Registrar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Check-in urgente */}
       {ciUrgente && (
         <button onClick={() => setModalCI(true)}
-          className="w-full flex items-center gap-4 rounded-2xl p-4 active:scale-95 transition-all text-left animate-pulse"
-          style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <span className="text-xl">⏰</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white">
-              {diasSinCI > 900 ? 'Haz tu primer check-in' : `${diasSinCI} días sin check-in`}
-            </p>
+          className="w-full flex items-center gap-4 rounded-2xl p-4 active:scale-95 text-left animate-pulse"
+          style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)' }}>
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><span className="text-xl">⏰</span></div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-white">{diasSinCI>900?'Haz tu primer check-in':`${diasSinCI} días sin check-in`}</p>
             <p className="text-xs text-white/70 mt-0.5">Tu entrenador necesita saber cómo estás</p>
           </div>
-          <span className="text-white/80 flex-shrink-0 text-lg">→</span>
+          <span className="text-white/80 text-xl">→</span>
         </button>
       )}
 
-      {/* ── Agenda semanal ── */}
-      {hayAgenda && (
-        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-          <div className="px-4 py-3 border-b border-black/4 flex items-center justify-between">
-            <p className="text-xs font-bold text-[#0A0A0A]">📅 Tu semana</p>
-            <p className="text-[10px] text-[#9B9B9B]">
-              {esOnline ? 'Sesiones registradas' : 'Sesiones programadas'}
-            </p>
-          </div>
-          <div className="divide-y divide-black/4">
-            {diasAgenda.map((dia, i) => (
-              <div key={i} className={`px-4 py-3 flex items-center gap-3 ${dia.esHoy ? 'bg-[#F7F6F3]' : ''}`}>
-                <div className={`w-8 h-8 rounded-lg flex flex-col items-center justify-center flex-shrink-0`}
-                  style={dia.esHoy ? { background: color } : { background: '#F7F6F3' }}>
-                  <span className="text-[9px] font-bold leading-none"
-                    style={{ color: dia.esHoy ? 'rgba(255,255,255,0.8)' : '#9B9B9B' }}>
-                    {DIAS_SHORT[dia.d.getDay()]}
-                  </span>
-                  <span className="text-sm font-bold leading-none mt-0.5"
-                    style={{ color: dia.esHoy ? 'white' : dia.esPasado ? '#C0C0C0' : '#0A0A0A' }}>
-                    {dia.d.getDate()}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  {dia.sesiones.length > 0 ? (
-                    dia.sesiones.map((s, si) => (
-                      <div key={si} className={si > 0 ? 'mt-1' : ''}>
-                        <p className="text-xs font-semibold text-[#0A0A0A]">
-                          {s.tipo === 'online' ? '🖥 Online'
-                            : s.tipo === 'grupo' ? '👥 Grupo'
-                            : '🏋️ Personal'}
-                          {s.hora ? ` · ${s.hora.slice(0,5)}` : ''}
-                          {s.duracion_minutos ? ` · ${s.duracion_minutos}min` : ''}
-                          {esOnline && s.completada ? ' ✓' : ''}
-                        </p>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-xs" style={{ color: dia.esPasado ? '#D0D0D0' : '#C0C0C0' }}>
-                      {dia.esPasado ? 'Descanso' : 'Sin sesión'}
-                    </p>
-                  )}
-                </div>
-                {dia.esHoy && dia.sesiones.length > 0 && (
-                  <span className="text-[9px] font-bold px-2 py-1 rounded-full text-white flex-shrink-0"
-                    style={{ background: color }}>HOY</span>
-                )}
-              </div>
-            ))}
-          </div>
-          {esOnline && (
-            <div className="px-4 py-3 border-t border-black/4">
-              <button onClick={() => setTab('rutina')}
-                className="w-full text-xs font-bold py-2 rounded-xl text-white active:scale-95 transition-all"
-                style={{ background: color }}>
-                + Registrar sesión de hoy
-              </button>
+      {/* Stats */}
+      {(pesos.length>=2||semanasActivas>0||checkins.length>0) && (
+        <div className="grid grid-cols-3 gap-2">
+          {pesos.length>=2&&diffPeso!==null&&(
+            <button onClick={() => setTab('progreso')} className="bg-white rounded-2xl border border-black/5 p-3.5 text-center active:scale-95">
+              <p className="text-xl font-bold" style={{ color: diffPeso<0?'#10b981':diffPeso>0?'#6366f1':'#9B9B9B' }}>{diffPeso>0?'+':''}{diffPeso}</p>
+              <p className="text-[10px] text-[#9B9B9B] mt-0.5">kg desde inicio</p>
+            </button>
+          )}
+          {semanasActivas>0&&(
+            <div className="bg-white rounded-2xl border border-black/5 p-3.5 text-center">
+              <p className="text-xl font-bold" style={{ color }}>🔥{semanasActivas}</p>
+              <p className="text-[10px] text-[#9B9B9B] mt-0.5">semanas seguidas</p>
+            </div>
+          )}
+          {checkins.length>0&&(
+            <div className="bg-white rounded-2xl border border-black/5 p-3.5 text-center">
+              <p className="text-xl font-bold text-[#0A0A0A]">{checkins.length}</p>
+              <p className="text-[10px] text-[#9B9B9B] mt-0.5">check-ins</p>
             </div>
           )}
         </div>
       )}
 
-      {/* ── Progreso — tarjeta con gráfica ── */}
-      {pesos.length >= 2 && (
-        <button onClick={() => setTab('progreso')}
-          className="w-full bg-white rounded-2xl border border-black/5 p-4 text-left active:scale-95 transition-all">
-          <div className="flex items-start justify-between mb-3">
-            <div>
-              <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-widest">Tu progreso</p>
-              {diffPeso !== null && (
-                <p className="text-2xl font-bold mt-0.5"
-                  style={{ color: diffPeso < 0 ? '#10b981' : diffPeso > 0 ? '#6366f1' : '#9B9B9B' }}>
-                  {diffPeso > 0 ? '+' : ''}{diffPeso} kg
-                </p>
-              )}
-              <p className="text-xs text-[#9B9B9B] mt-0.5">
-                {checkins?.length} check-ins · último hace {diasSinCI === 0 ? 'hoy' : `${diasSinCI}d`}
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1.5">
-              {!ciUrgente && (
-                <span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full">✓ Al día</span>
-              )}
-              <p className="text-xs text-[#9B9B9B]">{pesos[pesos.length-1].peso} kg ahora</p>
-            </div>
+      {/* Gráfica de progreso */}
+      {pesos.length>=2&&(
+        <button onClick={() => setTab('progreso')} className="w-full bg-white rounded-2xl border border-black/5 p-4 text-left active:scale-95">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold text-[#0A0A0A]">Evolución del peso</p>
+            {!ciUrgente&&<span className="text-[10px] font-bold bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">✓ Al día</span>}
           </div>
           <div className="flex items-end gap-1 h-14">
-            {pesos.slice(-8).map((c, i, arr) => {
-              const min = Math.min(...arr.map(x => x.peso))
-              const max = Math.max(...arr.map(x => x.peso))
-              const h = max === min ? 60 : Math.max(18, ((c.peso - min) / (max - min)) * 75 + 25)
-              const isLast = i === arr.length - 1
-              return (
-                <div key={i} className="flex-1 rounded-md transition-all"
-                  style={{ height: `${h}%`, background: isLast ? color : `${color}28`, minHeight: 6 }} />
-              )
+            {pesos.slice(-10).map((c,i,arr)=>{
+              const min=Math.min(...arr.map(x=>x.peso)),max=Math.max(...arr.map(x=>x.peso))
+              const h=max===min?55:Math.max(18,((c.peso-min)/(max-min))*75+25)
+              return <div key={i} className="flex-1 rounded-md" style={{ height:`${h}%`, background:i===arr.length-1?color:`${color}25`, minHeight:5 }} />
             })}
           </div>
           <div className="flex justify-between mt-2">
-            <span className="text-[10px] text-[#C0C0C0]">{pesos[0].peso}kg</span>
-            <span className="text-[10px] font-bold" style={{ color }}>{pesos[pesos.length-1].peso}kg</span>
+            <span className="text-[10px] text-[#C0C0C0]">{pesos[0].peso} kg</span>
+            <span className="text-[10px] font-bold" style={{ color }}>{pesos[pesos.length-1].peso} kg hoy</span>
           </div>
         </button>
       )}
 
-      {/* ── Grid de accesos rápidos 2x2 ── */}
-      <div className="grid grid-cols-2 gap-2">
-
-        {/* Rutina */}
-        {verRutina && (
-          <button onClick={() => setTab('rutina')}
-            className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95 transition-all">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-              style={{ background: `${color}15` }}>
-              <span className="text-xl">💪</span>
-            </div>
-            <p className="text-xs font-bold text-[#0A0A0A] leading-tight">
-              {rutina ? rutina.nombre : 'Rutina'}
-            </p>
-            <p className="text-[10px] text-[#9B9B9B] mt-1">
-              {rutina ? `${diasRutina.length} días` : 'En preparación'}
-            </p>
-          </button>
-        )}
-
-        {/* Nutrición */}
-        {verNutricion && (
-          <button onClick={() => setTab('nutricion')}
-            className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95 transition-all">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-              style={{ background: '#10b98115' }}>
-              <span className="text-xl">🥗</span>
-            </div>
-            <p className="text-xs font-bold text-[#0A0A0A] leading-tight">
-              {nutricion ? nutricion.nombre : 'Nutrición'}
-            </p>
-            <p className="text-[10px] text-[#9B9B9B] mt-1">
-              {nutricion ? `${nutricion.calorias_dia} kcal` : cuest ? 'En preparación' : 'Pendiente'}
-            </p>
-          </button>
-        )}
-
-        {/* Check-in */}
-        <button onClick={() => setModalCI(true)}
-          className="border border-black/5 rounded-2xl p-4 text-left active:scale-95 transition-all"
-          style={{ background: ciUrgente ? `${color}10` : 'white', borderColor: ciUrgente ? color : undefined }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: ciUrgente ? `${color}20` : '#F7F6F3' }}>
-            <span className="text-xl">📋</span>
+      {/* Agenda semanal */}
+      {hayAgenda&&(
+        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
+          <div className="px-4 py-3 border-b border-black/4 flex items-center justify-between">
+            <p className="text-xs font-bold text-[#0A0A0A]">Esta semana</p>
+            <p className="text-[10px] text-[#9B9B9B]">{esOnline?'registradas':'programadas'}</p>
           </div>
-          <p className="text-xs font-bold text-[#0A0A0A] leading-tight">Check-in semanal</p>
-          <p className="text-[10px] mt-1" style={{ color: ciUrgente ? color : '#9B9B9B' }}>
-            {ciUrgente
-              ? diasSinCI > 900 ? '¡Primero!' : `${diasSinCI}d pendiente`
-              : checkins?.length ? `Hace ${diasSinCI === 0 ? 'hoy' : diasSinCI + 'd'}` : 'Registra cómo estás'}
+          <div className="divide-y divide-black/4">
+            {diasAgenda.map((dia,i)=>(
+              <div key={i} className="px-4 py-2.5 flex items-center gap-3" style={dia.esHoy?{background:`${color}06`}:{}}>
+                <div className="w-8 h-8 rounded-lg flex flex-col items-center justify-center flex-shrink-0"
+                  style={dia.esHoy?{background:color}:{background:'#F2F1EE'}}>
+                  <span className="text-[9px] font-bold" style={{ color:dia.esHoy?'rgba(255,255,255,0.7)':'#9B9B9B' }}>
+                    {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][dia.d.getDay()]}
+                  </span>
+                  <span className="text-sm font-bold" style={{ color:dia.esHoy?'white':dia.esPasado?'#C0C0C0':'#0A0A0A' }}>{dia.d.getDate()}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  {dia.sesiones.length>0
+                    ? dia.sesiones.map((s,si)=>(
+                      <p key={si} className="text-xs font-semibold text-[#0A0A0A]">
+                        {s.tipo==='online'?'🖥':s.tipo==='libre'?'🏃':'🏋️'}
+                        {s.hora?` ${s.hora.slice(0,5)}`:''}{s.duracion_minutos?` · ${s.duracion_minutos}min`:''}{s.completada?' ✓':''}
+                      </p>
+                    ))
+                    : <p className="text-xs text-[#D0D0D0]">{dia.esPasado?'Descanso':'—'}</p>
+                  }
+                </div>
+                {dia.esHoy&&dia.sesiones.length>0&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background:color }}>HOY</span>}
+              </div>
+            ))}
+          </div>
+          {esOnline&&(
+            <div className="px-4 py-3 border-t border-black/4">
+              <button onClick={() => setModalActividad(true)} className="w-full py-2.5 rounded-xl text-xs font-bold text-white active:scale-95" style={{ background:color }}>+ Registrar actividad</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Accesos rápidos */}
+      <div className="grid grid-cols-2 gap-2">
+        {verRutina&&(
+          <button onClick={() => setTab('entrena')} className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background:`${color}12` }}><span className="text-xl">💪</span></div>
+            <p className="text-xs font-bold text-[#0A0A0A] leading-tight">{rutina?rutina.nombre:'Rutina'}</p>
+            <p className="text-[10px] text-[#9B9B9B] mt-1">{rutina?`${diasRutina.length} días`:'En preparación'}</p>
+          </button>
+        )}
+        {verNutricion&&(
+          <button onClick={() => setTab('nutricion')} className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background:'#10b98112' }}><span className="text-xl">🥗</span></div>
+            <p className="text-xs font-bold text-[#0A0A0A] leading-tight">{nutricion?nutricion.nombre:'Nutrición'}</p>
+            <p className="text-[10px] text-[#9B9B9B] mt-1">{nutricion?.calorias_dia?`${nutricion.calorias_dia} kcal/día`:cuest?'En preparación':'Pendiente'}</p>
+          </button>
+        )}
+        <button onClick={() => setModalCI(true)}
+          className="border border-black/5 rounded-2xl p-4 text-left active:scale-95"
+          style={{ background:ciUrgente?`${color}08`:'white', borderColor:ciUrgente?color:undefined }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background:ciUrgente?`${color}15`:'#F2F1EE' }}><span className="text-xl">📋</span></div>
+          <p className="text-xs font-bold text-[#0A0A0A]">Check-in semanal</p>
+          <p className="text-[10px] mt-1" style={{ color:ciUrgente?color:'#9B9B9B' }}>
+            {ciUrgente?diasSinCI>900?'¡Primero!': `${diasSinCI}d sin registrar`:checkins.length?`Hace ${diasSinCI===0?'hoy':diasSinCI+'d'}`:'Cuéntame cómo estás'}
           </p>
         </button>
-
-        {/* Actividad libre */}
-        <button onClick={() => setModalActividad(true)}
-          className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95 transition-all">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
-            style={{ background: '#6366f115' }}>
-            <span className="text-xl">🏃</span>
-          </div>
-          <p className="text-xs font-bold text-[#0A0A0A] leading-tight">Actividad libre</p>
+        <button onClick={() => setModalActividad(true)} className="bg-white border border-black/5 rounded-2xl p-4 text-left active:scale-95">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ background:'#6366f112' }}><span className="text-xl">🏃</span></div>
+          <p className="text-xs font-bold text-[#0A0A0A]">Actividad libre</p>
           <p className="text-[10px] text-[#9B9B9B] mt-1">Footing, fútbol, natación…</p>
         </button>
-
       </div>
-
     </div>
   )
 }
 
-function TabRutina({ rutina, color }) {
+
+
+
+function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline }) {
   if (!rutina) return (
     <div className="text-center py-16">
       <div className="text-4xl mb-3">💪</div>
@@ -1111,8 +814,8 @@ function TabNutricion({ nutricion, cuest, cliente, color }) {
 }
 
 // ─── Tab Progreso ─────────────────────────────────────────────────────────────
-function TabProgreso({ checkins, marcas, medidas, fotos, color, subTab, setSubTab }) {
-  const SUBTABS = [{ id: 'peso', label: '⚖️ Peso' }, { id: 'medidas', label: '📏 Medidas' }, { id: 'marcas', label: '🏆 Marcas' }, { id: 'fotos', label: '📸 Fotos' }]
+function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, subTab, setSubTab }) {
+  const SUBTABS = [{ id: 'peso', label: '⚖️ Peso' }, { id: 'fuerza', label: '💪 Fuerza' }, { id: 'medidas', label: '📏 Medidas' }, { id: 'fotos', label: '📸 Fotos' }]
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-4 gap-1 bg-black/5 p-1 rounded-xl">
@@ -1125,7 +828,8 @@ function TabProgreso({ checkins, marcas, medidas, fotos, color, subTab, setSubTa
       </div>
       {subTab === 'peso' && <SubPeso checkins={checkins} color={color} />}
       {subTab === 'medidas' && <SubMedidas medidas={medidas} color={color} />}
-      {subTab === 'marcas' && <SubMarcas marcas={marcas} color={color} />}
+      {subTab === 'fuerza' && <SubFuerza ejerciciosHist={ejerciciosHist} color={color} />}
+      {subTab === 'medidas' && <SubMedidas medidas={medidas} color={color} />}
       {subTab === 'fotos' && <SubFotos fotos={fotos} />}
     </div>
   )
@@ -1334,7 +1038,7 @@ function TabPagos({ pagos, color }) {
 }
 
 // ─── Tab Ajustes ──────────────────────────────────────────────────────────────
-function TabAjustes({ cliente, setCliente, color }) {
+function TabMas({ pagos, cliente, setCliente, color }) {
   const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
   const [guardando, setGuardando] = useState(false)
   const [ok, setOk] = useState(false)
@@ -1409,6 +1113,352 @@ function TabAjustes({ cliente, setCliente, color }) {
         className="w-full py-3 rounded-xl border border-red-200 text-red-500 text-sm font-medium active:scale-95 transition-all">
         Cerrar sesión
       </button>
+    </div>
+  )
+}
+
+// ─── SubFuerza ────────────────────────────────────────────────────────────────
+function SubFuerza({ ejerciciosHist, color }) {
+  const [ejSel, setEjSel] = useState(null)
+
+  const mapa = {}
+  for (const reg of ejerciciosHist || []) {
+    const nombre = reg.ejercicio_nombre
+    if (!mapa[nombre]) mapa[nombre] = []
+    const sets = (reg.sets || []).filter(s => s.peso && !isNaN(+s.peso))
+    if (sets.length) {
+      const maxRM = Math.max(...sets.map(s => rmEpley(+s.peso, +s.reps || 1)))
+      const maxPeso = Math.max(...sets.map(s => +s.peso))
+      mapa[nombre].push({ fecha: reg.sesiones?.fecha, maxRM: +maxRM.toFixed(1), maxPeso: +maxPeso.toFixed(1) })
+    }
+  }
+
+  const lista = Object.entries(mapa)
+    .map(([nombre, registros]) => ({
+      nombre,
+      registros: registros.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '')),
+      rmActual: registros[registros.length - 1]?.maxRM || 0,
+      rmInicial: registros[0]?.maxRM || 0,
+    }))
+    .filter(e => e.registros.length >= 1)
+    .sort((a, b) => b.rmActual - a.rmActual)
+    .slice(0, 12)
+
+  if (!lista.length) return (
+    <div className="text-center py-12">
+      <div className="text-4xl mb-3">💪</div>
+      <p className="text-base font-bold text-[#0A0A0A]">Sin registros de fuerza</p>
+      <p className="text-sm text-[#9B9B9B] mt-2 max-w-xs mx-auto leading-relaxed">Registra tus sesiones con pesos y repeticiones para ver tu evolución.</p>
+    </div>
+  )
+
+  const sel = ejSel ? lista.find(e => e.nombre === ejSel) : null
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[10px] text-[#9B9B9B]">RM estimada = peso máximo en 1 rep (fórmula Epley). Toca un ejercicio para ver su evolución.</p>
+      {sel ? (
+        <div>
+          <button onClick={() => setEjSel(null)} className="text-xs font-bold mb-3 flex items-center gap-1" style={{ color }}>← Todos</button>
+          <div className="bg-white rounded-2xl border border-black/5 p-4">
+            <div className="flex items-start justify-between mb-4">
+              <p className="text-sm font-bold text-[#0A0A0A] flex-1 mr-3">{sel.nombre}</p>
+              <div className="text-right">
+                <p className="text-2xl font-bold" style={{ color }}>{sel.rmActual}<span className="text-sm font-normal text-[#9B9B9B] ml-1">kg RM</span></p>
+                {sel.rmActual > sel.rmInicial && <p className="text-xs font-bold text-emerald-600">+{(sel.rmActual - sel.rmInicial).toFixed(1)} kg desde inicio</p>}
+              </div>
+            </div>
+            {sel.registros.length > 1 && (
+              <div className="flex items-end gap-1.5 h-24 mt-2">
+                {sel.registros.slice(-8).map((r, i, arr) => {
+                  const min = Math.min(...arr.map(x => x.maxRM))
+                  const max = Math.max(...arr.map(x => x.maxRM))
+                  const h = max === min ? 50 : Math.max(15, ((r.maxRM - min) / (max - min)) * 75 + 25)
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <div className="w-full rounded-md" style={{ height: `${h}%`, background: i === arr.length - 1 ? color : `${color}30`, minHeight: 5 }} />
+                      <p className="text-[8px] text-[#C0C0C0]">{r.maxRM}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {lista.map(ej => {
+            const mejora = ej.rmActual > ej.rmInicial ? +(ej.rmActual - ej.rmInicial).toFixed(1) : null
+            return (
+              <button key={ej.nombre} onClick={() => setEjSel(ej.nombre)}
+                className="w-full bg-white rounded-2xl border border-black/5 p-4 flex items-center gap-3 text-left active:scale-95">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#0A0A0A] truncate">{ej.nombre}</p>
+                  <p className="text-[10px] text-[#9B9B9B] mt-0.5">{ej.registros.length} sesión{ej.registros.length !== 1 ? 'es' : ''}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-lg font-bold" style={{ color }}>{ej.rmActual}<span className="text-xs font-normal text-[#9B9B9B] ml-0.5">kg</span></p>
+                  {mejora && <p className="text-[10px] font-bold text-emerald-600">+{mejora} kg</p>}
+                </div>
+                <span className="text-[#C0C0C0] flex-shrink-0">›</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Modal check-in ───────────────────────────────────────────────────────────
+function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
+          <div><p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p><p className="text-xs text-[#9B9B9B] mt-0.5">¿Cómo ha ido esta semana?</p></div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl">×</button>
+        </div>
+        <div className="px-6 py-5 space-y-6">
+          {[
+            { k: 'energia', icon: '⚡', label: 'Energía', max: 5, lo: 'Agotado', hi: 'Excelente' },
+            { k: 'sueno', icon: '😴', label: 'Sueño', max: 5, lo: 'Muy mal', hi: 'Muy bien' },
+            { k: 'fatiga', icon: '🏋️', label: 'Fatiga muscular', max: 10, lo: 'Sin fatiga', hi: 'Al límite' },
+            { k: 'estres', icon: '🧠', label: 'Estrés', max: 10, lo: 'Sin estrés', hi: 'Al límite' },
+          ].map(({ k, icon, label, max, lo, hi }) => (
+            <div key={k}>
+              <div className="flex items-center gap-2 mb-3">
+                <span>{icon}</span><p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
+                {ciForm[k] && <span className="ml-auto text-sm font-bold" style={{ color }}>{ciForm[k]}/{max}</span>}
+              </div>
+              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max},1fr)` }}>
+                {Array.from({ length: max }, (_, i) => i + 1).map(v => {
+                  const sel = ciForm[k] === v
+                  const bg = sel ? ((k === 'fatiga' || k === 'estres') && v >= 7 ? '#ef4444' : (k === 'fatiga' || k === 'estres') && v >= 5 ? '#f59e0b' : color) : undefined
+                  return (
+                    <button key={v} onClick={() => setCiForm(f => ({ ...f, [k]: v }))}
+                      className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B]'}`}
+                      style={sel ? { background: bg } : {}}>{v}</button>
+                  )
+                })}
+              </div>
+              <div className="flex justify-between mt-1.5"><span className="text-[10px] text-[#C0C0C0]">{lo}</span><span className="text-[10px] text-[#C0C0C0]">{hi}</span></div>
+            </div>
+          ))}
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">⚖️ Peso <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
+            <div className="flex items-center gap-2">
+              <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso} onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
+                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none" />
+              <span className="text-sm text-[#9B9B9B]">kg</span>
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">💬 Nota <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
+            <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={ciForm.nota}
+              onChange={e => setCiForm(f => ({ ...f, nota: e.target.value }))}
+              className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
+          </div>
+          <button onClick={enviarCheckin} disabled={!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres || enviandoCI}
+            className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
+            style={{ background: color }}>{enviandoCI ? '⏳ Enviando...' : '✓ Enviar check-in'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Modal actividad libre ────────────────────────────────────────────────────
+function ModalActividad({ color, actForm, setActForm, guardandoAct, guardarActividad, onClose, ACTIVIDADES }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
+          <div><p className="font-bold text-[#0A0A0A] text-lg">Registrar actividad</p><p className="text-xs text-[#9B9B9B] mt-0.5">Tu entrenador lo verá en tu historial</p></div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl">×</button>
+        </div>
+        <div className="px-6 py-5 space-y-5">
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-3">¿Qué has hecho?</p>
+            <div className="grid grid-cols-2 gap-2">
+              {ACTIVIDADES.map(a => (
+                <button key={a.id} onClick={() => setActForm(f => ({ ...f, tipo: a.id }))}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-medium text-left border transition-all active:scale-95 ${actForm.tipo === a.id ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B]'}`}
+                  style={actForm.tipo === a.id ? { background: color } : {}}>{a.label}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">⏱ Duración</p>
+            <div className="grid grid-cols-4 gap-2">
+              {[30, 45, 60, 90].map(min => (
+                <button key={min} onClick={() => setActForm(f => ({ ...f, duracion: String(min) }))}
+                  className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${actForm.duracion === String(min) ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'}`}
+                  style={actForm.duracion === String(min) ? { background: color } : {}}>{min}'</button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <input type="number" placeholder="Otro (min)" value={[30,45,60,90].includes(+actForm.duracion) ? '' : actForm.duracion}
+                onChange={e => setActForm(f => ({ ...f, duracion: e.target.value }))}
+                className="flex-1 border border-black/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none" />
+              <span className="text-sm text-[#9B9B9B]">min</span>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-bold text-[#0A0A0A]">💓 Intensidad</p>
+              {actForm.rpe && <span className="text-sm font-bold" style={{ color }}>{actForm.rpe}/10</span>}
+            </div>
+            <div className="grid grid-cols-5 gap-1.5">
+              {[[2,'Suave'],[4,'Fácil'],[6,'Moderado'],[8,'Duro'],[10,'Máximo']].map(([v,l]) => (
+                <button key={v} onClick={() => setActForm(f => ({ ...f, rpe: v }))}
+                  className={`py-3 rounded-xl text-[10px] font-bold transition-all active:scale-95 ${actForm.rpe === v ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'}`}
+                  style={actForm.rpe === v ? { background: v>=8?'#ef4444':v>=6?'#f59e0b':color } : {}}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">📝 Nota <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
+            <input type="text" placeholder="Ej: 5km en el parque…" value={actForm.nota}
+              onChange={e => setActForm(f => ({ ...f, nota: e.target.value }))}
+              className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none" />
+          </div>
+          <button onClick={guardarActividad} disabled={!actForm.tipo || !actForm.duracion || guardandoAct}
+            className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
+            style={{ background: color }}>{guardandoAct ? '⏳...' : '✓ Registrar actividad'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Modal registrar sesión ───────────────────────────────────────────────────
+function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerciciosHist, guardandoRegistro, guardarRegistroSesion, onClose }) {
+  const ejercicios = dia?.ejercicios || []
+
+  const histEj = {}
+  for (const reg of ejerciciosHist || []) {
+    const nombre = reg.ejercicio_nombre
+    if (!histEj[nombre]) {
+      const sets = (reg.sets || []).filter(s => s.peso && !isNaN(+s.peso))
+      if (sets.length) histEj[nombre] = { sets, maxPeso: Math.max(...sets.map(s => +s.peso)) }
+    }
+  }
+
+  function iniciarEj(ei) {
+    if (registroSets[ei]) return
+    const ej = ejercicios[ei]
+    const n = parseInt(ej?.series) || 3
+    const hist = histEj[ej?.nombre]
+    setRegistroSets(prev => ({
+      ...prev,
+      [ei]: Array.from({ length: n }, (_, i) => ({
+        peso: hist?.sets?.[i]?.peso?.toString() || '',
+        reps: hist?.sets?.[i]?.reps?.toString() || ej?.reps?.split('-')[0] || '',
+        completada: false,
+      }))
+    }))
+  }
+
+  function updSet(ei, si, campo, valor) {
+    setRegistroSets(prev => {
+      const copy = { ...prev }
+      if (!copy[ei]) iniciarEj(ei)
+      copy[ei] = (copy[ei] || []).map((s, i) => i === si ? { ...s, [campo]: valor } : s)
+      return copy
+    })
+  }
+
+  function toggleSet(ei, si) {
+    setRegistroSets(prev => {
+      const copy = { ...prev }
+      copy[ei] = (copy[ei] || []).map((s, i) => i === si ? { ...s, completada: !s.completada } : s)
+      return copy
+    })
+  }
+
+  const totalComp = Object.values(registroSets).reduce((a, sets) => a + sets.filter(s => s.completada).length, 0)
+  const totalSets = Object.values(registroSets).reduce((a, sets) => a + sets.length, 0)
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-3xl w-full max-w-md max-h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-start justify-between flex-shrink-0">
+          <div className="flex-1 min-w-0 mr-3">
+            <p className="font-bold text-[#0A0A0A] text-lg">{dia.nombre}</p>
+            <p className="text-xs text-[#9B9B9B] mt-1">{ejercicios.length} ejercicios</p>
+            {totalSets > 0 && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#F2F1EE' }}>
+                  <div className="h-full rounded-full" style={{ width: `${(totalComp/totalSets*100).toFixed(0)}%`, background: color }} />
+                </div>
+                <span className="text-[10px] font-bold text-[#9B9B9B]">{totalComp}/{totalSets}</span>
+              </div>
+            )}
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl flex-shrink-0">×</button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {ejercicios.map((ej, ei) => {
+            const hist = histEj[ej.nombre]
+            const setsEj = registroSets[ei]
+            const n = parseInt(ej.series) || 3
+            const compEj = setsEj ? setsEj.filter(s => s.completada).length : 0
+
+            return (
+              <div key={ei} className="border-b border-black/4 last:border-0 px-5 py-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-sm font-bold text-[#0A0A0A] flex-1">{ej.nombre}</p>
+                  {setsEj && compEj === n && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">✓</span>}
+                </div>
+                <div className="flex items-center gap-3 mb-3">
+                  <p className="text-xs text-[#9B9B9B]">{ej.series} × {ej.reps}{ej.peso ? ` · ${ej.peso}` : ''}</p>
+                  {hist && <p className="text-xs font-bold ml-auto" style={{ color }}>Última vez: {hist.maxPeso} kg</p>}
+                </div>
+                {!setsEj
+                  ? <button onClick={() => iniciarEj(ei)} className="w-full py-2 rounded-xl text-xs font-bold border border-black/10 text-[#6B6B6B] active:scale-95">+ Registrar sets</button>
+                  : (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-[1fr,72px,72px,36px] gap-2 px-0.5">
+                        <p className="text-[10px] text-[#9B9B9B]">Serie</p>
+                        <p className="text-[10px] text-[#9B9B9B] text-center">kg</p>
+                        <p className="text-[10px] text-[#9B9B9B] text-center">Reps</p>
+                        <p className="text-[10px] text-[#9B9B9B] text-center">✓</p>
+                      </div>
+                      {setsEj.map((s, si) => (
+                        <div key={si} className="grid grid-cols-[1fr,72px,72px,36px] gap-2 items-center py-0.5 rounded-xl px-0.5"
+                          style={s.completada ? { background: `${color}08` } : {}}>
+                          <p className="text-xs font-bold" style={{ color: s.completada ? color : '#9B9B9B' }}>S{si+1}</p>
+                          <input type="number" step="0.5" value={s.peso} placeholder="—"
+                            onChange={e => updSet(ei, si, 'peso', e.target.value)}
+                            className="w-full border border-black/10 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none font-bold"
+                            style={s.completada ? { borderColor: `${color}40` } : {}} />
+                          <input type="number" value={s.reps} placeholder="—"
+                            onChange={e => updSet(ei, si, 'reps', e.target.value)}
+                            className="w-full border border-black/10 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none font-bold"
+                            style={s.completada ? { borderColor: `${color}40` } : {}} />
+                          <button onClick={() => toggleSet(ei, si)}
+                            className="w-9 h-9 rounded-xl flex items-center justify-center text-sm border transition-all"
+                            style={s.completada ? { background: color, borderColor: color, color: 'white' } : { background: 'white', borderColor: '#E0E0E0', color: '#C0C0C0' }}>✓</button>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                }
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="px-5 py-4 border-t border-black/5 flex-shrink-0">
+          <button onClick={guardarRegistroSesion} disabled={guardandoRegistro || Object.keys(registroSets).length === 0}
+            className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
+            style={{ background: color }}>
+            {guardandoRegistro ? '⏳ Guardando...' : `✓ Guardar sesión${totalComp > 0 ? ` · ${totalComp} series` : ''}`}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
