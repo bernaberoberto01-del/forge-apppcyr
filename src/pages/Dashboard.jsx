@@ -162,6 +162,7 @@ export default function Dashboard({ session }) {
       alertasExtra: alertas||[], tasaRetencion, totalClientes,
       nombreEntrenador: cfg?.nombre_entrenador?.split(' ')[0] || null,
       analisisPendientes: analisisPendientes||[],
+      checkins: checkins||[],
     })
     setLoading(false)
     } catch (e) {
@@ -348,11 +349,13 @@ export default function Dashboard({ session }) {
 
                 {/* Check-ins sin hacer — con urgencia y días */}
                 {d.clientesSinCI.length > 0 && (() => {
+                  // clientesSinCI ya filtra los que llevan +7 días — todos son al menos warning
+                  // Los críticos son los que no tienen NINGÚN check-in o llevan +14 días
+                  const hace14d = new Date(Date.now() - 14*864e5).toISOString().split('T')[0]
                   const criticos = d.clientesSinCI.filter(c => {
-                    const ci = (ciRecientes||[]).filter(r=>r.cliente_id===c.id).sort((a,b)=>b.fecha?.localeCompare(a.fecha))[0]
-                    return !ci || (new Date() - new Date(ci.fecha)) / 864e5 >= 14
+                    const ultimoCI = (d.checkins||[]).filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha?.localeCompare(a.fecha))[0]
+                    return !ultimoCI || ultimoCI.fecha < hace14d
                   })
-                  const normales = d.clientesSinCI.filter(c => !criticos.includes(c))
                   return (
                     <div className={`px-5 py-3.5 ${criticos.length > 0 ? 'bg-red-50' : ''}`}>
                       <div className="flex items-center gap-3 mb-2">
