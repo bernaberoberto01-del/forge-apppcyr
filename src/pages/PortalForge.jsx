@@ -68,7 +68,7 @@ export default function PortalForge() {
     const cid = cl.id, eid = cl.entrenador_id, hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
-      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana] = await Promise.all([
+      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros] = await Promise.all([
       q1(supabase.from('configuracion').select('*').eq('entrenador_id', eid)),
       q1(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
@@ -84,10 +84,11 @@ export default function PortalForge() {
       supabase.from('cuestionarios_nutricion').select('id').eq('cliente_id', cid).limit(1).then(r => !!(r.data?.length)).catch(() => false),
       qa(supabase.from('sesion_ejercicios').select('ejercicio_nombre,sets,patron,sesion_id').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(500)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(7)).lte('fecha', new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
+      qa(supabase.from('nutricion_registros').select('fecha,dia_nombre').eq('cliente_id', cid).gte('fecha', hace(30)).order('fecha', { ascending: false })),
     ])
 
     setConfig(cfg)
-    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana })
+    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros })
     supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
     setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
     setCargando(false)
@@ -322,7 +323,7 @@ export default function PortalForge() {
         <div className="flex-1 px-4 md:px-8 py-5 max-w-2xl w-full mx-auto pb-28 md:pb-10">
           {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={setModalActividad} setModalRegistro={setModalRegistro} ejerciciosHist={ejerciciosHist} />}
           {tab === 'entrena' && <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={setModalRegistro} esOnline={esOnline} />}
-          {tab === 'nutricion' && <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} />}
+          {tab === 'nutricion' && <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} />}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} />}
           {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />}
           {tab === 'mas' && <TabMas pagos={pagos} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} />}
@@ -924,29 +925,30 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline 
 }
 
 // ─── Tab Nutrición ────────────────────────────────────────────────────────────
-function TabNutricion({ nutricion, cuest, cliente, color }) {
+function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [] }) {
+  const [diaAbierto, setDiaAbierto] = useState(null)
+  const [guardandoDia, setGuardandoDia] = useState(null)
+  const [registrosLocales, setRegistrosLocales] = useState(nutricionRegistros)
+
   if (!nutricion) return (
     <div className="text-center py-16">
       <div className="text-4xl mb-3">🥗</div>
-      <p className="text-sm font-bold text-[#0A0A0A]">Plan de nutrición en preparación</p>
-      {!cuest && (
-        <div className="mt-4">
-          <p className="text-xs text-[#6B6B6B] mb-3 leading-relaxed max-w-xs mx-auto">Tu entrenador necesita tu cuestionario de alimentación para crear tu plan.</p>
-          <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
-            className="inline-block text-white text-sm font-bold px-5 py-3 rounded-xl active:scale-95 transition-all"
-            style={{ background: color }}>
-            Rellenar cuestionario →
-          </a>
-        </div>
-      )}
-      {cuest && <p className="text-xs text-[#9B9B9B] mt-2">Cuestionario enviado · Tu entrenador está preparando tu plan</p>}
+      <p className="text-lg font-black text-[#0A0A0A]">Plan en preparación</p>
+      {!cuest
+        ? <div className="mt-5">
+            <p className="text-sm text-[#6B6B6B] mb-4 leading-relaxed max-w-xs mx-auto">Tu entrenador necesita tu cuestionario para crear tu plan.</p>
+            <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
+              className="inline-block text-white text-sm font-black px-6 py-3 rounded-xl"
+              style={{ background: color }}>Rellenar cuestionario →</a>
+          </div>
+        : <p className="text-sm text-[#9B9B9B] mt-3">Cuestionario enviado · Pendiente</p>
+      }
     </div>
   )
 
   const contenido = nutricion.contenido || nutricion.borrador || {}
   const macrosSrc = contenido.macros || {}
 
-  // Macros: columnas directas de BD tienen prioridad, fallback a contenido.macros
   const macros = [
     { label: 'Calorías', val: nutricion.calorias_dia || macrosSrc.calorias_dia, unit: 'kcal', c: color },
     { label: 'Proteína', val: nutricion.proteinas_g || macrosSrc.proteinas_g, unit: 'g', c: '#6366f1' },
@@ -954,25 +956,29 @@ function TabNutricion({ nutricion, cuest, cliente, color }) {
     { label: 'Grasas', val: nutricion.grasas_g || macrosSrc.grasas_g, unit: 'g', c: '#10b981' },
   ].filter(m => m.val)
 
-  // Comidas: soportar contenido.comidas[] y contenido.menu[].comidas[]
-  // Si hay menu por días, coger el día de hoy o mostrar selector
   const tieneMenu = Array.isArray(contenido.menu) && contenido.menu.length > 0
-  const tieneComidas = Array.isArray(contenido.comidas) && contenido.comidas.length > 0
-
-  const DIAS_ES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
-  const diaHoyNombre = DIAS_ES[new Date().getDay()]
-
-  // Si tiene estructura menu por días: mostrar las comidas del día actual
-  const comidasHoy = tieneMenu
-    ? (contenido.menu.find(d => d.dia?.toLowerCase() === diaHoyNombre.toLowerCase())?.comidas
-      || contenido.menu[0]?.comidas || [])
-    : tieneComidas ? contenido.comidas : []
-
-  const diaActual = tieneMenu
-    ? (contenido.menu.find(d => d.dia?.toLowerCase() === diaHoyNombre.toLowerCase())?.dia || contenido.menu[0]?.dia)
-    : null
-
+  const dias = tieneMenu ? contenido.menu : []
   const hidratacion = contenido.hidratacion || macrosSrc.hidratacion_litros || null
+
+  // Tracker: fechas registradas
+  const fechasRegistradas = new Set(registrosLocales.map(r => r.fecha))
+  const hoy = hoyStr()
+
+  async function registrarDia(dia, diaNombre) {
+    setGuardandoDia(diaNombre)
+    const { error } = await supabase.from('nutricion_registros').insert({
+      cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
+      fecha: hoy, dia_nombre: diaNombre
+    })
+    if (!error) {
+      setRegistrosLocales(prev => [...prev, { fecha: hoy, dia_nombre: diaNombre }])
+    }
+    setGuardandoDia(null)
+  }
+
+  const yaRegistradoHoy = registrosLocales.some(r => r.fecha === hoy)
+  // Semanas: últimas 4 semanas de registros por día de semana
+  const totalRegistros = registrosLocales.length
 
   return (
     <div className="space-y-3">
@@ -982,106 +988,193 @@ function TabNutricion({ nutricion, cuest, cliente, color }) {
         <h2 className="text-xl font-black text-[#0A0A0A] tracking-tight mt-0.5">{nutricion.nombre}</h2>
       </div>
 
-      {/* Macros — hero negro */}
+      {/* Macros hero negro */}
       {macros.length > 0 && (
         <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
-          <div className="grid grid-cols-4 divide-x" style={{ divideColor: 'rgba(255,255,255,0.06)' }}>
-            {macros.map(m => (
-              <div key={m.label} className="px-3 py-4 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="grid grid-cols-4">
+            {macros.map((m, i) => (
+              <div key={m.label} className="px-3 py-4 text-center"
+                style={{ borderRight: i < 3 ? '1px solid rgba(255,255,255,0.06)' : undefined }}>
                 <p className="text-xl font-black leading-none" style={{ color: m.c }}>{m.val}</p>
                 <p className="text-[9px] font-bold mt-1.5 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{m.unit}</p>
                 <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.2)' }}>{m.label}</p>
               </div>
             ))}
           </div>
-          {/* Barra distribución macro */}
+          {/* Barra macros */}
           {macros.length >= 3 && (() => {
-            const prot = (macros.find(m => m.label === 'Proteína')?.val || 0) * 4
-            const carb = (macros.find(m => m.label === 'Carbos')?.val || 0) * 4
-            const gras = (macros.find(m => m.label === 'Grasas')?.val || 0) * 9
-            const total = prot + carb + gras || 1
+            const prot = (macros.find(m=>m.label==='Proteína')?.val||0)*4
+            const carb = (macros.find(m=>m.label==='Carbos')?.val||0)*4
+            const gras = (macros.find(m=>m.label==='Grasas')?.val||0)*9
+            const total = prot+carb+gras||1
             return (
-              <div className="px-4 pb-4 space-y-1.5">
-                <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
-                  <div style={{ width: `${(prot/total*100).toFixed(0)}%`, background: '#6366f1' }} />
-                  <div style={{ width: `${(carb/total*100).toFixed(0)}%`, background: '#f59e0b' }} />
-                  <div style={{ width: `${(gras/total*100).toFixed(0)}%`, background: '#10b981' }} />
+              <div className="px-4 pb-3 space-y-1.5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                <div className="flex h-1.5 rounded-full overflow-hidden gap-px mt-2">
+                  <div style={{ width:`${(prot/total*100).toFixed(0)}%`, background:'#6366f1' }} />
+                  <div style={{ width:`${(carb/total*100).toFixed(0)}%`, background:'#f59e0b' }} />
+                  <div style={{ width:`${(gras/total*100).toFixed(0)}%`, background:'#10b981' }} />
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[9px] font-bold" style={{ color: '#6366f180' }}>Prot {(prot/total*100).toFixed(0)}%</span>
-                  <span className="text-[9px] font-bold" style={{ color: '#f59e0b80' }}>Carbos {(carb/total*100).toFixed(0)}%</span>
-                  <span className="text-[9px] font-bold" style={{ color: '#10b98180' }}>Grasas {(gras/total*100).toFixed(0)}%</span>
+                  <span className="text-[9px] font-bold" style={{ color:'#6366f150' }}>Prot {(prot/total*100).toFixed(0)}%</span>
+                  <span className="text-[9px] font-bold" style={{ color:'#f59e0b50' }}>Carbos {(carb/total*100).toFixed(0)}%</span>
+                  <span className="text-[9px] font-bold" style={{ color:'#10b98150' }}>Grasas {(gras/total*100).toFixed(0)}%</span>
                 </div>
               </div>
             )
           })()}
           {hidratacion && (
             <div className="px-4 pb-3 flex items-center gap-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>💧</span>
-              <p className="text-[11px] font-bold" style={{ color: 'rgba(255,255,255,0.4)' }}>{hidratacion}L de agua al día</p>
+              <span style={{ color:'rgba(255,255,255,0.4)', fontSize:13 }}>💧</span>
+              <p className="text-[11px] font-bold" style={{ color:'rgba(255,255,255,0.35)' }}>{hidratacion}L de agua al día</p>
             </div>
           )}
         </div>
       )}
 
-      {/* Comidas del día */}
-      {comidasHoy.length > 0 && (
-        <div>
-          {diaActual && (
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">
-                Hoy — {diaActual}
-              </p>
-              {tieneMenu && (
-                <div className="flex-1 h-px" style={{ background: 'rgba(0,0,0,0.08)' }} />
-              )}
-            </div>
-          )}
-          {comidasHoy.map((comida, ci) => (
-            <div key={ci} className="bg-white rounded-2xl overflow-hidden mb-2">
-              <div className="px-4 py-3 flex items-center justify-between border-b border-black/5">
-                <div>
-                  <p className="text-sm font-black text-[#0A0A0A]">{comida.nombre}</p>
-                  {comida.hora && <p className="text-[10px] font-medium text-[#9B9B9B] mt-0.5">{comida.hora}</p>}
-                </div>
-                {comida.kcal && (
-                  <div className="text-right">
-                    <p className="text-base font-black" style={{ color }}>{comida.kcal}</p>
-                    <p className="text-[9px] text-[#9B9B9B] font-medium">kcal</p>
+      {/* Tracker semanal */}
+      {tieneMenu && (
+        <div className="bg-white rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Seguimiento</p>
+            <p className="text-[10px] font-black" style={{ color }}>{totalRegistros} días registrados</p>
+          </div>
+          <div className="flex gap-1.5">
+            {dias.map((dia, di) => {
+              // Ver si algún registro de esta semana corresponde a este índice de día
+              const registrosDelDia = registrosLocales.filter(r => r.dia_nombre === dia.dia)
+              const completado = registrosDelDia.length > 0
+              const esHoyDia = (() => {
+                const DIAS_ES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+                const diaHoy = DIAS_ES[new Date().getDay()]
+                return dia.dia?.toLowerCase() === diaHoy.toLowerCase()
+              })()
+              return (
+                <button key={di} onClick={() => setDiaAbierto(diaAbierto === di ? null : di)}
+                  className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl active:scale-95 transition-all"
+                  style={{
+                    background: completado ? `${color}15` : esHoyDia ? '#0A0A0A' : '#F4F3F0',
+                    border: esHoyDia && !completado ? `1.5px solid ${color}` : undefined
+                  }}>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black"
+                    style={{
+                      background: completado ? color : esHoyDia ? color : 'rgba(0,0,0,0.08)',
+                      color: completado || esHoyDia ? 'white' : '#9B9B9B'
+                    }}>
+                    {completado ? '✓' : (di + 1)}
                   </div>
-                )}
-              </div>
-              {/* Macros de la comida */}
-              {(comida.proteinas_g || comida.carbohidratos_g || comida.grasas_g) && (
-                <div className="grid grid-cols-3 divide-x border-b border-black/5">
-                  {[
-                    { label: 'Prot', val: comida.proteinas_g, c: '#6366f1' },
-                    { label: 'Carbos', val: comida.carbohidratos_g, c: '#f59e0b' },
-                    { label: 'Grasas', val: comida.grasas_g, c: '#10b981' },
-                  ].filter(m => m.val).map(m => (
-                    <div key={m.label} className="py-2 text-center" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
-                      <p className="text-xs font-black" style={{ color: m.c }}>{m.val}g</p>
-                      <p className="text-[9px] text-[#9B9B9B] font-medium">{m.label}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {/* Alimentos */}
-              <div className="px-4 py-2.5 space-y-2">
-                {(comida.alimentos || []).map((al, ai) => (
-                  <div key={ai} className="flex items-center justify-between">
-                    <p className="text-sm text-[#0A0A0A] font-medium">{typeof al === 'string' ? al : al.nombre}</p>
-                    {al.cantidad && <p className="text-xs font-bold text-[#9B9B9B]">{al.cantidad}</p>}
-                  </div>
-                ))}
-                {comida.prep && (
-                  <p className="text-[10px] text-[#9B9B9B] italic pt-1 border-t border-black/4 mt-1 leading-relaxed">
-                    {comida.prep}
+                  <p className="text-[8px] font-black uppercase"
+                    style={{ color: completado ? color : esHoyDia ? 'white' : '#B0B0B0' }}>
+                    {dia.dia?.slice(0, 3)}
                   </p>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 7 días colapsados */}
+      {dias.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Plan semanal</p>
+            {diaAbierto !== null && (
+              <button onClick={() => setDiaAbierto(null)} className="text-[10px] font-bold text-[#9B9B9B]">Cerrar</button>
+            )}
+          </div>
+
+          {dias.map((dia, di) => {
+            const abierto = diaAbierto === di
+            const comidas = dia.comidas || []
+            const totalKcal = comidas.reduce((sum, c) => sum + (c.kcal || 0), 0)
+            const registradoEste = registrosLocales.some(r => r.dia_nombre === dia.dia)
+            const DIAS_ES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+            const esHoyDia = dia.dia?.toLowerCase() === DIAS_ES[new Date().getDay()].toLowerCase()
+
+            return (
+              <div key={di} className="bg-white rounded-2xl overflow-hidden">
+                {/* Header colapsable */}
+                <button className="w-full px-4 py-3.5 flex items-center gap-3 text-left active:bg-black/2 transition-colors"
+                  onClick={() => setDiaAbierto(abierto ? null : di)}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+                    style={{ background: registradoEste ? '#10b981' : esHoyDia ? color : '#0A0A0A' }}>
+                    {registradoEste ? '✓' : di + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-[#0A0A0A]">{dia.dia}</p>
+                    <p className="text-[10px] text-[#9B9B9B] font-medium mt-0.5">
+                      {comidas.length} comidas · {totalKcal} kcal
+                      {registradoEste && <span className="text-emerald-500 ml-1.5">· ✓ registrado</span>}
+                      {esHoyDia && !registradoEste && <span style={{ color }} className="ml-1.5">· HOY</span>}
+                    </p>
+                  </div>
+                  <span className="text-[#C0C0C0] text-sm transition-transform duration-200 flex-shrink-0"
+                    style={{ transform: abierto ? 'rotate(180deg)' : 'none' }}>▾</span>
+                </button>
+
+                {/* Comidas del día */}
+                {abierto && (
+                  <>
+                    <div className="divide-y border-t" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+                      {comidas.map((comida, ci) => (
+                        <div key={ci} className="px-4 py-3.5">
+                          {/* Cabecera comida */}
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <p className="text-sm font-black text-[#0A0A0A]">{comida.nombre}</p>
+                              {comida.hora && <p className="text-[10px] text-[#9B9B9B] font-medium">{comida.hora}</p>}
+                            </div>
+                            {comida.kcal && (
+                              <div className="text-right flex-shrink-0 ml-2">
+                                <p className="text-base font-black" style={{ color }}>{comida.kcal}</p>
+                                <p className="text-[9px] text-[#9B9B9B]">kcal</p>
+                              </div>
+                            )}
+                          </div>
+                          {/* Macros comida */}
+                          {(comida.proteinas_g || comida.carbohidratos_g || comida.grasas_g) && (
+                            <div className="flex gap-3 mb-2.5">
+                              {[['P', comida.proteinas_g, '#6366f1'], ['C', comida.carbohidratos_g, '#f59e0b'], ['G', comida.grasas_g, '#10b981']].filter(([,v]) => v).map(([l,v,c]) => (
+                                <span key={l} className="text-[10px] font-black" style={{ color: c }}>{l}: {v}g</span>
+                              ))}
+                            </div>
+                          )}
+                          {/* Alimentos */}
+                          <div className="space-y-1.5">
+                            {(comida.alimentos || []).map((al, ai) => (
+                              <div key={ai} className="flex items-center justify-between">
+                                <p className="text-sm text-[#0A0A0A] font-medium">{typeof al === 'string' ? al : al.nombre}</p>
+                                {al.cantidad && <p className="text-xs font-black text-[#9B9B9B] flex-shrink-0 ml-3">{al.cantidad}</p>}
+                              </div>
+                            ))}
+                          </div>
+                          {/* Preparación */}
+                          {comida.prep && (
+                            <p className="text-[10px] text-[#9B9B9B] italic mt-2.5 leading-relaxed border-t pt-2 border-black/5">
+                              {comida.prep}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {/* Botón registrar */}
+                    <div className="px-4 py-3 border-t" style={{ borderColor: 'rgba(0,0,0,0.05)', background: registradoEste ? '#f0fdf4' : `${color}04` }}>
+                      {registradoEste
+                        ? <p className="text-xs font-black text-emerald-600 text-center">✓ Este día está registrado</p>
+                        : (
+                          <button onClick={() => registrarDia(dia, dia.dia)} disabled={!!guardandoDia}
+                            className="w-full py-3 rounded-xl text-sm font-black text-white active:scale-95 transition-all disabled:opacity-40"
+                            style={{ background: color }}>
+                            {guardandoDia === dia.dia ? '⏳ Registrando...' : `✓ He seguido el plan de ${dia.dia}`}
+                          </button>
+                        )
+                      }
+                    </div>
+                  </>
                 )}
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -1099,27 +1192,10 @@ function TabNutricion({ nutricion, cuest, cliente, color }) {
           </div>
         </div>
       )}
-
-      {/* Notas */}
-      {contenido.notas && !contenido.recomendaciones?.length && (
-        <div className="rounded-2xl p-4" style={{ background: '#fffbeb', border: '1px solid #fef08a' }}>
-          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-amber-600 mb-2">Nota</p>
-          <p className="text-sm text-amber-800 leading-relaxed">{contenido.notas}</p>
-        </div>
-      )}
-
-      {/* Selector de días si tiene menú semanal */}
-      {tieneMenu && contenido.menu.length > 1 && (
-        <div className="bg-white rounded-2xl p-4">
-          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Plan semanal</p>
-          <p className="text-xs text-[#6B6B6B] leading-relaxed">
-            Tienes un plan de {contenido.menu.length} días. Hoy te mostramos el menú de <strong>{diaActual}</strong>.
-          </p>
-        </div>
-      )}
     </div>
   )
 }
+
 
 // ─── Tab Progreso ─────────────────────────────────────────────────────────────
 function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, subTab, setSubTab }) {
