@@ -324,7 +324,7 @@ export default function PortalForge() {
           {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={setModalActividad} setModalRegistro={setModalRegistro} ejerciciosHist={ejerciciosHist} />}
           {tab === 'entrena' && <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={setModalRegistro} esOnline={esOnline} />}
           {tab === 'nutricion' && <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} />}
-          {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} />}
+          {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} />}
           {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />}
           {tab === 'mas' && <TabMas pagos={pagos} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} />}
         </div>
@@ -1198,91 +1198,173 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
 
 
 // ─── Tab Progreso ─────────────────────────────────────────────────────────────
-function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, subTab, setSubTab }) {
-  const SUBTABS = [{ id: 'peso', label: '⚖️ Peso' }, { id: 'fuerza', label: '💪 Fuerza' }, { id: 'medidas', label: '📏 Medidas' }, { id: 'fotos', label: '📸 Fotos' }]
+// ─── TAB PROGRESO ─────────────────────────────────────────────────────────────
+function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, subTab, setSubTab, cliente, cargarTodo }) {
+  const SUBTABS = [
+    { id: 'peso',    label: 'Peso' },
+    { id: 'fuerza',  label: 'Fuerza' },
+    { id: 'medidas', label: 'Medidas' },
+    { id: 'fotos',   label: 'Fotos' },
+  ]
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-1 bg-black/5 p-1 rounded-xl">
+      {/* Selector subtabs — estilo Nike */}
+      <div className="flex gap-0 bg-[#0A0A0A] rounded-2xl p-1">
         {SUBTABS.map(s => (
           <button key={s.id} onClick={() => setSubTab(s.id)}
-            className={`py-2 text-xs font-semibold rounded-lg transition-all ${subTab === s.id ? 'bg-white text-[#0A0A0A] shadow-sm' : 'text-[#6B6B6B]'}`}>
+            className="flex-1 py-2.5 text-[11px] font-black rounded-xl tracking-wide uppercase transition-all"
+            style={subTab === s.id
+              ? { background: color, color: 'white' }
+              : { color: 'rgba(255,255,255,0.3)' }}>
             {s.label}
           </button>
         ))}
       </div>
-      {subTab === 'peso' && <SubPeso checkins={checkins} color={color} />}
-      {subTab === 'medidas' && <SubMedidas medidas={medidas} color={color} />}
-      {subTab === 'fuerza' && <SubFuerza ejerciciosHist={ejerciciosHist} color={color} />}
-      {subTab === 'medidas' && <SubMedidas medidas={medidas} color={color} />}
-      {subTab === 'fotos' && <SubFotos fotos={fotos} />}
+      {subTab === 'peso'    && <SubPeso checkins={checkins} color={color} />}
+      {subTab === 'fuerza'  && <SubFuerza ejerciciosHist={ejerciciosHist} color={color} />}
+      {subTab === 'medidas' && <SubMedidas medidas={medidas} color={color} cliente={cliente} cargarTodo={cargarTodo} />}
+      {subTab === 'fotos'   && <SubFotos fotos={fotos} color={color} cliente={cliente} cargarTodo={cargarTodo} />}
     </div>
   )
 }
 
+// ─── SubPeso ─────────────────────────────────────────────────────────────────
 function SubPeso({ checkins, color }) {
-  const pesos = checkins?.filter(c => c.peso).slice().reverse() || []
+  const pesos = (checkins || []).filter(c => c.peso).slice().reverse()
+  const pesoActual = pesos[pesos.length - 1]?.peso
+  const pesoInicial = pesos[0]?.peso
+  const diff = pesoActual && pesoInicial ? +(pesoActual - pesoInicial).toFixed(1) : null
+  const energiaMedia = checkins?.filter(c => c.energia).length
+    ? (checkins.filter(c => c.energia).reduce((s, c) => s + c.energia, 0) / checkins.filter(c => c.energia).length).toFixed(1)
+    : null
+
   if (!checkins?.length) return (
-    <div className="text-center py-10">
-      <div className="text-3xl mb-2">📊</div>
-      <p className="text-sm font-bold text-[#0A0A0A]">Sin check-ins aún</p>
-      <p className="text-xs text-[#9B9B9B] mt-1">Haz tu primer check-in desde el Inicio</p>
+    <div className="rounded-2xl p-10 text-center" style={{ background: '#0A0A0A' }}>
+      <p className="text-4xl mb-4">⚖️</p>
+      <p className="text-base font-black text-white">Sin check-ins aún</p>
+      <p className="text-xs mt-2" style={{ color: 'rgba(255,255,255,0.35)' }}>Haz tu primer check-in desde Inicio</p>
     </div>
   )
-  const ultimo = checkins[0]
-  const energiaMedia = checkins.length ? (checkins.reduce((s, c) => s + (c.energia || 0), 0) / checkins.length).toFixed(1) : '—'
+
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Peso actual', val: pesos[pesos.length-1]?.peso ? `${pesos[pesos.length-1].peso}kg` : '—', c: '#0A0A0A' },
-          { label: 'Check-ins', val: checkins.length, c: color },
-          { label: 'Energía media', val: energiaMedia === '0.0' ? '—' : `${energiaMedia}/5`, c: '#6366f1' },
-        ].map(k => (
-          <div key={k.label} className="bg-white rounded-2xl border border-black/5 p-3 text-center">
-            <p className="text-xl font-bold" style={{ color: k.c }}>{k.val}</p>
-            <p className="text-[10px] text-[#9B9B9B] mt-0.5">{k.label}</p>
-          </div>
-        ))}
-      </div>
-      {pesos.length > 1 && (
-        <div className="bg-white rounded-2xl border border-black/5 p-4">
-          <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-widest mb-3">Evolución del peso</p>
-          <div className="flex items-end gap-1.5 h-28">
-            {pesos.slice(-10).map((c, i, arr) => {
-              const min = Math.min(...arr.map(x => x.peso))
-              const max = Math.max(...arr.map(x => x.peso))
-              const h = max === min ? 50 : Math.max(15, ((c.peso - min) / (max - min)) * 75 + 25)
-              const isLast = i === arr.length - 1
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full rounded-md" style={{ height: `${h}%`, background: isLast ? color : `${color}30`, minHeight: 6 }} />
-                  <p className="text-[8px] text-[#C0C0C0]">{c.peso}</p>
-                </div>
-              )
-            })}
-          </div>
+      {/* KPIs hero negro */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+        <div className="grid grid-cols-3">
+          {[
+            { label: 'Ahora', val: pesoActual ? `${pesoActual}` : '—', unit: 'kg', c: 'white' },
+            { label: 'Cambio', val: diff !== null ? `${diff > 0 ? '+' : ''}${diff}` : '—', unit: diff !== null ? 'kg' : '', c: diff === null ? 'white' : diff < 0 ? '#10b981' : diff > 0 ? '#818cf8' : 'white' },
+            { label: 'Check-ins', val: checkins.length, unit: '', c: color },
+          ].map((k, i) => (
+            <div key={k.label} className="px-3 py-4 text-center"
+              style={{ borderRight: i < 2 ? '1px solid rgba(255,255,255,0.06)' : undefined }}>
+              <p className="text-[9px] font-black tracking-[0.12em] uppercase mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>{k.label}</p>
+              <p className="text-2xl font-black leading-none" style={{ color: k.c }}>
+                {k.val}<span className="text-xs font-normal ml-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>{k.unit}</span>
+              </p>
+            </div>
+          ))}
         </div>
-      )}
-      <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-        <div className="px-4 py-3 border-b border-black/4">
-          <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-widest">Historial</p>
+        {energiaMedia && (
+          <div className="px-5 py-2.5 border-t flex items-center gap-2" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+            <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <div className="h-full rounded-full" style={{ width: `${(parseFloat(energiaMedia)/5*100).toFixed(0)}%`, background: color }} />
+            </div>
+            <p className="text-[10px] font-black flex-shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }}>⚡ {energiaMedia}/5</p>
+          </div>
+        )}
+      </div>
+
+      {/* Gráfica SVG — línea con área y puntos */}
+      {pesos.length > 1 && (() => {
+        const datos = pesos.slice(-10)
+        const min = Math.min(...datos.map(x => x.peso))
+        const max = Math.max(...datos.map(x => x.peso))
+        const range = max - min || 0.1
+        const W = 320, H = 120, pad = 16
+        const iW = W - pad*2, iH = H - pad*2 - 20
+        const pts = datos.map((c, i) => ({
+          x: pad + (i / (datos.length-1)) * iW,
+          y: pad + (1 - (c.peso - min) / range) * iH,
+          peso: c.peso,
+          fecha: c.fecha,
+        }))
+        const linePath = pts.map((p, i) => `${i===0?'M':'L'} ${p.x},${p.y}`).join(' ')
+        const areaPath = `M ${pts[0].x},${H-20} ` + pts.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${pts[pts.length-1].x},${H-20} Z`
+        return (
+          <div className="bg-white rounded-2xl p-4">
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-3">Evolución del peso</p>
+            <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }}>
+              <defs>
+                <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity="0.2"/>
+                  <stop offset="100%" stopColor={color} stopOpacity="0"/>
+                </linearGradient>
+              </defs>
+              {/* Grid lines */}
+              {[0,0.5,1].map(t => (
+                <line key={t} x1={pad} y1={pad + t*iH} x2={W-pad} y2={pad + t*iH}
+                  stroke="rgba(0,0,0,0.06)" strokeWidth="1" strokeDasharray="4 4" />
+              ))}
+              {/* Área */}
+              <path d={areaPath} fill="url(#pg)" />
+              {/* Línea */}
+              <path d={linePath} stroke={color} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              {/* Puntos */}
+              {pts.map((p, i) => (
+                <g key={i}>
+                  <circle cx={p.x} cy={p.y} r={i === pts.length-1 ? 6 : 4}
+                    fill={i === pts.length-1 ? color : 'white'}
+                    stroke={color} strokeWidth="2.5" />
+                  {/* Label peso */}
+                  <text x={p.x} y={H-4} textAnchor="middle"
+                    fontSize="9" fontWeight="700" fill={i === pts.length-1 ? color : '#C0C0C0'}>
+                    {p.peso}
+                  </text>
+                </g>
+              ))}
+              {/* Label hover del último punto */}
+              {pts.length > 0 && (
+                <g>
+                  <rect x={pts[pts.length-1].x - 24} y={pts[pts.length-1].y - 22}
+                    width="48" height="16" rx="4" fill={color} />
+                  <text x={pts[pts.length-1].x} y={pts[pts.length-1].y - 10}
+                    textAnchor="middle" fontSize="9" fontWeight="900" fill="white">
+                    {pts[pts.length-1].peso} kg
+                  </text>
+                </g>
+              )}
+            </svg>
+          </div>
+        )
+      })()}
+
+      {/* Historial — limpio, tipografía fuerte */}
+      <div className="bg-white rounded-2xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-black/5 flex items-center justify-between">
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Historial</p>
+          <p className="text-[10px] font-black text-[#9B9B9B]">{checkins.length} entradas</p>
         </div>
         <div className="divide-y divide-black/4">
-          {checkins.slice(0, 12).map((c, i) => (
-            <div key={i} className="px-4 py-3 flex items-center gap-3">
+          {checkins.slice(0, 15).map((c, i) => (
+            <div key={i} className="px-5 py-3.5 flex items-start gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-[#0A0A0A]">
-                  {new Date(c.fecha).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                <p className="text-xs font-black text-[#0A0A0A]">
+                  {new Date(c.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}
                 </p>
-                <div className="flex gap-3 mt-0.5 flex-wrap">
-                  {c.energia != null && <span className="text-[10px] text-[#9B9B9B]">⚡ {c.energia}/5</span>}
-                  {c.fatiga != null && <span className="text-[10px] text-[#9B9B9B]">🏋️ {c.fatiga}/10</span>}
-                  {c.sueno != null && <span className="text-[10px] text-[#9B9B9B]">😴 {c.sueno}/5</span>}
-                  {c.estres != null && <span className="text-[10px] text-[#9B9B9B]">🧠 {c.estres}/10</span>}
+                <div className="flex gap-2.5 mt-1.5 flex-wrap">
+                  {c.energia  != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ {c.energia}/5</span>}
+                  {c.fatiga   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ {c.fatiga}/10</span>}
+                  {c.sueno    != null && <span className="text-[10px] font-bold text-[#9B9B9B]">😴 {c.sueno}/5</span>}
+                  {c.estres   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 {c.estres}/10</span>}
                 </div>
-                {c.comentario && <p className="text-[10px] text-[#9B9B9B] mt-1 italic">"{c.comentario}"</p>}
+                {c.comentario && (
+                  <p className="text-[10px] text-[#9B9B9B] mt-1.5 italic leading-relaxed">"{c.comentario}"</p>
+                )}
               </div>
-              {c.peso && <p className="text-sm font-bold text-[#0A0A0A] flex-shrink-0">{c.peso}kg</p>}
+              {c.peso && (
+                <p className="text-base font-black text-[#0A0A0A] flex-shrink-0">{c.peso}<span className="text-xs font-normal text-[#9B9B9B] ml-0.5">kg</span></p>
+              )}
             </div>
           ))}
         </div>
@@ -1291,345 +1373,289 @@ function SubPeso({ checkins, color }) {
   )
 }
 
-function SubMedidas({ medidas, color }) {
-  if (!medidas?.length) return (
-    <div className="text-center py-10"><div className="text-3xl mb-2">📏</div><p className="text-sm font-bold text-[#0A0A0A]">Sin medidas aún</p></div>
-  )
-  return (
-    <div className="space-y-2">
-      {medidas.slice(0, 6).map((m, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-black/5 p-4">
-          <p className="text-xs text-[#9B9B9B] mb-3">{new Date(m.fecha + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-          <div className="grid grid-cols-3 gap-3">
-            {[['Pecho', m.pecho], ['Cintura', m.cintura], ['Cadera', m.cadera], ['Muslo', m.muslo], ['Brazo', m.brazo], ['Gemelo', m.gemelo]].filter(([, v]) => v).map(([l, v]) => (
-              <div key={l} className="text-center">
-                <p className="text-sm font-bold text-[#0A0A0A]">{v}cm</p>
-                <p className="text-[10px] text-[#9B9B9B]">{l}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
 
-function SubMarcas({ marcas, color }) {
-  if (!marcas?.length) return (
-    <div className="text-center py-10"><div className="text-3xl mb-2">🏆</div><p className="text-sm font-bold text-[#0A0A0A]">Sin marcas aún</p></div>
-  )
-  return (
-    <div className="space-y-2">
-      {marcas.map((m, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-black/5 p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}>
-            <span>🏆</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A] truncate">{m.ejercicio}</p>
-            <p className="text-xs text-[#9B9B9B]">{new Date(m.fecha + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-lg font-bold" style={{ color }}>{m.peso_kg}kg</p>
-            {m.reps && <p className="text-xs text-[#9B9B9B]">{m.reps} reps</p>}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function SubFotos({ fotos }) {
-  if (!fotos?.length) return (
-    <div className="text-center py-10"><div className="text-3xl mb-2">📸</div><p className="text-sm font-bold text-[#0A0A0A]">Sin fotos aún</p></div>
-  )
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      {fotos.map((f, i) => (
-        <div key={i} className="aspect-square rounded-xl overflow-hidden bg-[#F7F6F3]">
-          <img src={f.url} alt="" className="w-full h-full object-cover" />
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Tab Mensajes ─────────────────────────────────────────────────────────────
-function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensaje, color, endRef }) {
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes?.length])
-  return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
-      <div className="flex-1 overflow-y-auto space-y-2 pb-2">
-        {!mensajes?.length && (
-          <div className="text-center py-10">
-            <div className="text-3xl mb-2">✉️</div>
-            <p className="text-sm font-bold text-[#0A0A0A]">Sin mensajes aún</p>
-            <p className="text-xs text-[#9B9B9B] mt-1">Escríbele a tu entrenador</p>
-          </div>
-        )}
-        {mensajes?.map((m, i) => {
-          const esEntrenador = m.tipo === 'entrenador' || m.tipo === 'sistema'
-          return (
-            <div key={i} className={`flex ${esEntrenador ? 'justify-start' : 'justify-end'}`}>
-              <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${esEntrenador ? 'bg-white border border-black/5 text-[#0A0A0A]' : 'text-white'}`}
-                style={!esEntrenador ? { background: color } : {}}>
-                {m.contenido}
-              </div>
-            </div>
-          )
-        })}
-        <div ref={endRef} />
-      </div>
-      <form onSubmit={enviarMensaje} className="flex gap-2 pt-3 border-t border-black/5">
-        <input value={textoMsg} onChange={e => setTextoMsg(e.target.value)}
-          placeholder="Escribe un mensaje..."
-          className="flex-1 border border-black/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] bg-white" />
-        <button type="submit" disabled={!textoMsg.trim() || enviandoMsg}
-          className="px-4 py-3 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
-          style={{ background: color }}>
-          {enviandoMsg ? '…' : '→'}
-        </button>
-      </form>
-    </div>
-  )
-}
-
-// ─── Tab Pagos ────────────────────────────────────────────────────────────────
-function TabPagos({ pagos, color }) {
-  if (!pagos?.length) return (
-    <div className="text-center py-10"><div className="text-3xl mb-2">💳</div><p className="text-sm font-bold text-[#0A0A0A]">Sin pagos registrados</p></div>
-  )
-  return (
-    <div className="space-y-2">
-      {pagos.map((p, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-black/5 p-4 flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A]">{p.concepto || 'Pago mensual'}</p>
-            <p className="text-xs text-[#9B9B9B] mt-0.5">
-              {p.fecha_pago ? new Date(p.fecha_pago + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
-            </p>
-          </div>
-          <div className="text-right flex-shrink-0">
-            <p className="text-lg font-bold text-[#0A0A0A]">{p.importe}€</p>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.estado === 'cobrado' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-              {p.estado === 'cobrado' ? '✓ Cobrado' : 'Pendiente'}
-            </span>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Tab Ajustes ──────────────────────────────────────────────────────────────
-function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0 }) {
-  const [seccion, setSeccion] = useState('menu')
-  const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
+// ─── SubMedidas ───────────────────────────────────────────────────────────────
+function SubMedidas({ medidas, color, cliente, cargarTodo }) {
+  const [mostrando, setMostrando] = useState('lista')
+  const [form, setForm] = useState({ cintura:'', pecho:'', cadera:'', bicep:'', muslo:'', gemelo:'', cuello:'' })
   const [guardando, setGuardando] = useState(false)
   const [ok, setOk] = useState(false)
 
-  const pagosPendientes = pagos?.filter(p => p.estado !== 'cobrado').length || 0
-
-  const ITEMS = [
-    {
-      id: 'mensajes',
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-      label: 'Mensajes',
-      desc: msgNoLeidos > 0 ? `${msgNoLeidos} mensaje${msgNoLeidos > 1 ? 's' : ''} sin leer` : 'Chat con tu entrenador',
-      badge: msgNoLeidos,
-      urgente: msgNoLeidos > 0,
-    },
-    ...(pagos?.length ? [{
-      id: 'pagos',
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
-      label: 'Pagos',
-      desc: pagosPendientes > 0 ? `${pagosPendientes} pago${pagosPendientes > 1 ? 's' : ''} pendiente${pagosPendientes > 1 ? 's' : ''}` : 'Historial de pagos',
-      badge: pagosPendientes,
-      urgente: pagosPendientes > 0,
-    }] : []),
-    {
-      id: 'ajustes',
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>,
-      label: 'Ajustes',
-      desc: 'Objetivo, peso, contraseña',
-      badge: 0,
-      urgente: false,
-    },
+  const CAMPOS = [
+    { key:'cintura', label:'Cintura', icon:'📏' },
+    { key:'pecho',   label:'Pecho',   icon:'💪' },
+    { key:'cadera',  label:'Cadera',  icon:'⬡' },
+    { key:'bicep',   label:'Bícep',   icon:'💪' },
+    { key:'muslo',   label:'Muslo',   icon:'🦵' },
+    { key:'gemelo',  label:'Gemelo',  icon:'🦵' },
+    { key:'cuello',  label:'Cuello',  icon:'📐' },
   ]
 
-  async function guardar(e) {
-    e.preventDefault(); setGuardando(true); setOk(false)
-    await supabase.from('clientes').update({
-      peso_actual: form.peso_actual ? parseFloat(form.peso_actual) : null,
-      peso_objetivo: form.peso_objetivo ? parseFloat(form.peso_objetivo) : null,
-      objetivo: form.objetivo || null,
-    }).eq('id', cliente.id)
-    setOk(true); setGuardando(false)
-    setTimeout(() => setOk(false), 3000)
+  async function guardar() {
+    const rellenos = CAMPOS.filter(c => form[c.key] && !isNaN(+form[c.key]))
+    if (!rellenos.length) return
+    setGuardando(true)
+    const payload = { cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr() }
+    rellenos.forEach(c => { payload[c.key] = parseFloat(form[c.key]) })
+    await supabase.from('medidas_cliente').insert(payload)
+    setOk(true)
+    setTimeout(() => {
+      setOk(false); setMostrando('lista')
+      setForm({ cintura:'', pecho:'', cadera:'', bicep:'', muslo:'', gemelo:'', cuello:'' })
+      cargarTodo()
+    }, 1200)
+    setGuardando(false)
   }
 
-  const OBJETIVOS = [
-    ['perdida_grasa', '🔥 Pérdida de grasa'], ['ganancia_muscular', '💪 Ganar músculo'],
-    ['tonificacion', '✨ Tonificación'], ['rendimiento', '🏃 Rendimiento'],
-    ['mantenimiento', '⚖️ Mantenimiento'], ['salud', '❤️ Salud'],
-  ]
-
-  if (seccion === 'ajustes') {
-    const OBJETIVOS = [
-      ['perdida_grasa','🔥 Pérdida de grasa'],['ganancia_muscular','💪 Ganar músculo'],
-      ['tonificacion','✨ Tonificación'],['rendimiento','🏃 Rendimiento'],
-      ['mantenimiento','⚖️ Mantenimiento'],['salud','❤️ Salud'],
-    ]
-    return (
-      <div className="space-y-4">
-        <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
-        <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Ajustes</p>
-        <form onSubmit={guardar} className="bg-white rounded-2xl p-4 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {[['Peso actual (kg)','peso_actual'],['Peso objetivo (kg)','peso_objetivo']].map(([label,key]) => (
-              <div key={key}>
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#9B9B9B] block mb-2">{label}</label>
-                <input type="number" step="0.1" value={form[key]}
-                  onChange={e => setForm(f => ({...f,[key]:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none" />
-              </div>
-            ))}
-          </div>
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#9B9B9B] block mb-2">Mi objetivo</label>
-            <div className="grid grid-cols-2 gap-2">
-              {OBJETIVOS.map(([v,l]) => (
-                <button key={v} type="button" onClick={() => setForm(f=>({...f,objetivo:v}))}
-                  className={`py-2.5 px-3 rounded-xl text-xs font-bold border text-left transition-all ${form.objetivo===v?'text-white border-transparent':'border-black/10 text-[#6B6B6B]'}`}
-                  style={form.objetivo===v?{background:color}:{}}>{l}</button>
-              ))}
-            </div>
-          </div>
-          <button type="submit" disabled={guardando}
-            className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40"
-            style={{background:ok?'#10b981':color}}>
-            {guardando?'Guardando...':ok?'✓ Guardado':'Guardar'}
-          </button>
-        </form>
-        <div className="bg-white rounded-2xl p-4">
-          <button onClick={async()=>{await supabase.auth.resetPasswordForEmail(cliente?.email||'',{redirectTo:`${window.location.origin}/`});alert('Email enviado.')}}
-            className="text-sm font-bold text-[#6B6B6B]">Cambiar contraseña →</button>
-        </div>
-        <button onClick={()=>supabase.auth.signOut()}
-          className="w-full py-3.5 rounded-xl border border-red-100 text-red-400 text-sm font-bold">
-          Cerrar sesión
-        </button>
-      </div>
-    )
-  }
-
-  if (seccion === 'pagos') {
-    return (
-      <div className="space-y-3">
-        <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
-        <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Pagos</p>
-        {!pagos?.length
-          ? <div className="text-center py-10"><p className="text-base font-bold text-[#0A0A0A]">Sin pagos registrados</p></div>
-          : pagos.map((p, i) => (
-            <div key={i} className="bg-white rounded-2xl p-4 flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-black text-[#0A0A0A]">{p.concepto||'Pago mensual'}</p>
-                <p className="text-[10px] text-[#9B9B9B] mt-0.5 font-medium">
-                  {p.fecha_pago?new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):''}
-                </p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xl font-black text-[#0A0A0A]">{p.importe}€</p>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${p.estado==='cobrado'?'bg-emerald-50 text-emerald-600':'bg-amber-50 text-amber-600'}`}>
-                  {p.estado==='cobrado'?'✓ Cobrado':'Pendiente'}
-                </span>
-              </div>
-            </div>
-          ))
-        }
-      </div>
-    )
-  }
-
-  if (seccion === 'mensajes') {
-    return (
-      <div>
-        <button onClick={() => setSeccion('menu')} className="text-xs font-bold mb-4 flex items-center gap-1.5" style={{ color }}>← Volver</button>
-        <p className="text-xl font-black text-[#0A0A0A] tracking-tight mb-4">Mensajes</p>
-        <button onClick={() => { setSeccion('menu'); setTab('mensajes') }}
-          className="w-full py-4 rounded-2xl text-white font-black text-sm active:scale-95 transition-all"
-          style={{ background: color }}>Ir a Mensajes →</button>
-      </div>
-    )
-  }
-
-  return (
+  if (mostrando === 'form') return (
     <div className="space-y-3">
-      <p className="text-2xl font-black text-[#0A0A0A] tracking-tight pt-1">Más</p>
-
-      {/* Tarjetas grandes — cada sección bien visible */}
-      {ITEMS.map(item => (
-        <button key={item.id}
-          onClick={() => {
-            if (item.id === 'mensajes') setTab('mensajes')
-            else setSeccion(item.id)
-          }}
-          className="w-full rounded-2xl p-5 flex items-center gap-4 text-left active:scale-[0.98] transition-all"
-          style={{
-            background: item.urgente ? '#0A0A0A' : 'white',
-            border: item.urgente ? `1px solid ${color}` : undefined,
-          }}>
-          {/* Icono */}
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{
-              background: item.urgente ? `${color}20` : '#F4F3F0',
-              color: item.urgente ? color : '#6B6B6B',
-            }}>
-            {item.icon}
-          </div>
-          {/* Texto */}
-          <div className="flex-1 min-w-0">
-            <p className="text-base font-black leading-tight"
-              style={{ color: item.urgente ? 'white' : '#0A0A0A' }}>
-              {item.label}
-            </p>
-            <p className="text-xs mt-0.5 font-medium"
-              style={{ color: item.urgente ? `${color}` : '#9B9B9B' }}>
-              {item.desc}
-            </p>
-          </div>
-          {/* Badge o flecha */}
-          {item.badge > 0
-            ? <span className="w-7 h-7 rounded-full text-sm font-black flex items-center justify-center text-white flex-shrink-0"
-                style={{ background: color }}>{item.badge > 9 ? '9+' : item.badge}</span>
-            : <span className="text-2xl flex-shrink-0" style={{ color: 'rgba(0,0,0,0.15)' }}>›</span>
-          }
-        </button>
-      ))}
-
-      {/* Perfil del cliente */}
-      <div className="bg-white rounded-2xl p-4 flex items-center gap-3 mt-2">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black text-white flex-shrink-0"
-          style={{ background: color }}>
-          {cliente?.nombre?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+      <button onClick={() => setMostrando('lista')} className="text-xs font-black flex items-center gap-1.5" style={{ color }}>← Volver</button>
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+        <div className="px-5 pt-5 pb-3">
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Nueva medición</p>
+          <p className="text-xl font-black text-white">{new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</p>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-[#0A0A0A] truncate">{cliente?.nombre}</p>
-          <p className="text-[10px] text-[#9B9B9B] truncate font-medium">{cliente?.email}</p>
+        <div className="grid grid-cols-2 gap-px" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          {CAMPOS.map(campo => (
+            <div key={campo.key} className="px-4 py-3.5" style={{ background: '#0A0A0A' }}>
+              <p className="text-[9px] font-black uppercase tracking-widest mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>{campo.label}</p>
+              <div className="flex items-center gap-2">
+                <input type="number" step="0.5" inputMode="decimal" placeholder="—" value={form[campo.key]}
+                  onChange={e => setForm(f => ({...f,[campo.key]:e.target.value}))}
+                  className="flex-1 bg-transparent text-xl font-black text-white focus:outline-none w-0"
+                  style={{ color: form[campo.key] ? color : 'rgba(255,255,255,0.4)' }} />
+                <span className="text-xs font-bold" style={{ color: 'rgba(255,255,255,0.25)' }}>cm</span>
+              </div>
+              {form[campo.key] && (
+                <div className="h-0.5 rounded-full mt-2" style={{ background: color }} />
+              )}
+            </div>
+          ))}
         </div>
-        <span className="text-[10px] font-bold px-2 py-1 rounded-lg capitalize"
-          style={{ background: '#F4F3F0', color: '#9B9B9B' }}>
-          {cliente?.tipo}
-        </span>
       </div>
-
-      <button onClick={() => supabase.auth.signOut()}
-        className="w-full py-3.5 rounded-2xl text-sm font-bold border border-red-100 text-red-400 active:scale-95 transition-all">
-        Cerrar sesión
+      <button onClick={guardar} disabled={guardando || !CAMPOS.some(c => form[c.key])}
+        className="w-full py-4 rounded-2xl text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all"
+        style={{ background: ok ? '#10b981' : color }}>
+        {guardando ? '⏳ Guardando...' : ok ? '✓ Medidas guardadas' : 'Guardar medidas'}
       </button>
     </div>
   )
+
+  const ultimaMedida = medidas?.[0]
+  const hayMedidas = medidas?.length > 0
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">
+          {hayMedidas ? `${medidas.length} medición${medidas.length>1?'es':''}` : 'Sin medidas'}
+        </p>
+        <button onClick={() => setMostrando('form')}
+          className="text-xs font-black px-4 py-2 rounded-xl text-white active:scale-95"
+          style={{ background: color }}>+ Añadir</button>
+      </div>
+
+      {!hayMedidas ? (
+        <div className="rounded-2xl p-10 text-center" style={{ background: '#0A0A0A' }}>
+          <p className="text-4xl mb-4">📏</p>
+          <p className="text-base font-black text-white">Sin medidas aún</p>
+          <p className="text-xs mt-2 mb-5" style={{ color: 'rgba(255,255,255,0.35)' }}>Registra tu primera medición para ver tu evolución</p>
+          <button onClick={() => setMostrando('form')}
+            className="px-6 py-3 rounded-xl text-sm font-black text-white active:scale-95"
+            style={{ background: color }}>Añadir medidas →</button>
+        </div>
+      ) : (
+        <>
+          {/* Última medición — hero negro */}
+          {ultimaMedida && (
+            <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+              <div className="px-5 pt-4 pb-2">
+                <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Última medición</p>
+                <p className="text-xs font-bold mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  {new Date(ultimaMedida.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+                </p>
+              </div>
+              <div className="grid grid-cols-4 p-4 gap-3">
+                {CAMPOS.filter(c => ultimaMedida[c.key]).map((campo, i) => {
+                  const anterior = medidas[1]?.[campo.key]
+                  const diff = anterior && ultimaMedida[campo.key] ? +(ultimaMedida[campo.key]-anterior).toFixed(1) : null
+                  return (
+                    <div key={campo.key} className="text-center">
+                      <p className="text-lg font-black leading-none text-white">{ultimaMedida[campo.key]}</p>
+                      <p className="text-[8px] font-bold mt-1 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{campo.label}</p>
+                      {diff !== null && diff !== 0 && (
+                        <p className="text-[9px] font-black mt-0.5" style={{ color: diff < 0 ? '#10b981' : '#ef4444' }}>
+                          {diff > 0 ? '+' : ''}{diff}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Historial */}
+          <div className="bg-white rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-black/5">
+              <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Historial</p>
+            </div>
+            <div className="divide-y divide-black/4">
+              {medidas.slice(0,8).map((m,i) => (
+                <div key={i} className="px-5 py-3.5">
+                  <p className="text-[10px] font-black text-[#9B9B9B] mb-2">
+                    {new Date(m.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}
+                  </p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {CAMPOS.filter(c => m[c.key]).map(campo => (
+                      <span key={campo.key} className="text-xs font-bold text-[#0A0A0A]">
+                        {campo.label}: <span style={{ color }}>{m[campo.key]}<span className="text-[#9B9B9B] font-normal">cm</span></span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
+
+
+// ─── SubFotos ─────────────────────────────────────────────────────────────────
+function SubFotos({ fotos, color, cliente, cargarTodo }) {
+  const [subiendo, setSubiendo] = useState(false)
+  const [tipo, setTipo] = useState('frente')
+  const [errorMsg, setErrorMsg] = useState('')
+  const fileRef = React.useRef(null)
+
+  const TIPOS = [
+    { id:'frente',  label:'Frente' },
+    { id:'lateral', label:'Lateral' },
+    { id:'espalda', label:'Espalda' },
+  ]
+
+  async function subirFoto(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setSubiendo(true); setErrorMsg('')
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const path = `${cliente.id}/${hoyStr()}-${tipo}-${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('fotos-progreso').upload(path, file, { upsert: false, contentType: file.type })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = supabase.storage.from('fotos-progreso').getPublicUrl(path)
+      await supabase.from('fotos_progreso').insert({
+        cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
+        url: publicUrl, fecha: hoyStr(), tipo, visible_cliente: true,
+      })
+      await cargarTodo()
+    } catch(err) {
+      console.error(err)
+      setErrorMsg('Error al subir. Intenta de nuevo.')
+    }
+    setSubiendo(false)
+    if (fileRef.current) fileRef.current.value = ''
+  }
+
+  const grupos = (fotos || []).reduce((acc, f) => {
+    const key = f.fecha || 'sin-fecha'
+    if (!acc[key]) acc[key] = []
+    acc[key].push(f)
+    return acc
+  }, {})
+  const fechas = Object.keys(grupos).sort().reverse()
+
+  return (
+    <div className="space-y-3">
+      {/* Uploader — negro */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+        <div className="px-5 pt-4 pb-3">
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-3" style={{ color: 'rgba(255,255,255,0.3)' }}>Añadir foto</p>
+          <div className="flex gap-1.5 mb-3">
+            {TIPOS.map(t => (
+              <button key={t.id} onClick={() => setTipo(t.id)}
+                className="flex-1 py-2 rounded-xl text-xs font-black transition-all"
+                style={tipo===t.id ? { background:color, color:'white' } : { background:'rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.35)' }}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment"
+            onChange={subirFoto} className="hidden" id="foto-up" />
+          <label htmlFor="foto-up"
+            className="w-full py-3.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+            style={{ background: subiendo ? 'rgba(255,255,255,0.1)' : color }}>
+            {subiendo
+              ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Subiendo...</>
+              : <>📸 Foto de {TIPOS.find(t=>t.id===tipo)?.label.toLowerCase()}</>
+            }
+          </label>
+          {errorMsg && <p className="text-xs text-red-400 text-center mt-2">{errorMsg}</p>}
+        </div>
+      </div>
+
+      {fechas.length === 0 ? (
+        <div className="text-center py-10">
+          <p className="text-4xl mb-3">📸</p>
+          <p className="text-base font-black text-[#0A0A0A]">Sin fotos aún</p>
+          <p className="text-xs text-[#9B9B9B] mt-1">Sube tu primera foto de progreso</p>
+        </div>
+      ) : (
+        <>
+          {/* Comparativa inicio vs ahora */}
+          {fechas.length >= 2 && (
+            <div className="bg-white rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-black/5">
+                <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Inicio vs Ahora</p>
+              </div>
+              <div className="grid grid-cols-2 gap-0.5">
+                {[grupos[fechas[fechas.length-1]]?.[0], grupos[fechas[0]]?.[0]].filter(Boolean).map((f,i) => (
+                  <div key={i} className="relative aspect-[3/4]">
+                    <img src={f.url} alt="" className="w-full h-full object-cover" />
+                    <div className="absolute bottom-0 left-0 right-0 px-3 py-2"
+                      style={{ background: i===0?'rgba(0,0,0,0.6)':`${color}dd` }}>
+                      <p className="text-white text-[9px] font-black uppercase tracking-widest">
+                        {i===0?'INICIO':'AHORA'} · {new Date(f.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Galería por fecha */}
+          {fechas.map(fecha => (
+            <div key={fecha} className="bg-white rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-black/5">
+                <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">
+                  {new Date(fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-0.5">
+                {grupos[fecha].map((f,i) => (
+                  <div key={i} className="relative aspect-square">
+                    <img src={f.url} alt={f.tipo||''} className="w-full h-full object-cover" />
+                    {f.tipo && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-1.5 py-1">
+                        <p className="text-white text-[8px] font-black uppercase">{f.tipo}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  )
+}
+
 
 // ─── SubFuerza ────────────────────────────────────────────────────────────────
 function SubFuerza({ ejerciciosHist, color }) {
