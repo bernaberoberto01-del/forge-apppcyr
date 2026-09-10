@@ -944,54 +944,177 @@ function TabNutricion({ nutricion, cuest, cliente, color }) {
   )
 
   const contenido = nutricion.contenido || nutricion.borrador || {}
-  const comidas = contenido.comidas || []
+  const macrosSrc = contenido.macros || {}
+
+  // Macros: columnas directas de BD tienen prioridad, fallback a contenido.macros
   const macros = [
-    { label: 'Calorías', val: nutricion.calorias_dia, unit: 'kcal', c: color },
-    { label: 'Proteína', val: nutricion.proteinas_dia, unit: 'g', c: '#6366f1' },
-    { label: 'Carbos', val: nutricion.carbos_dia, unit: 'g', c: '#f59e0b' },
-    { label: 'Grasas', val: nutricion.grasas_dia, unit: 'g', c: '#10b981' },
+    { label: 'Calorías', val: nutricion.calorias_dia || macrosSrc.calorias_dia, unit: 'kcal', c: color },
+    { label: 'Proteína', val: nutricion.proteinas_g || macrosSrc.proteinas_g, unit: 'g', c: '#6366f1' },
+    { label: 'Carbos', val: nutricion.carbohidratos_g || macrosSrc.carbohidratos_g, unit: 'g', c: '#f59e0b' },
+    { label: 'Grasas', val: nutricion.grasas_g || macrosSrc.grasas_g, unit: 'g', c: '#10b981' },
   ].filter(m => m.val)
+
+  // Comidas: soportar contenido.comidas[] y contenido.menu[].comidas[]
+  // Si hay menu por días, coger el día de hoy o mostrar selector
+  const tieneMenu = Array.isArray(contenido.menu) && contenido.menu.length > 0
+  const tieneComidas = Array.isArray(contenido.comidas) && contenido.comidas.length > 0
+
+  const DIAS_ES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+  const diaHoyNombre = DIAS_ES[new Date().getDay()]
+
+  // Si tiene estructura menu por días: mostrar las comidas del día actual
+  const comidasHoy = tieneMenu
+    ? (contenido.menu.find(d => d.dia?.toLowerCase() === diaHoyNombre.toLowerCase())?.comidas
+      || contenido.menu[0]?.comidas || [])
+    : tieneComidas ? contenido.comidas : []
+
+  const diaActual = tieneMenu
+    ? (contenido.menu.find(d => d.dia?.toLowerCase() === diaHoyNombre.toLowerCase())?.dia || contenido.menu[0]?.dia)
+    : null
+
+  const hidratacion = contenido.hidratacion || macrosSrc.hidratacion_litros || null
 
   return (
     <div className="space-y-3">
+      {/* Header */}
       <div className="pb-1">
-        <h2 className="text-xl font-bold text-[#0A0A0A]">{nutricion.nombre}</h2>
+        <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Nutrición</p>
+        <h2 className="text-xl font-black text-[#0A0A0A] tracking-tight mt-0.5">{nutricion.nombre}</h2>
       </div>
+
+      {/* Macros — hero negro */}
       {macros.length > 0 && (
-        <div className="grid grid-cols-4 gap-2">
-          {macros.map(m => (
-            <div key={m.label} className="bg-white rounded-2xl border border-black/5 p-3 text-center">
-              <p className="text-base font-bold" style={{ color: m.c }}>{m.val}</p>
-              <p className="text-[9px] text-[#9B9B9B] mt-0.5">{m.unit}</p>
-              <p className="text-[9px] text-[#9B9B9B]">{m.label}</p>
+        <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+          <div className="grid grid-cols-4 divide-x" style={{ divideColor: 'rgba(255,255,255,0.06)' }}>
+            {macros.map(m => (
+              <div key={m.label} className="px-3 py-4 text-center" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+                <p className="text-xl font-black leading-none" style={{ color: m.c }}>{m.val}</p>
+                <p className="text-[9px] font-bold mt-1.5 uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{m.unit}</p>
+                <p className="text-[9px] mt-0.5" style={{ color: 'rgba(255,255,255,0.2)' }}>{m.label}</p>
+              </div>
+            ))}
+          </div>
+          {/* Barra distribución macro */}
+          {macros.length >= 3 && (() => {
+            const prot = (macros.find(m => m.label === 'Proteína')?.val || 0) * 4
+            const carb = (macros.find(m => m.label === 'Carbos')?.val || 0) * 4
+            const gras = (macros.find(m => m.label === 'Grasas')?.val || 0) * 9
+            const total = prot + carb + gras || 1
+            return (
+              <div className="px-4 pb-4 space-y-1.5">
+                <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
+                  <div style={{ width: `${(prot/total*100).toFixed(0)}%`, background: '#6366f1' }} />
+                  <div style={{ width: `${(carb/total*100).toFixed(0)}%`, background: '#f59e0b' }} />
+                  <div style={{ width: `${(gras/total*100).toFixed(0)}%`, background: '#10b981' }} />
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[9px] font-bold" style={{ color: '#6366f180' }}>Prot {(prot/total*100).toFixed(0)}%</span>
+                  <span className="text-[9px] font-bold" style={{ color: '#f59e0b80' }}>Carbos {(carb/total*100).toFixed(0)}%</span>
+                  <span className="text-[9px] font-bold" style={{ color: '#10b98180' }}>Grasas {(gras/total*100).toFixed(0)}%</span>
+                </div>
+              </div>
+            )
+          })()}
+          {hidratacion && (
+            <div className="px-4 pb-3 flex items-center gap-2 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+              <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>💧</span>
+              <p className="text-[11px] font-bold" style={{ color: 'rgba(255,255,255,0.4)' }}>{hidratacion}L de agua al día</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Comidas del día */}
+      {comidasHoy.length > 0 && (
+        <div>
+          {diaActual && (
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">
+                Hoy — {diaActual}
+              </p>
+              {tieneMenu && (
+                <div className="flex-1 h-px" style={{ background: 'rgba(0,0,0,0.08)' }} />
+              )}
+            </div>
+          )}
+          {comidasHoy.map((comida, ci) => (
+            <div key={ci} className="bg-white rounded-2xl overflow-hidden mb-2">
+              <div className="px-4 py-3 flex items-center justify-between border-b border-black/5">
+                <div>
+                  <p className="text-sm font-black text-[#0A0A0A]">{comida.nombre}</p>
+                  {comida.hora && <p className="text-[10px] font-medium text-[#9B9B9B] mt-0.5">{comida.hora}</p>}
+                </div>
+                {comida.kcal && (
+                  <div className="text-right">
+                    <p className="text-base font-black" style={{ color }}>{comida.kcal}</p>
+                    <p className="text-[9px] text-[#9B9B9B] font-medium">kcal</p>
+                  </div>
+                )}
+              </div>
+              {/* Macros de la comida */}
+              {(comida.proteinas_g || comida.carbohidratos_g || comida.grasas_g) && (
+                <div className="grid grid-cols-3 divide-x border-b border-black/5">
+                  {[
+                    { label: 'Prot', val: comida.proteinas_g, c: '#6366f1' },
+                    { label: 'Carbos', val: comida.carbohidratos_g, c: '#f59e0b' },
+                    { label: 'Grasas', val: comida.grasas_g, c: '#10b981' },
+                  ].filter(m => m.val).map(m => (
+                    <div key={m.label} className="py-2 text-center" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+                      <p className="text-xs font-black" style={{ color: m.c }}>{m.val}g</p>
+                      <p className="text-[9px] text-[#9B9B9B] font-medium">{m.label}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Alimentos */}
+              <div className="px-4 py-2.5 space-y-2">
+                {(comida.alimentos || []).map((al, ai) => (
+                  <div key={ai} className="flex items-center justify-between">
+                    <p className="text-sm text-[#0A0A0A] font-medium">{typeof al === 'string' ? al : al.nombre}</p>
+                    {al.cantidad && <p className="text-xs font-bold text-[#9B9B9B]">{al.cantidad}</p>}
+                  </div>
+                ))}
+                {comida.prep && (
+                  <p className="text-[10px] text-[#9B9B9B] italic pt-1 border-t border-black/4 mt-1 leading-relaxed">
+                    {comida.prep}
+                  </p>
+                )}
+              </div>
             </div>
           ))}
         </div>
       )}
-      {comidas.map((comida, ci) => (
-        <div key={ci} className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-          <div className="px-4 py-3 border-b border-black/4" style={{ background: `${color}06` }}>
-            <div className="flex items-center justify-between">
-              <p className="font-bold text-[#0A0A0A] text-sm">{comida.nombre}</p>
-              {comida.hora && <p className="text-xs text-[#9B9B9B]">{comida.hora}</p>}
-            </div>
-            {comida.calorias && <p className="text-xs text-[#9B9B9B] mt-0.5">{comida.calorias} kcal</p>}
-          </div>
-          <div className="px-4 py-3 space-y-2">
-            {(comida.alimentos || []).map((al, ai) => (
-              <div key={ai} className="flex items-center justify-between">
-                <p className="text-sm text-[#0A0A0A]">{typeof al === 'string' ? al : al.nombre}</p>
-                {al.cantidad && <p className="text-xs text-[#9B9B9B]">{al.cantidad}</p>}
+
+      {/* Recomendaciones */}
+      {contenido.recomendaciones?.length > 0 && (
+        <div className="bg-white rounded-2xl p-4">
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-3">Recomendaciones</p>
+          <div className="space-y-2">
+            {contenido.recomendaciones.map((r, i) => (
+              <div key={i} className="flex gap-2">
+                <span className="text-[10px] font-black mt-0.5 flex-shrink-0" style={{ color }}>—</span>
+                <p className="text-xs text-[#444] leading-relaxed">{r}</p>
               </div>
             ))}
-            {comida.notas && <p className="text-xs text-[#9B9B9B] italic mt-1">{comida.notas}</p>}
           </div>
         </div>
-      ))}
-      {contenido.notas && (
-        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-          <p className="text-xs font-bold text-amber-700 mb-1">📝 Notas de tu entrenador</p>
+      )}
+
+      {/* Notas */}
+      {contenido.notas && !contenido.recomendaciones?.length && (
+        <div className="rounded-2xl p-4" style={{ background: '#fffbeb', border: '1px solid #fef08a' }}>
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-amber-600 mb-2">Nota</p>
           <p className="text-sm text-amber-800 leading-relaxed">{contenido.notas}</p>
+        </div>
+      )}
+
+      {/* Selector de días si tiene menú semanal */}
+      {tieneMenu && contenido.menu.length > 1 && (
+        <div className="bg-white rounded-2xl p-4">
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Plan semanal</p>
+          <p className="text-xs text-[#6B6B6B] leading-relaxed">
+            Tienes un plan de {contenido.menu.length} días. Hoy te mostramos el menú de <strong>{diaActual}</strong>.
+          </p>
         </div>
       )}
     </div>
