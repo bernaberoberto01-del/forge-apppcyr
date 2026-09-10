@@ -1055,9 +1055,9 @@ function TabPagos({ datos, cliente, color }) {
             {pagos.map((p, i) => (
               <div key={i} className="flex items-center gap-3 px-5 py-3.5">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-sm ${
-                  p.estado === 'cobrado' ? 'bg-emerald-50' : 'bg-amber-50'
+                  ['cobrado','pagado'].includes(p.estado) ? 'bg-emerald-50' : 'bg-amber-50'
                 }`}>
-                  {p.estado === 'cobrado' ? '✓' : '⏳'}
+                  {['cobrado','pagado'].includes(p.estado) ? '✓' : '⏳'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#0A0A0A]">{p.concepto || 'Pago'}</p>
@@ -1067,8 +1067,8 @@ function TabPagos({ datos, cliente, color }) {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-[#0A0A0A]">{p.importe}€</p>
-                  <span className={`text-[10px] font-bold ${p.estado === 'cobrado' ? 'text-emerald-600' : 'text-amber-600'}`}>
-                    {p.estado === 'cobrado' ? 'Cobrado' : 'Pendiente'}
+                  <span className={`text-[10px] font-bold ${['cobrado','pagado'].includes(p.estado) ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {['cobrado','pagado'].includes(p.estado) ? 'Cobrado' : 'Pendiente'}
                   </span>
                 </div>
               </div>
