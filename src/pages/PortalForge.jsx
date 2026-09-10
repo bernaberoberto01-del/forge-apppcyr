@@ -223,31 +223,27 @@ export default function PortalForge() {
   })()
 
   const TABS = [
-    { id: 'hoy', label: 'Hoy', icon: '⊞' },
-    ...(verRutina ? [{ id: 'entrena', label: 'Entrena', icon: '💪' }] : []),
-    ...(verNutricion ? [{ id: 'nutricion', label: 'Nutrición', icon: '🥗' }] : []),
-    { id: 'progreso', label: 'Progreso', icon: '📈' },
-    { id: 'mensajes', label: 'Mensajes', icon: '✉️', badge: msgNoLeidos },
-    { id: 'mas', label: 'Más', icon: '⚙️' },
-  ]
+    { id: 'hoy',      label: 'Inicio',    icon: '⊞' },
+    { id: 'entrena',  label: 'Entrena',   icon: '💪', oculto: !verRutina },
+    { id: 'nutricion',label: 'Nutrición', icon: '🥗', oculto: !verNutricion },
+    { id: 'progreso', label: 'Progreso',  icon: '📈' },
+    { id: 'mas',      label: 'Más',       icon: '···', badge: msgNoLeidos },
+  ].filter(t => !t.oculto)
 
-  // Bottom bar: siempre exactamente 5 slots
-  // Prioridad: Hoy, Entrena (si existe), Nutrición (si existe), Progreso, Mensajes, Más
-  // Si hay 6 tabs, Progreso va dentro de Más
+  // Siempre 5 fijos — si faltan Entrena o Nutrición, Mensajes ocupa su lugar
   const BOTTOM_TABS = (() => {
-    const prioridad = ['hoy', 'entrena', 'nutricion', 'progreso', 'mensajes']
-    const disponibles = TABS.filter(t => t.id !== 'mas' && prioridad.includes(t.id))
-      .sort((a, b) => prioridad.indexOf(a.id) - prioridad.indexOf(b.id))
-    if (disponibles.length <= 4) {
-      return [...disponibles, { id: 'mas', label: 'Más', icon: '⚙️' }]
-    }
-    // 5 o más: coger los 4 primeros + Más
-    return [...disponibles.slice(0, 4), { id: 'mas', label: 'Más', icon: '⚙️' }]
+    const fijos = TABS.filter(t => t.id !== 'mas').slice(0, 4)
+    // Asegurar que Más siempre está con el badge de mensajes
+    const masBadge = msgNoLeidos
+    return [...fijos, { id: 'mas', label: 'Más', icon: '···', badge: masBadge }]
   })()
 
-  // Tabs que van dentro del menú Más (los que no están en la bottom bar)
-  const BOTTOM_IDS = new Set(BOTTOM_TABS.map(t => t.id))
-  const TABS_EN_MAS = TABS.filter(t => !BOTTOM_IDS.has(t.id) && t.id !== 'mas')
+  // Secciones dentro del menú Más
+  const MAS_ITEMS = [
+    { id: 'mensajes', label: 'Mensajes',  icon: '✉️', badge: msgNoLeidos, desc: msgNoLeidos > 0 ? `${msgNoLeidos} sin leer` : 'Chat con tu entrenador' },
+    ...(pagos?.length ? [{ id: 'pagos', label: 'Pagos', icon: '💳', badge: 0, desc: `${pagos.filter(p=>p.estado!=='cobrado').length > 0 ? 'Tienes pagos pendientes' : 'Historial al día'}` }] : []),
+    { id: 'ajustes', label: 'Ajustes', icon: '⚙️', badge: 0, desc: 'Objetivo, peso, contraseña' },
+  ]
 
   return (
     <div className="min-h-screen flex" style={{ background: '#F4F3F0', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica Neue,sans-serif' }}>
@@ -330,33 +326,45 @@ export default function PortalForge() {
           {tab === 'nutricion' && <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} />}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} />}
           {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />}
-          {tab === 'mas' && <TabMas pagos={pagos} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={TABS_EN_MAS} setTab={setTab} />}
+          {tab === 'mas' && <TabMas pagos={pagos} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} />}
         </div>
 
-        {/* Bottom bar — negro total */}
+        {/* Bottom bar — negro total, 5 slots fijos */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20"
           style={{ background: '#0A0A0A', paddingBottom: 'max(env(safe-area-inset-bottom),8px)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="flex">
             {BOTTOM_TABS.map(t => {
-              const esMas = t.id === 'mas'
-              const activo = esMas
-                ? tab === 'mas' || TABS_EN_MAS.some(x => x.id === tab)
+              const activo = t.id === 'mas'
+                ? tab === 'mas' || ['mensajes','pagos','ajustes'].includes(tab)
                 : tab === t.id
               const badge = t.badge || 0
+              // Iconos SVG por tab
+              const ICONS = {
+                hoy: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,
+                entrena: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4v16M18 4v16M2 9h4M18 9h4M2 15h4M18 15h4M6 9h12M6 15h12"/></svg>,
+                nutricion: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>,
+                progreso: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+                mas: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
+              }
               return (
                 <button key={t.id} onClick={() => setTab(t.id)}
-                  className="flex-1 flex flex-col items-center justify-center pt-2.5 pb-2 min-h-[58px] relative active:opacity-70 transition-opacity"
-                  style={{ color: activo ? color : 'rgba(255,255,255,0.35)' }}>
+                  className="flex-1 flex flex-col items-center justify-center pt-2.5 pb-1.5 min-h-[56px] relative active:opacity-60 transition-opacity"
+                  style={{ color: activo ? color : 'rgba(255,255,255,0.3)' }}>
                   {activo && (
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-8 rounded-full"
                       style={{ background: color }} />
                   )}
-                  <span className="text-[18px] leading-none mb-1">{t.icon}</span>
-                  <span className="text-[9px] font-bold tracking-wide uppercase">{t.label}</span>
-                  {badge > 0 && (
-                    <span className="absolute top-1.5 right-[14%] w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center text-white"
-                      style={{ background: color }}>{badge}</span>
-                  )}
+                  <div className="relative">
+                    {ICONS[t.id] || <span className="text-lg">{t.icon}</span>}
+                    {badge > 0 && (
+                      <span className="absolute -top-1.5 -right-2 w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center text-white"
+                        style={{ background: color }}>{badge > 9 ? '9+' : badge}</span>
+                    )}
+                  </div>
+                  <span className="text-[8px] font-black tracking-wide uppercase mt-1.5"
+                    style={{ color: activo ? color : 'rgba(255,255,255,0.25)' }}>
+                    {t.label}
+                  </span>
                 </button>
               )
             })}
@@ -1216,10 +1224,40 @@ function TabPagos({ pagos, color }) {
 }
 
 // ─── Tab Ajustes ──────────────────────────────────────────────────────────────
-function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab }) {
+function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0 }) {
+  const [seccion, setSeccion] = useState('menu')
   const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
   const [guardando, setGuardando] = useState(false)
   const [ok, setOk] = useState(false)
+
+  const pagosPendientes = pagos?.filter(p => p.estado !== 'cobrado').length || 0
+
+  const ITEMS = [
+    {
+      id: 'mensajes',
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+      label: 'Mensajes',
+      desc: msgNoLeidos > 0 ? `${msgNoLeidos} mensaje${msgNoLeidos > 1 ? 's' : ''} sin leer` : 'Chat con tu entrenador',
+      badge: msgNoLeidos,
+      urgente: msgNoLeidos > 0,
+    },
+    ...(pagos?.length ? [{
+      id: 'pagos',
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+      label: 'Pagos',
+      desc: pagosPendientes > 0 ? `${pagosPendientes} pago${pagosPendientes > 1 ? 's' : ''} pendiente${pagosPendientes > 1 ? 's' : ''}` : 'Historial de pagos',
+      badge: pagosPendientes,
+      urgente: pagosPendientes > 0,
+    }] : []),
+    {
+      id: 'ajustes',
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>,
+      label: 'Ajustes',
+      desc: 'Objetivo, peso, contraseña',
+      badge: 0,
+      urgente: false,
+    },
+  ]
 
   async function guardar(e) {
     e.preventDefault(); setGuardando(true); setOk(false)
@@ -1238,32 +1276,86 @@ function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab }) {
     ['mantenimiento', '⚖️ Mantenimiento'], ['salud', '❤️ Salud'],
   ]
 
-  return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">Más</h2>
+  if (seccion === 'mensajes') {
+    return (
+      <div>
+        <button onClick={() => setSeccion('menu')} className="text-xs font-bold mb-4 flex items-center gap-1.5" style={{ color }}>← Volver</button>
+        <p className="text-xl font-black text-[#0A0A0A] tracking-tight mb-4">Mensajes</p>
+        <p className="text-sm text-[#9B9B9B]">Usa el tab de Mensajes para chatear con tu entrenador.</p>
+        <button onClick={() => { setSeccion('menu'); setTab('mensajes') }}
+          className="w-full mt-4 py-4 rounded-2xl text-white font-black text-sm active:scale-95 transition-all"
+          style={{ background: color }}>Ir a Mensajes →</button>
+      </div>
+    )
+  }
 
-      {/* Tabs que no caben en la bottom bar */}
-      {tabsExtra.length > 0 && (
-        <div className="space-y-2">
-          {tabsExtra.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className="w-full bg-white rounded-2xl border border-black/5 p-4 flex items-center gap-4 text-left active:scale-95 transition-all">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}12` }}>
-                <span className="text-xl">{t.icon}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-[#0A0A0A]">{t.label}</p>
-              </div>
-              {t.badge > 0 && (
-                <span className="w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center text-white flex-shrink-0"
-                  style={{ background: color }}>{t.badge}</span>
-              )}
-              <span className="text-[#C0C0C0] flex-shrink-0">›</span>
-            </button>
-          ))}
-          <div className="border-t border-black/5 pt-2" />
+  return (
+    <div className="space-y-3">
+      <p className="text-2xl font-black text-[#0A0A0A] tracking-tight pt-1">Más</p>
+
+      {/* Tarjetas grandes — cada sección bien visible */}
+      {ITEMS.map(item => (
+        <button key={item.id}
+          onClick={() => {
+            if (item.id === 'mensajes') setTab('mensajes')
+            else setSeccion(item.id)
+          }}
+          className="w-full rounded-2xl p-5 flex items-center gap-4 text-left active:scale-[0.98] transition-all"
+          style={{
+            background: item.urgente ? '#0A0A0A' : 'white',
+            border: item.urgente ? `1px solid ${color}` : undefined,
+          }}>
+          {/* Icono */}
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{
+              background: item.urgente ? `${color}20` : '#F4F3F0',
+              color: item.urgente ? color : '#6B6B6B',
+            }}>
+            {item.icon}
+          </div>
+          {/* Texto */}
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-black leading-tight"
+              style={{ color: item.urgente ? 'white' : '#0A0A0A' }}>
+              {item.label}
+            </p>
+            <p className="text-xs mt-0.5 font-medium"
+              style={{ color: item.urgente ? `${color}` : '#9B9B9B' }}>
+              {item.desc}
+            </p>
+          </div>
+          {/* Badge o flecha */}
+          {item.badge > 0
+            ? <span className="w-7 h-7 rounded-full text-sm font-black flex items-center justify-center text-white flex-shrink-0"
+                style={{ background: color }}>{item.badge > 9 ? '9+' : item.badge}</span>
+            : <span className="text-2xl flex-shrink-0" style={{ color: 'rgba(0,0,0,0.15)' }}>›</span>
+          }
+        </button>
+      ))}
+
+      {/* Perfil del cliente */}
+      <div className="bg-white rounded-2xl p-4 flex items-center gap-3 mt-2">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black text-white flex-shrink-0"
+          style={{ background: color }}>
+          {cliente?.nombre?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
         </div>
-      )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-black text-[#0A0A0A] truncate">{cliente?.nombre}</p>
+          <p className="text-[10px] text-[#9B9B9B] truncate font-medium">{cliente?.email}</p>
+        </div>
+        <span className="text-[10px] font-bold px-2 py-1 rounded-lg capitalize"
+          style={{ background: '#F4F3F0', color: '#9B9B9B' }}>
+          {cliente?.tipo}
+        </span>
+      </div>
+
+      <button onClick={() => supabase.auth.signOut()}
+        className="w-full py-3.5 rounded-2xl text-sm font-bold border border-red-100 text-red-400 active:scale-95 transition-all">
+        Cerrar sesión
+      </button>
+    </div>
+  )
+}
 
       <div className="bg-white rounded-2xl border border-black/5 p-4">
         <p className="text-sm font-bold text-[#0A0A0A]">{cliente?.nombre}</p>
