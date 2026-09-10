@@ -200,8 +200,9 @@ export default function PortalForge() {
   const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana } = datos
   const esOnline = cliente.tipo === 'online'
   const plan = cliente.plan_online
-  const verRutina = !esOnline || ['entrenamiento', 'completo'].includes(plan)
-  const verNutricion = !esOnline || ['nutricion', 'completo'].includes(plan)
+  // Mostrar si tiene plan, o si directamente tiene datos en BD
+  const verRutina = !esOnline || ['entrenamiento', 'completo'].includes(plan) || !!(datos?.rutina)
+  const verNutricion = !esOnline || ['nutricion', 'completo'].includes(plan) || !!(datos?.nutricion)
   const nombre = cliente.nombre?.split(' ')[0] || ''
   const iniciales = cliente.nombre?.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || '?'
   const msgNoLeidos = mensajes.filter(m => !m.leido && m.tipo === 'entrenador').length
@@ -230,12 +231,10 @@ export default function PortalForge() {
     { id: 'mas',      label: 'Más',       icon: '···', badge: msgNoLeidos },
   ].filter(t => !t.oculto)
 
-  // Siempre 5 fijos — si faltan Entrena o Nutrición, Mensajes ocupa su lugar
+  // Bottom bar: siempre los tabs disponibles (máx 4) + Más
   const BOTTOM_TABS = (() => {
-    const fijos = TABS.filter(t => t.id !== 'mas').slice(0, 4)
-    // Asegurar que Más siempre está con el badge de mensajes
-    const masBadge = msgNoLeidos
-    return [...fijos, { id: 'mas', label: 'Más', icon: '···', badge: masBadge }]
+    const sinMas = TABS.filter(t => t.id !== 'mas') // todos menos Más
+    return [...sinMas, { id: 'mas', label: 'Más', icon: '···', badge: msgNoLeidos }]
   })()
 
   // Secciones dentro del menú Más
