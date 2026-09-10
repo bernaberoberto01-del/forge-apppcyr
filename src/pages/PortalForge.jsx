@@ -198,7 +198,7 @@ export default function PortalForge() {
 
   if (!datos) return <div className="min-h-screen" style={{ background: '#F2F1EE' }} />
 
-  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana } = datos
+  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros } = datos
   const esOnline = cliente.tipo === 'online'
   const plan = cliente.plan_online
   // Mostrar si tiene plan, o si directamente tiene datos en BD
