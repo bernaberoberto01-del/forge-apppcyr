@@ -1178,6 +1178,64 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
         </div>
       )}
 
+      {/* Lista de la compra */}
+      {tieneMenu && (() => {
+        // Agrupar todos los alimentos de todos los días
+        const listaMap = {}
+        dias.forEach(dia => {
+          (dia.comidas || []).forEach(comida => {
+            (comida.alimentos || []).forEach(al => {
+              const nombre = typeof al === 'string' ? al : al.nombre
+              const cantidad = typeof al === 'string' ? null : al.cantidad
+              if (!nombre) return
+              const key = nombre.toLowerCase().trim()
+              if (!listaMap[key]) listaMap[key] = { nombre, cantidades: [] }
+              if (cantidad) listaMap[key].cantidades.push(cantidad)
+            })
+          })
+        })
+        const lista = Object.values(listaMap).sort((a, b) => a.nombre.localeCompare(b.nombre))
+        if (!lista.length) return null
+
+        const textoCompartir = `🛒 Lista de la compra — ${nutricion.nombre}\n\n` +
+          lista.map(item => `• ${item.nombre}${item.cantidades.length ? ` (${[...new Set(item.cantidades)].join(', ')})` : ''}`).join('\n')
+
+        return (
+          <div className="bg-white rounded-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-black/5 flex items-center justify-between">
+              <div>
+                <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Lista de la compra</p>
+                <p className="text-[10px] text-[#9B9B9B] mt-0.5">{lista.length} productos del plan</p>
+              </div>
+              <button onClick={() => {
+                if (navigator.share) {
+                  navigator.share({ title: 'Lista de la compra', text: textoCompartir })
+                } else {
+                  navigator.clipboard?.writeText(textoCompartir)
+                    .then(() => alert('Lista copiada al portapapeles'))
+                    .catch(() => alert('Copia el texto manualmente'))
+                }
+              }} className="text-xs font-black px-3 py-1.5 rounded-xl text-white active:scale-95 transition-all"
+                style={{ background: color }}>
+                Compartir 🛒
+              </button>
+            </div>
+            <div className="divide-y divide-black/4 max-h-64 overflow-y-auto">
+              {lista.map((item, i) => (
+                <div key={i} className="px-4 py-2.5 flex items-center justify-between">
+                  <p className="text-sm text-[#0A0A0A] font-medium">{item.nombre}</p>
+                  {item.cantidades.length > 0 && (
+                    <p className="text-xs font-black flex-shrink-0 ml-3" style={{ color }}>
+                      {[...new Set(item.cantidades)].join(' · ')}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Recomendaciones */}
       {contenido.recomendaciones?.length > 0 && (
         <div className="bg-white rounded-2xl p-4">
