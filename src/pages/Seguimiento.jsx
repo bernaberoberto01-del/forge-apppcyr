@@ -1114,80 +1114,136 @@ export default function Seguimiento({ session }) {
 // ─── Tarjeta cliente semana ────────────────────────────────────────────────────
 function TarjetaClienteSemana({ c, color, onVerCheckins, onVerSesiones }) {
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+  const [valorando, setValorando] = React.useState(false)
+  const [rpe, setRpe] = React.useState(null)
+  const [fatiga, setFatiga] = React.useState(null)
+  const [guardando, setGuardando] = React.useState(false)
+
+  async function guardarRPE() {
+    if (!rpe || !fatiga) return
+    setGuardando(true)
+    const sesionSinValorar = c.sesCompletadas?.find(s => !s.rpe)
+    if (sesionSinValorar) {
+      await supabase.from('sesiones').update({ rpe, fatiga_post: fatiga }).eq('id', sesionSinValorar.id)
+    }
+    setValorando(false); setRpe(null); setFatiga(null); setGuardando(false)
+    window.location.reload()
+  }
 
   return (
-    <div className="bg-white rounded-2xl border border-black/5 p-4"
-      style={c.alerta === 'critical' ? { borderColor: '#fecaca', background: '#fff5f5' } : {}}>
-      <div className="flex items-center gap-3 mb-3">
-        {/* Avatar */}
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-          style={{ background: color }}>
-          {ini(c.nombre)}
+    <>
+      <div className="bg-white rounded-2xl border border-black/5 p-4"
+        style={c.alerta === 'critical' ? { borderColor: '#fecaca', background: '#fff5f5' } : {}}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+            style={{ background: color }}>
+            {ini(c.nombre)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-[#0A0A0A] truncate">{c.nombre.trim()}</p>
+            <p className="text-[10px] text-[#9B9B9B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}</p>
+          </div>
         </div>
-        {/* Nombre + tipo */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-[#0A0A0A] truncate">{c.nombre.trim()}</p>
-          <p className="text-[10px] text-[#9B9B9B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}</p>
+
+        <div className="grid grid-cols-3 gap-2">
+          <div className={`rounded-xl p-2.5 text-center ${c.ciSem?.length > 0 ? 'bg-emerald-50' : c.diasSinCI >= 14 ? 'bg-red-50' : 'bg-amber-50'}`}>
+            <p className="text-sm font-bold" style={{ color: c.ciSem?.length > 0 ? '#10b981' : c.diasSinCI >= 14 ? '#ef4444' : '#f59e0b' }}>
+              {c.ciSem?.length > 0 ? '✓' : c.diasSinCI === 999 ? '—' : `${c.diasSinCI}d`}
+            </p>
+            <p className="text-[9px] text-[#9B9B9B] mt-0.5">Check-in</p>
+          </div>
+
+          <div className={`rounded-xl p-2.5 text-center ${c.sesCompletadas?.length > 0 ? 'bg-emerald-50' : 'bg-[#F7F6F3]'}`}>
+            <p className="text-sm font-bold" style={{ color: c.sesCompletadas?.length > 0 ? '#10b981' : '#9B9B9B' }}>
+              {c.sesCompletadas?.length > 0 ? c.sesCompletadas.length : '—'}
+            </p>
+            <p className="text-[9px] text-[#9B9B9B] mt-0.5">Sesiones</p>
+          </div>
+
+          <div onClick={() => c.sinValorar > 0 && setValorando(true)}
+            className={`rounded-xl p-2.5 text-center transition-all ${c.sinValorar > 0 ? 'bg-amber-50 cursor-pointer hover:bg-amber-100' : c.rpePromedio ? 'bg-emerald-50' : 'bg-[#F7F6F3]'}`}>
+            <p className="text-sm font-bold" style={{ color: c.sinValorar > 0 ? '#f59e0b' : c.rpePromedio ? '#10b981' : '#9B9B9B' }}>
+              {c.sinValorar > 0 ? '⭐ Pte' : c.rpePromedio ? `RPE ${c.rpePromedio}` : '—'}
+            </p>
+            <p className="text-[9px] text-[#9B9B9B] mt-0.5">Valoración</p>
+          </div>
         </div>
+
+        {c.fatigaMax >= 4 && (
+          <div className="mt-2 bg-red-50 rounded-xl px-3 py-2 flex items-center gap-2">
+            <span className="text-xs">⚠️</span>
+            <p className="text-xs font-medium text-red-700">Fatiga alta: {c.fatigaMax}/5 — ajusta la carga</p>
+          </div>
+        )}
+
+        {(c.sinValorar > 0 || c.diasSinCI >= 7) && (
+          <div className="flex gap-2 mt-3">
+            {c.sinValorar > 0 && (
+              <button onClick={() => setValorando(true)}
+                className="flex-1 text-[10px] font-bold py-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all">
+                ⭐ Valorar sesión →
+              </button>
+            )}
+            {c.diasSinCI >= 7 && (
+              <button onClick={onVerCheckins}
+                className="flex-1 text-[10px] font-bold py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all">
+                {c.diasSinCI === 999 ? 'Sin check-in' : `${c.diasSinCI}d sin CI`} →
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Indicadores de la semana */}
-      <div className="grid grid-cols-3 gap-2">
-        {/* Check-in */}
-        <div className={`rounded-xl p-2.5 text-center ${c.ciSem?.length > 0 ? 'bg-emerald-50' : c.diasSinCI >= 14 ? 'bg-red-50' : 'bg-amber-50'}`}>
-          <p className="text-sm font-bold" style={{ color: c.ciSem?.length > 0 ? '#10b981' : c.diasSinCI >= 14 ? '#ef4444' : '#f59e0b' }}>
-            {c.ciSem?.length > 0 ? '✓' : c.diasSinCI === 999 ? '—' : `${c.diasSinCI}d`}
-          </p>
-          <p className="text-[9px] text-[#9B9B9B] mt-0.5">Check-in</p>
-        </div>
+      {valorando && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setValorando(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold" style={{ background: color }}>
+                {ini(c.nombre)}
+              </div>
+              <div>
+                <p className="font-bold text-[#0A0A0A] text-sm">{c.nombre.trim()}</p>
+                <p className="text-xs text-[#9B9B9B]">
+                  Valorar · {c.sesCompletadas?.find(s=>!s.rpe)?.fecha || 'última sesión'}
+                </p>
+              </div>
+            </div>
 
-        {/* Sesiones */}
-        <div className={`rounded-xl p-2.5 text-center ${c.sesCompletadas.length > 0 ? 'bg-emerald-50' : 'bg-[#F7F6F3]'}`}>
-          <p className="text-sm font-bold" style={{ color: c.sesCompletadas.length > 0 ? '#10b981' : '#9B9B9B' }}>
-            {c.sesCompletadas.length > 0 ? c.sesCompletadas.length : '—'}
-          </p>
-          <p className="text-[9px] text-[#9B9B9B] mt-0.5">Sesiones</p>
-        </div>
+            {[
+              { label: '💪 RPE (esfuerzo 1-10)', val: rpe, set: setRpe, max: 10 },
+              { label: '🏋️ Fatiga muscular (1-5)', val: fatiga, set: setFatiga, max: 5 },
+            ].map(({ label, val, set, max }) => (
+              <div key={label} className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
+                  {val && <span className="text-sm font-bold" style={{ color }}>{val}/{max}</span>}
+                </div>
+                <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max}, 1fr)` }}>
+                  {Array.from({ length: max }, (_, i) => i+1).map(v => (
+                    <button key={v} onClick={() => set(v)}
+                      className={`py-2.5 rounded-lg text-sm font-bold transition-all ${val===v?'text-white':'border border-black/10 text-[#9B9B9B]'}`}
+                      style={val===v?{background: v>=(max*.7)?'#ef4444':v>=(max*.4)?'#f59e0b':color}:{}}>
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
 
-        {/* RPE / valoración */}
-        <div className={`rounded-xl p-2.5 text-center ${
-          c.sinValorar > 0 ? 'bg-amber-50' :
-          c.rpePromedio ? 'bg-emerald-50' : 'bg-[#F7F6F3]'
-        }`}>
-          <p className="text-sm font-bold" style={{
-            color: c.sinValorar > 0 ? '#f59e0b' : c.rpePromedio ? '#10b981' : '#9B9B9B'
-          }}>
-            {c.sinValorar > 0 ? `${c.sinValorar}⚠️` : c.rpePromedio ? `RPE ${c.rpePromedio}` : '—'}
-          </p>
-          <p className="text-[9px] text-[#9B9B9B] mt-0.5">Valoración</p>
-        </div>
-      </div>
-
-      {/* Fatiga si es alta */}
-      {c.fatigaMax >= 4 && (
-        <div className="mt-2 bg-red-50 rounded-xl px-3 py-2 flex items-center gap-2">
-          <span className="text-xs">⚠️</span>
-          <p className="text-xs font-medium text-red-700">Fatiga alta: {c.fatigaMax}/5 — ajusta la carga</p>
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => setValorando(false)}
+                className="flex-1 py-3 rounded-xl text-sm font-bold border border-black/10 text-[#6B6B6B]">
+                Cancelar
+              </button>
+              <button onClick={guardarRPE} disabled={!rpe || !fatiga || guardando}
+                className="flex-1 py-3 rounded-xl text-sm font-bold text-white disabled:opacity-40"
+                style={{ background: color }}>
+                {guardando ? '⏳...' : '✓ Guardar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Acciones rápidas si hay algo pendiente */}
-      {(c.sinValorar > 0 || c.diasSinCI >= 7) && (
-        <div className="flex gap-2 mt-3">
-          {c.sinValorar > 0 && (
-            <button onClick={onVerSesiones}
-              className="flex-1 text-[10px] font-bold py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all">
-              {c.sinValorar} sin valorar →
-            </button>
-          )}
-          {c.diasSinCI >= 7 && (
-            <button onClick={onVerCheckins}
-              className="flex-1 text-[10px] font-bold py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all">
-              {c.diasSinCI === 999 ? 'Sin check-in' : `${c.diasSinCI}d sin CI`} →
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+    </>
   )
 }

@@ -121,7 +121,7 @@ export default function Dashboard({ session }) {
     setSesionesManana(sesManana || [])
     setCuestPendientes(cuestPendientes || [])
     setClientesIAPendiente(clientesIAPendiente || [])
-    const activos = (clientes||[]).filter(c => c.estado === 'activo')
+    const activos = (clientes||[]).filter(c => c.estado === 'activo' && !c.nombre?.toLowerCase().includes('prueba') && !c.email?.includes('@forge-app.test'))
     const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
     const hace4s = new Date(Date.now()-28*864e5).toISOString().split('T')[0]
     const ciRecientes = (checkins||[]).filter(c => c.fecha >= hace4s)
