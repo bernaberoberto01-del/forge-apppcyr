@@ -1276,14 +1276,90 @@ function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab, msg
     ['mantenimiento', '⚖️ Mantenimiento'], ['salud', '❤️ Salud'],
   ]
 
+  if (seccion === 'ajustes') {
+    const OBJETIVOS = [
+      ['perdida_grasa','🔥 Pérdida de grasa'],['ganancia_muscular','💪 Ganar músculo'],
+      ['tonificacion','✨ Tonificación'],['rendimiento','🏃 Rendimiento'],
+      ['mantenimiento','⚖️ Mantenimiento'],['salud','❤️ Salud'],
+    ]
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
+        <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Ajustes</p>
+        <form onSubmit={guardar} className="bg-white rounded-2xl p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {[['Peso actual (kg)','peso_actual'],['Peso objetivo (kg)','peso_objetivo']].map(([label,key]) => (
+              <div key={key}>
+                <label className="text-[10px] font-black uppercase tracking-widest text-[#9B9B9B] block mb-2">{label}</label>
+                <input type="number" step="0.1" value={form[key]}
+                  onChange={e => setForm(f => ({...f,[key]:e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none" />
+              </div>
+            ))}
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-[#9B9B9B] block mb-2">Mi objetivo</label>
+            <div className="grid grid-cols-2 gap-2">
+              {OBJETIVOS.map(([v,l]) => (
+                <button key={v} type="button" onClick={() => setForm(f=>({...f,objetivo:v}))}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold border text-left transition-all ${form.objetivo===v?'text-white border-transparent':'border-black/10 text-[#6B6B6B]'}`}
+                  style={form.objetivo===v?{background:color}:{}}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <button type="submit" disabled={guardando}
+            className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40"
+            style={{background:ok?'#10b981':color}}>
+            {guardando?'Guardando...':ok?'✓ Guardado':'Guardar'}
+          </button>
+        </form>
+        <div className="bg-white rounded-2xl p-4">
+          <button onClick={async()=>{await supabase.auth.resetPasswordForEmail(cliente?.email||'',{redirectTo:`${window.location.origin}/`});alert('Email enviado.')}}
+            className="text-sm font-bold text-[#6B6B6B]">Cambiar contraseña →</button>
+        </div>
+        <button onClick={()=>supabase.auth.signOut()}
+          className="w-full py-3.5 rounded-xl border border-red-100 text-red-400 text-sm font-bold">
+          Cerrar sesión
+        </button>
+      </div>
+    )
+  }
+
+  if (seccion === 'pagos') {
+    return (
+      <div className="space-y-3">
+        <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
+        <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Pagos</p>
+        {!pagos?.length
+          ? <div className="text-center py-10"><p className="text-base font-bold text-[#0A0A0A]">Sin pagos registrados</p></div>
+          : pagos.map((p, i) => (
+            <div key={i} className="bg-white rounded-2xl p-4 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-[#0A0A0A]">{p.concepto||'Pago mensual'}</p>
+                <p className="text-[10px] text-[#9B9B9B] mt-0.5 font-medium">
+                  {p.fecha_pago?new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):''}
+                </p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-xl font-black text-[#0A0A0A]">{p.importe}€</p>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${p.estado==='cobrado'?'bg-emerald-50 text-emerald-600':'bg-amber-50 text-amber-600'}`}>
+                  {p.estado==='cobrado'?'✓ Cobrado':'Pendiente'}
+                </span>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    )
+  }
+
   if (seccion === 'mensajes') {
     return (
       <div>
         <button onClick={() => setSeccion('menu')} className="text-xs font-bold mb-4 flex items-center gap-1.5" style={{ color }}>← Volver</button>
         <p className="text-xl font-black text-[#0A0A0A] tracking-tight mb-4">Mensajes</p>
-        <p className="text-sm text-[#9B9B9B]">Usa el tab de Mensajes para chatear con tu entrenador.</p>
         <button onClick={() => { setSeccion('menu'); setTab('mensajes') }}
-          className="w-full mt-4 py-4 rounded-2xl text-white font-black text-sm active:scale-95 transition-all"
+          className="w-full py-4 rounded-2xl text-white font-black text-sm active:scale-95 transition-all"
           style={{ background: color }}>Ir a Mensajes →</button>
       </div>
     )
@@ -1351,60 +1427,6 @@ function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab, msg
 
       <button onClick={() => supabase.auth.signOut()}
         className="w-full py-3.5 rounded-2xl text-sm font-bold border border-red-100 text-red-400 active:scale-95 transition-all">
-        Cerrar sesión
-      </button>
-    </div>
-  )
-}
-
-      <div className="bg-white rounded-2xl border border-black/5 p-4">
-        <p className="text-sm font-bold text-[#0A0A0A]">{cliente?.nombre}</p>
-        <p className="text-xs text-[#9B9B9B] mt-0.5">{cliente?.email}</p>
-        <span className="inline-block mt-2 text-[10px] bg-[#F7F6F3] text-[#9B9B9B] px-2 py-1 rounded-lg font-medium capitalize">
-          {cliente?.tipo} {cliente?.plan_online ? `· ${cliente.plan_online}` : ''}
-        </span>
-      </div>
-      <form onSubmit={guardar} className="bg-white rounded-2xl border border-black/5 p-4 space-y-4">
-        <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-widest">Mi plan</p>
-        <div className="grid grid-cols-2 gap-3">
-          {[['Peso actual (kg)', 'peso_actual'], ['Peso objetivo (kg)', 'peso_objetivo']].map(([label, key]) => (
-            <div key={key}>
-              <label className="text-xs text-[#6B6B6B] font-medium block mb-1.5">{label}</label>
-              <input type="number" step="0.1" value={form[key]}
-                onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
-            </div>
-          ))}
-        </div>
-        <div>
-          <label className="text-xs text-[#6B6B6B] font-medium block mb-2">Mi objetivo</label>
-          <div className="grid grid-cols-2 gap-2">
-            {OBJETIVOS.map(([v, l]) => (
-              <button key={v} type="button" onClick={() => setForm(f => ({ ...f, objetivo: v }))}
-                className={`py-2 px-3 rounded-xl text-xs font-medium border text-left transition-all active:scale-95 ${form.objetivo === v ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B]'}`}
-                style={form.objetivo === v ? { background: color } : {}}>
-                {l}
-              </button>
-            ))}
-          </div>
-        </div>
-        <button type="submit" disabled={guardando}
-          className="w-full py-3 rounded-xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
-          style={{ background: ok ? '#10b981' : color }}>
-          {guardando ? '⏳ Guardando...' : ok ? '✓ Guardado' : 'Guardar cambios'}
-        </button>
-      </form>
-      <div className="bg-white rounded-2xl border border-black/5 p-4">
-        <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-widest mb-3">Seguridad</p>
-        <button onClick={async () => {
-          await supabase.auth.resetPasswordForEmail(cliente?.email || '', { redirectTo: `${window.location.origin}/portal` })
-          alert('Te hemos enviado un email para cambiar tu contraseña.')
-        }} className="text-sm font-medium text-[#6B6B6B] hover:text-[#0A0A0A] transition-colors">
-          Cambiar contraseña →
-        </button>
-      </div>
-      <button onClick={() => supabase.auth.signOut()}
-        className="w-full py-3 rounded-xl border border-red-200 text-red-500 text-sm font-medium active:scale-95 transition-all">
         Cerrar sesión
       </button>
     </div>
