@@ -95,6 +95,8 @@ export default function Dashboard({ session }) {
       { data: clientesIAPendiente },
       { data: cfg },
       { data: analisisPendientes },
+      { data: cuestSuplemento },
+      { data: suplementacionExistente },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -110,6 +112,8 @@ export default function Dashboard({ session }) {
       supabase.from('clientes').select('id,nombre,plan_online,ia_estado').eq('entrenador_id', uid).eq('tipo','online').in('ia_estado',['generando','error','pendiente_datos']).eq('estado','activo'),
       supabase.from('configuracion').select('nombre_entrenador').eq('entrenador_id', uid).maybeSingle(),
       supabase.from('analisis_mensual').select('id,cliente_id,accion,clientes(nombre)').eq('entrenador_id', uid).eq('revisado', false).order('created_at',{ascending:false}).limit(5),
+      supabase.from('cuestionarios_nutricion').select('cliente_id,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('interes_suplementacion', true).order('created_at',{ascending:false}),
+      supabase.from('suplementacion_cliente').select('cliente_id').eq('entrenador_id', uid),
     ])
 
     if (alertas?.length > 0) {
@@ -155,6 +159,12 @@ export default function Dashboard({ session }) {
     const totalClientes = (clientes||[]).length
     const tasaRetencion = totalClientes > 0 ? Math.round((activos.length/totalClientes)*100) : 100
 
+    // Clientes con interés en suplementación activado pero sin recomendaciones generadas aún
+    const interesPorCliente = {}
+    ;(cuestSuplemento||[]).forEach(c => { if (!interesPorCliente[c.cliente_id]) interesPorCliente[c.cliente_id] = c })
+    const clienteIdsConSuplementacion = new Set((suplementacionExistente||[]).map(s => s.cliente_id))
+    const suplementacionPendiente = Object.values(interesPorCliente).filter(c => !clienteIdsConSuplementacion.has(c.cliente_id))
+
     setDatos({
       activos, ingresosMes, adherenciaMedia, ingresosPorMes, maxIngreso,
       alertasPagos, cobrosProximos, clientesSinCI, checkinsNuevos,
@@ -163,6 +173,7 @@ export default function Dashboard({ session }) {
       nombreEntrenador: cfg?.nombre_entrenador?.split(' ')[0] || null,
       analisisPendientes: analisisPendientes||[],
       checkins: checkins||[],
+      suplementacionPendiente,
     })
     setLoading(false)
     } catch (e) {
@@ -343,6 +354,25 @@ export default function Dashboard({ session }) {
                     <button onClick={() => navigate('/pagos')}
                       className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Ver →
+                    </button>
+                  </div>
+                )}
+
+                {/* Suplementación activada pendiente de generar */}
+                {d.suplementacionPendiente?.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700 text-sm flex-shrink-0">💊</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">
+                        {d.suplementacionPendiente.length} cliente{d.suplementacionPendiente.length>1?'s':''} han activado suplementación — pendiente de generar
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">
+                        {d.suplementacionPendiente.slice(0,3).map(c=>c.clientes?.nombre?.split(' ')[0]).filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/nutricion')}
+                      className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Generar →
                     </button>
                   </div>
                 )}

@@ -674,24 +674,33 @@ export default function Nutricion({ session }) {
                 </button>
               </div>
 
-              {/* Suplementación — solo si el cliente activó interés */}
-              {cuestDetalle?.interes_suplementacion && (
-                suplementacion?.recomendaciones?.length ? (
-                  <div className="flex items-center justify-between gap-2 bg-[#F5F5F0] rounded-xl px-3 py-2.5">
-                    <p className="text-xs text-[#6B6B6B]">
-                      💊 Suplementación generada{suplementacion.generado_en ? ` · ${new Date(suplementacion.generado_en).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}` : ''}
-                    </p>
-                    <button onClick={() => generarSuplementacionAdmin(detalle.cliente_id)} disabled={generandoSup}
-                      className="text-xs font-semibold text-[#FF5C00] disabled:opacity-40 flex-shrink-0">
-                      {generandoSup ? '⏳' : '🔄 Regenerar'}
-                    </button>
+              {/* Suplementación — badge de estado siempre visible si hay cuestionario */}
+              {cuestDetalle && (
+                <div className="bg-white border border-black/5 rounded-xl p-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${cuestDetalle.interes_suplementacion ? 'bg-emerald-50 text-emerald-700' : 'bg-[#F5F5F0] text-[#9B9B9B]'}`}>
+                      {cuestDetalle.interes_suplementacion ? '💊 Suplementación activada' : 'Suplementación no activada'}
+                    </span>
+                    {cuestDetalle.interes_suplementacion && suplementacion?.recomendaciones?.length > 0 && (
+                      <p className="text-xs text-[#6B6B6B]">
+                        Última generación: {suplementacion.generado_en ? new Date(suplementacion.generado_en).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—'}
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <button onClick={() => generarSuplementacionAdmin(detalle.cliente_id)} disabled={generandoSup}
-                    className="w-full bg-[#6366f1] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
-                    {generandoSup ? '⏳ Generando...' : '💊 Generar suplementación IA'}
-                  </button>
-                )
+                  {cuestDetalle.interes_suplementacion && (
+                    suplementacion?.recomendaciones?.length > 0 ? (
+                      <button onClick={() => generarSuplementacionAdmin(detalle.cliente_id)} disabled={generandoSup}
+                        className="text-xs font-semibold text-[#FF5C00] disabled:opacity-40">
+                        {generandoSup ? '⏳ Regenerando...' : '🔄 Regenerar'}
+                      </button>
+                    ) : (
+                      <button onClick={() => generarSuplementacionAdmin(detalle.cliente_id)} disabled={generandoSup}
+                        className="w-full bg-[#6366f1] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
+                        {generandoSup ? '⏳ Generando...' : '💊 Generar suplementación IA'}
+                      </button>
+                    )
+                  )}
+                </div>
               )}
             </div>
           </div>
