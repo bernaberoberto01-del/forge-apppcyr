@@ -1,0 +1,17 @@
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.notificar-cuestionario]
+verify_jwt = false
+
+[functions.crear-suscripcion]
+verify_jwt = true
+
+[functions.generar-protocolo-rehab]
+verify_jwt = true
+
+[functions.generar-suplementacion]
+verify_jwt = true
+
+[functions.enviar-mensajes-programados]
+verify_jwt = false
