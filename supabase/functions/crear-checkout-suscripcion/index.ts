@@ -26,6 +26,9 @@ serve(async (req) => {
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'), { apiVersion: '2023-10-16' })
     const planData = PLANES[plan]
     let customerId = cliente.stripe_customer_id
+    if (customerId) {
+      try { await stripe.customers.retrieve(customerId) } catch (_) { customerId = null }
+    }
     if (!customerId) {
       const customer = await stripe.customers.create({ email: cliente.email, name: cliente.nombre?.trim(), metadata: { cliente_id, entrenador_id: user.id } })
       customerId = customer.id
@@ -47,6 +50,7 @@ serve(async (req) => {
     })
     return new Response(JSON.stringify({ ok: true, url: session.url }), { headers: { ...cors, 'Content-Type': 'application/json' } })
   } catch (err) {
+    console.error('crear-checkout-suscripcion error:', err?.message, err?.stack)
     return new Response(JSON.stringify({ error: err.message || 'Error interno' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } })
   }
 })

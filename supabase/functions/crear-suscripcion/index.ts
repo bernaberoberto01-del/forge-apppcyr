@@ -26,6 +26,9 @@ serve(async (req) => {
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY'), { apiVersion: '2023-10-16' })
     const planData = PLANES[plan]
     let customerId = cliente.stripe_customer_id
+    if (customerId) {
+      try { await stripe.customers.retrieve(customerId) } catch (_) { customerId = null }
+    }
     if (!customerId) {
       const customer = await stripe.customers.create({ email: cliente.email, name: cliente.nombre?.trim(), metadata: { cliente_id, entrenador_id: user.id } })
       customerId = customer.id
