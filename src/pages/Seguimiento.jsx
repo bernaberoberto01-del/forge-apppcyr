@@ -1114,10 +1114,10 @@ export default function Seguimiento({ session }) {
 // ─── Tarjeta cliente semana ────────────────────────────────────────────────────
 function TarjetaClienteSemana({ c, color, onVerCheckins, onVerSesiones }) {
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-  const [valorando, setValorando] = React.useState(false)
-  const [rpe, setRpe] = React.useState(null)
-  const [fatiga, setFatiga] = React.useState(null)
-  const [guardando, setGuardando] = React.useState(false)
+  const [valorando, setValorando] = useState(false)
+  const [rpe, setRpe] = useState(null)
+  const [fatiga, setFatiga] = useState(null)
+  const [guardando, setGuardando] = useState(false)
 
   async function guardarRPE() {
     if (!rpe || !fatiga) return
