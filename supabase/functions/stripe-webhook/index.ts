@@ -14,6 +14,33 @@ serve(async (req) => {
   const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
   try {
     switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object
+        if (session.mode !== 'subscription') break
+        const { cliente_id, entrenador_id, plan } = session.metadata || {}
+        const subId = session.subscription
+        if (!cliente_id || !entrenador_id || !subId) break
+        const CONCEPTOS = { nutricion: 'Asesoría Nutrición', entrenamiento: 'Asesoría Entrenamiento', completo: 'Asesoría Completa' }
+        const IMPORTES = { nutricion: 29, entrenamiento: 35, completo: 49 }
+        let proximoCobro = null
+        try {
+          const sub = await stripe.subscriptions.retrieve(subId)
+          proximoCobro = new Date(sub.current_period_end * 1000).toISOString().split('T')[0]
+        } catch (_) {}
+        const payload = {
+          entrenador_id, cliente_id, stripe_subscription_id: subId, stripe_customer_id: session.customer,
+          plan, importe: IMPORTES[plan] || null, concepto: CONCEPTOS[plan] || plan,
+          frecuencia: 'mensual', activo: true, estado: 'activo', proximo_cobro: proximoCobro,
+        }
+        const { data: planExistente } = await supabase.from('planes_cobro').select('id').eq('cliente_id', cliente_id).maybeSingle()
+        if (planExistente) {
+          await supabase.from('planes_cobro').update(payload).eq('id', planExistente.id)
+        } else {
+          await supabase.from('planes_cobro').insert(payload)
+        }
+        await supabase.from('clientes').update({ stripe_subscription_id: subId, stripe_customer_id: session.customer, plan_online: plan }).eq('id', cliente_id)
+        break
+      }
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object
         const subId = invoice.subscription

@@ -436,14 +436,14 @@ export default function Clientes({ session }) {
     if (!detalle) return
     setCreandoSuscripcion(true)
     try {
-      const { data, error } = await supabase.functions.invoke('crear-suscripcion', {
+      const { data, error } = await supabase.functions.invoke('crear-checkout-suscripcion', {
         body: { cliente_id: detalle.id, plan: planSeleccionado },
         headers: { Authorization: 'Bearer ' + session.access_token },
       })
       if (error) throw error
-      if (data?.ok) {
-        showToast('✓ Suscripción creada')
-        await abrirDetalle(detalle)
+      if (data?.ok && data?.url) {
+        window.open(data.url, '_blank')
+        showToast('Se ha abierto la página de pago de Stripe en una nueva pestaña. El cliente debe completar el pago ahí.')
       } else {
         showToast('Error: ' + (data?.error || 'inténtalo de nuevo'), 'error')
       }

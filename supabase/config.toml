@@ -7,6 +7,9 @@ verify_jwt = false
 [functions.crear-suscripcion]
 verify_jwt = true
 
+[functions.crear-checkout-suscripcion]
+verify_jwt = true
+
 [functions.generar-protocolo-rehab]
 verify_jwt = true
 

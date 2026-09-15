@@ -63,6 +63,18 @@ export default function PortalForge() {
   }, [])
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const checkout = params.get('checkout')
+    if (checkout === 'success') {
+      showToast('✓ Pago completado correctamente. Tu plan está activo.')
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (checkout === 'cancelled') {
+      showToast('El proceso de pago fue cancelado.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  useEffect(() => {
     if (sesion === undefined) return
     if (!sesion) { setCargando(false); return }
     cargarTodo()
