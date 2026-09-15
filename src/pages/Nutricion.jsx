@@ -40,6 +40,9 @@ export default function Nutricion({ session }) {
   const [modalActivar, setModalActivar] = useState(null)
   const [modalCuest, setModalCuest] = useState(null)
   const [cuest, setCuest] = useState({})
+  const [cuestDetalle, setCuestDetalle] = useState(null)
+  const [suplementacion, setSuplementacion] = useState(null)
+  const [generandoSup, setGenerandoSup] = useState(false)
   const uid = session.user.id
 
   useEffect(() => { cargar() }, [uid])
@@ -82,6 +85,34 @@ export default function Nutricion({ session }) {
     setDetalle(null)
     setToast({ msg: `Plan publicado para ${plan.clientes?.nombre}` })
     await cargar()
+  }
+
+  async function abrirDetalle(p) {
+    setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(p.borrador?.instrucciones_guardadas||p.contenido?.instrucciones_guardadas||''); setDiaActivo(0)
+    const [{ data: cu }, { data: sup }] = await Promise.all([
+      supabase.from('cuestionarios_nutricion').select('*').eq('cliente_id', p.cliente_id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('suplementacion_cliente').select('*').eq('cliente_id', p.cliente_id).maybeSingle(),
+    ])
+    setCuestDetalle(cu || null)
+    setSuplementacion(sup || null)
+  }
+
+  async function generarSuplementacionAdmin(clienteId) {
+    setGenerandoSup(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('generar-suplementacion', { body: { cliente_id: clienteId } })
+      if (error) throw error
+      if (data?.ok) {
+        const { data: sup } = await supabase.from('suplementacion_cliente').select('*').eq('cliente_id', clienteId).maybeSingle()
+        setSuplementacion(sup || null)
+        setToast({ msg: '✓ Suplementación generada' })
+      } else {
+        setToast({ msg: 'Error: ' + (data?.error || 'inténtalo de nuevo'), tipo: 'error' })
+      }
+    } catch (e) {
+      setToast({ msg: 'Error de conexión', tipo: 'error' })
+    }
+    setGenerandoSup(false)
   }
 
   async function guardarCuest(clienteId) {
@@ -226,7 +257,7 @@ export default function Nutricion({ session }) {
           const hoy = new Date().toLocaleDateString('es-ES',{weekday:'long'}).replace(/^\w/,c=>c.toUpperCase())
           const diaHoy = menu.find(d => d.dia === hoy) || menu[0]
           return (
-          <div key={p.id} onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(p.borrador?.instrucciones_guardadas||p.contenido?.instrucciones_guardadas||''); setDiaActivo(0) }}
+          <div key={p.id} onClick={() => abrirDetalle(p)}
             className="bg-white rounded-2xl border border-black/5 shadow-sm hover:shadow-md hover:border-[#FF5C00]/20 transition-all cursor-pointer">
             {/* Header con objetivo */}
             <div className="px-4 pt-4 pb-3 border-b border-black/5">
@@ -288,7 +319,7 @@ export default function Nutricion({ session }) {
             {/* Acciones */}
             <div className="px-4 pb-3 flex gap-2" onClick={e=>e.stopPropagation()}>
               {p.estado==='borrador' && (
-                <button onClick={() => { setDetalle(p); setNotasEdit(p.notas_entrenador||''); setInstruccionesIA(p.borrador?.instrucciones_guardadas||p.contenido?.instrucciones_guardadas||''); setDiaActivo(0) }}
+                <button onClick={() => abrirDetalle(p)}
                   className="flex-1 bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl">
                   Revisar y publicar →
                 </button>
@@ -642,6 +673,26 @@ export default function Nutricion({ session }) {
                   🔗
                 </button>
               </div>
+
+              {/* Suplementación — solo si el cliente activó interés */}
+              {cuestDetalle?.interes_suplementacion && (
+                suplementacion?.recomendaciones?.length ? (
+                  <div className="flex items-center justify-between gap-2 bg-[#F5F5F0] rounded-xl px-3 py-2.5">
+                    <p className="text-xs text-[#6B6B6B]">
+                      💊 Suplementación generada{suplementacion.generado_en ? ` · ${new Date(suplementacion.generado_en).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}` : ''}
+                    </p>
+                    <button onClick={() => generarSuplementacionAdmin(detalle.cliente_id)} disabled={generandoSup}
+                      className="text-xs font-semibold text-[#FF5C00] disabled:opacity-40 flex-shrink-0">
+                      {generandoSup ? '⏳' : '🔄 Regenerar'}
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => generarSuplementacionAdmin(detalle.cliente_id)} disabled={generandoSup}
+                    className="w-full bg-[#6366f1] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
+                    {generandoSup ? '⏳ Generando...' : '💊 Generar suplementación IA'}
+                  </button>
+                )
+              )}
             </div>
           </div>
         </div>

@@ -42,9 +42,6 @@ const SEVERIDAD_COLORS = {
   grave: 'bg-red-50 text-red-600 border-red-100',
 }
 const ESTADO_LESION_LABEL = { activa: 'Activa', recuperada: 'Recuperada', en_seguimiento: 'En seguimiento' }
-const ZONAS_LESION = ['Rodilla','Hombro','Lumbar','Cervical','Tobillo','Cadera','Muñeca','Codo','Isquiotibial','Cuádriceps','Gemelo','Otro']
-const SEVERIDADES = [['leve','Leve'],['moderada','Moderada'],['grave','Grave']]
-const initFormLesion = { zona: '', severidad: 'leve', descripcion: '', visito_medico: false, diagnostico_medico: '', es_recurrente: false, limitaciones: '' }
 
 function ProtocoloIA({ protocolo: p }) {
   if (!p) return null
@@ -176,10 +173,7 @@ export default function Clientes({ session }) {
   const [dData, setDData] = useState({})
   const [lesionExpandida, setLesionExpandida] = useState(null)
   const [generandoProtocolo, setGenerandoProtocolo] = useState(null)
-  const [supEstado, setSupEstado] = useState(null)
-  const [modalLesion, setModalLesion] = useState(false)
-  const [formLesion, setFormLesion] = useState(initFormLesion)
-  const [guardandoLesion, setGuardandoLesion] = useState(false)
+  const [mostrarLesiones, setMostrarLesiones] = useState(false)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const uid = session.user.id
@@ -422,7 +416,7 @@ export default function Clientes({ session }) {
   }
 
   async function abrirDetalle(c) {
-    setDetalle(c); setDTab('resumen'); setLesionExpandida(null); setSupEstado(null)
+    setDetalle(c); setDTab('resumen'); setLesionExpandida(null); setMostrarLesiones(false)
     const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
@@ -456,41 +450,6 @@ export default function Clientes({ session }) {
     await supabase.from('lesiones_cliente').update({ estado: 'recuperada' }).eq('id', lesionId)
     setDData(d => ({ ...d, lesiones: (d.lesiones||[]).map(l => l.id === lesionId ? { ...l, estado: 'recuperada' } : l) }))
     showToast('✓ Marcada como recuperada')
-  }
-
-  async function guardarLesion() {
-    if (!formLesion.zona || !detalle) return
-    setGuardandoLesion(true)
-    const { data, error } = await supabase.from('lesiones_cliente').insert({
-      cliente_id: detalle.id,
-      entrenador_id: uid,
-      zona: formLesion.zona,
-      severidad: formLesion.severidad,
-      descripcion: formLesion.descripcion || null,
-      visito_medico: formLesion.visito_medico,
-      diagnostico_medico: formLesion.visito_medico ? (formLesion.diagnostico_medico || null) : null,
-      es_recurrente: formLesion.es_recurrente,
-      limitaciones: formLesion.limitaciones || null,
-      estado: 'activa',
-      fecha_inicio: new Date().toISOString().split('T')[0],
-    }).select().single()
-    setGuardandoLesion(false)
-    if (error) { showToast('Error al guardar la lesión', 'error'); return }
-    setDData(d => ({ ...d, lesiones: [data, ...(d.lesiones||[])] }))
-    setModalLesion(false); setFormLesion(initFormLesion)
-    showToast('✓ Lesión registrada')
-  }
-
-  async function generarSuplementacion() {
-    setSupEstado('loading')
-    try {
-      const { data, error } = await supabase.functions.invoke('generar-suplementacion', { body: { cliente_id: detalle.id } })
-      if (error) throw error
-      if (data?.ok) { setSupEstado('done'); showToast('✓ Suplementación generada') }
-      else { setSupEstado('error'); showToast('Error: ' + (data?.error || 'inténtalo de nuevo'), 'error') }
-    } catch (e) {
-      setSupEstado('error'); showToast('Error de conexión', 'error')
-    }
   }
 
   async function anadirTarea() {
@@ -1127,7 +1086,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['lesiones','Lesiones'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -1224,6 +1183,62 @@ export default function Clientes({ session }) {
                   {detalle.lesiones && <div className="bg-red-50 border border-red-100 rounded-xl p-3"><p className="text-xs font-semibold text-red-700 mb-1">⚠ Lesiones / limitaciones</p><p className="text-sm text-red-800">{detalle.lesiones}</p></div>}
                   {detalle.notas && <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs font-semibold text-amber-700 mb-1">📝 Notas internas</p><p className="text-sm text-amber-800">{detalle.notas}</p></div>}
 
+                  {/* Lesiones activas — reportadas por el cliente al registrar sesión */}
+                  {(dData.lesiones||[]).filter(l => l.estado !== 'recuperada').length > 0 && (() => {
+                    const activas = (dData.lesiones||[]).filter(l => l.estado !== 'recuperada')
+                    return (
+                      <div className="bg-white border border-red-100 rounded-xl overflow-hidden">
+                        <button onClick={() => setMostrarLesiones(m => !m)}
+                          className="w-full flex items-center gap-2 p-3 text-left hover:bg-[#FAFAFA] transition-all">
+                          <span className="text-base flex-shrink-0">🩹</span>
+                          <p className="text-sm font-bold text-[#0A0A0A] flex-1">Lesiones activas ({activas.length})</p>
+                          <span className="text-[#C0C0C0] text-xs flex-shrink-0">{mostrarLesiones ? '▲' : '▼'}</span>
+                        </button>
+                        {mostrarLesiones && (
+                          <div className="px-3 pb-3 space-y-2 border-t border-black/5 pt-2">
+                            {activas.map(l => {
+                              const expandida = lesionExpandida === l.id
+                              return (
+                                <div key={l.id} className="bg-[#F7F6F3] rounded-xl overflow-hidden">
+                                  <button onClick={() => setLesionExpandida(expandida ? null : l.id)}
+                                    className="w-full flex items-center gap-3 p-2.5 text-left">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-semibold text-[#0A0A0A] truncate">{l.zona}</p>
+                                      <p className="text-xs text-[#9B9B9B]">
+                                        {l.fecha_inicio ? new Date(l.fecha_inicio+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—'} · {ESTADO_LESION_LABEL[l.estado] || l.estado}
+                                      </p>
+                                    </div>
+                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-full border flex-shrink-0 ${SEVERIDAD_COLORS[l.severidad] || 'bg-white text-[#6B6B6B] border-black/5'}`}>
+                                      {(l.severidad || '—').toUpperCase()}
+                                    </span>
+                                    <span className="text-[#C0C0C0] text-xs flex-shrink-0">{expandida ? '▲' : '▼'}</span>
+                                  </button>
+                                  {expandida && (
+                                    <div className="px-2.5 pb-2.5 space-y-2">
+                                      {l.descripcion && <p className="text-xs text-[#6B6B6B]">{l.descripcion}</p>}
+                                      {l.protocolo_generado && l.protocolo_ia ? (
+                                        <ProtocoloIA protocolo={l.protocolo_ia} />
+                                      ) : (
+                                        <button onClick={() => generarProtocolo(l.id)} disabled={generandoProtocolo===l.id}
+                                          className="w-full bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40">
+                                          {generandoProtocolo===l.id ? '⏳ Generando protocolo...' : '🩹 Generar protocolo IA'}
+                                        </button>
+                                      )}
+                                      <button onClick={() => marcarRecuperada(l.id)}
+                                        className="w-full border border-emerald-200 text-emerald-600 text-xs font-semibold py-2 rounded-xl hover:bg-emerald-50">
+                                        ✓ Marcar recuperada
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
                   {/* Módulos activos — toggle por módulo */}
                   {detalle.tipo === 'online' && (
                     <div className="bg-[#F7F6F3] rounded-xl p-3">
@@ -1261,12 +1276,6 @@ export default function Clientes({ session }) {
 
                   {/* Acciones */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
-                    {detalle.tipo === 'online' && (
-                      <button onClick={generarSuplementacion} disabled={supEstado==='loading'}
-                        className={`col-span-2 border text-sm font-medium py-2.5 rounded-xl transition-all disabled:opacity-60 ${supEstado==='error' ? 'border-red-200 text-red-500 hover:bg-red-50' : supEstado==='done' ? 'border-emerald-200 text-emerald-600' : 'border-black/10 text-[#0A0A0A] hover:bg-[#F5F5F0]'}`}>
-                        {supEstado==='loading' ? '⏳ Generando...' : supEstado==='done' ? '✓ Suplementación generada' : supEstado==='error' ? '⚠ Error — reintentar' : '💊 Generar suplementación IA'}
-                      </button>
-                    )}
                     {/* Si no tiene acceso al portal, CTA prominente */}
                     {!detalle.auth_user_id && detalle.email && (
                       <button onClick={async () => {
@@ -1305,67 +1314,6 @@ export default function Clientes({ session }) {
                   </div>
                 </div>
               )})()}
-              {dTab==='lesiones' && (
-                <div className="space-y-3">
-                  <button onClick={() => { setFormLesion(initFormLesion); setModalLesion(true) }}
-                    className="w-full border-2 border-dashed border-black/10 rounded-2xl py-3 text-sm text-[#9B9B9B] hover:border-[#FF5C00]/30 hover:text-[#FF5C00] transition-all">
-                    + Nueva lesión
-                  </button>
-                  {!(dData.lesiones||[]).length ? (
-                    <div className="text-center py-10">
-                      <p className="text-3xl mb-2">🩹</p>
-                      <p className="text-sm font-bold text-[#0A0A0A]">Sin lesiones registradas</p>
-                      <p className="text-xs text-[#9B9B9B] mt-1 leading-relaxed max-w-xs mx-auto">Aquí aparecerán las lesiones que el cliente reporte o que registres manualmente.</p>
-                    </div>
-                  ) : (dData.lesiones||[]).map(l => {
-                    const expandida = lesionExpandida === l.id
-                    return (
-                      <div key={l.id} className={`bg-white rounded-2xl border overflow-hidden ${l.estado==='activa' ? 'border-red-100' : 'border-black/5'}`}>
-                        <button onClick={() => setLesionExpandida(expandida ? null : l.id)}
-                          className="w-full flex items-center gap-3 p-3 text-left hover:bg-[#FAFAFA] transition-all">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-[#0A0A0A] truncate">{l.zona}</p>
-                            <p className="text-xs text-[#9B9B9B]">
-                              {l.fecha_inicio ? new Date(l.fecha_inicio+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—'} · {ESTADO_LESION_LABEL[l.estado] || l.estado}
-                            </p>
-                          </div>
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded-full border flex-shrink-0 ${SEVERIDAD_COLORS[l.severidad] || 'bg-[#F5F5F0] text-[#6B6B6B] border-black/5'}`}>
-                            {(l.severidad || '—').toUpperCase()}
-                          </span>
-                          <span className="text-[#C0C0C0] text-xs flex-shrink-0">{expandida ? '▲' : '▼'}</span>
-                        </button>
-                        {expandida && (
-                          <div className="px-3 pb-3 border-t border-black/5 pt-3 space-y-3">
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                              {l.descripcion && <p className="col-span-2 text-[#6B6B6B]"><span className="font-semibold text-[#0A0A0A]">Descripción:</span> {l.descripcion}</p>}
-                              {l.limitaciones && <p className="col-span-2 text-[#6B6B6B]"><span className="font-semibold text-[#0A0A0A]">Limitaciones:</span> {l.limitaciones}</p>}
-                              <p className="text-[#6B6B6B]">Visitó médico: <span className="font-semibold text-[#0A0A0A]">{l.visito_medico ? 'Sí' : 'No'}</span></p>
-                              <p className="text-[#6B6B6B]">Recurrente: <span className="font-semibold text-[#0A0A0A]">{l.es_recurrente ? 'Sí' : 'No'}</span></p>
-                              {l.diagnostico_medico && <p className="col-span-2 text-[#6B6B6B]"><span className="font-semibold text-[#0A0A0A]">Diagnóstico:</span> {l.diagnostico_medico}</p>}
-                            </div>
-
-                            {l.protocolo_generado && l.protocolo_ia ? (
-                              <ProtocoloIA protocolo={l.protocolo_ia} />
-                            ) : (
-                              <button onClick={() => generarProtocolo(l.id)} disabled={generandoProtocolo===l.id}
-                                className="w-full bg-[#FF5C00] text-white text-xs font-semibold py-2.5 rounded-xl disabled:opacity-40">
-                                {generandoProtocolo===l.id ? '⏳ Generando protocolo...' : '🩹 Generar protocolo IA'}
-                              </button>
-                            )}
-
-                            {l.estado !== 'recuperada' && (
-                              <button onClick={() => marcarRecuperada(l.id)}
-                                className="w-full border border-emerald-200 text-emerald-600 text-xs font-semibold py-2.5 rounded-xl hover:bg-emerald-50">
-                                ✓ Marcar recuperada
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
               {dTab==='sesiones' && (
                 <div className="space-y-4">
                   {/* Historial de sesiones con feedback */}
@@ -1613,79 +1561,6 @@ export default function Clientes({ session }) {
                     })}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      )}
-      {modalLesion && detalle && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center p-4" onClick={() => setModalLesion(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
-            <h2 className="font-bold text-[#0A0A0A] mb-4">Nueva lesión — {detalle.nombre}</h2>
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Zona afectada</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {ZONAS_LESION.map(z => (
-                    <button key={z} type="button" onClick={() => setFormLesion(f => ({...f, zona: z}))}
-                      className={`py-2 rounded-xl text-xs font-bold border transition-all ${formLesion.zona===z ? 'bg-[#FF5C00] text-white border-[#FF5C00]' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
-                      {z}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Severidad</label>
-                <div className="flex gap-2">
-                  {SEVERIDADES.map(([k,l]) => (
-                    <button key={k} type="button" onClick={() => setFormLesion(f => ({...f, severidad: k}))}
-                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${formLesion.severidad===k ? 'bg-[#FF5C00] text-white border-[#FF5C00]' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Descripción</label>
-                <textarea value={formLesion.descripcion} onChange={e => setFormLesion(f => ({...f, descripcion: e.target.value}))} rows={2}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
-                  placeholder="Cómo ocurrió, desde cuándo..." />
-              </div>
-              <div className="flex items-center justify-between py-1">
-                <p className="text-sm text-[#0A0A0A]">¿Ha visitado al médico?</p>
-                <button type="button" onClick={() => setFormLesion(f => ({...f, visito_medico: !f.visito_medico}))}
-                  className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${formLesion.visito_medico ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${formLesion.visito_medico ? 'left-5' : 'left-0.5'}`}/>
-                </button>
-              </div>
-              {formLesion.visito_medico && (
-                <div>
-                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Diagnóstico médico</label>
-                  <input type="text" value={formLesion.diagnostico_medico} onChange={e => setFormLesion(f => ({...f, diagnostico_medico: e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
-                    placeholder="Ej: Tendinitis rotuliana" />
-                </div>
-              )}
-              <div className="flex items-center justify-between py-1">
-                <p className="text-sm text-[#0A0A0A]">¿Es recurrente?</p>
-                <button type="button" onClick={() => setFormLesion(f => ({...f, es_recurrente: !f.es_recurrente}))}
-                  className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${formLesion.es_recurrente ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${formLesion.es_recurrente ? 'left-5' : 'left-0.5'}`}/>
-                </button>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Limitaciones</label>
-                <textarea value={formLesion.limitaciones} onChange={e => setFormLesion(f => ({...f, limitaciones: e.target.value}))} rows={2}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
-                  placeholder="Qué movimientos no puede hacer..." />
-              </div>
-            </div>
-            <div className="flex gap-2 mt-4">
-              <button onClick={() => { setModalLesion(false); setFormLesion(initFormLesion) }}
-                className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl">Cancelar</button>
-              <button onClick={guardarLesion} disabled={!formLesion.zona || guardandoLesion}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
-                {guardandoLesion ? '...' : 'Guardar lesión'}
-              </button>
             </div>
           </div>
         </div>
