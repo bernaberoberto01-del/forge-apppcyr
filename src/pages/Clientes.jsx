@@ -42,6 +42,9 @@ const SEVERIDAD_COLORS = {
   grave: 'bg-red-50 text-red-600 border-red-100',
 }
 const ESTADO_LESION_LABEL = { activa: 'Activa', recuperada: 'Recuperada', en_seguimiento: 'En seguimiento' }
+const ZONAS_LESION = ['Rodilla','Hombro','Lumbar','Cervical','Tobillo','Cadera','Muñeca','Codo','Isquiotibial','Cuádriceps','Gemelo','Otro']
+const SEVERIDADES = [['leve','Leve'],['moderada','Moderada'],['grave','Grave']]
+const initFormLesion = { zona: '', severidad: 'leve', descripcion: '', visito_medico: false, diagnostico_medico: '', es_recurrente: false, limitaciones: '' }
 
 function ProtocoloIA({ protocolo: p }) {
   if (!p) return null
@@ -174,6 +177,9 @@ export default function Clientes({ session }) {
   const [lesionExpandida, setLesionExpandida] = useState(null)
   const [generandoProtocolo, setGenerandoProtocolo] = useState(null)
   const [supEstado, setSupEstado] = useState(null)
+  const [modalLesion, setModalLesion] = useState(false)
+  const [formLesion, setFormLesion] = useState(initFormLesion)
+  const [guardandoLesion, setGuardandoLesion] = useState(false)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const uid = session.user.id
@@ -450,6 +456,29 @@ export default function Clientes({ session }) {
     await supabase.from('lesiones_cliente').update({ estado: 'recuperada' }).eq('id', lesionId)
     setDData(d => ({ ...d, lesiones: (d.lesiones||[]).map(l => l.id === lesionId ? { ...l, estado: 'recuperada' } : l) }))
     showToast('✓ Marcada como recuperada')
+  }
+
+  async function guardarLesion() {
+    if (!formLesion.zona || !detalle) return
+    setGuardandoLesion(true)
+    const { data, error } = await supabase.from('lesiones_cliente').insert({
+      cliente_id: detalle.id,
+      entrenador_id: uid,
+      zona: formLesion.zona,
+      severidad: formLesion.severidad,
+      descripcion: formLesion.descripcion || null,
+      visito_medico: formLesion.visito_medico,
+      diagnostico_medico: formLesion.visito_medico ? (formLesion.diagnostico_medico || null) : null,
+      es_recurrente: formLesion.es_recurrente,
+      limitaciones: formLesion.limitaciones || null,
+      estado: 'activa',
+      fecha_inicio: new Date().toISOString().split('T')[0],
+    }).select().single()
+    setGuardandoLesion(false)
+    if (error) { showToast('Error al guardar la lesión', 'error'); return }
+    setDData(d => ({ ...d, lesiones: [data, ...(d.lesiones||[])] }))
+    setModalLesion(false); setFormLesion(initFormLesion)
+    showToast('✓ Lesión registrada')
   }
 
   async function generarSuplementacion() {
@@ -1278,6 +1307,10 @@ export default function Clientes({ session }) {
               )})()}
               {dTab==='lesiones' && (
                 <div className="space-y-3">
+                  <button onClick={() => { setFormLesion(initFormLesion); setModalLesion(true) }}
+                    className="w-full border-2 border-dashed border-black/10 rounded-2xl py-3 text-sm text-[#9B9B9B] hover:border-[#FF5C00]/30 hover:text-[#FF5C00] transition-all">
+                    + Nueva lesión
+                  </button>
                   {!(dData.lesiones||[]).length ? (
                     <div className="text-center py-10">
                       <p className="text-3xl mb-2">🩹</p>
@@ -1580,6 +1613,79 @@ export default function Clientes({ session }) {
                     })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {modalLesion && detalle && (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center p-4" onClick={() => setModalLesion(false)}>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
+            <h2 className="font-bold text-[#0A0A0A] mb-4">Nueva lesión — {detalle.nombre}</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Zona afectada</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {ZONAS_LESION.map(z => (
+                    <button key={z} type="button" onClick={() => setFormLesion(f => ({...f, zona: z}))}
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all ${formLesion.zona===z ? 'bg-[#FF5C00] text-white border-[#FF5C00]' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+                      {z}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Severidad</label>
+                <div className="flex gap-2">
+                  {SEVERIDADES.map(([k,l]) => (
+                    <button key={k} type="button" onClick={() => setFormLesion(f => ({...f, severidad: k}))}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${formLesion.severidad===k ? 'bg-[#FF5C00] text-white border-[#FF5C00]' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Descripción</label>
+                <textarea value={formLesion.descripcion} onChange={e => setFormLesion(f => ({...f, descripcion: e.target.value}))} rows={2}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  placeholder="Cómo ocurrió, desde cuándo..." />
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <p className="text-sm text-[#0A0A0A]">¿Ha visitado al médico?</p>
+                <button type="button" onClick={() => setFormLesion(f => ({...f, visito_medico: !f.visito_medico}))}
+                  className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${formLesion.visito_medico ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                  <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${formLesion.visito_medico ? 'left-5' : 'left-0.5'}`}/>
+                </button>
+              </div>
+              {formLesion.visito_medico && (
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Diagnóstico médico</label>
+                  <input type="text" value={formLesion.diagnostico_medico} onChange={e => setFormLesion(f => ({...f, diagnostico_medico: e.target.value}))}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+                    placeholder="Ej: Tendinitis rotuliana" />
+                </div>
+              )}
+              <div className="flex items-center justify-between py-1">
+                <p className="text-sm text-[#0A0A0A]">¿Es recurrente?</p>
+                <button type="button" onClick={() => setFormLesion(f => ({...f, es_recurrente: !f.es_recurrente}))}
+                  className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${formLesion.es_recurrente ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                  <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${formLesion.es_recurrente ? 'left-5' : 'left-0.5'}`}/>
+                </button>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Limitaciones</label>
+                <textarea value={formLesion.limitaciones} onChange={e => setFormLesion(f => ({...f, limitaciones: e.target.value}))} rows={2}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  placeholder="Qué movimientos no puede hacer..." />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => { setModalLesion(false); setFormLesion(initFormLesion) }}
+                className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl">Cancelar</button>
+              <button onClick={guardarLesion} disabled={!formLesion.zona || guardandoLesion}
+                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                {guardandoLesion ? '...' : 'Guardar lesión'}
+              </button>
             </div>
           </div>
         </div>
