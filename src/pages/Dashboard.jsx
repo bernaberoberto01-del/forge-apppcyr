@@ -97,6 +97,7 @@ export default function Dashboard({ session }) {
       { data: analisisPendientes },
       { data: cuestSuplemento },
       { data: suplementacionExistente },
+      { data: planesCobroAll },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -114,6 +115,7 @@ export default function Dashboard({ session }) {
       supabase.from('analisis_mensual').select('id,cliente_id,accion,clientes(nombre)').eq('entrenador_id', uid).eq('revisado', false).order('created_at',{ascending:false}).limit(5),
       supabase.from('cuestionarios_nutricion').select('cliente_id,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('interes_suplementacion', true).order('created_at',{ascending:false}),
       supabase.from('suplementacion_cliente').select('cliente_id').eq('entrenador_id', uid),
+      supabase.from('planes_cobro').select('cliente_id,estado,importe,concepto,clientes(nombre)').eq('entrenador_id', uid),
     ])
 
     if (alertas?.length > 0) {
@@ -165,6 +167,11 @@ export default function Dashboard({ session }) {
     const clienteIdsConSuplementacion = new Set((suplementacionExistente||[]).map(s => s.cliente_id))
     const suplementacionPendiente = Object.values(interesPorCliente).filter(c => !clienteIdsConSuplementacion.has(c.cliente_id))
 
+    // Cobros online: pagos fallidos y clientes online sin ninguna suscripción configurada
+    const clientesPagoFallido = (planesCobroAll||[]).filter(pc => pc.estado === 'pago_fallido')
+    const clienteIdsConPlanCobro = new Set((planesCobroAll||[]).map(pc => pc.cliente_id))
+    const clientesOnlineSinSuscripcion = activos.filter(c => c.tipo === 'online' && !clienteIdsConPlanCobro.has(c.id))
+
     setDatos({
       activos, ingresosMes, adherenciaMedia, ingresosPorMes, maxIngreso,
       alertasPagos, cobrosProximos, clientesSinCI, checkinsNuevos,
@@ -174,6 +181,8 @@ export default function Dashboard({ session }) {
       analisisPendientes: analisisPendientes||[],
       checkins: checkins||[],
       suplementacionPendiente,
+      clientesPagoFallido,
+      clientesOnlineSinSuscripcion,
     })
     setLoading(false)
     } catch (e) {
@@ -354,6 +363,44 @@ export default function Dashboard({ session }) {
                     <button onClick={() => navigate('/pagos')}
                       className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Ver →
+                    </button>
+                  </div>
+                )}
+
+                {/* Suscripciones online con pago fallido */}
+                {d.clientesPagoFallido?.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5 bg-red-50">
+                    <div className="w-8 h-8 bg-red-500 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">⚠️</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-red-700">
+                        {d.clientesPagoFallido.length} suscripción{d.clientesPagoFallido.length>1?'es':''} con pago fallido
+                      </p>
+                      <p className="text-xs text-red-500 truncate">
+                        {d.clientesPagoFallido.slice(0,3).map(pc=>pc.clientes?.nombre?.split(' ')[0]).filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/clientes')}
+                      className="text-xs bg-red-500 text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Ver →
+                    </button>
+                  </div>
+                )}
+
+                {/* Clientes online sin suscripción configurada */}
+                {d.clientesOnlineSinSuscripcion?.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700 text-sm flex-shrink-0">💳</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">
+                        {d.clientesOnlineSinSuscripcion.length} cliente{d.clientesOnlineSinSuscripcion.length>1?'s':''} online sin suscripción
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">
+                        {d.clientesOnlineSinSuscripcion.slice(0,3).map(c=>c.nombre.split(' ')[0]).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/clientes')}
+                      className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Configurar →
                     </button>
                   </div>
                 )}

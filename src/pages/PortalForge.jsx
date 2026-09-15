@@ -76,7 +76,7 @@ export default function PortalForge() {
     const cid = cl.id, eid = cl.entrenador_id, hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
-      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion] = await Promise.all([
+      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro] = await Promise.all([
       q1(supabase.from('configuracion').select('*').eq('entrenador_id', eid)),
       q1(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
@@ -94,10 +94,11 @@ export default function PortalForge() {
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(7)).lte('fecha', new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
       qa(supabase.from('nutricion_registros').select('fecha,dia_nombre').eq('cliente_id', cid).gte('fecha', hace(30)).order('fecha', { ascending: false })),
       q1(supabase.from('suplementacion_cliente').select('*').eq('cliente_id', cid)),
+      q1(supabase.from('planes_cobro').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(1)),
     ])
 
     setConfig(cfg)
-    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion })
+    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro })
     supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
     setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
     setCargando(false)
@@ -211,7 +212,7 @@ export default function PortalForge() {
 
   if (!datos) return <div className="min-h-screen" style={{ background: '#F2F1EE' }} />
 
-  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion } = datos
+  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro } = datos
   const esOnline = cliente.tipo === 'online'
   const plan = cliente.plan_online
   // Mostrar si tiene plan, o si directamente tiene datos en BD
@@ -339,7 +340,7 @@ export default function PortalForge() {
           {tab === 'nutricion' && <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} suplementacion={suplementacion} cargarTodo={cargarTodo} />}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} />}
           {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />}
-          {tab === 'mas' && <TabMas pagos={pagos} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} />}
+          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} />}
         </div>
 
         {/* Bottom bar — negro total, 5 slots fijos */}
@@ -1005,7 +1006,7 @@ function TabPagos({ pagos, color }) {
 }
 
 // ─── Tab Más ──────────────────────────────────────────────────────────────────
-function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0 }) {
+function TabMas({ pagos, planCobro, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0 }) {
   const [seccion, setSeccion] = useState('menu')
   const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
   const [guardando, setGuardando] = useState(false)
@@ -1106,6 +1107,26 @@ function TabMas({ pagos, cliente, setCliente, color, tabsExtra = [], setTab, msg
       <div className="space-y-3">
         <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
         <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Pagos</p>
+        {planCobro?.estado === 'pago_fallido' && (
+          <div className="rounded-2xl p-4 border border-red-200 bg-red-50">
+            <p className="text-sm font-black text-red-700 mb-1">⚠️ Hay un problema con tu pago</p>
+            <p className="text-xs text-red-600 leading-relaxed">Contacta con tu entrenador para actualizar tu método de pago y no perder el acceso a tu plan.</p>
+          </div>
+        )}
+        {planCobro?.estado === 'activo' && (
+          <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+            <div className="px-5 py-4">
+              <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>Suscripción activa</p>
+              <p className="text-lg font-black text-white capitalize">{planCobro.concepto || planCobro.plan}</p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-2xl font-black" style={{ color }}>{planCobro.importe}€<span className="text-xs text-white/40">/mes</span></p>
+                {planCobro.proximo_cobro && (
+                  <p className="text-[10px] text-white/40 text-right">Próximo cobro<br/><span className="text-white font-bold text-xs">{new Date(planCobro.proximo_cobro+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long'})}</span></p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {!pagos?.length
           ? <div className="text-center py-10"><p className="text-base font-bold text-[#0A0A0A]">Sin pagos registrados</p></div>
           : pagos.map((p, i) => (

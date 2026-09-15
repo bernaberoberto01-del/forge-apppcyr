@@ -174,6 +174,8 @@ export default function Clientes({ session }) {
   const [lesionExpandida, setLesionExpandida] = useState(null)
   const [generandoProtocolo, setGenerandoProtocolo] = useState(null)
   const [mostrarLesiones, setMostrarLesiones] = useState(false)
+  const [planSeleccionado, setPlanSeleccionado] = useState('nutricion')
+  const [creandoSuscripcion, setCreandoSuscripcion] = useState(false)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const uid = session.user.id
@@ -417,16 +419,46 @@ export default function Clientes({ session }) {
 
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen'); setLesionExpandida(null); setMostrarLesiones(false)
-    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }] = await Promise.all([
+    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('fotos_progreso').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('tareas_extra').select('*').eq('cliente_id', c.id).order('orden'),
       supabase.from('lesiones_cliente').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }),
+      supabase.from('planes_cobro').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
-    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[] })
+    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null })
     setTareasExtra(te||[])
+  }
+
+  async function crearSuscripcion() {
+    if (!detalle) return
+    setCreandoSuscripcion(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('crear-suscripcion', {
+        body: { cliente_id: detalle.id, plan: planSeleccionado },
+        headers: { Authorization: 'Bearer ' + session.access_token },
+      })
+      if (error) throw error
+      if (data?.ok) {
+        showToast('✓ Suscripción creada')
+        await abrirDetalle(detalle)
+      } else {
+        showToast('Error: ' + (data?.error || 'inténtalo de nuevo'), 'error')
+      }
+    } catch (e) {
+      showToast('Error de conexión', 'error')
+    }
+    setCreandoSuscripcion(false)
+  }
+
+  async function cancelarSuscripcionAdmin() {
+    if (!dData.planCobro) return
+    if (!confirm('Esto solo marca la suscripción como cancelada en Forge. Tienes que cancelarla también manualmente en el dashboard de Stripe. ¿Continuar?')) return
+    await supabase.from('planes_cobro').update({ estado: 'cancelado', activo: false }).eq('id', dData.planCobro.id)
+    showToast('Suscripción marcada como cancelada — cancélala también en Stripe')
+    await abrirDetalle(detalle)
   }
 
   async function generarProtocolo(lesionId) {
@@ -1086,7 +1118,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='online'?[['cobros','💳 Cobros']]:[]),...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -1561,6 +1593,62 @@ export default function Clientes({ session }) {
                     })}
                 </div>
               )}
+              {dTab==='cobros' && (() => {
+                const PLANES_COBRO = [
+                  ['nutricion', 'Nutrición', 29],
+                  ['entrenamiento', 'Entrenamiento', 35],
+                  ['completo', 'Completo', 49],
+                ]
+                const pc = dData.planCobro
+                const hayActiva = pc && pc.estado === 'activo'
+                const pagoFallido = pc && pc.estado === 'pago_fallido'
+                return (
+                  <div className="space-y-3">
+                    {hayActiva ? (
+                      <div className="bg-white border border-emerald-100 rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">✓ Activa</span>
+                          <span className="text-lg font-bold text-[#0A0A0A]">{pc.importe}€/mes</span>
+                        </div>
+                        <p className="text-sm text-[#0A0A0A] font-semibold capitalize">{pc.concepto || pc.plan}</p>
+                        {pc.proximo_cobro && (
+                          <p className="text-xs text-[#6B6B6B]">Próximo cobro: {new Date(pc.proximo_cobro+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</p>
+                        )}
+                        <button onClick={cancelarSuscripcionAdmin}
+                          className="w-full border border-red-100 text-red-500 text-sm font-semibold py-2.5 rounded-xl hover:bg-red-50">
+                          Cancelar suscripción
+                        </button>
+                      </div>
+                    ) : pagoFallido ? (
+                      <div className="bg-white border border-red-100 rounded-2xl p-4 space-y-2">
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600">⚠️ Pago fallido</span>
+                        <p className="text-sm text-[#0A0A0A] font-semibold capitalize">{pc.concepto || pc.plan} · {pc.importe}€/mes</p>
+                        <p className="text-xs text-[#6B6B6B]">Pide al cliente que actualice su método de pago en Stripe.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-xs font-semibold text-[#6B6B6B]">Elige un plan para crear la suscripción</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {PLANES_COBRO.map(([id, label, precio]) => (
+                            <button key={id} onClick={() => setPlanSeleccionado(id)}
+                              className={`rounded-xl border p-3 text-center transition-all ${planSeleccionado===id ? 'bg-[#FF5C00] border-[#FF5C00] text-white' : 'border-black/10 text-[#0A0A0A] hover:border-[#FF5C00]'}`}>
+                              <p className="text-sm font-bold">{label}</p>
+                              <p className={`text-xs mt-0.5 ${planSeleccionado===id ? 'text-white/80' : 'text-[#6B6B6B]'}`}>{precio}€/mes</p>
+                            </button>
+                          ))}
+                        </div>
+                        <button onClick={crearSuscripcion} disabled={creandoSuscripcion}
+                          className="w-full bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
+                          {creandoSuscripcion ? '⏳ Creando...' : 'Crear suscripción'}
+                        </button>
+                        {pc?.estado === 'cancelado' && (
+                          <p className="text-xs text-[#9B9B9B] text-center">La suscripción anterior está cancelada.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           </div>
         </div>
