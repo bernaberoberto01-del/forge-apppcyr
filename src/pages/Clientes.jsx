@@ -36,6 +36,107 @@ function calcTarifa(modalidad, dias) {
   return TARIFAS_GRUPO[modalidad]?.[dias] || null
 }
 
+const SEVERIDAD_COLORS = {
+  leve: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+  moderada: 'bg-amber-50 text-amber-600 border-amber-100',
+  grave: 'bg-red-50 text-red-600 border-red-100',
+}
+const ESTADO_LESION_LABEL = { activa: 'Activa', recuperada: 'Recuperada', en_seguimiento: 'En seguimiento' }
+
+function ProtocoloIA({ protocolo: p }) {
+  if (!p) return null
+  const senales = p['señales_de_alarma']
+  return (
+    <div className="bg-[#F7F6F3] rounded-xl p-3 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold text-[#0A0A0A]">🤖 Protocolo generado por IA</p>
+        {p.fase_actual && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF5C00]/10 text-[#FF5C00] flex-shrink-0">{p.fase_actual}</span>}
+      </div>
+      {p.duracion_estimada && <p className="text-xs text-[#6B6B6B]">⏱ Duración estimada: <span className="font-semibold text-[#0A0A0A]">{p.duracion_estimada}</span></p>}
+      {p.resumen && <p className="text-xs text-[#0A0A0A] leading-relaxed">{p.resumen}</p>}
+
+      {Array.isArray(p.calentamiento_especifico) && p.calentamiento_especifico.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-1">Calentamiento específico</p>
+          <div className="space-y-1">
+            {p.calentamiento_especifico.map((e, i) => (
+              <div key={i} className="bg-white rounded-lg px-2.5 py-1.5 text-xs flex items-center justify-between gap-2">
+                <span className="text-[#0A0A0A] font-medium">{e.ejercicio}</span>
+                <span className="text-[#9B9B9B] flex-shrink-0">{e.series}×{e.reps}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {Array.isArray(p.ejercicios_rehab) && p.ejercicios_rehab.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-1">Ejercicios de rehabilitación</p>
+          <div className="space-y-1">
+            {p.ejercicios_rehab.map((e, i) => (
+              <div key={i} className="bg-white rounded-lg px-2.5 py-1.5 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[#0A0A0A] font-medium">{e.ejercicio}</span>
+                  <span className="text-[#9B9B9B] flex-shrink-0">{e.series}×{e.reps}</span>
+                </div>
+                {e.notas && <p className="text-[#9B9B9B] mt-0.5">{e.notas}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {Array.isArray(p.ejercicios_evitar) && p.ejercicios_evitar.length > 0 && (
+        <div className="bg-red-50 border border-red-100 rounded-lg p-2.5">
+          <p className="text-[10px] font-bold text-red-700 uppercase tracking-wide mb-1">⛔ Ejercicios a evitar</p>
+          <ul className="text-xs text-red-800 space-y-0.5 list-disc list-inside">
+            {p.ejercicios_evitar.map((e, i) => <li key={i}>{e}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {Array.isArray(p.ejercicios_adaptar) && p.ejercicios_adaptar.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-1">Adaptaciones</p>
+          <div className="space-y-1">
+            {p.ejercicios_adaptar.map((e, i) => (
+              <div key={i} className="bg-white rounded-lg px-2.5 py-1.5 text-xs">
+                <p className="text-[#0A0A0A]"><span className="line-through text-[#9B9B9B]">{e.original}</span> → <span className="font-semibold">{e.alternativa}</span></p>
+                {e.motivo && <p className="text-[#9B9B9B] mt-0.5">{e.motivo}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {Array.isArray(p.recomendaciones_generales) && p.recomendaciones_generales.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-1">Recomendaciones generales</p>
+          <ul className="text-xs text-[#0A0A0A] space-y-0.5 list-disc list-inside">
+            {p.recomendaciones_generales.map((r, i) => <li key={i}>{r}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {Array.isArray(senales) && senales.length > 0 && (
+        <div className="bg-amber-50 border border-amber-100 rounded-lg p-2.5">
+          <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">⚠️ Señales de alarma</p>
+          <ul className="text-xs text-amber-800 space-y-0.5 list-disc list-inside">
+            {senales.map((s, i) => <li key={i}>{s}</li>)}
+          </ul>
+        </div>
+      )}
+
+      {p.progresion && (
+        <div>
+          <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-1">Progresión</p>
+          <p className="text-xs text-[#0A0A0A]">{p.progresion}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'',
   // Campos del cuestionario
   edad:'',altura:'',anos_entrenando:'',
@@ -70,6 +171,9 @@ export default function Clientes({ session }) {
   const [nuevaTarea, setNuevaTarea] = useState({ texto: '', frecuencia: '' })
   const [dTab, setDTab] = useState('resumen')
   const [dData, setDData] = useState({})
+  const [lesionExpandida, setLesionExpandida] = useState(null)
+  const [generandoProtocolo, setGenerandoProtocolo] = useState(null)
+  const [supEstado, setSupEstado] = useState(null)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const uid = session.user.id
@@ -312,16 +416,52 @@ export default function Clientes({ session }) {
   }
 
   async function abrirDetalle(c) {
-    setDetalle(c); setDTab('resumen')
-    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }] = await Promise.all([
+    setDetalle(c); setDTab('resumen'); setLesionExpandida(null); setSupEstado(null)
+    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('fotos_progreso').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('tareas_extra').select('*').eq('cliente_id', c.id).order('orden'),
+      supabase.from('lesiones_cliente').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }),
     ])
-    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[] })
+    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[] })
     setTareasExtra(te||[])
+  }
+
+  async function generarProtocolo(lesionId) {
+    setGenerandoProtocolo(lesionId)
+    try {
+      const { data, error } = await supabase.functions.invoke('generar-protocolo-rehab', { body: { lesion_id: lesionId } })
+      if (error) throw error
+      if (data?.ok) {
+        setDData(d => ({ ...d, lesiones: (d.lesiones||[]).map(l => l.id === lesionId ? { ...l, protocolo_ia: data.protocolo, protocolo_generado: true, estado: 'en_seguimiento' } : l) }))
+        showToast('✓ Protocolo generado')
+      } else {
+        showToast('Error: ' + (data?.error || 'inténtalo de nuevo'), 'error')
+      }
+    } catch (e) {
+      showToast('Error de conexión', 'error')
+    }
+    setGenerandoProtocolo(null)
+  }
+
+  async function marcarRecuperada(lesionId) {
+    await supabase.from('lesiones_cliente').update({ estado: 'recuperada' }).eq('id', lesionId)
+    setDData(d => ({ ...d, lesiones: (d.lesiones||[]).map(l => l.id === lesionId ? { ...l, estado: 'recuperada' } : l) }))
+    showToast('✓ Marcada como recuperada')
+  }
+
+  async function generarSuplementacion() {
+    setSupEstado('loading')
+    try {
+      const { data, error } = await supabase.functions.invoke('generar-suplementacion', { body: { cliente_id: detalle.id } })
+      if (error) throw error
+      if (data?.ok) { setSupEstado('done'); showToast('✓ Suplementación generada') }
+      else { setSupEstado('error'); showToast('Error: ' + (data?.error || 'inténtalo de nuevo'), 'error') }
+    } catch (e) {
+      setSupEstado('error'); showToast('Error de conexión', 'error')
+    }
   }
 
   async function anadirTarea() {
@@ -958,7 +1098,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['lesiones','Lesiones'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -1092,6 +1232,12 @@ export default function Clientes({ session }) {
 
                   {/* Acciones */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
+                    {detalle.tipo === 'online' && (
+                      <button onClick={generarSuplementacion} disabled={supEstado==='loading'}
+                        className={`col-span-2 border text-sm font-medium py-2.5 rounded-xl transition-all disabled:opacity-60 ${supEstado==='error' ? 'border-red-200 text-red-500 hover:bg-red-50' : supEstado==='done' ? 'border-emerald-200 text-emerald-600' : 'border-black/10 text-[#0A0A0A] hover:bg-[#F5F5F0]'}`}>
+                        {supEstado==='loading' ? '⏳ Generando...' : supEstado==='done' ? '✓ Suplementación generada' : supEstado==='error' ? '⚠ Error — reintentar' : '💊 Generar suplementación IA'}
+                      </button>
+                    )}
                     {/* Si no tiene acceso al portal, CTA prominente */}
                     {!detalle.auth_user_id && detalle.email && (
                       <button onClick={async () => {
@@ -1130,6 +1276,63 @@ export default function Clientes({ session }) {
                   </div>
                 </div>
               )})()}
+              {dTab==='lesiones' && (
+                <div className="space-y-3">
+                  {!(dData.lesiones||[]).length ? (
+                    <div className="text-center py-10">
+                      <p className="text-3xl mb-2">🩹</p>
+                      <p className="text-sm font-bold text-[#0A0A0A]">Sin lesiones registradas</p>
+                      <p className="text-xs text-[#9B9B9B] mt-1 leading-relaxed max-w-xs mx-auto">Aquí aparecerán las lesiones que el cliente reporte o que registres manualmente.</p>
+                    </div>
+                  ) : (dData.lesiones||[]).map(l => {
+                    const expandida = lesionExpandida === l.id
+                    return (
+                      <div key={l.id} className={`bg-white rounded-2xl border overflow-hidden ${l.estado==='activa' ? 'border-red-100' : 'border-black/5'}`}>
+                        <button onClick={() => setLesionExpandida(expandida ? null : l.id)}
+                          className="w-full flex items-center gap-3 p-3 text-left hover:bg-[#FAFAFA] transition-all">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0A0A0A] truncate">{l.zona}</p>
+                            <p className="text-xs text-[#9B9B9B]">
+                              {l.fecha_inicio ? new Date(l.fecha_inicio+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : '—'} · {ESTADO_LESION_LABEL[l.estado] || l.estado}
+                            </p>
+                          </div>
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded-full border flex-shrink-0 ${SEVERIDAD_COLORS[l.severidad] || 'bg-[#F5F5F0] text-[#6B6B6B] border-black/5'}`}>
+                            {(l.severidad || '—').toUpperCase()}
+                          </span>
+                          <span className="text-[#C0C0C0] text-xs flex-shrink-0">{expandida ? '▲' : '▼'}</span>
+                        </button>
+                        {expandida && (
+                          <div className="px-3 pb-3 border-t border-black/5 pt-3 space-y-3">
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                              {l.descripcion && <p className="col-span-2 text-[#6B6B6B]"><span className="font-semibold text-[#0A0A0A]">Descripción:</span> {l.descripcion}</p>}
+                              {l.limitaciones && <p className="col-span-2 text-[#6B6B6B]"><span className="font-semibold text-[#0A0A0A]">Limitaciones:</span> {l.limitaciones}</p>}
+                              <p className="text-[#6B6B6B]">Visitó médico: <span className="font-semibold text-[#0A0A0A]">{l.visito_medico ? 'Sí' : 'No'}</span></p>
+                              <p className="text-[#6B6B6B]">Recurrente: <span className="font-semibold text-[#0A0A0A]">{l.es_recurrente ? 'Sí' : 'No'}</span></p>
+                              {l.diagnostico_medico && <p className="col-span-2 text-[#6B6B6B]"><span className="font-semibold text-[#0A0A0A]">Diagnóstico:</span> {l.diagnostico_medico}</p>}
+                            </div>
+
+                            {l.protocolo_generado && l.protocolo_ia ? (
+                              <ProtocoloIA protocolo={l.protocolo_ia} />
+                            ) : (
+                              <button onClick={() => generarProtocolo(l.id)} disabled={generandoProtocolo===l.id}
+                                className="w-full bg-[#FF5C00] text-white text-xs font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                                {generandoProtocolo===l.id ? '⏳ Generando protocolo...' : '🩹 Generar protocolo IA'}
+                              </button>
+                            )}
+
+                            {l.estado !== 'recuperada' && (
+                              <button onClick={() => marcarRecuperada(l.id)}
+                                className="w-full border border-emerald-200 text-emerald-600 text-xs font-semibold py-2.5 rounded-xl hover:bg-emerald-50">
+                                ✓ Marcar recuperada
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
               {dTab==='sesiones' && (
                 <div className="space-y-4">
                   {/* Historial de sesiones con feedback */}
