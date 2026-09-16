@@ -431,6 +431,7 @@ export default function Clientes({ session }) {
       supabase.from('solicitudes_cambio_plan').select('*').eq('cliente_id', c.id).eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
     setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null })
+    setPlanSeleccionado((pc?.estado === 'activo' ? pc.plan : null) || c.plan_online || 'nutricion')
     setTareasExtra(te||[])
   }
 
