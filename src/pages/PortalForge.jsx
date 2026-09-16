@@ -1247,25 +1247,27 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
             )}
           </div>
         )}
-        {!pagos?.length
-          ? <div className="text-center py-10"><p className="text-base font-bold text-[#0A0A0A]">Sin pagos registrados</p></div>
-          : pagos.map((p, i) => (
-            <div key={i} className="bg-white rounded-2xl p-4 flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-black text-[#0A0A0A]">{p.concepto||'Pago mensual'}</p>
-                <p className="text-[10px] text-[#9B9B9B] mt-0.5 font-medium">
-                  {p.fecha_pago?new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'}):''}
-                </p>
+        {!pagos?.length ? (
+          <p className="text-sm text-[#6B6B6B] text-center py-4">Sin pagos registrados aún</p>
+        ) : (
+          <>
+            {pagos.map((p, i) => (
+              <div key={i} className="bg-white rounded-2xl p-3 flex items-center justify-between border border-black/5">
+                <div>
+                  <p className="text-sm font-medium text-[#0A0A0A]">{p.concepto||'Mensualidad'}</p>
+                  <p className="text-xs text-[#6B6B6B]">{p.fecha_pago?new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}):''}</p>
+                </div>
+                <div className="text-right flex flex-col items-end gap-1">
+                  <p className="font-bold text-emerald-600">{p.importe}€</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.estado==='pendiente' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                    {p.estado==='pendiente' ? '⏳ Pendiente' : '✓ Pagado'}
+                  </span>
+                </div>
               </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-xl font-black text-[#0A0A0A]">{p.importe}€</p>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${p.estado==='cobrado'?'bg-emerald-50 text-emerald-600':'bg-amber-50 text-amber-600'}`}>
-                  {p.estado==='cobrado'?'✓ Cobrado':'Pendiente'}
-                </span>
-              </div>
-            </div>
-          ))
-        }
+            ))}
+            <p className="text-xs text-[#9B9B9B] text-right pt-1">Total facturado: {pagos.reduce((s,p)=>s+Number(p.importe||0),0)}€</p>
+          </>
+        )}
       </div>
     )
   }

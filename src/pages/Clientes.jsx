@@ -1679,28 +1679,27 @@ export default function Clientes({ session }) {
 
                     {/* Sección 2 — Historial de pagos */}
                     <div className="space-y-2">
-                      <div className="bg-[#111] rounded-xl p-3 mb-3">
-                        <p className="text-white/40 text-xs">Total facturado</p>
-                        <p className="text-white text-2xl font-bold">{dData.pagos?.reduce((s,p)=>s+Number(p.importe||0),0)||0}€</p>
-                      </div>
-                      {!dData.pagos?.length ? <p className="text-sm text-[#6B6B6B] text-center py-4">Sin pagos registrados</p> :
-                        dData.pagos.map(p => {
-                          const d = p.valido_hasta ? Math.ceil((new Date(p.valido_hasta)-new Date())/864e5) : null
-                          return (
+                      {!dData.pagos?.length ? (
+                        <p className="text-sm text-[#6B6B6B] text-center py-4">Sin pagos registrados aún</p>
+                      ) : (
+                        <>
+                          {dData.pagos.map(p => (
                             <div key={p.id} className="border border-black/5 rounded-xl p-3 flex items-center justify-between">
                               <div>
                                 <p className="text-sm font-medium text-[#0A0A0A]">{p.concepto||'Mensualidad'}</p>
                                 <p className="text-xs text-[#6B6B6B]">{new Date(p.fecha_pago).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
                               </div>
-                              <div className="text-right">
-                                <p className="font-bold text-[#FF5C00]">{p.importe}€</p>
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.estado==='pendiente'?'bg-amber-50 text-amber-600':d!==null&&d<0?'bg-red-50 text-red-600':d!==null&&d<=7?'bg-amber-50 text-amber-600':'bg-emerald-50 text-emerald-700'}`}>
-                                  {p.estado==='pendiente'?'Pendiente':d===null?'Pagado':d<0?'Vencido':d<=7?`${d}d`:'Al día'}
+                              <div className="text-right flex flex-col items-end gap-1">
+                                <p className="font-bold text-emerald-600">{p.importe}€</p>
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.estado==='pendiente' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                                  {p.estado==='pendiente' ? '⏳ Pendiente' : '✓ Pagado'}
                                 </span>
                               </div>
                             </div>
-                          )
-                        })}
+                          ))}
+                          <p className="text-xs text-[#9B9B9B] text-right pt-1">Total facturado: {dData.pagos?.reduce((s,p)=>s+Number(p.importe||0),0)||0}€</p>
+                        </>
+                      )}
                     </div>
                   </div>
                 )
