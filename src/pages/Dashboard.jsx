@@ -98,6 +98,7 @@ export default function Dashboard({ session }) {
       { data: cuestSuplemento },
       { data: suplementacionExistente },
       { data: planesCobroAll },
+      { data: solicitudesCambioPlan },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -116,6 +117,7 @@ export default function Dashboard({ session }) {
       supabase.from('cuestionarios_nutricion').select('cliente_id,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('interes_suplementacion', true).order('created_at',{ascending:false}),
       supabase.from('suplementacion_cliente').select('cliente_id').eq('entrenador_id', uid),
       supabase.from('planes_cobro').select('cliente_id,estado,importe,concepto,clientes(nombre)').eq('entrenador_id', uid),
+      supabase.from('solicitudes_cambio_plan').select('cliente_id,plan_actual,plan_solicitado,clientes(nombre)').eq('entrenador_id', uid).eq('estado', 'pendiente'),
     ])
 
     if (alertas?.length > 0) {
@@ -183,6 +185,7 @@ export default function Dashboard({ session }) {
       suplementacionPendiente,
       clientesPagoFallido,
       clientesOnlineSinSuscripcion,
+      solicitudesCambioPlan: solicitudesCambioPlan || [],
     })
     setLoading(false)
     } catch (e) {
@@ -401,6 +404,25 @@ export default function Dashboard({ session }) {
                     <button onClick={() => navigate('/clientes')}
                       className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Configurar →
+                    </button>
+                  </div>
+                )}
+
+                {/* Solicitudes de cambio de plan */}
+                {d.solicitudesCambioPlan?.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="w-8 h-8 bg-orange-100 rounded-xl flex items-center justify-center text-orange-700 text-sm flex-shrink-0">📋</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">
+                        {d.solicitudesCambioPlan.length} cliente{d.solicitudesCambioPlan.length>1?'s':''} han solicitado cambio de plan
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">
+                        {d.solicitudesCambioPlan.slice(0,3).map(s=>s.clientes?.nombre?.split(' ')[0]).filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/clientes')}
+                      className="text-xs bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Revisar →
                     </button>
                   </div>
                 )}

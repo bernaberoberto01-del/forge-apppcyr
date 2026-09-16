@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-const PASOS = ['Tus datos','Tu objetivo','Tus hábitos','Preferencias']
+const PASOS = ['Tus datos','Tu objetivo','Tus hábitos','Salud','Preferencias']
+const CONDICIONES_SALUD_OPTS = [
+  'Diabetes tipo 1', 'Diabetes tipo 2', 'Celiaquía', 'Intolerancia a la lactosa',
+  'Hipotiroidismo', 'Hipertiroidismo', 'SII (colon irritable)', 'Enfermedad de Crohn',
+  'Hipertensión', 'Colesterol alto',
+]
 
 export default function NutricionCuestionario() {
   const params = new URLSearchParams(window.location.search)
@@ -9,12 +14,13 @@ export default function NutricionCuestionario() {
   const clienteId = params.get('c')
   const [cliente, setCliente] = useState(null)
   const [paso, setPaso] = useState(0)
-  const [form, setForm] = useState({ sexo:'', peso:'', altura:'', edad:'', nivel_actividad:'', objetivo:'', velocidad_progreso:'', comidas_dia:'', tiempo_cocina:'', tipo_dieta:'', entrena_cuando:'', alergias:'', alimentos_no_gustan:'', alimentos_favoritos:'', suplementos:'', notas:'' })
+  const [form, setForm] = useState({ sexo:'', peso:'', altura:'', edad:'', nivel_actividad:'', objetivo:'', velocidad_progreso:'', comidas_dia:'', tiempo_cocina:'', tipo_dieta:'', entrena_cuando:'', alergias:'', alimentos_no_gustan:'', alimentos_favoritos:'', suplementos:'', notas:'', tiene_condicion_salud:false, condiciones_salud:[], condicion_otro:'', medicacion:'' })
   const [aceptaRgpd, setAceptaRgpd] = useState(false)
   const [aceptaIa, setAceptaIa] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [loading, setLoading] = useState(false)
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
+  const toggleCondicion = c => setForm(f => ({...f, condiciones_salud: f.condiciones_salud.includes(c) ? f.condiciones_salud.filter(x=>x!==c) : [...f.condiciones_salud, c]}))
 
   useEffect(() => {
     if (!clienteId || !entrenadorId) return
@@ -65,7 +71,18 @@ export default function NutricionCuestionario() {
 
   async function enviar() {
     setLoading(true)
-    await supabase.from('cuestionarios_nutricion').insert({ ...form, cliente_id: clienteId, entrenador_id: entrenadorId, peso: form.peso?Number(form.peso):null, altura: form.altura?Number(form.altura):null, edad: form.edad?Number(form.edad):null, comidas_dia: form.comidas_dia?Number(form.comidas_dia):null, acepta_rgpd: aceptaRgpd, acepta_ia: aceptaIa, fecha_consentimiento: new Date().toISOString() })
+    const { condicion_otro, ...formLimpio } = form
+    const condicionesFinal = [...form.condiciones_salud]
+    if (condicionesFinal.includes('Otro') && condicion_otro?.trim()) {
+      condicionesFinal[condicionesFinal.indexOf('Otro')] = `Otro: ${condicion_otro.trim()}`
+    }
+    await supabase.from('cuestionarios_nutricion').insert({
+      ...formLimpio,
+      condiciones_salud: form.tiene_condicion_salud ? condicionesFinal : null,
+      cliente_id: clienteId, entrenador_id: entrenadorId,
+      peso: form.peso?Number(form.peso):null, altura: form.altura?Number(form.altura):null, edad: form.edad?Number(form.edad):null, comidas_dia: form.comidas_dia?Number(form.comidas_dia):null,
+      acepta_rgpd: aceptaRgpd, acepta_ia: aceptaIa, fecha_consentimiento: new Date().toISOString(),
+    })
     setEnviado(true)
     setLoading(false)
   }
@@ -215,6 +232,41 @@ export default function NutricionCuestionario() {
           </>)}
 
           {paso===3 && (<>
+            <p className="text-sm font-bold text-[#0A0A0A]">Condiciones de salud</p>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input type="checkbox" checked={form.tiene_condicion_salud} onChange={e=>set('tiene_condicion_salud', e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+              <span className="text-sm text-[#0A0A0A]">¿Tienes alguna condición de salud que afecte a tu alimentación?</span>
+            </label>
+            {form.tiene_condicion_salud && (
+              <div className="space-y-2 pl-1">
+                {CONDICIONES_SALUD_OPTS.map(c => (
+                  <label key={c} className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={form.condiciones_salud.includes(c)} onChange={()=>toggleCondicion(c)}
+                      className="w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                    <span className="text-sm text-[#0A0A0A]">{c}</span>
+                  </label>
+                ))}
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input type="checkbox" checked={form.condiciones_salud.includes('Otro')} onChange={()=>toggleCondicion('Otro')}
+                    className="w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                  <span className="text-sm text-[#0A0A0A]">Otro</span>
+                </label>
+                {form.condiciones_salud.includes('Otro') && (
+                  <input value={form.condicion_otro} onChange={e=>set('condicion_otro', e.target.value)} placeholder="Especifica..."
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                )}
+              </div>
+            )}
+            <div>
+              <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">¿Tomas medicación que deba tenerse en cuenta? (opcional)</label>
+              <textarea value={form.medicacion} onChange={e=>set('medicacion', e.target.value)} rows={2}
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                placeholder="Ej: Metformina, Levotiroxina..." />
+            </div>
+          </>)}
+
+          {paso===4 && (<>
             <p className="text-sm font-bold text-[#0A0A0A]">Restricciones y preferencias</p>
             {[['Alergias e intolerancias','alergias','Ej: lactosa, gluten, frutos secos...'],['Alimentos que NO te gustan','alimentos_no_gustan','Ej: hígado, sardinas...'],['Tus alimentos favoritos','alimentos_favoritos','Ej: pollo, arroz, huevos...'],['Suplementos que tomas','suplementos','Ej: whey, creatina...'],['Algo más que debamos saber','notas','Contexto, restricciones especiales...']].map(([l,k,ph])=>(
               <div key={k}>

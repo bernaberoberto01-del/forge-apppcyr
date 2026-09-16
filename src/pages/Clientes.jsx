@@ -419,7 +419,7 @@ export default function Clientes({ session }) {
 
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen'); setLesionExpandida(null); setMostrarLesiones(false)
-    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }] = await Promise.all([
+    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }, { data: cn }, { data: scp }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
@@ -427,9 +427,33 @@ export default function Clientes({ session }) {
       supabase.from('tareas_extra').select('*').eq('cliente_id', c.id).order('orden'),
       supabase.from('lesiones_cliente').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }),
       supabase.from('planes_cobro').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('cuestionarios_nutricion').select('tiene_condicion_salud, condiciones_salud').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('solicitudes_cambio_plan').select('*').eq('cliente_id', c.id).eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
-    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null })
+    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null })
     setTareasExtra(te||[])
+  }
+
+  async function aprobarCambioPlan() {
+    const sol = dData.solicitudCambioPlan
+    if (!sol || !detalle) return
+    await supabase.from('clientes').update({ plan_online: sol.plan_solicitado }).eq('id', detalle.id)
+    if (dData.planCobro) await supabase.from('planes_cobro').update({ plan: sol.plan_solicitado }).eq('id', dData.planCobro.id)
+    await supabase.from('solicitudes_cambio_plan').update({ estado: 'aprobado' }).eq('id', sol.id)
+    const PLAN_LABEL = { nutricion: 'Nutrición', entrenamiento: 'Entrenamiento', completo: 'Completo' }
+    await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: detalle.id, contenido: `✓ Tu cambio al plan ${PLAN_LABEL[sol.plan_solicitado] || sol.plan_solicitado} ha sido aprobado.`, enviado_por: 'entrenador', leido_cliente: false })
+    showToast('✓ Cambio de plan aprobado')
+    await abrirDetalle(detalle)
+  }
+
+  async function rechazarCambioPlan() {
+    const sol = dData.solicitudCambioPlan
+    if (!sol || !detalle) return
+    await supabase.from('solicitudes_cambio_plan').update({ estado: 'rechazado' }).eq('id', sol.id)
+    const PLAN_LABEL = { nutricion: 'Nutrición', entrenamiento: 'Entrenamiento', completo: 'Completo' }
+    await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: detalle.id, contenido: `Hemos revisado tu solicitud de cambio al plan ${PLAN_LABEL[sol.plan_solicitado] || sol.plan_solicitado}. Escríbenos si quieres que lo hablemos.`, enviado_por: 'entrenador', leido_cliente: false })
+    showToast('Solicitud rechazada')
+    await abrirDetalle(detalle)
   }
 
   async function crearSuscripcion() {
@@ -1214,6 +1238,34 @@ export default function Clientes({ session }) {
                   {/* Lesiones/notas */}
                   {detalle.lesiones && <div className="bg-red-50 border border-red-100 rounded-xl p-3"><p className="text-xs font-semibold text-red-700 mb-1">⚠ Lesiones / limitaciones</p><p className="text-sm text-red-800">{detalle.lesiones}</p></div>}
                   {detalle.notas && <div className="bg-amber-50 rounded-xl p-3"><p className="text-xs font-semibold text-amber-700 mb-1">📝 Notas internas</p><p className="text-sm text-amber-800">{detalle.notas}</p></div>}
+
+                  {/* Condición de salud reportada en el cuestionario de nutrición */}
+                  {dData.cuestNutricion?.tiene_condicion_salud && (
+                    <button onClick={() => navigate('/nutricion')}
+                      className="w-full flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 text-left hover:bg-amber-100/60 transition-all">
+                      <span className="text-base flex-shrink-0">⚕️</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-amber-700">Condición de salud — ver cuestionario</p>
+                        {dData.cuestNutricion.condiciones_salud?.length > 0 && (
+                          <p className="text-xs text-amber-700/80 truncate">{dData.cuestNutricion.condiciones_salud.join(', ')}</p>
+                        )}
+                      </div>
+                      <span className="text-amber-400 text-xs flex-shrink-0">›</span>
+                    </button>
+                  )}
+
+                  {/* Solicitud pendiente de cambio de plan */}
+                  {dData.solicitudCambioPlan && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
+                      <p className="text-xs font-bold text-orange-700">
+                        📋 Solicita cambio a plan {({nutricion:'Nutrición',entrenamiento:'Entrenamiento',completo:'Completo'})[dData.solicitudCambioPlan.plan_solicitado] || dData.solicitudCambioPlan.plan_solicitado}
+                      </p>
+                      <div className="flex gap-2">
+                        <button onClick={aprobarCambioPlan} className="flex-1 bg-emerald-500 text-white text-xs font-bold py-2 rounded-lg">Aprobar</button>
+                        <button onClick={rechazarCambioPlan} className="flex-1 border border-red-200 text-red-500 text-xs font-bold py-2 rounded-lg hover:bg-red-50">Rechazar</button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Lesiones activas — reportadas por el cliente al registrar sesión */}
                   {(dData.lesiones||[]).filter(l => l.estado !== 'recuperada').length > 0 && (() => {
