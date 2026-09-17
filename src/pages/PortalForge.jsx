@@ -138,24 +138,31 @@ export default function PortalForge() {
   async function enviarCheckin() {
     if (!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres) return
     setEnviandoCI(true)
-    const diasPlan = cliente.dias_semana || 3
-    const adherencia = ciForm.sesiones_semana != null ? Math.round((ciForm.sesiones_semana / diasPlan) * 10) : null
-    const { error } = await supabase.from('checkins').insert({
-      cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
-      energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
-      sesiones_semana: ciForm.sesiones_semana, sesiones_planificadas: diasPlan,
-      cargas_sensacion: ciForm.cargas_sensacion, logro_semana: ciForm.logro_semana || null,
-      peso: ciForm.peso ? parseFloat(ciForm.peso) : null, comentario: ciForm.nota || null, adherencia_entreno: adherencia,
-    })
-    if (!error) {
-      setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null, adherencia_entreno: adherencia }, ...d.checkins] }))
-      setModalCI(false)
-      setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones_semana: null, cargas_sensacion: null, logro_semana: '', peso: '', nota: '' })
-      showToast('✓ Check-in enviado')
-    } else {
+    try {
+      const diasPlan = cliente.dias_semana || 3
+      const adherencia = ciForm.sesiones_semana != null ? Math.round((ciForm.sesiones_semana / diasPlan) * 10) : null
+      const { error } = await supabase.from('checkins').insert({
+        cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
+        energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
+        sesiones_semana: ciForm.sesiones_semana, sesiones_planificadas: diasPlan,
+        cargas_sensacion: ciForm.cargas_sensacion, logro_semana: ciForm.logro_semana || null,
+        peso: ciForm.peso ? parseFloat(ciForm.peso) : null, comentario: ciForm.nota || null, adherencia_entreno: adherencia,
+      })
+      if (!error) {
+        setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null, adherencia_entreno: adherencia }, ...d.checkins] }))
+        setModalCI(false)
+        setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones_semana: null, cargas_sensacion: null, logro_semana: '', peso: '', nota: '' })
+        showToast('✓ Check-in enviado')
+      } else {
+        console.error('enviarCheckin error:', error)
+        showToast('⚠️ Error al enviar — inténtalo de nuevo')
+      }
+    } catch (e) {
+      console.error('enviarCheckin exception:', e)
       showToast('⚠️ Error al enviar — inténtalo de nuevo')
+    } finally {
+      setEnviandoCI(false)
     }
-    setEnviandoCI(false)
   }
 
   async function guardarValoracion() {
