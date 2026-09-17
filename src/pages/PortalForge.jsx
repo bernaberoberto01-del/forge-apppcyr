@@ -136,6 +136,7 @@ export default function PortalForge() {
   }
 
   async function enviarCheckin() {
+    console.log('enviarCheckin llamado', ciForm)
     if (!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres) return
     setEnviandoCI(true)
     try {
