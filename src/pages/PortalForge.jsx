@@ -45,7 +45,8 @@ export default function PortalForge() {
 
   // Modales
   const [modalCI, setModalCI] = useState(false)
-  const [ciForm, setCiForm] = useState({ energia: null, sueno: null, fatiga: null, estres: null, peso: '', nota: '' })
+  const [ciForm, setCiForm] = useState({ energia: null, sueno: null, fatiga: null, estres: null, sesiones_semana: null, cargas_sensacion: null, logro_semana: '', peso: '', nota: '' })
+  const [ciPaso, setCiPaso] = useState(1)
   const [enviandoCI, setEnviandoCI] = useState(false)
   const [valorando, setValorando] = useState(null)
   const [rpe, setRpe] = useState(null)
@@ -138,14 +139,19 @@ export default function PortalForge() {
   async function enviarCheckin() {
     if (!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres) return
     setEnviandoCI(true)
+    const diasPlan = cliente.dias_semana || 3
+    const adherencia = ciForm.sesiones_semana != null ? Math.round((ciForm.sesiones_semana / diasPlan) * 10) : null
     const { error } = await supabase.from('checkins').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
       energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
-      peso: ciForm.peso ? parseFloat(ciForm.peso) : null, comentario: ciForm.nota || null, adherencia_entreno: 5,
+      sesiones_semana: ciForm.sesiones_semana, sesiones_planificadas: diasPlan,
+      cargas_sensacion: ciForm.cargas_sensacion, logro_semana: ciForm.logro_semana || null,
+      peso: ciForm.peso ? parseFloat(ciForm.peso) : null, comentario: ciForm.nota || null, adherencia_entreno: adherencia,
     })
     if (!error) {
-      setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null }, ...d.checkins] }))
-      setModalCI(false); setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, peso: '', nota: '' })
+      setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null, adherencia_entreno: adherencia }, ...d.checkins] }))
+      setModalCI(false); setCiPaso(1)
+      setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones_semana: null, cargas_sensacion: null, logro_semana: '', peso: '', nota: '' })
       showToast('✓ Check-in enviado')
     }
     setEnviandoCI(false)
@@ -476,7 +482,7 @@ export default function PortalForge() {
         {toast && <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl whitespace-nowrap" style={{ background: color }}>{toast}</div>}
 
         {/* Modal check-in */}
-        {modalCI && <ModalCheckin color={color} ciForm={ciForm} setCiForm={setCiForm} enviandoCI={enviandoCI} enviarCheckin={enviarCheckin} onClose={() => setModalCI(false)} />}
+        {modalCI && <ModalCheckin color={color} ciForm={ciForm} setCiForm={setCiForm} ciPaso={ciPaso} setCiPaso={setCiPaso} enviandoCI={enviandoCI} enviarCheckin={enviarCheckin} onClose={() => { setModalCI(false); setCiPaso(1) }} />}
 
         {/* Modal valorar */}
         {valorando && (
@@ -2341,57 +2347,120 @@ function SubFuerza({ ejerciciosHist, color }) {
 }
 
 // ─── Modal check-in ───────────────────────────────────────────────────────────
-function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, onClose }) {
+function ModalCheckin({ color, ciForm, setCiForm, ciPaso, setCiPaso, enviandoCI, enviarCheckin, onClose }) {
+  const paso1Completo = ciForm.energia && ciForm.sueno && ciForm.fatiga && ciForm.estres
+  const paso2Completo = ciForm.sesiones_semana != null && ciForm.cargas_sensacion
+
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
-          <div><p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p><p className="text-xs text-[#9B9B9B] mt-0.5">¿Cómo ha ido esta semana?</p></div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl">×</button>
+        <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5">
+          <div className="flex items-center justify-between">
+            <div><p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p><p className="text-xs text-[#9B9B9B] mt-0.5">¿Cómo ha ido esta semana?</p></div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl">×</button>
+          </div>
+          <div className="flex gap-1.5 mt-4">
+            {[1,2,3].map(p => <div key={p} className="h-1 flex-1 rounded-full" style={{ background: p <= ciPaso ? color : '#F2F1EE' }} />)}
+          </div>
         </div>
         <div className="px-6 py-5 space-y-6">
-          {[
-            { k: 'energia', icon: '⚡', label: 'Energía', max: 5, lo: 'Agotado', hi: 'Excelente' },
-            { k: 'sueno', icon: '😴', label: 'Sueño', max: 5, lo: 'Muy mal', hi: 'Muy bien' },
-            { k: 'fatiga', icon: '🏋️', label: 'Fatiga muscular', max: 10, lo: 'Sin fatiga', hi: 'Al límite' },
-            { k: 'estres', icon: '🧠', label: 'Estrés', max: 10, lo: 'Sin estrés', hi: 'Al límite' },
-          ].map(({ k, icon, label, max, lo, hi }) => (
-            <div key={k}>
-              <div className="flex items-center gap-2 mb-3">
-                <span>{icon}</span><p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
-                {ciForm[k] && <span className="ml-auto text-sm font-bold" style={{ color }}>{ciForm[k]}/{max}</span>}
+          {ciPaso === 1 && (
+            <>
+              {[
+                { k: 'energia', icon: '⚡', label: 'Energía', max: 5, lo: 'Agotado', hi: 'Excelente' },
+                { k: 'sueno', icon: '😴', label: 'Sueño (calidad)', max: 5, lo: 'Muy mal', hi: 'Muy bien' },
+                { k: 'fatiga', icon: '🏋️', label: 'Fatiga muscular', max: 10, lo: 'Sin fatiga', hi: 'Al límite' },
+                { k: 'estres', icon: '🧠', label: 'Estrés', max: 10, lo: 'Sin estrés', hi: 'Al límite' },
+              ].map(({ k, icon, label, max, lo, hi }) => (
+                <div key={k}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <span>{icon}</span><p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
+                    {ciForm[k] && <span className="ml-auto text-sm font-bold" style={{ color }}>{ciForm[k]}/{max}</span>}
+                  </div>
+                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max},1fr)` }}>
+                    {Array.from({ length: max }, (_, i) => i + 1).map(v => {
+                      const sel = ciForm[k] === v
+                      const bg = sel ? ((k === 'fatiga' || k === 'estres') && v >= 7 ? '#ef4444' : (k === 'fatiga' || k === 'estres') && v >= 5 ? '#f59e0b' : color) : undefined
+                      return (
+                        <button key={v} onClick={() => setCiForm(f => ({ ...f, [k]: v }))}
+                          className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B]'}`}
+                          style={sel ? { background: bg } : {}}>{v}</button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex justify-between mt-1.5"><span className="text-[10px] text-[#C0C0C0]">{lo}</span><span className="text-[10px] text-[#C0C0C0]">{hi}</span></div>
+                </div>
+              ))}
+              <button onClick={() => setCiPaso(2)} disabled={!paso1Completo}
+                className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
+                style={{ background: color }}>Siguiente →</button>
+            </>
+          )}
+
+          {ciPaso === 2 && (
+            <>
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-3">🏋️‍♂️ ¿Cuántas sesiones has completado esta semana?</p>
+                <div className="grid grid-cols-6 gap-1.5">
+                  {[0,1,2,3,4,5].map(v => (
+                    <button key={v} onClick={() => setCiForm(f => ({ ...f, sesiones_semana: v }))}
+                      className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${ciForm.sesiones_semana === v ? 'text-white' : 'border border-black/10 text-[#9B9B9B]'}`}
+                      style={ciForm.sesiones_semana === v ? { background: color } : {}}>{v === 5 ? '5+' : v}</button>
+                  ))}
+                </div>
               </div>
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max},1fr)` }}>
-                {Array.from({ length: max }, (_, i) => i + 1).map(v => {
-                  const sel = ciForm[k] === v
-                  const bg = sel ? ((k === 'fatiga' || k === 'estres') && v >= 7 ? '#ef4444' : (k === 'fatiga' || k === 'estres') && v >= 5 ? '#f59e0b' : color) : undefined
-                  return (
-                    <button key={v} onClick={() => setCiForm(f => ({ ...f, [k]: v }))}
-                      className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B]'}`}
-                      style={sel ? { background: bg } : {}}>{v}</button>
-                  )
-                })}
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-3">💪 ¿Cómo has sentido las cargas?</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    ['muy_facil', '😅 Muy fácil'], ['bien', '✅ Ajustadas'],
+                    ['duro', '🔥 Algo duras'], ['muy_duro', '😤 Muy duras'],
+                  ].map(([v, l]) => (
+                    <button key={v} onClick={() => setCiForm(f => ({ ...f, cargas_sensacion: v }))}
+                      className={`p-3 rounded-xl border text-left text-xs font-bold transition-all ${ciForm.cargas_sensacion === v ? 'border-transparent text-white' : 'border-black/10 text-[#0A0A0A]'}`}
+                      style={ciForm.cargas_sensacion === v ? { background: color } : {}}>{l}</button>
+                  ))}
+                </div>
               </div>
-              <div className="flex justify-between mt-1.5"><span className="text-[10px] text-[#C0C0C0]">{lo}</span><span className="text-[10px] text-[#C0C0C0]">{hi}</span></div>
-            </div>
-          ))}
-          <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">⚖️ Peso <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
-            <div className="flex items-center gap-2">
-              <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso} onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
-                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none" />
-              <span className="text-sm text-[#9B9B9B]">kg</span>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">💬 Nota <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
-            <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={ciForm.nota}
-              onChange={e => setCiForm(f => ({ ...f, nota: e.target.value }))}
-              className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
-          </div>
-          <button onClick={enviarCheckin} disabled={!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres || enviandoCI}
-            className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
-            style={{ background: color }}>{enviandoCI ? '⏳ Enviando...' : '✓ Enviar check-in'}</button>
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-2">🏆 ¿Algún logro esta semana? <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
+                <textarea rows={2} placeholder="Ej: Por fin hice las 5 series completas..." value={ciForm.logro_semana}
+                  onChange={e => setCiForm(f => ({ ...f, logro_semana: e.target.value }))}
+                  className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setCiPaso(1)} className="flex-1 py-4 rounded-2xl border border-black/10 text-[#6B6B6B] font-bold text-sm">← Atrás</button>
+                <button onClick={() => setCiPaso(3)} disabled={!paso2Completo}
+                  className="flex-1 py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
+                  style={{ background: color }}>Siguiente →</button>
+              </div>
+            </>
+          )}
+
+          {ciPaso === 3 && (
+            <>
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-2">⚖️ Peso <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
+                <div className="flex items-center gap-2">
+                  <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso} onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
+                    className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none" />
+                  <span className="text-sm text-[#9B9B9B]">kg</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-2">💬 Nota <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
+                <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={ciForm.nota}
+                  onChange={e => setCiForm(f => ({ ...f, nota: e.target.value }))}
+                  className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setCiPaso(2)} className="flex-1 py-4 rounded-2xl border border-black/10 text-[#6B6B6B] font-bold text-sm">← Atrás</button>
+                <button onClick={enviarCheckin} disabled={!paso1Completo || enviandoCI}
+                  className="flex-1 py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
+                  style={{ background: color }}>{enviandoCI ? '⏳ Enviando...' : '✓ Enviar check-in'}</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

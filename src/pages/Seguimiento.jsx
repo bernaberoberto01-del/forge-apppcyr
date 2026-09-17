@@ -6,10 +6,10 @@ import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 
 const ESCALAS = [
-  { label: 'Energía', field: 'energia', min: 1, max: 10, suffix: '/10', color: 'blue' },
-  { label: 'Sueño (horas)', field: 'sueno', min: 4, max: 10, suffix: 'h', color: 'purple' },
-  { label: 'Estrés', field: 'estres', min: 1, max: 5, suffix: '/5', red: true },
-  { label: 'Fatiga muscular', field: 'fatiga', min: 1, max: 5, suffix: '/5', red: true },
+  { label: 'Energía', field: 'energia', min: 1, max: 5, suffix: '/5', color: 'blue' },
+  { label: 'Sueño (calidad)', field: 'sueno', min: 1, max: 5, suffix: '/5', color: 'purple' },
+  { label: 'Estrés', field: 'estres', min: 1, max: 10, suffix: '/10', red: true },
+  { label: 'Fatiga muscular', field: 'fatiga', min: 1, max: 10, suffix: '/10', red: true },
   { label: 'Motivación', field: 'motivacion', min: 1, max: 7, suffix: '/7', color: 'yellow' },
   { label: 'Calidad entreno', field: 'calidad_entreno', min: 1, max: 7, suffix: '/7', color: 'green' },
   { label: 'Adherencia entreno', field: 'adherencia_entreno', min: 1, max: 10, suffix: '/10', color: 'orange' },
@@ -17,14 +17,15 @@ const ESCALAS = [
 ]
 
 const initForm = {
-  cliente_id: '', fecha: new Date().toISOString().split('T')[0], peso: '', energia: 7, sueno: 7, estres: 2, fatiga: 2,
+  cliente_id: '', fecha: new Date().toISOString().split('T')[0], peso: '', energia: 4, sueno: 4, estres: 3, fatiga: 3,
   motivacion: 5, calidad_entreno: 5, sesiones_semana: 3,
   adherencia_entreno: 7, adherencia_nutricion: 7, pasos_diarios: '', comentario: ''
 }
 
 const badgeColor = (field, val) => {
   if (field === 'estres' || field === 'fatiga') return val >= 7 ? 'bg-red-50 text-red-700' : val >= 5 ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'
-  if (field === 'energia' || field === 'motivacion' || field === 'calidad_entreno') return val >= 7 ? 'bg-green-50 text-green-700' : val >= 4 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'
+  if (field === 'energia' || field === 'sueno') return val >= 4 ? 'bg-green-50 text-green-700' : val >= 3 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'
+  if (field === 'motivacion' || field === 'calidad_entreno') return val >= 5 ? 'bg-green-50 text-green-700' : val >= 3 ? 'bg-blue-50 text-blue-700' : 'bg-red-50 text-red-700'
   if (field === 'adherencia_entreno' || field === 'adherencia_nutricion') return val >= 7 ? 'bg-green-50 text-green-700' : val >= 4 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'
   return 'bg-[#F5F5F0] text-[#6B6B6B]'
 }
