@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import ClienteQuickView from '../components/ClienteQuickView'
@@ -21,6 +22,7 @@ const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCas
 
 export default function Mensajes({ session }) {
   const uid = session.user.id
+  const location = useLocation()
   const { completar, completado } = useOnboarding(uid)
   const [clientes, setClientes] = useState([])
   const [seleccionado, setSeleccionado] = useState(null)
@@ -66,6 +68,15 @@ export default function Mensajes({ session }) {
   const endRef = useRef()
 
   useEffect(() => { cargarClientes() }, [uid])
+  useEffect(() => {
+    if (location.state?.clienteId && clientes.length) {
+      const c = clientes.find(cl => cl.id === location.state.clienteId)
+      if (c) {
+        setSeleccionado(c)
+        if (location.state.mensaje) setTexto(location.state.mensaje)
+      }
+    }
+  }, [location.state, clientes])
   useEffect(() => { if (seleccionado) cargarMensajes(seleccionado.id) }, [seleccionado])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes])
 

@@ -566,6 +566,7 @@ export default function Agenda({ session }) {
       fecha: sesion.fecha, hora: sesion.hora,
       tipo: 'presencial', duracion_minutos: sesion.duracion_minutos,
       completada: true,
+      valoracion_pendiente: true,
       grupo_id: esGrupo ? sesion._grupoData.id : null,
       es_recurrente: true,
     }))

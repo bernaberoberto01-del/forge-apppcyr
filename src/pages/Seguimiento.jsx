@@ -44,6 +44,11 @@ export default function Seguimiento({ session }) {
   const [lanzandoMensual, setLanzandoMensual] = useState(false)
   const [borradores, setBorradores] = useState([])
   const [analisisMensual, setAnalisisMensual] = useState([])
+  const [historialAnalisis, setHistorialAnalisis] = useState([])
+  const [mostrarHistorialAnalisis, setMostrarHistorialAnalisis] = useState(false)
+  const [cargandoHistorial, setCargandoHistorial] = useState(false)
+  const [historialCargado, setHistorialCargado] = useState(false)
+  const [historialExpandido, setHistorialExpandido] = useState(null)
   const [publicandoBorrador, setPublicandoBorrador] = useState(null)
   const [rutinaBorradorExpandida, setRutinaBorradorExpandida] = useState(null)
   const [busqueda, setBusqueda] = useState('')
@@ -84,6 +89,20 @@ export default function Seguimiento({ session }) {
     setSesiones(se || [])
     setBorradores(bors || [])
     setAnalisisMensual(an || [])
+  }
+
+  async function cargarHistorialAnalisis() {
+    setCargandoHistorial(true)
+    const { data } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('revisado', true).order('created_at', { ascending: false }).limit(50)
+    setHistorialAnalisis(data || [])
+    setHistorialCargado(true)
+    setCargandoHistorial(false)
+  }
+
+  function toggleHistorialAnalisis() {
+    const abrir = !mostrarHistorialAnalisis
+    setMostrarHistorialAnalisis(abrir)
+    if (abrir && !historialCargado) cargarHistorialAnalisis()
   }
 
   async function lanzarMensual() {
@@ -225,47 +244,30 @@ export default function Seguimiento({ session }) {
       </div>
 
       {tabPrincipal === 'semana' && (() => {
-        const hoy = new Date()
-        const lunesEsta = new Date(hoy); lunesEsta.setDate(hoy.getDate() - (hoy.getDay()||7) + 1)
-        const lunesStr = lunesEsta.toISOString().split('T')[0]
-        const hace7 = new Date(hoy.getTime() - 7*864e5).toISOString().split('T')[0]
-
-        // Estado de cada cliente esta semana
+        // Estado de cada cliente — solo check-in
         const estadoClientes = clientes.map(c => {
-          const sessSem = sesiones.filter(s => s.cliente_id === c.id && s.fecha >= lunesStr && !s.cancelada)
-          const sesCompletadas = sessSem.filter(s => s.completada)
-          const sesValorTodas = sesCompletadas.every(s => s.rpe)
-          const sinValorar = sesCompletadas.filter(s => !s.rpe).length
-          const ciSem = checkins.filter(ci => ci.cliente_id === c.id && ci.fecha >= lunesStr)
           const ciUltimo = checkins.filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha.localeCompare(a.fecha))[0]
           const diasSinCI = ciUltimo ? Math.floor((Date.now() - new Date(ciUltimo.fecha).getTime()) / 864e5) : 999
-          const rpePromedio = sesCompletadas.filter(s=>s.rpe).length
-            ? (sesCompletadas.filter(s=>s.rpe).reduce((sum,s) => sum+s.rpe, 0) / sesCompletadas.filter(s=>s.rpe).length).toFixed(1)
-            : null
-          const fatigaMax = sesCompletadas.reduce((max,s) => s.fatiga_post > max ? s.fatiga_post : max, 0) || null
 
-          // Nivel de alerta
           let alerta = 'ok' // ok | warning | critical
-          if (diasSinCI >= 14 || (sesCompletadas.length > 0 && sinValorar > 0 && sesCompletadas.length === sinValorar)) alerta = 'critical'
-          else if (diasSinCI >= 7 || sinValorar > 0) alerta = 'warning'
+          if (diasSinCI >= 14) alerta = 'critical'
+          else if (diasSinCI >= 7) alerta = 'warning'
 
-          return { ...c, sessSem, sesCompletadas, sinValorar, ciSem, ciUltimo, diasSinCI, rpePromedio, fatigaMax, alerta }
+          return { ...c, diasSinCI, alerta }
         }).sort((a,b) => {
           const orden = { critical: 0, warning: 1, ok: 2 }
-          return orden[a.alerta] - orden[b.alerta]
+          return orden[a.alerta] - orden[b.alerta] || a.diasSinCI - b.diasSinCI
         })
 
-        const criticos = estadoClientes.filter(c => c.alerta === 'critical')
-        const warnings = estadoClientes.filter(c => c.alerta === 'warning')
-        const okClientes = estadoClientes.filter(c => c.alerta === 'ok')
+        const sinCI = estadoClientes.filter(c => c.diasSinCI >= 7)
+        const okClientes = estadoClientes.filter(c => c.diasSinCI < 7)
 
         return (
           <div className="space-y-4">
             {/* Resumen rápido */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {[
-                { label: 'Sin check-in', val: estadoClientes.filter(c=>c.diasSinCI>=7).length, color: '#ef4444', icon: '⏰' },
-                { label: 'Sin valorar', val: estadoClientes.reduce((sum,c)=>sum+c.sinValorar,0), color: '#f59e0b', icon: '⭐' },
+                { label: 'Sin check-in', val: sinCI.length, color: '#ef4444', icon: '⏰' },
                 { label: 'Al día', val: okClientes.length, color: '#10b981', icon: '✓' },
               ].map(k => (
                 <div key={k.label} className="bg-white rounded-2xl border border-black/5 p-3 text-center">
@@ -275,38 +277,13 @@ export default function Seguimiento({ session }) {
               ))}
             </div>
 
-            {/* Críticos */}
-            {criticos.length > 0 && (
-              <div>
-                <p className="text-xs font-bold text-red-600 mb-2 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-500 inline-block animate-pulse" />
-                  Requieren atención ({criticos.length})
-                </p>
-                <div className="space-y-2">
-                  {criticos.map(c => <TarjetaClienteSemana key={c.id} c={c} color="#ef4444" onVerCheckins={() => { setTabPrincipal('checkins'); setFiltroCliente(c.id) }} onVerSesiones={() => setTabPrincipal('sesiones')} />)}
-                </div>
-              </div>
-            )}
-
-            {/* Warnings */}
-            {warnings.length > 0 && (
-              <div>
-                <p className="text-xs font-bold text-amber-600 mb-2">⚠️ Pendiente ({warnings.length})</p>
-                <div className="space-y-2">
-                  {warnings.map(c => <TarjetaClienteSemana key={c.id} c={c} color="#f59e0b" onVerCheckins={() => { setTabPrincipal('checkins'); setFiltroCliente(c.id) }} onVerSesiones={() => setTabPrincipal('sesiones')} />)}
-                </div>
-              </div>
-            )}
-
-            {/* OK */}
-            {okClientes.length > 0 && (
-              <div>
-                <p className="text-xs font-bold text-emerald-600 mb-2">✓ Al día ({okClientes.length})</p>
-                <div className="space-y-2">
-                  {okClientes.map(c => <TarjetaClienteSemana key={c.id} c={c} color="#10b981" onVerCheckins={() => { setTabPrincipal('checkins'); setFiltroCliente(c.id) }} onVerSesiones={() => setTabPrincipal('sesiones')} />)}
-                </div>
-              </div>
-            )}
+            <div className="space-y-2">
+              {estadoClientes.map(c => (
+                <TarjetaClienteSemana key={c.id} c={c}
+                  color={c.alerta === 'critical' ? '#ef4444' : c.alerta === 'warning' ? '#f59e0b' : '#10b981'}
+                  navigate={navigate} setQuickView={setQuickView} />
+              ))}
+            </div>
           </div>
         )
       })()}
@@ -1003,6 +980,7 @@ export default function Seguimiento({ session }) {
                           <button onClick={async () => {
                             await supabase.from('analisis_mensual').update({ revisado: true, accion_tomada: 'revisado' }).eq('id', a.id)
                             setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
+                            setHistorialAnalisis(prev => [{ ...a, revisado: true, accion_tomada: 'revisado' }, ...prev])
                           }}
                             className="border border-black/10 text-[#6B6B6B] text-xs font-medium py-2.5 px-3 rounded-xl hover:bg-[#F5F5F0]">
                             ✓ Revisado
@@ -1015,6 +993,52 @@ export default function Seguimiento({ session }) {
               })}
             </div>
           )}
+
+          {/* Historial de análisis revisados */}
+          <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
+            <button onClick={toggleHistorialAnalisis}
+              className="w-full flex items-center justify-between p-4 text-left hover:bg-[#FAFAFA] transition-all">
+              <p className="text-sm font-bold text-[#0A0A0A]">📚 Historial de análisis</p>
+              <span className="text-[#C0C0C0] text-xs">{mostrarHistorialAnalisis ? '▲' : '▼'}</span>
+            </button>
+            {mostrarHistorialAnalisis && (
+              <div className="border-t border-black/5 p-4 space-y-2">
+                {cargandoHistorial ? (
+                  <div className="flex items-center justify-center py-6">
+                    <div className="w-5 h-5 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+                  </div>
+                ) : historialAnalisis.length === 0 ? (
+                  <p className="text-sm text-[#9B9B9B] text-center py-4">Sin análisis revisados todavía</p>
+                ) : (
+                  historialAnalisis.map(a => {
+                    const ETIQUETAS = { actualizar_rutina:'Nueva rutina', ajustar_cargas:'Ajustar cargas', mensaje_motivacional:'Mensaje', pausa_recomendada:'Pausa ⚠️' }
+                    const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:'#FF5C00', pausa_recomendada:'#ef4444' }
+                    const expandido = historialExpandido === a.id
+                    return (
+                      <div key={a.id} className="border border-black/5 rounded-xl overflow-hidden">
+                        <button onClick={() => setHistorialExpandido(expandido ? null : a.id)}
+                          className="w-full flex items-center gap-3 p-3 text-left hover:bg-[#FAFAFA] transition-all">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#0A0A0A] truncate">{a.clientes?.nombre || 'Cliente'}</p>
+                            <p className="text-xs text-[#9B9B9B]">{new Date(a.created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
+                          </div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0" style={{background: COLORES[a.accion] || '#9B9B9B'}}>
+                            {ETIQUETAS[a.accion] || a.accion}
+                          </span>
+                          <span className="text-[#C0C0C0] text-xs flex-shrink-0">{expandido ? '▲' : '▼'}</span>
+                        </button>
+                        {expandido && (
+                          <div className="px-3 pb-3 border-t border-black/5 pt-2">
+                            <p className="text-xs text-[#6B6B6B] leading-relaxed">{a.resumen}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Rutinas borrador pendientes */}
           {borradores.length > 0 && (
@@ -1112,138 +1136,37 @@ export default function Seguimiento({ session }) {
 }
 
 // ─── Tarjeta cliente semana ────────────────────────────────────────────────────
-function TarjetaClienteSemana({ c, color, onVerCheckins, onVerSesiones }) {
+function TarjetaClienteSemana({ c, color, navigate, setQuickView }) {
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-  const [valorando, setValorando] = useState(false)
-  const [rpe, setRpe] = useState(null)
-  const [fatiga, setFatiga] = useState(null)
-  const [guardando, setGuardando] = useState(false)
+  const alDia = c.diasSinCI < 7
+  const texto = alDia ? '✓ Esta semana' : c.diasSinCI === 999 ? 'Sin check-in nunca' : `${c.diasSinCI} días sin check-in`
 
-  async function guardarRPE() {
-    if (!rpe || !fatiga) return
-    setGuardando(true)
-    const sesionSinValorar = c.sesCompletadas?.find(s => !s.rpe)
-    if (sesionSinValorar) {
-      await supabase.from('sesiones').update({ rpe, fatiga_post: fatiga }).eq('id', sesionSinValorar.id)
-    }
-    setValorando(false); setRpe(null); setFatiga(null); setGuardando(false)
-    window.location.reload()
+  function recordar() {
+    navigate('/mensajes', { state: { clienteId: c.id, mensaje: `Hola ${c.nombre.trim().split(' ')[0]}, recuerda hacer tu check-in semanal 💪` } })
   }
 
   return (
-    <>
-      <div className="bg-white rounded-2xl border border-black/5 p-4"
-        style={c.alerta === 'critical' ? { borderColor: '#fecaca', background: '#fff5f5' } : {}}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-            style={{ background: color }}>
-            {ini(c.nombre)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A] truncate">{c.nombre.trim()}</p>
-            <p className="text-[10px] text-[#9B9B9B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          <div className={`rounded-xl p-2.5 text-center ${c.ciSem?.length > 0 ? 'bg-emerald-50' : c.diasSinCI >= 14 ? 'bg-red-50' : 'bg-amber-50'}`}>
-            <p className="text-sm font-bold" style={{ color: c.ciSem?.length > 0 ? '#10b981' : c.diasSinCI >= 14 ? '#ef4444' : '#f59e0b' }}>
-              {c.ciSem?.length > 0 ? '✓' : c.diasSinCI === 999 ? '—' : `${c.diasSinCI}d`}
-            </p>
-            <p className="text-[9px] text-[#9B9B9B] mt-0.5">Check-in</p>
-          </div>
-
-          <div className={`rounded-xl p-2.5 text-center ${c.sesCompletadas?.length > 0 ? 'bg-emerald-50' : 'bg-[#F7F6F3]'}`}>
-            <p className="text-sm font-bold" style={{ color: c.sesCompletadas?.length > 0 ? '#10b981' : '#9B9B9B' }}>
-              {c.sesCompletadas?.length > 0 ? c.sesCompletadas.length : '—'}
-            </p>
-            <p className="text-[9px] text-[#9B9B9B] mt-0.5">Sesiones</p>
-          </div>
-
-          <div onClick={() => c.sinValorar > 0 && setValorando(true)}
-            className={`rounded-xl p-2.5 text-center transition-all ${c.sinValorar > 0 ? 'bg-amber-50 cursor-pointer hover:bg-amber-100' : c.rpePromedio ? 'bg-emerald-50' : 'bg-[#F7F6F3]'}`}>
-            <p className="text-sm font-bold" style={{ color: c.sinValorar > 0 ? '#f59e0b' : c.rpePromedio ? '#10b981' : '#9B9B9B' }}>
-              {c.sinValorar > 0 ? '⭐ Pte' : c.rpePromedio ? `RPE ${c.rpePromedio}` : '—'}
-            </p>
-            <p className="text-[9px] text-[#9B9B9B] mt-0.5">Valoración</p>
-          </div>
-        </div>
-
-        {c.fatigaMax >= 4 && (
-          <div className="mt-2 bg-red-50 rounded-xl px-3 py-2 flex items-center gap-2">
-            <span className="text-xs">⚠️</span>
-            <p className="text-xs font-medium text-red-700">Fatiga alta: {c.fatigaMax}/5 — ajusta la carga</p>
-          </div>
-        )}
-
-        {(c.sinValorar > 0 || c.diasSinCI >= 7) && (
-          <div className="flex gap-2 mt-3">
-            {c.sinValorar > 0 && (
-              <button onClick={() => setValorando(true)}
-                className="flex-1 text-[10px] font-bold py-2 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all">
-                ⭐ Valorar sesión →
-              </button>
-            )}
-            {c.diasSinCI >= 7 && (
-              <button onClick={onVerCheckins}
-                className="flex-1 text-[10px] font-bold py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-all">
-                {c.diasSinCI === 999 ? 'Sin check-in' : `${c.diasSinCI}d sin CI`} →
-              </button>
-            )}
-          </div>
-        )}
+    <div className="bg-white rounded-2xl border border-black/5 p-3.5 flex items-center gap-3">
+      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+        style={{ background: color }}>
+        {ini(c.nombre)}
       </div>
-
-      {valorando && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setValorando(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold" style={{ background: color }}>
-                {ini(c.nombre)}
-              </div>
-              <div>
-                <p className="font-bold text-[#0A0A0A] text-sm">{c.nombre.trim()}</p>
-                <p className="text-xs text-[#9B9B9B]">
-                  Valorar · {c.sesCompletadas?.find(s=>!s.rpe)?.fecha || 'última sesión'}
-                </p>
-              </div>
-            </div>
-
-            {[
-              { label: '💪 RPE (esfuerzo 1-10)', val: rpe, set: setRpe, max: 10 },
-              { label: '🏋️ Fatiga muscular (1-5)', val: fatiga, set: setFatiga, max: 5 },
-            ].map(({ label, val, set, max }) => (
-              <div key={label} className="mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
-                  {val && <span className="text-sm font-bold" style={{ color }}>{val}/{max}</span>}
-                </div>
-                <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max}, 1fr)` }}>
-                  {Array.from({ length: max }, (_, i) => i+1).map(v => (
-                    <button key={v} onClick={() => set(v)}
-                      className={`py-2.5 rounded-lg text-sm font-bold transition-all ${val===v?'text-white':'border border-black/10 text-[#9B9B9B]'}`}
-                      style={val===v?{background: v>=(max*.7)?'#ef4444':v>=(max*.4)?'#f59e0b':color}:{}}>
-                      {v}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setValorando(false)}
-                className="flex-1 py-3 rounded-xl text-sm font-bold border border-black/10 text-[#6B6B6B]">
-                Cancelar
-              </button>
-              <button onClick={guardarRPE} disabled={!rpe || !fatiga || guardando}
-                className="flex-1 py-3 rounded-xl text-sm font-bold text-white disabled:opacity-40"
-                style={{ background: color }}>
-                {guardando ? '⏳...' : '✓ Guardar'}
-              </button>
-            </div>
-          </div>
-        </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-[#0A0A0A] truncate">{c.nombre.trim()}</p>
+        <p className="text-xs font-medium" style={{ color }}>{texto}</p>
+      </div>
+      {alDia ? (
+        <button onClick={() => setQuickView(c.id)}
+          className="text-xs font-bold px-3 py-2 rounded-lg bg-[#F5F5F0] text-[#6B6B6B] hover:bg-[#EDEBE5] flex-shrink-0 transition-all">
+          Ver detalle
+        </button>
+      ) : (
+        <button onClick={recordar}
+          className="text-xs font-bold px-3 py-2 rounded-lg text-white flex-shrink-0 active:scale-95 transition-all" style={{ background: color }}>
+          Recordar check-in
+        </button>
       )}
-    </>
+    </div>
   )
 }

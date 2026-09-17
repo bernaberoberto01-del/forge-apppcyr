@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
     const hoy = ahora.toISOString().split('T')[0]
 
     const { data: sesiones, error } = await sb.from('sesiones')
-      .select('id, fecha, hora, duracion_minutos, cliente_id, entrenador_id')
+      .select('id, fecha, hora, duracion_minutos, cliente_id, entrenador_id, tipo')
       .eq('completada', false).eq('cancelada', false)
       .lte('fecha', hoy).not('cliente_id', 'is', null)
 
@@ -28,7 +28,10 @@ Deno.serve(async (req) => {
 
     if (!aCompletar.length) return new Response(JSON.stringify({ ok: true, completadas: 0 }), { headers: CORS })
 
-    await sb.from('sesiones').update({ completada: true }).in('id', aCompletar.map(s => s.id))
+    const idsPresencial = aCompletar.filter(s => s.tipo === 'presencial').map(s => s.id)
+    const idsOtros = aCompletar.filter(s => s.tipo !== 'presencial').map(s => s.id)
+    if (idsPresencial.length) await sb.from('sesiones').update({ completada: true, valoracion_pendiente: true }).in('id', idsPresencial)
+    if (idsOtros.length) await sb.from('sesiones').update({ completada: true }).in('id', idsOtros)
 
     return new Response(JSON.stringify({ ok: true, completadas: aCompletar.length }), { headers: CORS })
   } catch (err: any) {

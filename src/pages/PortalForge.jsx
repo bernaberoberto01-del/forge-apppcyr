@@ -50,6 +50,7 @@ export default function PortalForge() {
   const [valorando, setValorando] = useState(null)
   const [rpe, setRpe] = useState(null)
   const [fatigaVal, setFatigaVal] = useState(null)
+  const [notaValoracion, setNotaValoracion] = useState('')
   const [guardandoVal, setGuardandoVal] = useState(false)
   const [modalActividad, setModalActividad] = useState(false)
   const [actForm, setActForm] = useState({ tipo: '', duracion: '', rpe: null, nota: '' })
@@ -105,14 +106,14 @@ export default function PortalForge() {
     const cid = cl.id, eid = cl.entrenador_id, hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
-      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro] = await Promise.all([
+      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar] = await Promise.all([
       q1(supabase.from('configuracion').select('*').eq('entrenador_id', eid)),
       q1(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
       qa(supabase.from('checkins').select('*').eq('cliente_id', cid).order('fecha', { ascending: false }).limit(52)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).gte('fecha', hoy).eq('cancelada', false).order('fecha').order('hora').limit(10)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('fecha', hoy).eq('cancelada', false)),
-      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('completada', true).eq('cancelada', false).is('rpe', null).gte('fecha', hace(14)).lte('fecha', hoy).order('fecha', { ascending: false }).limit(3)),
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('completada', true).eq('cancelada', false).eq('tipo', 'online').is('rpe', null).gte('fecha', hace(14)).lte('fecha', hoy).order('fecha', { ascending: false }).limit(3)),
       qa(supabase.from('mensajes_cliente').select('*').eq('cliente_id', cid).order('created_at', { ascending: true })),
       qa(supabase.from('pagos').select('*').eq('cliente_id', cid).order('fecha_pago', { ascending: false })),
       qa(supabase.from('marcas_cliente').select('*').eq('cliente_id', cid).order('fecha', { ascending: false })),
@@ -124,10 +125,11 @@ export default function PortalForge() {
       qa(supabase.from('nutricion_registros').select('fecha,dia_nombre').eq('cliente_id', cid).gte('fecha', hace(30)).order('fecha', { ascending: false })),
       q1(supabase.from('suplementacion_cliente').select('*').eq('cliente_id', cid)),
       q1(supabase.from('planes_cobro').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(1)),
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('valoracion_pendiente', true).is('rpe', null).gte('fecha', hace(7)).order('fecha', { ascending: false })),
     ])
 
     setConfig(cfg)
-    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro })
+    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar })
     supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
     setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
     setCargando(false)
@@ -152,9 +154,9 @@ export default function PortalForge() {
   async function guardarValoracion() {
     if (!rpe || !fatigaVal || !valorando) return
     setGuardandoVal(true)
-    await supabase.from('sesiones').update({ rpe, fatiga_post: fatigaVal }).eq('id', valorando.id)
-    setDatos(d => ({ ...d, pendientes: d.pendientes.filter(s => s.id !== valorando.id) }))
-    setValorando(null); setRpe(null); setFatigaVal(null)
+    await supabase.from('sesiones').update({ rpe, fatiga_post: fatigaVal, notas_cliente: notaValoracion || null, valoracion_pendiente: false }).eq('id', valorando.id)
+    setDatos(d => ({ ...d, pendientes: d.pendientes.filter(s => s.id !== valorando.id), sesionesPendientesValorar: (d.sesionesPendientesValorar||[]).filter(s => s.id !== valorando.id) }))
+    setValorando(null); setRpe(null); setFatigaVal(null); setNotaValoracion('')
     showToast('✓ Sesión valorada')
     setGuardandoVal(false)
   }
@@ -241,7 +243,7 @@ export default function PortalForge() {
 
   if (!datos) return <div className="min-h-screen" style={{ background: '#F2F1EE' }} />
 
-  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro } = datos
+  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar } = datos
   const esOnline = cliente.tipo === 'online'
   const plan = (planCobro?.estado === 'activo' ? planCobro.plan : null) || cliente.plan_online || null
   const acceso = {
@@ -398,7 +400,7 @@ export default function PortalForge() {
 
         {/* Contenido */}
         <div className="flex-1 px-4 md:px-8 py-5 max-w-2xl w-full mx-auto pb-28 md:pb-10">
-          {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={setModalActividad} setModalRegistro={setModalRegistro} ejerciciosHist={ejerciciosHist} />}
+          {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={setModalActividad} setModalRegistro={setModalRegistro} ejerciciosHist={ejerciciosHist} />}
           {tab === 'entrena' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoRutina) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
@@ -504,6 +506,12 @@ export default function PortalForge() {
                   <div className="flex justify-between mt-1.5"><span className="text-[10px] text-[#C0C0C0]">{lo}</span><span className="text-[10px] text-[#C0C0C0]">{hi}</span></div>
                 </div>
               ))}
+              <div className="mb-4">
+                <p className="text-sm font-bold text-[#0A0A0A] mb-2">📝 Nota (opcional)</p>
+                <textarea value={notaValoracion} onChange={e => setNotaValoracion(e.target.value)} rows={2}
+                  placeholder="Algo que quieras contarle a tu entrenador..."
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none" />
+              </div>
               <button onClick={guardarValoracion} disabled={!rpe||!fatigaVal||guardandoVal}
                 className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
                 style={{ background: color }}>{guardandoVal?'⏳...':'✓ Guardar valoración'}</button>
@@ -598,7 +606,7 @@ function LoginPortal() {
 }
 
 // ─── TAB HOY ──────────────────────────────────────────────────────────────────
-function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones, sesionesHoy, pendientes, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando, sesionesEstaSemana, semanasActivas, setModalActividad, setModalRegistro, ejerciciosHist }) {
+function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones, sesionesHoy, pendientes, sesionesPendientesValorar, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando, sesionesEstaSemana, semanasActivas, setModalActividad, setModalRegistro, ejerciciosHist }) {
   const hoy = hoyStr()
   const ahora = new Date()
   const hora = ahora.getHours()
@@ -698,6 +706,29 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
           <div className="flex-1"><p className="text-sm font-bold text-white">Cuestionario de nutrición</p><p className="text-xs text-white/70 mt-0.5">Necesario para crear tu plan personalizado</p></div>
           <span className="text-white/70 text-xl flex-shrink-0">→</span>
         </a>
+      )}
+
+      {/* Sesiones presenciales pendientes de valorar */}
+      {sesionesPendientesValorar?.length > 0 && (
+        <div className="rounded-2xl p-4 border-2 space-y-3" style={{ borderColor: color, background: `${color}06` }}>
+          <p className="text-sm font-bold text-[#0A0A0A]">
+            Tienes {sesionesPendientesValorar.length} sesión{sesionesPendientesValorar.length > 1 ? 'es' : ''} pendiente{sesionesPendientesValorar.length > 1 ? 's' : ''} de valorar
+          </p>
+          <div className="space-y-2">
+            {sesionesPendientesValorar.map(s => (
+              <div key={s.id} className="bg-white rounded-xl p-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[#0A0A0A]">{new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}</p>
+                  {s.hora && <p className="text-xs text-[#6B6B6B]">{s.hora.slice(0,5)}</p>}
+                </div>
+                <button onClick={() => setValorando(s)}
+                  className="text-white text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0 active:scale-95 transition-all" style={{ background: color }}>
+                  Valorar
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Valoración pendiente */}

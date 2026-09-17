@@ -136,6 +136,7 @@ export default function Sesiones({ session }) {
         fecha: form.fecha,
         tipo: form.tipo,
         completada: true,
+        valoracion_pendiente: form.tipo === 'presencial',
         notas: form.sensaciones || form.notas,
         rpe: form.rpe,
         fatiga_post: form.fatiga_post,

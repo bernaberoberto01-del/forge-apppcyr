@@ -6,6 +6,25 @@ import { supabase } from '../lib/supabase'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
+const DESCARTE_KEY = 'forge-alertas-descartadas'
+const DESCARTE_DIAS = 30
+
+function leerDescartadas() {
+  try { return JSON.parse(localStorage.getItem(DESCARTE_KEY) || '{}') } catch { return {} }
+}
+function estaDescartada(clienteId, tipo) {
+  const d = leerDescartadas()
+  const ts = d[`${clienteId}_${tipo}`]
+  if (!ts) return false
+  return (Date.now() - ts) < DESCARTE_DIAS * 864e5
+}
+function descartarAlertas(clienteIds, tipo) {
+  const d = leerDescartadas()
+  const ahora = Date.now()
+  clienteIds.forEach(id => { if (id) d[`${id}_${tipo}`] = ahora })
+  try { localStorage.setItem(DESCARTE_KEY, JSON.stringify(d)) } catch {}
+}
+
 function BarChart({ datos, max }) {
   return (
     <div className="flex items-end gap-1 h-20">
@@ -44,6 +63,14 @@ export default function Dashboard({ session }) {
   const { completar, completado, porcentaje } = useOnboarding(uid)
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
+
+  function descartarGrupo(clienteIds, tipo, campo) {
+    descartarAlertas(clienteIds, tipo)
+    setDatos(d => ({ ...d, [campo]: (d[campo] || []).filter(item => {
+      const id = item.cliente_id || item.id
+      return !clienteIds.includes(id)
+    }) }))
+  }
 
   useEffect(() => { cargar() }, [uid])
 
@@ -147,18 +174,18 @@ export default function Dashboard({ session }) {
     const alertasPagos = activos.filter(c => {
       const p = (pagos||[]).filter(p=>p.cliente_id===c.id).sort((a,b)=>b.fecha_pago?.localeCompare(a.fecha_pago))[0]
       return p?.valido_hasta && new Date(p.valido_hasta) < hoy
-    })
+    }).filter(c => !estaDescartada(c.id, 'pago_vencido'))
     const cobrosProximos = activos.filter(c => {
       const p = (pagos||[]).filter(p=>p.cliente_id===c.id).sort((a,b)=>b.fecha_pago?.localeCompare(a.fecha_pago))[0]
       const tieneVencimiento = p?.valido_hasta && new Date(p.valido_hasta) >= hoy && new Date(p.valido_hasta) <= new Date(en7d)
       // También incluir si hay plan de cobro con proximo_cobro en los próximos 7 días
       const planCobro = (planesCobro||[]).find(pc => pc.cliente_id === c.id)
-      const tienePlanProximo = planCobro?.proximo_cobro && 
-        new Date(planCobro.proximo_cobro) >= hoy && 
+      const tienePlanProximo = planCobro?.proximo_cobro &&
+        new Date(planCobro.proximo_cobro) >= hoy &&
         new Date(planCobro.proximo_cobro) <= new Date(en7d)
       return tieneVencimiento || tienePlanProximo
-    })
-    const clientesSinCI = activos.filter(c => !ciRecientes.some(ci => ci.cliente_id===c.id && ci.fecha>=hace7d))
+    }).filter(c => !estaDescartada(c.id, 'cobro_proximo'))
+    const clientesSinCI = activos.filter(c => !ciRecientes.some(ci => ci.cliente_id===c.id && ci.fecha>=hace7d)).filter(c => !estaDescartada(c.id, 'sin_checkin'))
     const checkinsNuevos = ciRecientes.filter(ci => ci.fecha >= inicioSemana)
     const totalClientes = (clientes||[]).length
     const tasaRetencion = totalClientes > 0 ? Math.round((activos.length/totalClientes)*100) : 100
@@ -167,25 +194,25 @@ export default function Dashboard({ session }) {
     const interesPorCliente = {}
     ;(cuestSuplemento||[]).forEach(c => { if (!interesPorCliente[c.cliente_id]) interesPorCliente[c.cliente_id] = c })
     const clienteIdsConSuplementacion = new Set((suplementacionExistente||[]).map(s => s.cliente_id))
-    const suplementacionPendiente = Object.values(interesPorCliente).filter(c => !clienteIdsConSuplementacion.has(c.cliente_id))
+    const suplementacionPendiente = Object.values(interesPorCliente).filter(c => !clienteIdsConSuplementacion.has(c.cliente_id)).filter(c => !estaDescartada(c.cliente_id, 'suplementacion_pendiente'))
 
     // Cobros online: pagos fallidos y clientes online sin ninguna suscripción configurada
-    const clientesPagoFallido = (planesCobroAll||[]).filter(pc => pc.estado === 'pago_fallido')
+    const clientesPagoFallido = (planesCobroAll||[]).filter(pc => pc.estado === 'pago_fallido').filter(pc => !estaDescartada(pc.cliente_id, 'pago_fallido'))
     const clienteIdsConPlanCobro = new Set((planesCobroAll||[]).map(pc => pc.cliente_id))
-    const clientesOnlineSinSuscripcion = activos.filter(c => c.tipo === 'online' && !clienteIdsConPlanCobro.has(c.id))
+    const clientesOnlineSinSuscripcion = activos.filter(c => c.tipo === 'online' && !clienteIdsConPlanCobro.has(c.id)).filter(c => !estaDescartada(c.id, 'sin_suscripcion'))
 
     setDatos({
       activos, ingresosMes, adherenciaMedia, ingresosPorMes, maxIngreso,
       alertasPagos, cobrosProximos, clientesSinCI, checkinsNuevos,
       mensajesNL: mensajesNL||[], rutinasIA: rutinasIA||[],
-      alertasExtra: alertas||[], tasaRetencion, totalClientes,
+      alertasExtra: (alertas||[]).filter(a => !estaDescartada(a.cliente_id, `extra_${a.tipo}`)), tasaRetencion, totalClientes,
       nombreEntrenador: cfg?.nombre_entrenador?.split(' ')[0] || null,
       analisisPendientes: analisisPendientes||[],
       checkins: checkins||[],
       suplementacionPendiente,
       clientesPagoFallido,
       clientesOnlineSinSuscripcion,
-      solicitudesCambioPlan: solicitudesCambioPlan || [],
+      solicitudesCambioPlan: (solicitudesCambioPlan || []).filter(s => !estaDescartada(s.cliente_id, 'cambio_plan')),
     })
     setLoading(false)
     } catch (e) {
@@ -351,6 +378,8 @@ export default function Dashboard({ session }) {
                       className="text-xs bg-red-500 text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Cobrar →
                     </button>
+                    <button onClick={() => descartarGrupo(d.alertasPagos.map(c=>c.id), 'pago_vencido', 'alertasPagos')}
+                      title="Descartar 30 días" className="text-red-300 hover:text-red-500 text-sm px-1 flex-shrink-0">✕</button>
                   </div>
                 )}
 
@@ -367,6 +396,8 @@ export default function Dashboard({ session }) {
                       className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Ver →
                     </button>
+                    <button onClick={() => descartarGrupo(d.cobrosProximos.map(c=>c.id), 'cobro_proximo', 'cobrosProximos')}
+                      title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                   </div>
                 )}
 
@@ -386,6 +417,8 @@ export default function Dashboard({ session }) {
                       className="text-xs bg-red-500 text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Ver →
                     </button>
+                    <button onClick={() => descartarGrupo(d.clientesPagoFallido.map(pc=>pc.cliente_id), 'pago_fallido', 'clientesPagoFallido')}
+                      title="Descartar 30 días" className="text-red-300 hover:text-red-500 text-sm px-1 flex-shrink-0">✕</button>
                   </div>
                 )}
 
@@ -405,6 +438,8 @@ export default function Dashboard({ session }) {
                       className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Configurar →
                     </button>
+                    <button onClick={() => descartarGrupo(d.clientesOnlineSinSuscripcion.map(c=>c.id), 'sin_suscripcion', 'clientesOnlineSinSuscripcion')}
+                      title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                   </div>
                 )}
 
@@ -424,6 +459,8 @@ export default function Dashboard({ session }) {
                       className="text-xs bg-orange-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Revisar →
                     </button>
+                    <button onClick={() => descartarGrupo(d.solicitudesCambioPlan.map(s=>s.cliente_id), 'cambio_plan', 'solicitudesCambioPlan')}
+                      title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                   </div>
                 )}
 
@@ -443,6 +480,8 @@ export default function Dashboard({ session }) {
                       className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Generar →
                     </button>
+                    <button onClick={() => descartarGrupo(d.suplementacionPendiente.map(c=>c.cliente_id), 'suplementacion_pendiente', 'suplementacionPendiente')}
+                      title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                   </div>
                 )}
 
@@ -478,6 +517,8 @@ export default function Dashboard({ session }) {
                         }} className={`text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 text-white ${criticos.length > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
                           Recordar →
                         </button>
+                        <button onClick={() => descartarGrupo(d.clientesSinCI.map(c=>c.id), 'sin_checkin', 'clientesSinCI')}
+                          title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                       </div>
                     </div>
                   )
@@ -489,7 +530,9 @@ export default function Dashboard({ session }) {
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 ${a.tipo==='fatiga_alta_post_sesion'?'bg-red-100 text-red-600':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
                       {a.tipo==='fatiga_alta_post_sesion'?'⚠️':'🔔'}
                     </div>
-                    <p className="text-xs text-[#444] leading-relaxed pt-1.5">{a.mensaje}</p>
+                    <p className="flex-1 text-xs text-[#444] leading-relaxed pt-1.5">{a.mensaje}</p>
+                    <button onClick={() => descartarGrupo([a.cliente_id], `extra_${a.tipo}`, 'alertasExtra')}
+                      title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0 mt-1">✕</button>
                   </div>
                 ))}
 
