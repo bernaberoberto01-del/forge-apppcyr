@@ -149,6 +149,7 @@ export default function PortalForge() {
         cargas_sensacion: ciForm.cargas,
         peso: ciForm.peso ? parseFloat(ciForm.peso) : null, comentario: ciForm.nota || null, adherencia_entreno: adherencia,
       })
+      console.log('resultado insert:', error)
       if (!error) {
         setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null, adherencia_entreno: adherencia }, ...d.checkins] }))
         setModalCI(false)
