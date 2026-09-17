@@ -46,7 +46,6 @@ export default function PortalForge() {
   // Modales
   const [modalCI, setModalCI] = useState(false)
   const [ciForm, setCiForm] = useState({ energia: null, sueno: null, fatiga: null, estres: null, sesiones_semana: null, cargas_sensacion: null, logro_semana: '', peso: '', nota: '' })
-  const [ciPaso, setCiPaso] = useState(1)
   const [enviandoCI, setEnviandoCI] = useState(false)
   const [valorando, setValorando] = useState(null)
   const [rpe, setRpe] = useState(null)
@@ -150,9 +149,11 @@ export default function PortalForge() {
     })
     if (!error) {
       setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null, adherencia_entreno: adherencia }, ...d.checkins] }))
-      setModalCI(false); setCiPaso(1)
+      setModalCI(false)
       setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones_semana: null, cargas_sensacion: null, logro_semana: '', peso: '', nota: '' })
       showToast('✓ Check-in enviado')
+    } else {
+      showToast('⚠️ Error al enviar — inténtalo de nuevo')
     }
     setEnviandoCI(false)
   }
@@ -482,7 +483,7 @@ export default function PortalForge() {
         {toast && <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl whitespace-nowrap" style={{ background: color }}>{toast}</div>}
 
         {/* Modal check-in */}
-        {modalCI && <ModalCheckin color={color} ciForm={ciForm} setCiForm={setCiForm} ciPaso={ciPaso} setCiPaso={setCiPaso} enviandoCI={enviandoCI} enviarCheckin={enviarCheckin} onClose={() => { setModalCI(false); setCiPaso(1) }} />}
+        {modalCI && <ModalCheckin color={color} ciForm={ciForm} setCiForm={setCiForm} enviandoCI={enviandoCI} enviarCheckin={enviarCheckin} onClose={() => setModalCI(false)} />}
 
         {/* Modal valorar */}
         {valorando && (
@@ -2347,120 +2348,162 @@ function SubFuerza({ ejerciciosHist, color }) {
 }
 
 // ─── Modal check-in ───────────────────────────────────────────────────────────
-function ModalCheckin({ color, ciForm, setCiForm, ciPaso, setCiPaso, enviandoCI, enviarCheckin, onClose }) {
-  const paso1Completo = ciForm.energia && ciForm.sueno && ciForm.fatiga && ciForm.estres
-  const paso2Completo = ciForm.sesiones_semana != null && ciForm.cargas_sensacion
+function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, onClose }) {
+  const completo = ciForm.energia && ciForm.sueno && ciForm.fatiga && ciForm.estres
+
+  const colorEscala5 = v => v <= 2 ? '#ef4444' : v === 3 ? '#f59e0b' : color
+  const colorEscala10 = v => v <= 4 ? '#10b981' : v <= 6 ? '#f59e0b' : '#ef4444'
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5">
-          <div className="flex items-center justify-between">
-            <div><p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p><p className="text-xs text-[#9B9B9B] mt-0.5">¿Cómo ha ido esta semana?</p></div>
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl">×</button>
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center" onClick={onClose} style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-3xl md:rounded-3xl" onClick={e => e.stopPropagation()} style={{ background: '#0A0A0A' }}>
+        <div className="sticky top-0 px-6 pt-6 pb-4 flex items-center justify-between" style={{ background: '#0A0A0A' }}>
+          <div>
+            <p className="font-bold text-white text-lg">Check-in semanal</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>¿Cómo ha ido esta semana?</p>
           </div>
-          <div className="flex gap-1.5 mt-4">
-            {[1,2,3].map(p => <div key={p} className="h-1 flex-1 rounded-full" style={{ background: p <= ciPaso ? color : '#F2F1EE' }} />)}
-          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-xl text-white" style={{ background: 'rgba(255,255,255,0.1)' }}>×</button>
         </div>
-        <div className="px-6 py-5 space-y-6">
-          {ciPaso === 1 && (
-            <>
-              {[
-                { k: 'energia', icon: '⚡', label: 'Energía', max: 5, lo: 'Agotado', hi: 'Excelente' },
-                { k: 'sueno', icon: '😴', label: 'Sueño (calidad)', max: 5, lo: 'Muy mal', hi: 'Muy bien' },
-                { k: 'fatiga', icon: '🏋️', label: 'Fatiga muscular', max: 10, lo: 'Sin fatiga', hi: 'Al límite' },
-                { k: 'estres', icon: '🧠', label: 'Estrés', max: 10, lo: 'Sin estrés', hi: 'Al límite' },
-              ].map(({ k, icon, label, max, lo, hi }) => (
-                <div key={k}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span>{icon}</span><p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
-                    {ciForm[k] && <span className="ml-auto text-sm font-bold" style={{ color }}>{ciForm[k]}/{max}</span>}
-                  </div>
-                  <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max},1fr)` }}>
-                    {Array.from({ length: max }, (_, i) => i + 1).map(v => {
-                      const sel = ciForm[k] === v
-                      const bg = sel ? ((k === 'fatiga' || k === 'estres') && v >= 7 ? '#ef4444' : (k === 'fatiga' || k === 'estres') && v >= 5 ? '#f59e0b' : color) : undefined
-                      return (
-                        <button key={v} onClick={() => setCiForm(f => ({ ...f, [k]: v }))}
-                          className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B]'}`}
-                          style={sel ? { background: bg } : {}}>{v}</button>
-                      )
-                    })}
-                  </div>
-                  <div className="flex justify-between mt-1.5"><span className="text-[10px] text-[#C0C0C0]">{lo}</span><span className="text-[10px] text-[#C0C0C0]">{hi}</span></div>
-                </div>
-              ))}
-              <button onClick={() => setCiPaso(2)} disabled={!paso1Completo}
-                className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
-                style={{ background: color }}>Siguiente →</button>
-            </>
-          )}
 
-          {ciPaso === 2 && (
-            <>
-              <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-3">🏋️‍♂️ ¿Cuántas sesiones has completado esta semana?</p>
-                <div className="grid grid-cols-6 gap-1.5">
-                  {[0,1,2,3,4,5].map(v => (
-                    <button key={v} onClick={() => setCiForm(f => ({ ...f, sesiones_semana: v }))}
-                      className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${ciForm.sesiones_semana === v ? 'text-white' : 'border border-black/10 text-[#9B9B9B]'}`}
-                      style={ciForm.sesiones_semana === v ? { background: color } : {}}>{v === 5 ? '5+' : v}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-3">💪 ¿Cómo has sentido las cargas?</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {[
-                    ['muy_facil', '😅 Muy fácil'], ['bien', '✅ Ajustadas'],
-                    ['duro', '🔥 Algo duras'], ['muy_duro', '😤 Muy duras'],
-                  ].map(([v, l]) => (
-                    <button key={v} onClick={() => setCiForm(f => ({ ...f, cargas_sensacion: v }))}
-                      className={`p-3 rounded-xl border text-left text-xs font-bold transition-all ${ciForm.cargas_sensacion === v ? 'border-transparent text-white' : 'border-black/10 text-[#0A0A0A]'}`}
-                      style={ciForm.cargas_sensacion === v ? { background: color } : {}}>{l}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-2">🏆 ¿Algún logro esta semana? <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
-                <textarea rows={2} placeholder="Ej: Por fin hice las 5 series completas..." value={ciForm.logro_semana}
-                  onChange={e => setCiForm(f => ({ ...f, logro_semana: e.target.value }))}
-                  className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setCiPaso(1)} className="flex-1 py-4 rounded-2xl border border-black/10 text-[#6B6B6B] font-bold text-sm">← Atrás</button>
-                <button onClick={() => setCiPaso(3)} disabled={!paso2Completo}
-                  className="flex-1 py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
-                  style={{ background: color }}>Siguiente →</button>
-              </div>
-            </>
-          )}
+        <div className="px-6 pb-6 space-y-7">
+          {/* 1. Energía */}
+          <div>
+            <p className="text-sm font-bold text-white mb-3">⚡ Energía</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {[[1,'Agotado'],[2,'Bajo'],[3,'Normal'],[4,'Bien'],[5,'Excelente']].map(([v]) => {
+                const sel = ciForm.energia === v
+                return (
+                  <button key={v} onClick={() => setCiForm(f => ({ ...f, energia: v }))}
+                    className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'text-white/40'}`}
+                    style={sel ? { background: colorEscala5(v) } : { border: '1px solid rgba(255,255,255,0.15)' }}>{v}</button>
+                )
+              })}
+            </div>
+            <div className="flex justify-between mt-1.5 text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <span>Agotado</span><span>Excelente</span>
+            </div>
+          </div>
 
-          {ciPaso === 3 && (
-            <>
-              <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-2">⚖️ Peso <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
-                <div className="flex items-center gap-2">
-                  <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso} onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
-                    className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none" />
-                  <span className="text-sm text-[#9B9B9B]">kg</span>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-2">💬 Nota <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
-                <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={ciForm.nota}
-                  onChange={e => setCiForm(f => ({ ...f, nota: e.target.value }))}
-                  className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setCiPaso(2)} className="flex-1 py-4 rounded-2xl border border-black/10 text-[#6B6B6B] font-bold text-sm">← Atrás</button>
-                <button onClick={enviarCheckin} disabled={!paso1Completo || enviandoCI}
-                  className="flex-1 py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
-                  style={{ background: color }}>{enviandoCI ? '⏳ Enviando...' : '✓ Enviar check-in'}</button>
-              </div>
-            </>
-          )}
+          {/* 2. Calidad del sueño */}
+          <div>
+            <p className="text-sm font-bold text-white mb-3">😴 Calidad del sueño</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {[1,2,3,4,5].map(v => {
+                const sel = ciForm.sueno === v
+                return (
+                  <button key={v} onClick={() => setCiForm(f => ({ ...f, sueno: v }))}
+                    className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'text-white/40'}`}
+                    style={sel ? { background: colorEscala5(v) } : { border: '1px solid rgba(255,255,255,0.15)' }}>{v}</button>
+                )
+              })}
+            </div>
+            <div className="flex justify-between mt-1.5 text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <span>Muy mal</span><span>Muy bien</span>
+            </div>
+          </div>
+
+          {/* 3. Fatiga */}
+          <div>
+            <p className="text-sm font-bold text-white">🏋️ Fatiga</p>
+            <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>¿Cómo llevas el cuerpo hoy?</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {Array.from({length:10},(_,i)=>i+1).map(v => {
+                const sel = ciForm.fatiga === v
+                return (
+                  <button key={v} onClick={() => setCiForm(f => ({ ...f, fatiga: v }))}
+                    className={`py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'text-white/40'}`}
+                    style={sel ? { background: colorEscala10(v) } : { border: '1px solid rgba(255,255,255,0.15)' }}>{v}</button>
+                )
+              })}
+            </div>
+            <div className="flex justify-between mt-1.5 text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <span>Sin fatiga</span><span>Al límite</span>
+            </div>
+          </div>
+
+          {/* 4. Estrés */}
+          <div>
+            <p className="text-sm font-bold text-white mb-3">🧠 Estrés</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {Array.from({length:10},(_,i)=>i+1).map(v => {
+                const sel = ciForm.estres === v
+                return (
+                  <button key={v} onClick={() => setCiForm(f => ({ ...f, estres: v }))}
+                    className={`py-2.5 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'text-white/40'}`}
+                    style={sel ? { background: colorEscala10(v) } : { border: '1px solid rgba(255,255,255,0.15)' }}>{v}</button>
+                )
+              })}
+            </div>
+            <div className="flex justify-between mt-1.5 text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>
+              <span>Sin estrés</span><span>Al límite</span>
+            </div>
+          </div>
+
+          <div className="h-px" style={{ background: 'rgba(255,255,255,0.1)' }} />
+
+          {/* 5. Sesiones completadas */}
+          <div>
+            <p className="text-sm font-bold text-white mb-1">🏃 Sesiones completadas esta semana</p>
+            <p className="text-xs mb-3" style={{ color: 'rgba(255,255,255,0.4)' }}>Opcional — ayuda a calcular tu adherencia real</p>
+            <div className="grid grid-cols-6 gap-1.5">
+              {[0,1,2,3,4,5].map(v => {
+                const sel = ciForm.sesiones_semana === v
+                return (
+                  <button key={v} onClick={() => setCiForm(f => ({ ...f, sesiones_semana: v }))}
+                    className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'text-white/40'}`}
+                    style={sel ? { background: color } : { border: '1px solid rgba(255,255,255,0.15)' }}>{v === 5 ? '5+' : v}</button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 6. Cargas */}
+          <div>
+            <p className="text-sm font-bold text-white mb-3">💪 ¿Cómo has sentido las cargas? <span className="text-xs font-normal" style={{ color: 'rgba(255,255,255,0.4)' }}>(opcional)</span></p>
+            <div className="grid grid-cols-2 gap-2">
+              {[['muy_facil','Muy fácil'],['bien','Bien'],['duro','Duro'],['muy_duro','Muy duro']].map(([v,l]) => {
+                const sel = ciForm.cargas_sensacion === v
+                return (
+                  <button key={v} onClick={() => setCiForm(f => ({ ...f, cargas_sensacion: v }))}
+                    className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'text-white/60'}`}
+                    style={sel ? { background: color } : { border: '1px solid rgba(255,255,255,0.15)' }}>{l}</button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 7. Logro de la semana */}
+          <div>
+            <p className="text-sm font-bold text-white mb-2">🏆 Logro de la semana <span className="text-xs font-normal" style={{ color: 'rgba(255,255,255,0.4)' }}>(opcional)</span></p>
+            <textarea rows={2} placeholder="¿Algo que destacar? Un RM, una mejora..." value={ciForm.logro_semana}
+              onChange={e => setCiForm(f => ({ ...f, logro_semana: e.target.value }))}
+              className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none resize-none"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} />
+          </div>
+
+          {/* 8. Peso */}
+          <div>
+            <p className="text-sm font-bold text-white mb-2">⚖️ Peso <span className="text-xs font-normal" style={{ color: 'rgba(255,255,255,0.4)' }}>(opcional)</span></p>
+            <div className="flex items-center gap-2">
+              <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso} onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
+                className="flex-1 rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} />
+              <span className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>kg</span>
+            </div>
+          </div>
+
+          {/* 9. Nota */}
+          <div>
+            <p className="text-sm font-bold text-white mb-2">💬 Nota <span className="text-xs font-normal" style={{ color: 'rgba(255,255,255,0.4)' }}>(opcional)</span></p>
+            <textarea rows={2} placeholder="¿Algo más que quieras contarme?" value={ciForm.nota}
+              onChange={e => setCiForm(f => ({ ...f, nota: e.target.value }))}
+              className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder-white/30 focus:outline-none resize-none"
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }} />
+          </div>
+
+          <button onClick={enviarCheckin} disabled={!completo || enviandoCI}
+            className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
+            style={{ background: color }}>{enviandoCI ? '⏳ Enviando...' : '✓ Enviar check-in'}</button>
         </div>
       </div>
     </div>
