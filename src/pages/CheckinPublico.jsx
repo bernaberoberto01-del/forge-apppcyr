@@ -49,7 +49,7 @@ export default function CheckinPublico() {
     setSending(true)
     // Calcular adherencia a partir de sesiones reales vs planificadas
     const adherencia = form.sesiones_planificadas && form.sesiones_semana !== null
-      ? Math.round((form.sesiones_semana / form.sesiones_planificadas) * 10)
+      ? Math.max(1, Math.round((form.sesiones_semana / form.sesiones_planificadas) * 10))
       : null
 
     await supabase.from('checkins').insert({

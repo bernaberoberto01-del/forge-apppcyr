@@ -141,7 +141,7 @@ export default function PortalForge() {
     setEnviandoCI(true)
     try {
       const diasPlan = cliente.dias_semana || 3
-      const adherencia = ciForm.sesiones != null ? Math.round((ciForm.sesiones / diasPlan) * 10) : null
+      const adherencia = ciForm.sesiones != null ? Math.max(1, Math.round((ciForm.sesiones / diasPlan) * 10)) : null
       const { error } = await supabase.from('checkins').insert({
         cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
         energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
