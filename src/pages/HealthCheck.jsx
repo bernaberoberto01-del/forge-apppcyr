@@ -3,8 +3,12 @@ import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 
 // Cliente totalmente aparte y sin sesión, solo para probar que el acceso anónimo está bloqueado.
-// (No reutiliza `supabase` para no arriesgarse a tocar la sesión real del entrenador.)
-const anonClient = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
+// No reutiliza `supabase` (reutilizarlo invalidaría el check: pasaría con la sesión del entrenador).
+// storageKey propio + persistSession/autoRefreshToken desactivados: evita compartir
+// sb-<ref>-auth-token con el cliente principal, que disparaba "Multiple GoTrueClient instances".
+const anonClient = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, storageKey: 'health-check-anon' }
+})
 
 // Las Edge Functions ahora exigen la sesión real del entrenador (no la clave anónima),
 // por eso usamos supabase.functions.invoke: adjunta el JWT del usuario logueado.
