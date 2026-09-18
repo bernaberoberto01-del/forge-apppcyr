@@ -1216,7 +1216,7 @@ export default function Clientes({ session }) {
                         <p className="text-xs text-[#6B6B6B]">{new Date(ci0.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</p>
                       </div>
                       <div className="grid grid-cols-3 gap-1.5">
-                        {[['⚡',ci0.energia,'/5','Energía'],['😴',ci0.sueno,'/5','Sueño'],['😤',ci0.estres,'/10','Estrés'],['🔥',ci0.fatiga,'/10','Fatiga'],['💫',ci0.motivacion,'/7','Motivación'],['💪',ci0.adherencia_entreno,'/10','Adherencia']].filter(([,,, ,v])=>ci0[['energia','sueno','estres','fatiga','motivacion','adherencia_entreno'][['⚡','😴','😤','🔥','💫','💪'].indexOf(_=>_)]]).filter(([,v])=>v).map(([ic,v,s,l])=>(
+                        {[['⚡',ci0.energia,'/5','Energía'],['😴',ci0.sueno,'/5','Sueño'],['😤',ci0.estres,'/5','Estrés'],['🔥',ci0.fatiga,'/5','Fatiga'],['💫',ci0.motivacion,'/7','Motivación'],['💪',ci0.adherencia_entreno,'/10','Adherencia']].filter(([,,, ,v])=>ci0[['energia','sueno','estres','fatiga','motivacion','adherencia_entreno'][['⚡','😴','😤','🔥','💫','💪'].indexOf(_=>_)]]).filter(([,v])=>v).map(([ic,v,s,l])=>(
                           <div key={l} className="bg-white rounded-lg p-2 text-center">
                             <p className="text-sm">{ic}</p>
                             <p className="text-xs font-bold text-[#0A0A0A]">{v}{s}</p>
@@ -1533,8 +1533,8 @@ export default function Clientes({ session }) {
                       <div className="flex gap-1.5 flex-wrap">
                         {ci.energia && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">⚡ {ci.energia}/5</span>}
                         {ci.sueno && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-1 rounded-full">😴 {ci.sueno}/5</span>}
-                        {ci.estres && <span className={`text-xs px-2 py-1 rounded-full ${ci.estres>=7?'bg-red-50 text-red-700':'bg-emerald-50 text-emerald-700'}`}>😤 {ci.estres}/10</span>}
-                        {ci.fatiga && <span className={`text-xs px-2 py-1 rounded-full ${ci.fatiga>=7?'bg-red-50 text-red-700':'bg-gray-50 text-gray-600'}`}>🔥 {ci.fatiga}/10</span>}
+                        {ci.estres && <span className={`text-xs px-2 py-1 rounded-full ${ci.estres>=4?'bg-red-50 text-red-700':'bg-emerald-50 text-emerald-700'}`}>😤 {ci.estres}/5</span>}
+                        {ci.fatiga && <span className={`text-xs px-2 py-1 rounded-full ${ci.fatiga>=4?'bg-red-50 text-red-700':'bg-gray-50 text-gray-600'}`}>🔥 {ci.fatiga}/5</span>}
                         {ci.motivacion && <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full">💫 {ci.motivacion}/7</span>}
                         {ci.adherencia_entreno && <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full">💪 {ci.adherencia_entreno}/10</span>}
                       </div>

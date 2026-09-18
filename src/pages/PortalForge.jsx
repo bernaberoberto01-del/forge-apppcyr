@@ -2370,33 +2370,31 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, onC
         </div>
         <div className="px-6 py-5 space-y-6">
           {[
-            { k: 'energia', icon: '⚡', label: 'Energía', max: 5, lo: 'Agotado', hi: 'Excelente' },
-            { k: 'sueno', icon: '😴', label: 'Sueño', max: 5, lo: 'Muy mal', hi: 'Muy bien' },
-            { k: 'fatiga', icon: '🏋️', label: 'Fatiga muscular', max: 10, lo: 'Sin fatiga', hi: 'Al límite' },
-            { k: 'estres', icon: '🧠', label: 'Estrés', max: 10, lo: 'Sin estrés', hi: 'Al límite' },
-          ].map(({ k, icon, label, max, lo, hi }) => (
+            { k: 'energia', icon: '⚡', label: 'Energía', opciones: ['Agotado','Bajo','Normal','Bien','Excelente'], tipo: 'positiva' },
+            { k: 'sueno', icon: '😴', label: 'Sueño', opciones: ['Muy mal','Mal','Regular','Bien','Muy bien'], tipo: 'positiva' },
+            { k: 'fatiga', icon: '🏋️', label: 'Fatiga', opciones: ['Ninguna','Leve','Moderada','Alta','Al límite'], tipo: 'negativa' },
+            { k: 'estres', icon: '🧠', label: 'Estrés', opciones: ['Tranquilo','Leve','Moderado','Alto','Al límite'], tipo: 'negativa' },
+          ].map(({ k, icon, label, opciones, tipo }) => (
             <div key={k}>
               <div className="flex items-center gap-2 mb-3">
                 <span>{icon}</span>
                 <p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
-                {ciForm[k] && <span className="ml-auto text-sm font-bold" style={{ color }}>{ciForm[k]}/{max}</span>}
               </div>
-              <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max}, 1fr)` }}>
-                {Array.from({ length: max }, (_, i) => i + 1).map(v => {
+              <div className="grid grid-cols-5 gap-1.5">
+                {[1,2,3,4,5].map(v => {
                   const sel = ciForm[k] === v
-                  const bg = sel ? ((k === 'fatiga' || k === 'estres') && v >= 7 ? '#ef4444' : (k === 'fatiga' || k === 'estres') && v >= 5 ? '#f59e0b' : color) : undefined
+                  const bg = tipo === 'positiva'
+                    ? (v <= 2 ? '#ef4444' : v === 3 ? '#f59e0b' : color)
+                    : (v <= 2 ? '#10b981' : v === 3 ? '#f59e0b' : '#ef4444')
                   return (
                     <button key={v} onClick={() => setCiForm(f => ({ ...f, [k]: v }))}
-                      className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
+                      className={`flex flex-col items-center gap-1 py-4 rounded-xl transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
                       style={sel ? { background: bg } : {}}>
-                      {v}
+                      <span className="text-base font-bold">{v}</span>
+                      <span className={`text-[9px] leading-tight text-center ${sel ? 'text-white/90' : 'text-[#9B9B9B]'}`}>{opciones[v - 1]}</span>
                     </button>
                   )
                 })}
-              </div>
-              <div className="flex justify-between mt-1.5 px-0.5">
-                <span className="text-[10px] text-[#C0C0C0]">{lo}</span>
-                <span className="text-[10px] text-[#C0C0C0]">{hi}</span>
               </div>
             </div>
           ))}
@@ -2407,7 +2405,7 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, onC
                 const sel = ciForm.sesiones === v
                 return (
                   <button key={v} onClick={() => setCiForm(f => ({ ...f, sesiones: v }))}
-                    className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
+                    className={`py-4 rounded-xl text-base font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
                     style={sel ? { background: color } : {}}>
                     {v === 5 ? '5+' : v}
                   </button>
@@ -2418,7 +2416,7 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, onC
           <div>
             <p className="text-sm font-bold text-[#0A0A0A] mb-2">💪 ¿Cómo has sentido las cargas? <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
             <div className="grid grid-cols-2 gap-2">
-              {[['muy_facil','Muy fácil'],['bien','Bien'],['duro','Duro'],['muy_duro','Muy duro']].map(([v,l]) => {
+              {[['muy_facil','😴 Muy fácil'],['bien','💪 Bien'],['duro','😤 Duro'],['muy_duro','🔥 Muy duro']].map(([v,l]) => {
                 const sel = ciForm.cargas === v
                 return (
                   <button key={v} onClick={() => setCiForm(f => ({ ...f, cargas: v }))}
