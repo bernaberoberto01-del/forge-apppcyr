@@ -87,6 +87,62 @@ function PortalEntrenadorRoute({ session }) {
   return <PortalEntrenador session={session} />
 }
 
+// Entrada pública del portal de cliente (/portal): no exige sesión previa como
+// el resto del área privada — así, si no hay sesión, se ve el login de CLIENTE
+// (LoginPortal, dentro de PortalForge.jsx) en vez de caer en el Login.jsx
+// genérico de entrenador. Si hay sesión, detecta el rol antes de decidir qué
+// mostrar: evita que una sesión de entrenador ya abierta en el navegador
+// (p.ej. por usar el admin en el mismo ordenador) se cuele como "cuenta no
+// vinculada" al abrir el portal.
+function PortalEntrada({ session }) {
+  const [esCliente, setEsCliente] = useState(undefined)
+
+  useEffect(() => {
+    if (!session) { setEsCliente(undefined); return }
+    let vivo = true
+    async function detectar() {
+      const uid = session.user.id
+      let { data: cli } = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
+      if (!cli) {
+        const res = await supabase.functions.invoke('vincular-cliente', { body: {} }).catch(() => ({ data: null }))
+        if (res?.data?.error === 'es_entrenador' || res?.error?.message?.includes('es_entrenador')) {
+          if (vivo) setEsCliente(false)
+          return
+        }
+        const r = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
+        cli = r.data
+      }
+      if (vivo) setEsCliente(!!cli)
+    }
+    detectar()
+    return () => { vivo = false }
+  }, [session])
+
+  // Sin sesión: PortalCliente (PortalForge.jsx) detecta !sesion internamente y muestra LoginPortal
+  if (!session) return <PortalCliente />
+
+  if (esCliente === undefined) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
+      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  if (esCliente) return <PortalCliente />
+
+  // Sesión de entrenador detectada en la ruta del portal de cliente
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
+      <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
+        <p className="text-5xl mb-4">👤</p>
+        <p className="font-bold text-xl mb-2 text-[#0A0A0A]">Esta es una cuenta de entrenador</p>
+        <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">Has iniciado sesión como entrenador en este navegador. Cierra sesión e inicia con la cuenta del cliente para ver el portal.</p>
+        <button onClick={() => supabase.auth.signOut().then(() => window.location.reload())}
+          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: '#FF5C00' }}>Cerrar sesión</button>
+      </div>
+    </div>
+  )
+}
+
 // Detecta el rol de la cuenta autenticada y enruta:
 //   cliente (tiene ficha vinculada) → portal del cliente
 //   resto (entrenador) → app del entrenador de siempre
@@ -163,6 +219,7 @@ export default function App() {
           <Route path="/seguimiento/:clienteId" element={<Navigate to="/seguimiento" replace />} />
 
           {/* ── OTRAS RUTAS PÚBLICAS ── */}
+          <Route path="/portal" element={<PortalEntrada session={session} />} />
           <Route path="/registro" element={<RegistroCliente />} />
           <Route path="/nutricion-cuest" element={<NutricionCuestionario />} />
           <Route path="/progreso/:clienteId" element={<ProgresoCliente />} />

@@ -126,6 +126,7 @@ export default function Dashboard({ session }) {
       { data: suplementacionExistente },
       { data: planesCobroAll },
       { data: solicitudesCambioPlan },
+      { data: cuestNutricionPendiente },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -145,6 +146,7 @@ export default function Dashboard({ session }) {
       supabase.from('suplementacion_cliente').select('cliente_id').eq('entrenador_id', uid),
       supabase.from('planes_cobro').select('cliente_id,estado,importe,concepto,clientes(nombre)').eq('entrenador_id', uid),
       supabase.from('solicitudes_cambio_plan').select('cliente_id,plan_actual,plan_solicitado,clientes(nombre)').eq('entrenador_id', uid).eq('estado', 'pendiente'),
+      supabase.from('cuestionarios_nutricion').select('id,cliente_id,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('procesado', false).order('created_at',{ascending:false}),
     ])
 
     if (alertas?.length > 0) {
@@ -196,6 +198,11 @@ export default function Dashboard({ session }) {
     const clienteIdsConSuplementacion = new Set((suplementacionExistente||[]).map(s => s.cliente_id))
     const suplementacionPendiente = Object.values(interesPorCliente).filter(c => !clienteIdsConSuplementacion.has(c.cliente_id)).filter(c => !estaDescartada(c.cliente_id, 'suplementacion_pendiente'))
 
+    // Cuestionarios de nutrición recién recibidos, aún sin procesar por el entrenador
+    const cuestNutricionPorCliente = {}
+    ;(cuestNutricionPendiente||[]).forEach(c => { if (!cuestNutricionPorCliente[c.cliente_id]) cuestNutricionPorCliente[c.cliente_id] = c })
+    const cuestionariosNutricionPendientes = Object.values(cuestNutricionPorCliente).filter(c => !estaDescartada(c.cliente_id, 'cuest_nutricion_pendiente'))
+
     // Cobros online: pagos fallidos y clientes online sin ninguna suscripción configurada
     const clientesPagoFallido = (planesCobroAll||[]).filter(pc => pc.estado === 'pago_fallido').filter(pc => !estaDescartada(pc.cliente_id, 'pago_fallido'))
     const clienteIdsConPlanCobro = new Set((planesCobroAll||[]).map(pc => pc.cliente_id))
@@ -210,6 +217,7 @@ export default function Dashboard({ session }) {
       analisisPendientes: analisisPendientes||[],
       checkins: checkins||[],
       suplementacionPendiente,
+      cuestionariosNutricionPendientes,
       clientesPagoFallido,
       clientesOnlineSinSuscripcion,
       solicitudesCambioPlan: (solicitudesCambioPlan || []).filter(s => !estaDescartada(s.cliente_id, 'cambio_plan')),
@@ -460,6 +468,27 @@ export default function Dashboard({ session }) {
                       Revisar →
                     </button>
                     <button onClick={() => descartarGrupo(d.solicitudesCambioPlan.map(s=>s.cliente_id), 'cambio_plan', 'solicitudesCambioPlan')}
+                      title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
+                  </div>
+                )}
+
+                {/* Cuestionario de nutrición recién recibido */}
+                {d.cuestionariosNutricionPendientes?.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-700 text-sm flex-shrink-0">🥗</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A]">
+                        {d.cuestionariosNutricionPendientes.length} cuestionario{d.cuestionariosNutricionPendientes.length>1?'s':''} de nutrición sin revisar
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">
+                        {d.cuestionariosNutricionPendientes.slice(0,3).map(c=>c.clientes?.nombre?.split(' ')[0]).filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/nutricion')}
+                      className="text-xs bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Ver cuestionario →
+                    </button>
+                    <button onClick={() => descartarGrupo(d.cuestionariosNutricionPendientes.map(c=>c.cliente_id), 'cuest_nutricion_pendiente', 'cuestionariosNutricionPendientes')}
                       title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                   </div>
                 )}

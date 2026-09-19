@@ -141,7 +141,7 @@ export default function PortalForge() {
     setEnviandoCI(true)
     try {
       const diasPlan = cliente.dias_semana || 3
-      const adherencia = ciForm.sesiones != null ? Math.max(1, Math.round((ciForm.sesiones / diasPlan) * 10)) : null
+      const adherencia = ciForm.sesiones != null ? Math.min(10, Math.max(1, Math.round((ciForm.sesiones / diasPlan) * 10))) : null
       const { error } = await supabase.from('checkins').insert({
         cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
         energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
@@ -705,6 +705,13 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             <p className="text-white/60 text-xs font-semibold mb-1.5">Bienvenido a Forge</p>
             <p className="text-white font-bold text-xl leading-snug">{config?.nombre_entrenador||'Tu entrenador'} está preparando tu plan</p>
             <p className="text-white/60 text-sm mt-2">En breve tendrás tu rutina, plan de nutrición y progreso.</p>
+            {verNutricion && !cuest && (
+              <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+                className="mt-4 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white font-black text-sm active:scale-95 transition-all"
+                style={{ color }}>
+                🥗 Rellenar cuestionario de nutrición →
+              </a>
+            )}
           </div>
           <div className="px-5 py-3.5 bg-black/15 flex items-center justify-between">
             <p className="text-white/60 text-xs">¿Alguna duda?</p>

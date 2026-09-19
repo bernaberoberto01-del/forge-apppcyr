@@ -164,6 +164,7 @@ export default function Clientes({ session }) {
   const [modal, setModal] = useState(false)
   const [modalRegistros, setModalRegistros] = useState(false)
   const [modalEnlace, setModalEnlace] = useState(false)
+  const [modalAccesoManual, setModalAccesoManual] = useState(null)
   const [form, setForm] = useState(initForm)
   const [editId, setEditId] = useState(null)
   const [detalle, setDetalle] = useState(null)
@@ -182,6 +183,9 @@ export default function Clientes({ session }) {
   const enlaceRegistro = `${window.location.origin}/registro?e=${uid}`
 
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
+  const manejarRespuestaAcceso = (data, nombre) => {
+    if (data?.sin_email && data?.link) setModalAccesoManual({ nombre, link: data.link })
+  }
   useEffect(() => { cargar() }, [uid])
 
   // Realtime — nuevo cuestionario llega sin recargar página
@@ -304,7 +308,8 @@ export default function Clientes({ session }) {
     if (!editId && clienteId && form.email) {
       supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: clienteId } })
         .then(({ data }) => {
-          if (data?.ok) showToast(`✓ ${form.nombre.split(' ')[0]} creado · Email de acceso enviado`)
+          if (data?.sin_email) { manejarRespuestaAcceso(data, form.nombre); showToast(`✓ ${form.nombre.split(' ')[0]} creado`) }
+          else if (data?.ok) showToast(`✓ ${form.nombre.split(' ')[0]} creado · Email de acceso enviado`)
           else showToast(`✓ ${form.nombre.split(' ')[0]} creado · Envía el acceso desde su ficha`)
         })
         .catch(() => showToast(`✓ ${form.nombre.split(' ')[0]} creado`))
@@ -383,7 +388,9 @@ export default function Clientes({ session }) {
         setTimeout(() => navigate('/rutinas?filtro=borrador'), 2500)
       } else {
         if (cliente.email) {
-          supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: cliente.id } }).catch(() => {})
+          supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: cliente.id } })
+            .then(({ data }) => manejarRespuestaAcceso(data, c.nombre))
+            .catch(() => {})
         }
         showToast(`✓ ${c.nombre.split(' ')[0]} convertido`)
       }
@@ -793,6 +800,23 @@ export default function Clientes({ session }) {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal acceso manual — email no configurado, hay que copiar el link */}
+      {modalAccesoManual && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalAccesoManual(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
+            <h2 className="font-bold text-[#0A0A0A] text-center mb-2">No se pudo enviar el email</h2>
+            <p className="text-sm text-[#6B6B6B] text-center mb-4">Copia este enlace y envíaselo a {modalAccesoManual.nombre.split(' ')[0]} manualmente (WhatsApp, SMS...):</p>
+            <div className="bg-[#F5F5F0] rounded-xl p-3 mb-4 break-all text-xs text-[#6B6B6B] font-mono">{modalAccesoManual.link}</div>
+            <div className="flex gap-2">
+              <button onClick={() => setModalAccesoManual(null)} className="flex-1 border border-black/10 text-sm font-medium py-3 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">Cerrar</button>
+              <button onClick={() => { navigator.clipboard.writeText(modalAccesoManual.link); showToast('✓ Enlace copiado') }}
+                className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar enlace</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal enlace copiado */}
@@ -1367,7 +1391,10 @@ export default function Clientes({ session }) {
                         try {
                           const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
                           if (error) throw error
-                          if (data?.ok) {
+                          if (data?.sin_email) {
+                            manejarRespuestaAcceso(data, detalle.nombre)
+                            setDetalle(d => ({ ...d, ultimo_acceso_enviado: new Date().toISOString() }))
+                          } else if (data?.ok) {
                             showToast('✓ Email de acceso enviado a ' + detalle.email)
                             setDetalle(d => ({ ...d, ultimo_acceso_enviado: new Date().toISOString() }))
                           } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
@@ -1382,7 +1409,8 @@ export default function Clientes({ session }) {
                         try {
                           const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
                           if (error) throw error
-                          if (data?.ok) showToast('✓ Email de acceso reenviado a ' + detalle.email)
+                          if (data?.sin_email) manejarRespuestaAcceso(data, detalle.nombre)
+                          else if (data?.ok) showToast('✓ Email de acceso reenviado a ' + detalle.email)
                           else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
                         } catch(e) { showToast('Error de conexión') }
                       }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">
