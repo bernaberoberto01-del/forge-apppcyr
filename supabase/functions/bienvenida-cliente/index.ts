@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     const nombreNegocio = config?.nombre_negocio || nombreEntrenador
     const color = config?.color_acento || '#FF5C00'
     const nombre = cliente.nombre.split(' ')[0]
-    const redirectTo = 'https://forge-studio-os.vercel.app/'
+    const redirectTo = 'https://forge-studio-os.vercel.app/portal'
 
     // Estrategia: intentar invite (crea cuenta nueva) → si ya existe, usar magiclink
     let accessLink = ''
