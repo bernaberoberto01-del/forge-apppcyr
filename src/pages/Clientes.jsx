@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import JSZip from 'jszip'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { TIPOS_ENTRENAMIENTO, TIPOS_MAP } from '../utils/tiposEntrenamiento'
@@ -169,6 +170,7 @@ export default function Clientes({ session }) {
   const [modalEditarCI, setModalEditarCI] = useState(null)
   const [formEditarCI, setFormEditarCI] = useState(null)
   const [guardandoCI, setGuardandoCI] = useState(false)
+  const [descargandoZip, setDescargandoZip] = useState(false)
   const [form, setForm] = useState(initForm)
   const [editId, setEditId] = useState(null)
   const [detalle, setDetalle] = useState(null)
@@ -219,6 +221,39 @@ export default function Clientes({ session }) {
       showToast('Error al guardar: ' + error.message)
     }
     setGuardandoCI(false)
+  }
+  async function descargarTodasLasFotos(fotos, nombreCliente) {
+    if (!fotos?.length || descargandoZip) return
+    setDescargandoZip(true)
+    try {
+      const zip = new JSZip()
+      const usedNames = new Set()
+      await Promise.all(fotos.map(async f => {
+        try {
+          const res = await fetch(f.url)
+          if (!res.ok) return
+          const blob = await res.blob()
+          const ext = (f.url.split('.').pop() || 'jpg').split('?')[0]
+          let nombre = `${f.fecha}_${f.tipo || 'foto'}.${ext}`
+          let n = 1
+          while (usedNames.has(nombre)) nombre = `${f.fecha}_${f.tipo || 'foto'}_${n++}.${ext}`
+          usedNames.add(nombre)
+          zip.file(nombre, blob)
+        } catch { /* si una foto falla, seguimos con el resto */ }
+      }))
+      const contenido = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(contenido)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `fotos_${nombreCliente.replace(/\s+/g, '_')}.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      showToast('Error al generar el ZIP')
+    }
+    setDescargandoZip(false)
   }
   useEffect(() => { cargar() }, [uid])
 
@@ -1597,6 +1632,13 @@ export default function Clientes({ session }) {
                         </label>
                       ))}
                     </div>
+
+                    {fotos.length > 0 && (
+                      <button onClick={() => descargarTodasLasFotos(fotos, detalle.nombre)} disabled={descargandoZip}
+                        className="w-full border border-black/10 text-sm font-semibold py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0] disabled:opacity-50 flex items-center justify-center gap-2">
+                        {descargandoZip ? <>⏳ Generando ZIP...</> : <>⬇️ Descargar todas ({fotos.length})</>}
+                      </button>
+                    )}
 
                     {fotos.length === 0 ? (
                       <div className="text-center py-6">
