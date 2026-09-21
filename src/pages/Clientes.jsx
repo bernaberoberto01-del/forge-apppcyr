@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
@@ -852,9 +853,11 @@ export default function Clientes({ session }) {
         </div>
       )}
 
-      {/* Modal editar check-in — el entrenador puede editar cualquier check-in, sin restricción de fecha */}
-      {modalEditarCI && formEditarCI && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => { setModalEditarCI(null); setFormEditarCI(null) }}>
+      {/* Modal editar check-in — el entrenador puede editar cualquier check-in, sin restricción de fecha.
+          Se monta con un portal a document.body y con z-index superior al panel de detalle del cliente
+          (z-50) para que nunca quede debajo, sea cual sea el orden de renderizado. */}
+      {modalEditarCI && formEditarCI && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-end md:items-center justify-center p-4" onClick={() => { setModalEditarCI(null); setFormEditarCI(null) }}>
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold text-[#0A0A0A]">Editar check-in</h2>
@@ -915,7 +918,8 @@ export default function Clientes({ session }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal enlace copiado */}
