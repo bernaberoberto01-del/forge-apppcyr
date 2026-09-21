@@ -2014,9 +2014,9 @@ function SubPeso({ checkins, color }) {
                 </p>
                 <div className="flex gap-2.5 mt-1.5 flex-wrap">
                   {c.energia  != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ {c.energia}/5</span>}
-                  {c.fatiga   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ {c.fatiga}/10</span>}
+                  {c.fatiga   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ {c.fatiga}/5</span>}
                   {c.sueno    != null && <span className="text-[10px] font-bold text-[#9B9B9B]">😴 {c.sueno}/5</span>}
-                  {c.estres   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 {c.estres}/10</span>}
+                  {c.estres   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 {c.estres}/5</span>}
                 </div>
                 {c.comentario && (
                   <p className="text-[10px] text-[#9B9B9B] mt-1.5 italic leading-relaxed">"{c.comentario}"</p>
