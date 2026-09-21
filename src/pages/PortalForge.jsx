@@ -47,6 +47,7 @@ export default function PortalForge() {
   const [modalCI, setModalCI] = useState(false)
   const [ciForm, setCiForm] = useState({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, peso: '', nota: '' })
   const [enviandoCI, setEnviandoCI] = useState(false)
+  const [ciEditandoId, setCiEditandoId] = useState(null)
   const [valorando, setValorando] = useState(null)
   const [rpe, setRpe] = useState(null)
   const [fatigaVal, setFatigaVal] = useState(null)
@@ -136,35 +137,62 @@ export default function PortalForge() {
   }
 
   async function enviarCheckin() {
-    console.log('enviarCheckin llamado', ciForm)
     if (!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres) return
     setEnviandoCI(true)
     try {
       const diasPlan = cliente.dias_semana || 3
       const adherencia = ciForm.sesiones != null ? Math.min(10, Math.max(1, Math.round((ciForm.sesiones / diasPlan) * 10))) : null
-      const { error } = await supabase.from('checkins').insert({
-        cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
-        energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
-        sesiones_semana: ciForm.sesiones, sesiones_planificadas: diasPlan,
-        cargas_sensacion: ciForm.cargas,
-        peso: ciForm.peso ? parseFloat(ciForm.peso) : null, comentario: ciForm.nota || null, adherencia_entreno: adherencia,
-      })
-      console.log('resultado insert:', error)
-      if (!error) {
-        setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso: ciForm.peso ? parseFloat(ciForm.peso) : null, adherencia_entreno: adherencia }, ...d.checkins] }))
-        setModalCI(false)
-        setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, peso: '', nota: '' })
-        showToast('✓ Check-in enviado')
+      const peso = ciForm.peso ? parseFloat(ciForm.peso) : null
+
+      if (ciEditandoId) {
+        const { error } = await supabase.from('checkins').update({
+          peso, energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
+          sesiones_semana: ciForm.sesiones, cargas_sensacion: ciForm.cargas,
+          comentario: ciForm.nota || null, adherencia_entreno: adherencia,
+        }).eq('id', ciEditandoId).eq('cliente_id', cliente.id)
+        if (!error) {
+          setDatos(d => ({ ...d, checkins: d.checkins.map(c => c.id === ciEditandoId
+            ? { ...c, peso, energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres, sesiones_semana: ciForm.sesiones, cargas_sensacion: ciForm.cargas, comentario: ciForm.nota || null, adherencia_entreno: adherencia }
+            : c) }))
+          setModalCI(false)
+          setCiEditandoId(null)
+          setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, peso: '', nota: '' })
+          showToast('✓ Check-in actualizado')
+        } else {
+          showToast('⚠️ Error al guardar — inténtalo de nuevo')
+        }
       } else {
-        console.error('enviarCheckin error:', error)
-        showToast('⚠️ Error al enviar — inténtalo de nuevo')
+        const { error } = await supabase.from('checkins').insert({
+          cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
+          energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
+          sesiones_semana: ciForm.sesiones, sesiones_planificadas: diasPlan,
+          cargas_sensacion: ciForm.cargas,
+          peso, comentario: ciForm.nota || null, adherencia_entreno: adherencia,
+        })
+        if (!error) {
+          setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso, adherencia_entreno: adherencia }, ...d.checkins] }))
+          setModalCI(false)
+          setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, peso: '', nota: '' })
+          showToast('✓ Check-in enviado')
+        } else {
+          showToast('⚠️ Error al enviar — inténtalo de nuevo')
+        }
       }
     } catch (e) {
-      console.error('enviarCheckin exception:', e)
       showToast('⚠️ Error al enviar — inténtalo de nuevo')
     } finally {
       setEnviandoCI(false)
     }
+  }
+
+  function editarCheckin(c) {
+    setCiForm({
+      energia: c.energia, sueno: c.sueno, fatiga: c.fatiga, estres: c.estres,
+      sesiones: c.sesiones_semana ?? null, cargas: c.cargas_sensacion ?? null,
+      peso: c.peso != null ? String(c.peso) : '', nota: c.comentario || '',
+    })
+    setCiEditandoId(c.id)
+    setModalCI(true)
   }
 
   async function guardarValoracion() {
@@ -416,7 +444,7 @@ export default function PortalForge() {
 
         {/* Contenido */}
         <div className="flex-1 px-4 md:px-8 py-5 max-w-2xl w-full mx-auto pb-28 md:pb-10">
-          {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={setModalActividad} setModalRegistro={setModalRegistro} ejerciciosHist={ejerciciosHist} />}
+          {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={setModalActividad} setModalRegistro={setModalRegistro} ejerciciosHist={ejerciciosHist} editarCheckin={editarCheckin} />}
           {tab === 'entrena' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoRutina) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
@@ -492,7 +520,7 @@ export default function PortalForge() {
         {toast && <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl whitespace-nowrap" style={{ background: color }}>{toast}</div>}
 
         {/* Modal check-in */}
-        {modalCI && <ModalCheckin color={color} ciForm={ciForm} setCiForm={setCiForm} enviandoCI={enviandoCI} enviarCheckin={enviarCheckin} onClose={() => setModalCI(false)} />}
+        {modalCI && <ModalCheckin color={color} ciForm={ciForm} setCiForm={setCiForm} enviandoCI={enviandoCI} enviarCheckin={enviarCheckin} editando={!!ciEditandoId} onClose={() => { setModalCI(false); setCiEditandoId(null) }} />}
 
         {/* Modal valorar */}
         {valorando && (
@@ -622,7 +650,7 @@ function LoginPortal() {
 }
 
 // ─── TAB HOY ──────────────────────────────────────────────────────────────────
-function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones, sesionesHoy, pendientes, sesionesPendientesValorar, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando, sesionesEstaSemana, semanasActivas, setModalActividad, setModalRegistro, ejerciciosHist }) {
+function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones, sesionesHoy, pendientes, sesionesPendientesValorar, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando, sesionesEstaSemana, semanasActivas, setModalActividad, setModalRegistro, ejerciciosHist, editarCheckin }) {
   const hoy = hoyStr()
   const ahora = new Date()
   const hora = ahora.getHours()
@@ -697,6 +725,25 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
           </div>
         )}
       </div>
+
+      {/* Último check-in — editable si es de hoy o ayer */}
+      {checkins?.[0] && (
+        <div className="bg-white rounded-2xl border border-black/5 p-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Último check-in</p>
+            {diasSinCI <= 1 && (
+              <button onClick={() => editarCheckin(checkins[0])} className="text-[10px] font-bold" style={{ color }}>✏️ Editar</button>
+            )}
+          </div>
+          <div className="flex gap-2.5 flex-wrap">
+            {checkins[0].energia != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ {checkins[0].energia}/5</span>}
+            {checkins[0].sueno != null && <span className="text-[10px] font-bold text-[#9B9B9B]">😴 {checkins[0].sueno}/5</span>}
+            {checkins[0].fatiga != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ {checkins[0].fatiga}/5</span>}
+            {checkins[0].estres != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 {checkins[0].estres}/5</span>}
+            {checkins[0].peso != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚖️ {checkins[0].peso}kg</span>}
+          </div>
+        </div>
+      )}
 
       {/* Bienvenida nuevo */}
       {esNuevo && (
@@ -2364,14 +2411,14 @@ function SubFuerza({ ejerciciosHist, color }) {
 }
 
 // ─── Modal check-in ───────────────────────────────────────────────────────────
-function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, onClose }) {
+function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, editando, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
           <div>
-            <p className="font-bold text-[#0A0A0A] text-lg">Check-in semanal</p>
-            <p className="text-xs text-[#9B9B9B] mt-0.5">Cuéntame cómo ha ido la semana</p>
+            <p className="font-bold text-[#0A0A0A] text-lg">{editando ? 'Editar check-in' : 'Check-in semanal'}</p>
+            <p className="text-xs text-[#9B9B9B] mt-0.5">{editando ? 'Corrige los datos que hayas enviado' : 'Cuéntame cómo ha ido la semana'}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F7F6F3] text-[#6B6B6B] text-xl font-light">×</button>
         </div>
@@ -2454,7 +2501,7 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, onC
             disabled={!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres || enviandoCI}
             className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
             style={{ background: color }}>
-            {enviandoCI ? '⏳ Enviando...' : '✓ Enviar check-in'}
+            {enviandoCI ? '⏳ Guardando...' : editando ? '✓ Guardar cambios' : '✓ Enviar check-in'}
           </button>
         </div>
       </div>

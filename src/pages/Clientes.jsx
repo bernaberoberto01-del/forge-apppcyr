@@ -165,6 +165,9 @@ export default function Clientes({ session }) {
   const [modalRegistros, setModalRegistros] = useState(false)
   const [modalEnlace, setModalEnlace] = useState(false)
   const [modalAccesoManual, setModalAccesoManual] = useState(null)
+  const [modalEditarCI, setModalEditarCI] = useState(null)
+  const [formEditarCI, setFormEditarCI] = useState(null)
+  const [guardandoCI, setGuardandoCI] = useState(false)
   const [form, setForm] = useState(initForm)
   const [editId, setEditId] = useState(null)
   const [detalle, setDetalle] = useState(null)
@@ -185,6 +188,36 @@ export default function Clientes({ session }) {
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
   const manejarRespuestaAcceso = (data, nombre) => {
     if (data?.sin_email && data?.link) setModalAccesoManual({ nombre, link: data.link })
+  }
+  function abrirEditarCI(ci) {
+    setFormEditarCI({
+      peso: ci.peso ?? '', energia: ci.energia ?? null, sueno: ci.sueno ?? null,
+      fatiga: ci.fatiga ?? null, estres: ci.estres ?? null,
+      sesiones_semana: ci.sesiones_semana ?? '', cargas_sensacion: ci.cargas_sensacion ?? '',
+      comentario: ci.comentario ?? '',
+    })
+    setModalEditarCI(ci)
+  }
+  async function guardarEdicionCI() {
+    if (!modalEditarCI || !formEditarCI) return
+    setGuardandoCI(true)
+    const payload = {
+      peso: formEditarCI.peso !== '' ? Number(formEditarCI.peso) : null,
+      energia: formEditarCI.energia, sueno: formEditarCI.sueno, fatiga: formEditarCI.fatiga, estres: formEditarCI.estres,
+      sesiones_semana: formEditarCI.sesiones_semana !== '' ? Number(formEditarCI.sesiones_semana) : null,
+      cargas_sensacion: formEditarCI.cargas_sensacion || null,
+      comentario: formEditarCI.comentario || null,
+    }
+    const { error } = await supabase.from('checkins').update(payload).eq('id', modalEditarCI.id)
+    if (!error) {
+      setDData(d => ({ ...d, checkins: (d.checkins||[]).map(c => c.id === modalEditarCI.id ? { ...c, ...payload } : c) }))
+      showToast('✓ Check-in actualizado')
+      setModalEditarCI(null)
+      setFormEditarCI(null)
+    } else {
+      showToast('Error al guardar: ' + error.message)
+    }
+    setGuardandoCI(false)
   }
   useEffect(() => { cargar() }, [uid])
 
@@ -814,6 +847,72 @@ export default function Clientes({ session }) {
               <button onClick={() => setModalAccesoManual(null)} className="flex-1 border border-black/10 text-sm font-medium py-3 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">Cerrar</button>
               <button onClick={() => { navigator.clipboard.writeText(modalAccesoManual.link); showToast('✓ Enlace copiado') }}
                 className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar enlace</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar check-in — el entrenador puede editar cualquier check-in, sin restricción de fecha */}
+      {modalEditarCI && formEditarCI && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => { setModalEditarCI(null); setFormEditarCI(null) }}>
+          <div className="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-bold text-[#0A0A0A]">Editar check-in</h2>
+              <p className="text-xs text-[#9B9B9B]">{new Date(modalEditarCI.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
+            </div>
+            <div className="space-y-4">
+              {[
+                ['energia','⚡ Energía'],['sueno','😴 Sueño'],['fatiga','🏋️ Fatiga'],['estres','🧠 Estrés'],
+              ].map(([campo,label]) => (
+                <div key={campo}>
+                  <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">{label} <span className="text-[#C0C0C0]">(1-5)</span></p>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[1,2,3,4,5].map(v => (
+                      <button key={v} type="button" onClick={() => setFormEditarCI(f => ({...f, [campo]: v}))}
+                        className={`py-2 rounded-lg text-sm font-bold ${formEditarCI[campo]===v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div>
+                <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Sesiones completadas</p>
+                <input type="number" min="0" value={formEditarCI.sesiones_semana}
+                  onChange={e => setFormEditarCI(f => ({...f, sesiones_semana: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Cargas</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[['muy_facil','Muy fácil'],['bien','Bien'],['duro','Duro'],['muy_duro','Muy duro']].map(([v,l]) => (
+                    <button key={v} type="button" onClick={() => setFormEditarCI(f => ({...f, cargas_sensacion: v}))}
+                      className={`py-2 rounded-lg text-xs font-bold ${formEditarCI.cargas_sensacion===v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Peso (kg)</p>
+                <input type="number" step="0.1" value={formEditarCI.peso}
+                  onChange={e => setFormEditarCI(f => ({...f, peso: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Comentario</p>
+                <textarea rows={2} value={formEditarCI.comentario}
+                  onChange={e => setFormEditarCI(f => ({...f, comentario: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={() => { setModalEditarCI(null); setFormEditarCI(null) }}
+                className="flex-1 border border-black/10 text-sm font-medium py-3 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">Cancelar</button>
+              <button onClick={guardarEdicionCI} disabled={guardandoCI}
+                className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all disabled:opacity-50">
+                {guardandoCI ? 'Guardando...' : 'Guardar cambios'}
+              </button>
             </div>
           </div>
         </div>
@@ -1557,7 +1656,10 @@ export default function Clientes({ session }) {
                     <div key={ci.id} className="border border-black/5 rounded-xl p-3">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-xs font-semibold text-[#0A0A0A]">{new Date(ci.fecha).toLocaleDateString('es-ES', { weekday:'short', day:'numeric', month:'short' })}</p>
-                        {ci.peso && <span className="text-xs font-bold text-[#FF5C00]">⚖️ {ci.peso}kg</span>}
+                        <div className="flex items-center gap-2">
+                          {ci.peso && <span className="text-xs font-bold text-[#FF5C00]">⚖️ {ci.peso}kg</span>}
+                          <button onClick={() => abrirEditarCI(ci)} className="text-[10px] font-bold text-[#9B9B9B] hover:text-[#0A0A0A]">✏️ Editar</button>
+                        </div>
                       </div>
                       <div className="flex gap-1.5 flex-wrap">
                         {ci.energia && <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full">⚡ {ci.energia}/5</span>}
