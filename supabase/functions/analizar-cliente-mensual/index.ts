@@ -197,10 +197,22 @@ JSON: {"nombre":"Rutina actualizada — ${nombreCorto}","descripcion":"resumen e
   return { ok: true, accion, cliente: cliente?.nombre, energia, fatiga, adherencia, razonDecision }
 }
 
+// El cron no puede enviar un JWT de usuario, así que se autentica con un secreto
+// compartido. Se compara contra ADMIN_SECRET (env) si existe, y también contra
+// el valor guardado en Supabase Vault bajo 'cron_admin_secret' — así el cron
+// puede sincronizarse sin depender de gestionar secrets de Edge Functions.
+async function validarAdminSecret(header: string | null): Promise<boolean> {
+  if (!header) return false
+  if (header === (Deno.env.get('ADMIN_SECRET') || 'forge-admin-2024')) return true
+  const { data } = await sb.schema('vault').from('decrypted_secrets')
+    .select('decrypted_secret').eq('name', 'cron_admin_secret').maybeSingle()
+  return !!data?.decrypted_secret && header === data.decrypted_secret
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
-  const adminOk = req.headers.get('x-admin-secret') === (Deno.env.get('ADMIN_SECRET') || 'forge-admin-2024')
+  const adminOk = await validarAdminSecret(req.headers.get('x-admin-secret'))
   let entrenadorId: string | null = null
 
   if (!adminOk) {

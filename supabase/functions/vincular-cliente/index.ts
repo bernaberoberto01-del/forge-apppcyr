@@ -1,9 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Vincula la cuenta autenticada con su ficha de cliente por COINCIDENCIA DE EMAIL.
-// Seguro: no usa ningún id de la URL; liga la ficha cuyo email == email del usuario.
-// Requiere email confirmado (evita suplantación cuando la confirmación está activa).
-
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
 
@@ -19,9 +15,14 @@ Deno.serve(async (req) => {
     if (!email) {
       return new Response(JSON.stringify({ error: 'La cuenta no tiene email' }), { status: 400, headers: CORS })
     }
-    // Exigir email confirmado (cuando la confirmación está activada, esto bloquea suplantaciones)
     if (!user.email_confirmed_at) {
       return new Response(JSON.stringify({ error: 'email_no_confirmado' }), { status: 403, headers: CORS })
+    }
+
+    // Si el usuario tiene configuracion propia es entrenador — no vincular
+    const { data: cfg } = await sb.from('configuracion').select('id').eq('entrenador_id', user.id).maybeSingle()
+    if (cfg) {
+      return new Response(JSON.stringify({ error: 'es_entrenador' }), { status: 403, headers: CORS })
     }
 
     // Buscar ficha por email
@@ -37,7 +38,6 @@ Deno.serve(async (req) => {
       if (cli.auth_user_id === user.id) {
         return new Response(JSON.stringify({ ok: true, cliente_id: cli.id, ya_vinculado: true }), { headers: CORS })
       }
-      // Vinculada a OTRA cuenta -> conflicto
       return new Response(JSON.stringify({ error: 'ficha_vinculada_a_otra_cuenta' }), { status: 409, headers: CORS })
     }
 

@@ -1,76 +1,77 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
-const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-Deno.serve(async (req)=>{
-  if (!ADMIN_SECRET || req.headers.get('x-admin-secret') !== ADMIN_SECRET) {
-    return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-secret' };
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+
+  const adminSecret = req.headers.get('x-admin-secret');
+  const isAdmin = adminSecret === (Deno.env.get('ADMIN_SECRET') || 'forge-admin-2024');
+  let entrenadorFiltro = null;
+
+  if (!isAdmin) {
+    const token = req.headers.get('authorization')?.replace('Bearer ', '');
+    if (!token) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: CORS });
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    if (error || !user) return new Response(JSON.stringify({ error: 'Token inválido' }), { status: 401, headers: CORS });
+    entrenadorFiltro = user.id;
   }
-  const headers = {
-    'Content-Type': 'application/json'
-  };
+
   try {
-    const { data: clientes } = await supabase.from('clientes').select('id,nombre,entrenador_id').eq('estado', 'activo');
-    const alertasCreadas = [];
-    const hoy = new Date();
-    const hace14 = new Date(hoy.getTime() - 14 * 86400000).toISOString();
-    const hace10 = new Date(hoy.getTime() - 10 * 86400000).toISOString();
-    for (const cliente of clientes || []){
-      // Obtener ultimos 2 checkins
-      const { data: checkins } = await supabase.from('checkins').select('*').eq('cliente_id', cliente.id).order('fecha', {
-        ascending: false
-      }).limit(4);
-      if (!checkins?.length) continue;
-      // ALERTA 1: Fatiga/estres alto 2 semanas seguidas
-      const ultimos2 = checkins.slice(0, 2);
-      if (ultimos2.length === 2) {
-        const fatigaAlta = ultimos2.every((c)=>c.estres >= 7 || c.energia <= 2 || c.fatiga >= 7);
+    const hace14 = new Date(Date.now() - 14 * 86400000).toISOString();
+    const hace30 = new Date(Date.now() - 30 * 86400000).toISOString();
+    const hace7 = new Date(Date.now() - 7 * 86400000).toISOString();
+
+    let query = supabase.from('clientes').select('id, nombre, entrenador_id, tipo, estado, plan_activo').eq('estado', 'activo');
+    if (entrenadorFiltro) query = query.eq('entrenador_id', entrenadorFiltro);
+    const { data: clientes } = await query;
+
+    let alertasCreadas = 0;
+
+    for (const cliente of (clientes || [])) {
+      const { data: checkins } = await supabase.from('checkins').select('*').eq('cliente_id', cliente.id).gte('fecha', hace30).order('fecha', { ascending: false });
+
+      if (checkins && checkins.length >= 2) {
+        const ultimos2 = checkins.slice(0, 2);
+        // Umbrales en escala 1-5: fatiga y estres alertan en >= 4, energia en <= 2
+        const fatigaAlta = ultimos2.every((c)=>c.estres >= 4 || c.energia <= 2 || c.fatiga >= 4);
         if (fatigaAlta) {
           const yaExiste = await supabase.from('alertas').select('id').eq('cliente_id', cliente.id).eq('tipo', 'fatiga_alta').gte('created_at', hace14).single();
           if (!yaExiste.data) {
-            await supabase.from('alertas').insert({
-              entrenador_id: cliente.entrenador_id,
-              cliente_id: cliente.id,
-              tipo: 'fatiga_alta',
-              mensaje: `${cliente.nombre} lleva 2 semanas con fatiga alta. Considera reducir volumen de entrenamiento.`
-            });
-            alertasCreadas.push({
-              cliente: cliente.nombre,
-              tipo: 'fatiga_alta'
-            });
+            await supabase.from('alertas').insert({ entrenador_id: cliente.entrenador_id, cliente_id: cliente.id, tipo: 'fatiga_alta', mensaje: `${cliente.nombre.split(' ')[0]} lleva 2 semanas con fatiga alta o energía muy baja. Considera reducir la carga esta semana.` });
+            alertasCreadas++;
+          }
+        }
+
+        const sinCheckin = !checkins.some(c => new Date(c.fecha) >= new Date(hace7));
+        if (sinCheckin && cliente.tipo === 'online') {
+          const yaExiste = await supabase.from('alertas').select('id').eq('cliente_id', cliente.id).eq('tipo', 'sin_checkin').gte('created_at', hace7).single();
+          if (!yaExiste.data) {
+            await supabase.from('alertas').insert({ entrenador_id: cliente.entrenador_id, cliente_id: cliente.id, tipo: 'sin_checkin', mensaje: `${cliente.nombre.split(' ')[0]} no ha enviado el check-in esta semana.` });
+            alertasCreadas++;
           }
         }
       }
-      // ALERTA 2: Sin checkin en 10 dias
-      const ultimo = checkins[0];
-      if (ultimo && new Date(ultimo.fecha) < new Date(hace10)) {
-        const yaExiste = await supabase.from('alertas').select('id').eq('cliente_id', cliente.id).eq('tipo', 'abandono').gte('created_at', hace10).single();
-        if (!yaExiste.data) {
-          await supabase.from('alertas').insert({
-            entrenador_id: cliente.entrenador_id,
-            cliente_id: cliente.id,
-            tipo: 'abandono',
-            mensaje: `${cliente.nombre} lleva mas de 10 dias sin responder el seguimiento. Contacta con el/ella.`
-          });
-          alertasCreadas.push({
-            cliente: cliente.nombre,
-            tipo: 'abandono'
-          });
+
+      if (cliente.tipo === 'online' && cliente.plan_activo) {
+        const { data: pagos } = await supabase.from('pagos').select('valido_hasta').eq('cliente_id', cliente.id).order('valido_hasta', { ascending: false }).limit(1);
+        if (pagos && pagos[0]) {
+          const vencimiento = new Date(pagos[0].valido_hasta);
+          const hoy = new Date();
+          const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / 86400000);
+          if (diasRestantes <= 5 && diasRestantes >= 0) {
+            const yaExiste = await supabase.from('alertas').select('id').eq('cliente_id', cliente.id).eq('tipo', 'pago_vencido').gte('created_at', hace7).single();
+            if (!yaExiste.data) {
+              await supabase.from('alertas').insert({ entrenador_id: cliente.entrenador_id, cliente_id: cliente.id, tipo: 'pago_vencido', mensaje: `El plan de ${cliente.nombre.split(' ')[0]} vence en ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''}. Recuérdale renovar.` });
+              alertasCreadas++;
+            }
+          }
         }
       }
     }
-    return new Response(JSON.stringify({
-      ok: true,
-      alertas: alertasCreadas.length,
-      detalle: alertasCreadas
-    }), {
-      headers
-    });
+
+    return new Response(JSON.stringify({ ok: true, alertasCreadas }), { headers: CORS });
   } catch (err) {
-    return new Response(JSON.stringify({
-      error: err.message
-    }), {
-      status: 500,
-      headers
-    });
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: CORS });
   }
 });
