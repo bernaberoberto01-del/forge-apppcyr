@@ -64,6 +64,9 @@ export default function Seguimiento({ session }) {
   const [busquedaSes, setBusquedaSes] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [toast, setToast] = useState('')
+  const [editandoMensajeAnalisis, setEditandoMensajeAnalisis] = useState(null)
+  const [borradorMensajeAnalisis, setBorradorMensajeAnalisis] = useState('')
+  const [enviandoAnalisisId, setEnviandoAnalisisId] = useState(null)
 
   const checkinsFiltrados = useMemo(() => {
     let r = [...checkins]
@@ -83,7 +86,7 @@ export default function Seguimiento({ session }) {
       supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(300),
       supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'por revisar').order('created_at', { ascending: false }),
-      supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('revisado', false).order('created_at', { ascending: false }).limit(20),
+      supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('enviado_cliente', false).order('created_at', { ascending: false }).limit(20),
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
@@ -94,7 +97,7 @@ export default function Seguimiento({ session }) {
 
   async function cargarHistorialAnalisis() {
     setCargandoHistorial(true)
-    const { data } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('revisado', true).order('created_at', { ascending: false }).limit(50)
+    const { data } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(50)
     setHistorialAnalisis(data || [])
     setHistorialCargado(true)
     setCargandoHistorial(false)
@@ -951,10 +954,20 @@ export default function Seguimiento({ session }) {
                         )}
 
                         {/* Mensaje listo para enviar */}
-                        {a.mensaje_cliente && (
+                        {a.mensaje_cliente && editandoMensajeAnalisis !== a.id && (
                           <div className="border border-[#FF5C00]/20 rounded-xl p-3">
                             <p className="text-xs font-bold text-[#FF5C00] mb-2">💬 Mensaje listo para enviar</p>
                             <p className="text-sm text-[#0A0A0A] leading-relaxed whitespace-pre-line">{a.mensaje_cliente}</p>
+                          </div>
+                        )}
+
+                        {/* Editor de mensaje — cuando no hay mensaje_cliente o se está redactando */}
+                        {editandoMensajeAnalisis === a.id && (
+                          <div className="border border-[#FF5C00]/20 rounded-xl p-3">
+                            <p className="text-xs font-bold text-[#FF5C00] mb-2">💬 Escribe el mensaje para el cliente</p>
+                            <textarea rows={4} value={borradorMensajeAnalisis} onChange={e => setBorradorMensajeAnalisis(e.target.value)}
+                              placeholder="Escribe aquí el mensaje que recibirá el cliente..."
+                              className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
                           </div>
                         )}
 
@@ -968,23 +981,61 @@ export default function Seguimiento({ session }) {
                             </button>
                           )}
                           {/* Enviar mensaje al cliente */}
-                          {a.mensaje_cliente && (
-                            <button onClick={async () => {
-                              // Navegar a mensajes con el texto pre-cargado
-                              navigate('/mensajes', { state: { clienteId: a.cliente_id, mensaje: a.mensaje_cliente } })
-                            }}
-                              className="flex-1 bg-[#FF5C00] text-white text-xs font-bold py-2.5 rounded-xl">
-                              💬 Enviar mensaje
-                            </button>
-                          )}
-                          {/* Marcar como revisado */}
-                          <button onClick={async () => {
-                            await supabase.from('analisis_mensual').update({ revisado: true, accion_tomada: 'revisado' }).eq('id', a.id)
-                            setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
-                            setHistorialAnalisis(prev => [{ ...a, revisado: true, accion_tomada: 'revisado' }, ...prev])
+                          <button disabled={enviandoAnalisisId === a.id} onClick={async () => {
+                            // Si ya se está redactando (o no hay mensaje_cliente todavía), este click confirma el envío
+                            if (editandoMensajeAnalisis === a.id || !a.mensaje_cliente) {
+                              const texto = editandoMensajeAnalisis === a.id ? borradorMensajeAnalisis.trim() : ''
+                              if (editandoMensajeAnalisis !== a.id) {
+                                // Primer click sin mensaje_cliente: abrir editor, no enviar todavía
+                                setEditandoMensajeAnalisis(a.id)
+                                setBorradorMensajeAnalisis('')
+                                return
+                              }
+                              if (!texto) return
+                              setEnviandoAnalisisId(a.id)
+                              const { error } = await supabase.from('mensajes_cliente').insert({
+                                entrenador_id: uid, cliente_id: a.cliente_id, contenido: texto, tipo: 'entrenador', leido: false, leido_entrenador: true
+                              })
+                              if (!error) {
+                                await supabase.from('analisis_mensual').update({ enviado_cliente: true, revisado: true, accion_tomada: 'mensaje_enviado', mensaje_cliente: texto }).eq('id', a.id)
+                                setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
+                                setHistorialAnalisis(prev => [{ ...a, enviado_cliente: true, revisado: true, mensaje_cliente: texto, accion_tomada: 'mensaje_enviado' }, ...prev])
+                                setEditandoMensajeAnalisis(null)
+                                setToast('✓ Mensaje enviado al cliente')
+                              } else {
+                                setToast('Error al enviar el mensaje')
+                              }
+                              setTimeout(() => setToast(''), 3000)
+                              setEnviandoAnalisisId(null)
+                            } else {
+                              // Ya hay mensaje_cliente listo: envío directo
+                              setEnviandoAnalisisId(a.id)
+                              const { error } = await supabase.from('mensajes_cliente').insert({
+                                entrenador_id: uid, cliente_id: a.cliente_id, contenido: a.mensaje_cliente, tipo: 'entrenador', leido: false, leido_entrenador: true
+                              })
+                              if (!error) {
+                                await supabase.from('analisis_mensual').update({ enviado_cliente: true, revisado: true, accion_tomada: 'mensaje_enviado' }).eq('id', a.id)
+                                setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
+                                setHistorialAnalisis(prev => [{ ...a, enviado_cliente: true, revisado: true, accion_tomada: 'mensaje_enviado' }, ...prev])
+                                setToast('✓ Mensaje enviado al cliente')
+                              } else {
+                                setToast('Error al enviar el mensaje')
+                              }
+                              setTimeout(() => setToast(''), 3000)
+                              setEnviandoAnalisisId(null)
+                            }
                           }}
-                            className="border border-black/10 text-[#6B6B6B] text-xs font-medium py-2.5 px-3 rounded-xl hover:bg-[#F5F5F0]">
-                            ✓ Revisado
+                            className="flex-1 bg-[#FF5C00] text-white text-xs font-bold py-2.5 rounded-xl disabled:opacity-50">
+                            {enviandoAnalisisId === a.id ? '⏳ Enviando...' : editandoMensajeAnalisis === a.id ? '✓ Confirmar envío' : '💬 Enviar mensaje'}
+                          </button>
+                          {/* Marcar como revisado — no oculta la tarjeta hasta que también se envíe el mensaje */}
+                          <button onClick={async () => {
+                            await supabase.from('analisis_mensual').update({ revisado: true }).eq('id', a.id)
+                            setAnalisisMensual(prev => prev.map(x => x.id === a.id ? { ...x, revisado: true } : x))
+                          }}
+                            disabled={a.revisado}
+                            className="border border-black/10 text-[#6B6B6B] text-xs font-medium py-2.5 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
+                            {a.revisado ? '✓ Revisado' : 'Marcar revisado'}
                           </button>
                         </div>
                       </div>
@@ -1026,11 +1077,31 @@ export default function Seguimiento({ session }) {
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white flex-shrink-0" style={{background: COLORES[a.accion] || '#9B9B9B'}}>
                             {ETIQUETAS[a.accion] || a.accion}
                           </span>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${a.enviado_cliente ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                            {a.enviado_cliente ? '✓ Enviado' : '⚠️ No enviado'}
+                          </span>
                           <span className="text-[#C0C0C0] text-xs flex-shrink-0">{expandido ? '▲' : '▼'}</span>
                         </button>
                         {expandido && (
-                          <div className="px-3 pb-3 border-t border-black/5 pt-2">
-                            <p className="text-xs text-[#6B6B6B] leading-relaxed">{a.resumen}</p>
+                          <div className="px-3 pb-3 border-t border-black/5 pt-2 space-y-2">
+                            <div>
+                              <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-0.5">Resumen</p>
+                              <p className="text-xs text-[#6B6B6B] leading-relaxed">{a.resumen}</p>
+                            </div>
+                            {a.indicaciones && (
+                              <div>
+                                <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-0.5">Indicaciones</p>
+                                <p className="text-xs text-[#6B6B6B] leading-relaxed">{a.indicaciones}</p>
+                              </div>
+                            )}
+                            {a.mensaje_cliente && (
+                              <div>
+                                <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-0.5">
+                                  {a.enviado_cliente ? 'Mensaje enviado al cliente' : 'Mensaje no enviado'}
+                                </p>
+                                <p className="text-xs text-[#6B6B6B] leading-relaxed whitespace-pre-line">{a.mensaje_cliente}</p>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
