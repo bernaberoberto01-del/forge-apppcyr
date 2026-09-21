@@ -104,6 +104,14 @@ export default function Rutinas({ session }) {
 
   useEffect(() => { cargar() }, [uid])
 
+  // Deep-link desde Seguimiento → IA: ?rutina=<id> abre esa rutina directamente
+  useEffect(() => {
+    const rutinaId = searchParams.get('rutina')
+    if (!rutinaId || !rutinas.length) return
+    const r = rutinas.find(x => x.id === rutinaId)
+    if (r) { setDetalle(r); setNotasEdit(r.notas_entrenador || ''); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }
+  }, [rutinas, searchParams])
+
   async function cargar() {
     setLoading(true)
     const [{ data: ru }, { data: cl }, { data: pl }, { data: bib }] = await Promise.all([

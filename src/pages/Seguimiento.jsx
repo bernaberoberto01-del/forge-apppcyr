@@ -67,6 +67,7 @@ export default function Seguimiento({ session }) {
   const [editandoMensajeAnalisis, setEditandoMensajeAnalisis] = useState(null)
   const [borradorMensajeAnalisis, setBorradorMensajeAnalisis] = useState('')
   const [enviandoAnalisisId, setEnviandoAnalisisId] = useState(null)
+  const [generandoAjusteId, setGenerandoAjusteId] = useState(null)
 
   const checkinsFiltrados = useMemo(() => {
     let r = [...checkins]
@@ -124,6 +125,25 @@ export default function Seguimiento({ session }) {
     }
     setLanzandoMensual(false)
     setTimeout(() => setToast(''), 4000)
+  }
+
+  async function generarAjustePlan(a) {
+    setGenerandoAjusteId(a.id)
+    try {
+      const { data, error } = await supabase.functions.invoke('actualizar-rutina-mensual', { body: { cliente_id: a.cliente_id } })
+      if (error) throw new Error(error.message)
+      if (data?.ok && data?.rutina_id) {
+        await supabase.from('analisis_mensual').update({ rutina_generada_id: data.rutina_id }).eq('id', a.id)
+        setAnalisisMensual(prev => prev.map(x => x.id === a.id ? { ...x, rutina_generada_id: data.rutina_id } : x))
+        setToast('✓ Plan ajustado generado — revísalo en Rutinas')
+      } else {
+        setToast('No se pudo generar el ajuste: ' + (data?.razon || data?.error || 'sin check-ins suficientes'))
+      }
+    } catch (e) {
+      setToast('Error al generar el ajuste: ' + (e?.message || 'inténtalo de nuevo'))
+    }
+    setTimeout(() => setToast(''), 4000)
+    setGenerandoAjusteId(null)
   }
 
   async function reenviarCheckin() {
@@ -973,12 +993,19 @@ export default function Seguimiento({ session }) {
 
                         {/* Acciones */}
                         <div className="flex gap-2 flex-wrap">
-                          {/* Ir a rutina si hay una generada */}
-                          {a.rutina_generada_id && (
-                            <button onClick={() => navigate('/rutinas')}
-                              className="flex-1 bg-[#6366f1] text-white text-xs font-bold py-2.5 rounded-xl">
-                              📋 Ver rutina generada
-                            </button>
+                          {/* Generar ajuste de plan / ver borrador — solo para ajustar_cargas y actualizar_rutina */}
+                          {(a.accion === 'ajustar_cargas' || a.accion === 'actualizar_rutina') && (
+                            a.rutina_generada_id ? (
+                              <button onClick={() => navigate(`/rutinas?rutina=${a.rutina_generada_id}`)}
+                                className="flex-1 bg-[#6366f1] text-white text-xs font-bold py-2.5 rounded-xl">
+                                📋 Ver borrador
+                              </button>
+                            ) : (
+                              <button onClick={() => generarAjustePlan(a)} disabled={generandoAjusteId === a.id}
+                                className="flex-1 bg-[#6366f1] text-white text-xs font-bold py-2.5 rounded-xl disabled:opacity-50">
+                                {generandoAjusteId === a.id ? '⏳ Generando plan ajustado...' : '🤖 Generar ajuste de plan'}
+                              </button>
+                            )
                           )}
                           {/* Enviar mensaje al cliente */}
                           <button disabled={enviandoAnalisisId === a.id} onClick={async () => {

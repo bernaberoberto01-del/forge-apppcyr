@@ -82,17 +82,17 @@ JSON: {"nombre":"Rutina [mes] — [nombre]","descripcion":"[resumen ajustes]","a
     if (!rutina) { const m=texto.match(/\{[\s\S]*\}/); if(m) try { rutina=JSON.parse(m[0]); } catch {} }
     if (!rutina) return { skip: true, razon: 'parse_error' };
 
-    await sb.from('rutinas').insert({
+    const { data: rutinaInsertada } = await sb.from('rutinas').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
       nombre: rutina.nombre || `Rutina actualizada — ${cliente.nombre.split(' ')[0]}`,
       objetivo: cliente.objetivo, semanas: 4, dias_semana: cliente.dias_semana || 3,
       borrador: rutina, notas_entrenador: `Ajustes: ${ajustesTxt}`, estado: 'borrador'
-    });
+    }).select('id').single();
     await sb.from('alertas').insert({
       entrenador_id: cliente.entrenador_id, cliente_id: cliente.id, tipo: 'rutina_lista',
       mensaje: `🤖 Rutina de ${cliente.nombre.split(' ')[0]} lista — ${ajustesTxt}`
     });
-    return { ok: true, ajustes: ajustes.length, checkins: checkins.length, ajustesTxt };
+    return { ok: true, ajustes: ajustes.length, checkins: checkins.length, ajustesTxt, rutina_id: rutinaInsertada?.id || null };
   }
   return { skip: true, razon: 'api_error' };
 }
@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
       if (entrenadorId && cliente.entrenador_id !== entrenadorId) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS });
       const resultado = await procesarCliente(cliente);
       if (resultado.skip) return new Response(JSON.stringify({ ok: false, razon: resultado.razon }), { headers: CORS });
-      return new Response(JSON.stringify({ ok: true, generadas: 1, ajustes: resultado.ajustesTxt }), { headers: CORS });
+      return new Response(JSON.stringify({ ok: true, generadas: 1, ajustes: resultado.ajustesTxt, rutina_id: resultado.rutina_id }), { headers: CORS });
     }
     let query = sb.from('clientes').select('*').eq('estado', 'activo');
     if (entrenadorId) query = query.eq('entrenador_id', entrenadorId);
