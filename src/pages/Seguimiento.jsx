@@ -30,6 +30,28 @@ const badgeColor = (field, val) => {
   return 'bg-[#F5F5F0] text-[#6B6B6B]'
 }
 
+// La IA a veces devuelve indicaciones como array JSON en vez de texto plano —
+// si el string parsea como array, se muestra como lista de puntos.
+function renderTextoOLista(texto) {
+  if (!texto) return null
+  if (typeof texto === 'string') {
+    const t = texto.trim()
+    if (t.startsWith('[') && t.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(t)
+        if (Array.isArray(parsed)) {
+          return (
+            <ul className="space-y-1">
+              {parsed.map((item, i) => <li key={i}>• {String(item)}</li>)}
+            </ul>
+          )
+        }
+      } catch {}
+    }
+  }
+  return <span className="whitespace-pre-line">{texto}</span>
+}
+
 export default function Seguimiento({ session }) {
   const [checkins, setCheckins] = useState([])
   const [clientes, setClientes] = useState([])
@@ -131,16 +153,30 @@ export default function Seguimiento({ session }) {
     setGenerandoAjusteId(a.id)
     try {
       const { data, error } = await supabase.functions.invoke('actualizar-rutina-mensual', { body: { cliente_id: a.cliente_id } })
-      if (error) throw new Error(error.message)
-      if (data?.ok && data?.rutina_id) {
+      if (error) {
+        // error.message de supabase-js suele ser genérico ("Edge Function returned a
+        // non-2xx status code") — el mensaje real va en el body de la respuesta HTTP,
+        // accesible vía error.context cuando existe.
+        let mensaje = error.message || 'inténtalo de nuevo'
+        if (error.context && typeof error.context.json === 'function') {
+          try {
+            const body = await error.context.clone().json()
+            mensaje = body?.error || body?.razon || mensaje
+          } catch { /* el body no era JSON, nos quedamos con error.message */ }
+        }
+        console.error('generarAjustePlan error:', error)
+        setToast('Error al generar: ' + mensaje)
+      } else if (data?.ok && data?.rutina_id) {
         await supabase.from('analisis_mensual').update({ rutina_generada_id: data.rutina_id }).eq('id', a.id)
         setAnalisisMensual(prev => prev.map(x => x.id === a.id ? { ...x, rutina_generada_id: data.rutina_id } : x))
         setToast('✓ Plan ajustado generado — revísalo en Rutinas')
       } else {
-        setToast('No se pudo generar el ajuste: ' + (data?.razon || data?.error || 'sin check-ins suficientes'))
+        console.error('generarAjustePlan respuesta inesperada:', data)
+        setToast('Error al generar: ' + (data?.razon || data?.error || 'la función no devolvió rutina_id'))
       }
     } catch (e) {
-      setToast('Error al generar el ajuste: ' + (e?.message || 'inténtalo de nuevo'))
+      console.error('generarAjustePlan excepción:', e)
+      setToast('Error al generar: ' + (e?.message || 'inténtalo de nuevo'))
     }
     setTimeout(() => setToast(''), 4000)
     setGenerandoAjusteId(null)
@@ -969,7 +1005,7 @@ export default function Seguimiento({ session }) {
                                a.accion === 'pausa_recomendada' ? '🔍 Qué explorar con el cliente' :
                                '💡 Sugerencias'}
                             </p>
-                            <p className="text-sm text-blue-900 leading-relaxed">{a.indicaciones}</p>
+                            <div className="text-sm text-blue-900 leading-relaxed">{renderTextoOLista(a.indicaciones)}</div>
                           </div>
                         )}
 
@@ -1118,7 +1154,7 @@ export default function Seguimiento({ session }) {
                             {a.indicaciones && (
                               <div>
                                 <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide mb-0.5">Indicaciones</p>
-                                <p className="text-xs text-[#6B6B6B] leading-relaxed">{a.indicaciones}</p>
+                                <div className="text-xs text-[#6B6B6B] leading-relaxed">{renderTextoOLista(a.indicaciones)}</div>
                               </div>
                             )}
                             {a.mensaje_cliente && (
