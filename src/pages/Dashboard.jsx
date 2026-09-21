@@ -105,6 +105,7 @@ export default function Dashboard({ session }) {
     const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
     const inicioSemana = (() => { const d=new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)); return d.toISOString().split('T')[0] })()
     const hace7d = new Date(Date.now()-7*864e5).toISOString().split('T')[0]
+    const hace14d = new Date(Date.now()-14*864e5).toISOString().split('T')[0]
     const en7d   = new Date(Date.now()+7*864e5).toISOString().split('T')[0]
 
     const [
@@ -188,6 +189,10 @@ export default function Dashboard({ session }) {
       return tieneVencimiento || tienePlanProximo
     }).filter(c => !estaDescartada(c.id, 'cobro_proximo'))
     const clientesSinCI = activos.filter(c => !ciRecientes.some(ci => ci.cliente_id===c.id && ci.fecha>=hace7d)).filter(c => !estaDescartada(c.id, 'sin_checkin'))
+    const clientesSinCI14d = activos.filter(c => {
+      const ultimoCI = (checkins||[]).filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha?.localeCompare(a.fecha))[0]
+      return !ultimoCI || ultimoCI.fecha < hace14d
+    }).filter(c => !estaDescartada(c.id, 'sin_checkin_14d'))
     const checkinsNuevos = ciRecientes.filter(ci => ci.fecha >= inicioSemana)
     const totalClientes = (clientes||[]).length
     const tasaRetencion = totalClientes > 0 ? Math.round((activos.length/totalClientes)*100) : 100
@@ -210,7 +215,7 @@ export default function Dashboard({ session }) {
 
     setDatos({
       activos, ingresosMes, adherenciaMedia, ingresosPorMes, maxIngreso,
-      alertasPagos, cobrosProximos, clientesSinCI, checkinsNuevos,
+      alertasPagos, cobrosProximos, clientesSinCI, clientesSinCI14d, checkinsNuevos,
       mensajesNL: mensajesNL||[], rutinasIA: rutinasIA||[],
       alertasExtra: (alertas||[]).filter(a => !estaDescartada(a.cliente_id, `extra_${a.tipo}`)), tasaRetencion, totalClientes,
       nombreEntrenador: cfg?.nombre_entrenador?.split(' ')[0] || null,
@@ -552,6 +557,28 @@ export default function Dashboard({ session }) {
                     </div>
                   )
                 })()}
+
+                {/* Más de 2 semanas sin check-in — alerta separada, más urgente */}
+                {d.clientesSinCI14d?.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5 bg-red-50">
+                    <div className="w-8 h-8 bg-red-500 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">⏰</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-red-700">
+                        {d.clientesSinCI14d.length} cliente{d.clientesSinCI14d.length>1?'s':''} llevan más de 2 semanas sin check-in
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">
+                        {d.clientesSinCI14d.slice(0,4).map(c=>c.nombre.split(' ')[0]).join(', ')}
+                        {d.clientesSinCI14d.length > 4 && ` +${d.clientesSinCI14d.length-4}`}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/seguimiento')}
+                      className="text-xs bg-red-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Ver →
+                    </button>
+                    <button onClick={() => descartarGrupo(d.clientesSinCI14d.map(c=>c.id), 'sin_checkin_14d', 'clientesSinCI14d')}
+                      title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
+                  </div>
+                )}
 
                 {/* Alertas extra (fatiga, etc.) */}
                 {d.alertasExtra.slice(0,2).map(a => (

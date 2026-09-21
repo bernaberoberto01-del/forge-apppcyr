@@ -1183,7 +1183,8 @@ export default function Clientes({ session }) {
                 const diff = pesoInicial && pesoActual ? (pesoActual - pesoInicial).toFixed(1) : null
                 const adherenciaMedia = dData.checkins?.length ? Math.round(dData.checkins.slice(0,4).reduce((s,c)=>s+(c.adherencia_entreno||0),0)/Math.min(dData.checkins.length,4)) : null
                 const ses30 = dData.sesiones?.filter(s=>new Date(s.fecha)>new Date(Date.now()-30*864e5)).length||0
-                const ingresosTotal = dData.pagos?.reduce((s,p)=>s+Number(p.importe||0),0)||0
+                const ingresosTotal = dData.pagos?.filter(p=>p.estado==='pagado').reduce((s,p)=>s+Number(p.importe||0),0)||0
+                const precioActivo = dData.planCobro?.estado === 'activo' ? dData.planCobro.importe : (detalle.precio_mensual || 0)
                 return (
                 <div className="space-y-3">
                   {/* Métricas clave */}
@@ -1218,7 +1219,7 @@ export default function Clientes({ session }) {
                         ['Nivel', detalle.nivel],
                         ['Días/sem', detalle.dias_semana ? `${detalle.dias_semana} días` : null],
                         ['Material', detalle.material],
-                        ['Precio', `${detalle.precio_mensual||0}€/mes`],
+                        ['Precio', `${precioActivo}€/mes`],
                         ['Total facturado', `${ingresosTotal}€`],
                         ['Inicio', detalle.fecha_inicio ? new Date(detalle.fecha_inicio).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) : null],
                       ].filter(([,v])=>v).map(([l,v])=>(
@@ -1725,7 +1726,7 @@ export default function Clientes({ session }) {
                               </div>
                             </div>
                           ))}
-                          <p className="text-xs text-[#9B9B9B] text-right pt-1">Total facturado: {dData.pagos?.reduce((s,p)=>s+Number(p.importe||0),0)||0}€</p>
+                          <p className="text-xs text-[#9B9B9B] text-right pt-1">Total facturado: {dData.pagos?.filter(p=>p.estado==='pagado').reduce((s,p)=>s+Number(p.importe||0),0)||0}€</p>
                         </>
                       )}
                     </div>
