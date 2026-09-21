@@ -171,6 +171,7 @@ export default function Clientes({ session }) {
   const [formEditarCI, setFormEditarCI] = useState(null)
   const [guardandoCI, setGuardandoCI] = useState(false)
   const [descargandoZip, setDescargandoZip] = useState(false)
+  const [lightboxFoto, setLightboxFoto] = useState(null)
   const [form, setForm] = useState(initForm)
   const [editId, setEditId] = useState(null)
   const [detalle, setDetalle] = useState(null)
@@ -222,16 +223,22 @@ export default function Clientes({ session }) {
     }
     setGuardandoCI(false)
   }
+  function descargarFotosIndividualmente(fotos) {
+    fotos.forEach(f => window.open(f.url, '_blank'))
+    showToast('Abriendo fotos en pestañas nuevas — descárgalas desde ahí')
+  }
   async function descargarTodasLasFotos(fotos, nombreCliente) {
     if (!fotos?.length || descargandoZip) return
     setDescargandoZip(true)
     try {
+      if (typeof JSZip !== 'function') throw new Error('JSZip no disponible')
       const zip = new JSZip()
       const usedNames = new Set()
+      let algunaFallo = false
       await Promise.all(fotos.map(async f => {
         try {
           const res = await fetch(f.url)
-          if (!res.ok) return
+          if (!res.ok) throw new Error(`HTTP ${res.status} para ${f.url}`)
           const blob = await res.blob()
           const ext = (f.url.split('.').pop() || 'jpg').split('?')[0]
           let nombre = `${f.fecha}_${f.tipo || 'foto'}.${ext}`
@@ -239,8 +246,12 @@ export default function Clientes({ session }) {
           while (usedNames.has(nombre)) nombre = `${f.fecha}_${f.tipo || 'foto'}_${n++}.${ext}`
           usedNames.add(nombre)
           zip.file(nombre, blob)
-        } catch { /* si una foto falla, seguimos con el resto */ }
+        } catch (e) {
+          algunaFallo = true
+          console.error('Error descargando foto para el ZIP:', f.url, e)
+        }
       }))
+      if (Object.keys(zip.files).length === 0) throw new Error('Ninguna foto se pudo descargar para el ZIP')
       const contenido = await zip.generateAsync({ type: 'blob' })
       const url = URL.createObjectURL(contenido)
       const a = document.createElement('a')
@@ -250,8 +261,11 @@ export default function Clientes({ session }) {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+      if (algunaFallo) showToast('⚠️ ZIP descargado, pero alguna foto no se pudo incluir')
     } catch (e) {
-      showToast('Error al generar el ZIP')
+      console.error('Error al generar el ZIP:', e)
+      showToast('⚠️ No se pudo generar el ZIP — abriendo fotos individualmente')
+      descargarFotosIndividualmente(fotos)
     }
     setDescargandoZip(false)
   }
@@ -957,6 +971,21 @@ export default function Clientes({ session }) {
         document.body
       )}
 
+      {/* Lightbox foto de progreso */}
+      {lightboxFoto && createPortal(
+        <div className="fixed inset-0 bg-black z-[70] flex items-center justify-center" onClick={() => setLightboxFoto(null)}>
+          <button onClick={() => setLightboxFoto(null)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white text-xl flex items-center justify-center hover:bg-white/20">✕</button>
+          <img src={lightboxFoto.url} alt={lightboxFoto.tipo} onClick={e => e.stopPropagation()}
+            className="max-w-full max-h-[85vh] object-contain" />
+          <button onClick={e => { e.stopPropagation(); window.open(lightboxFoto.url, '_blank') }}
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#FF5C00] text-white font-bold text-sm px-5 py-3 rounded-2xl active:scale-95 transition-all">
+            ⬇️ Descargar
+          </button>
+        </div>,
+        document.body
+      )}
+
       {/* Modal enlace copiado */}
       {modalEnlace && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -1618,6 +1647,13 @@ export default function Clientes({ session }) {
                 const tiposVista = ['frontal','lateral','espalda']
                 return (
                   <div className="space-y-4">
+                    {fotos.length > 0 && (
+                      <button onClick={() => descargarTodasLasFotos(fotos, detalle.nombre)} disabled={descargandoZip}
+                        className="w-full bg-[#0A0A0A] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#222] disabled:opacity-50 flex items-center justify-center gap-2">
+                        {descargandoZip ? <>⏳ Generando ZIP...</> : <>⬇️ Descargar todas ({fotos.length}) — ZIP</>}
+                      </button>
+                    )}
+
                     {/* Subir fotos */}
                     <div className="grid grid-cols-3 gap-2">
                       {tiposVista.map(tipo => (
@@ -1632,13 +1668,6 @@ export default function Clientes({ session }) {
                         </label>
                       ))}
                     </div>
-
-                    {fotos.length > 0 && (
-                      <button onClick={() => descargarTodasLasFotos(fotos, detalle.nombre)} disabled={descargandoZip}
-                        className="w-full border border-black/10 text-sm font-semibold py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0] disabled:opacity-50 flex items-center justify-center gap-2">
-                        {descargandoZip ? <>⏳ Generando ZIP...</> : <>⬇️ Descargar todas ({fotos.length})</>}
-                      </button>
-                    )}
 
                     {fotos.length === 0 ? (
                       <div className="text-center py-6">
@@ -1663,12 +1692,13 @@ export default function Clientes({ session }) {
                           <div className="grid grid-cols-3 gap-2">
                             {fotosDia.map(f => (
                               <div key={f.id} className="relative group">
-                                <img src={f.url} alt={f.tipo}
-                                  className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
+                                <img src={f.url} alt={f.tipo} onClick={() => setLightboxFoto(f)}
+                                  className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5 cursor-pointer" />
                                 <div className="absolute bottom-0 left-0 right-0 bg-black/60 rounded-b-xl px-2 py-1.5 flex items-center justify-between">
                                   <span className="text-white text-xs capitalize">{f.tipo}</span>
                                   <div className="flex gap-1">
-                                    <button onClick={async () => {
+                                    <button onClick={async (e) => {
+                                      e.stopPropagation()
                                       await supabase.from('fotos_progreso').update({ visible_cliente: !f.visible_cliente }).eq('id', f.id)
                                       await abrirDetalle(detalle)
                                     }} className={`text-xs px-1.5 py-0.5 rounded ${f.visible_cliente?'bg-emerald-500 text-white':'bg-white/20 text-white'}`}>
