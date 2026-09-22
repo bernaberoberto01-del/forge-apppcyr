@@ -489,7 +489,7 @@ export default function Dashboard({ session }) {
                         {d.cuestionariosNutricionPendientes.slice(0,3).map(c=>c.clientes?.nombre?.split(' ')[0]).filter(Boolean).join(', ')}
                       </p>
                     </div>
-                    <button onClick={() => navigate('/nutricion')}
+                    <button onClick={() => navigate(`/clientes?highlight=${d.cuestionariosNutricionPendientes[0].cliente_id}&tab=cuestionario`)}
                       className="text-xs bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Ver cuestionario →
                     </button>

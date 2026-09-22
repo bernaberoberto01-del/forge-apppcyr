@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import JSZip from 'jszip'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
@@ -151,6 +151,7 @@ const PER_PAGE = 20
 
 export default function Clientes({ session }) {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [clientes, setClientes] = useState([])
   const [grupos, setGrupos] = useState([])
   const [tarifas,     setTarifas]     = useState([])
@@ -270,6 +271,18 @@ export default function Clientes({ session }) {
     setDescargandoZip(false)
   }
   useEffect(() => { cargar() }, [uid])
+
+  // Deep-link desde Dashboard/notificaciones: /clientes?highlight=<id>&tab=cuestionario
+  // abre directamente la ficha de ese cliente en el tab indicado.
+  useEffect(() => {
+    const highlightId = searchParams.get('highlight')
+    if (!highlightId || !clientes.length) return
+    const c = clientes.find(x => x.id === highlightId)
+    if (!c) return
+    const tab = searchParams.get('tab')
+    abrirDetalle(c).then(() => { if (tab) setDTab(tab) })
+    setSearchParams({}, { replace: true })
+  }, [clientes])
 
   // Realtime — nuevo cuestionario llega sin recargar página
   useEffect(() => {
@@ -517,12 +530,23 @@ export default function Clientes({ session }) {
       supabase.from('tareas_extra').select('*').eq('cliente_id', c.id).order('orden'),
       supabase.from('lesiones_cliente').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }),
       supabase.from('planes_cobro').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('cuestionarios_nutricion').select('tiene_condicion_salud, condiciones_salud').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('cuestionarios_nutricion').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('solicitudes_cambio_plan').select('*').eq('cliente_id', c.id).eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
     setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null })
     setPlanSeleccionado((pc?.estado === 'activo' ? pc.plan : null) || c.plan_online || 'nutricion')
     setTareasExtra(te||[])
+  }
+
+  async function marcarCuestionarioProcesado() {
+    if (!dData.cuestNutricion) return
+    const { error } = await supabase.from('cuestionarios_nutricion').update({ procesado: true }).eq('id', dData.cuestNutricion.id)
+    if (!error) {
+      setDData(d => ({ ...d, cuestNutricion: { ...d.cuestNutricion, procesado: true } }))
+      showToast('✓ Cuestionario marcado como procesado')
+    } else {
+      showToast('Error al marcar: ' + error.message)
+    }
   }
 
   async function aprobarCambioPlan() {
@@ -1334,10 +1358,13 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['pagos','💳 Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
-                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
+                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all relative ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
+                    {id === 'cuestionario' && dData.cuestNutricion && !dData.cuestNutricion.procesado && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 border border-white" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -1791,6 +1818,67 @@ export default function Clientes({ session }) {
                   <ProgresoCargas clienteId={detalle.id} />
                 </div>
               )}
+              {dTab==='cuestionario' && (() => {
+                const cn = dData.cuestNutricion
+                if (!cn) return (
+                  <div className="text-center py-8">
+                    <p className="text-3xl mb-2">📋</p>
+                    <p className="text-sm text-[#6B6B6B]">El cliente aún no ha rellenado el cuestionario</p>
+                  </div>
+                )
+                const OBJETIVOS = { perdida_grasa: 'Pérdida de grasa', hipertrofia: 'Hipertrofia', ganancia_muscular: 'Ganancia muscular', mantenimiento: 'Mantenimiento', rendimiento: 'Rendimiento' }
+                const campos = [
+                  ['Objetivo', OBJETIVOS[cn.objetivo] || cn.objetivo],
+                  ['Edad', cn.edad ? `${cn.edad} años` : null],
+                  ['Sexo', cn.sexo],
+                  ['Peso', cn.peso ? `${cn.peso} kg` : null],
+                  ['Altura', cn.altura ? `${cn.altura} cm` : null],
+                  ['Nivel de actividad', cn.nivel_actividad],
+                  ['Tipo de dieta', cn.tipo_dieta],
+                  ['Comidas al día', cn.comidas_dia],
+                  ['Alergias', cn.alergias],
+                  ['Intolerancias', cn.intolerancias],
+                  ['Suplementos actuales', cn.suplementos],
+                  ['Interés en suplementación', cn.interes_suplementacion ? 'Sí' : 'No'],
+                  ['Notas', cn.notas],
+                ].filter(([, v]) => v)
+                return (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-[#9B9B9B]">
+                        Enviado el {new Date(cn.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </p>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cn.procesado ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
+                        {cn.procesado ? '✓ Procesado' : '⏳ Pendiente'}
+                      </span>
+                    </div>
+
+                    {cn.tiene_condicion_salud && (
+                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                        <p className="text-xs font-bold text-amber-700 mb-1">⚕️ Condiciones de salud</p>
+                        {cn.condiciones_salud?.length > 0 && <p className="text-xs text-amber-700/90">{cn.condiciones_salud.join(', ')}</p>}
+                        {cn.medicacion && <p className="text-xs text-amber-700/80 mt-1">Medicación: {cn.medicacion}</p>}
+                      </div>
+                    )}
+
+                    <div className="bg-white border border-black/5 rounded-xl divide-y divide-black/4">
+                      {campos.map(([label, valor]) => (
+                        <div key={label} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
+                          <p className="text-xs text-[#6B6B6B] flex-shrink-0">{label}</p>
+                          <p className="text-xs font-semibold text-[#0A0A0A] text-right">{valor}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {!cn.procesado && (
+                      <button onClick={marcarCuestionarioProcesado}
+                        className="w-full bg-[#FF5C00] text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
+                        ✓ Marcar como procesado
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
               {dTab==='extra' && (
                 <div className="space-y-4">
                   <div className="bg-[#F7F6F3] rounded-xl p-3.5">
