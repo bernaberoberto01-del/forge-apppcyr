@@ -63,24 +63,31 @@ AJUSTES A APLICAR: ${ajustesTxt}
 
 IMPORTANTE: Aplica los ajustes de forma concreta. Si la fatiga es alta, reduce series. Si las cargas son fáciles, sube reps o añade carga. Usa las marcas personales como referencia (85-90% de la mejor marca). Varía los ejercicios respecto al mes anterior para evitar monotonía.
 
-JSON: {"nombre":"Rutina [mes] — [nombre]","descripcion":"[resumen ajustes]","ajustes_aplicados":"${ajustesTxt}","semanas":4,"dias":[{"dia":1,"nombre":"Día A — [patrón]","patron_principal":"[tipo]","ejercicios":[{"orden":1,"nombre":"[ejercicio]","patron":"[fuerza/cardio/core]","series":3,"reps":"8-10","descanso":"90s","notas":""}]}]}`;
+FORMATO: Sé conciso. "descripcion", "ajustes_aplicados" y "notas" máximo 10 palabras cada uno, sin párrafos largos. El JSON completo debe caber en pocos tokens — prioriza incluir todos los días y ejercicios antes que texto descriptivo largo.
+
+JSON: {"nombre":"Rutina [mes] — [nombre]","descripcion":"[máx 10 palabras]","ajustes_aplicados":"${ajustesTxt}","semanas":4,"dias":[{"dia":1,"nombre":"Día A — [patrón]","patron_principal":"[tipo]","ejercicios":[{"orden":1,"nombre":"[ejercicio]","patron":"[fuerza/cardio/core]","series":3,"reps":"8-10","descanso":"90s","notas":""}]}]}`;
 
   for (let intento = 0; intento < 2; intento++) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': ANTHROPIC_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 2000,
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 4000,
         system: 'Responde SOLO con JSON válido. Sin texto ni markdown.',
         messages: [{ role: 'user', content: prompt }] })
     });
     if (res.status === 429) { await new Promise(r=>setTimeout(r,2000)); continue; }
     if (!res.ok) return { skip: true, razon: 'api_error' };
     const aiData = await res.json();
-    const texto = (aiData.content?.[0]?.text||'').trim();
+    console.error(`actualizar-rutina-mensual stop_reason para ${cliente.nombre}:`, aiData.stop_reason);
+    const rawTexto = (aiData.content?.[0]?.text||'').trim();
+    const texto = rawTexto.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     let rutina: any = null;
     try { rutina = JSON.parse(texto); } catch {}
     if (!rutina) { const m=texto.match(/\{[\s\S]*\}/); if(m) try { rutina=JSON.parse(m[0]); } catch {} }
-    if (!rutina) return { skip: true, razon: 'parse_error' };
+    if (!rutina) {
+      console.error(`actualizar-rutina-mensual parse_error para ${cliente.nombre} — Raw response:`, rawTexto.substring(0, 500));
+      return { skip: true, razon: 'parse_error' };
+    }
 
     const { data: rutinaInsertada } = await sb.from('rutinas').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
