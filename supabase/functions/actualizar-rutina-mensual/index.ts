@@ -45,6 +45,8 @@ async function procesarCliente(cliente: any) {
 
   const ajustesTxt = ajustes.join('; ');
   const marcasTexto = (marcas||[]).slice(0,5).map((m:any)=>`${m.ejercicio}: ${m.valor}`).join(', ');
+  const mesActual = new Date().toLocaleString('es-ES', { month: 'long' });
+  const añoActual = new Date().getFullYear();
 
   const prompt = `Eres entrenador personal experto. Genera rutina mes siguiente con datos reales del cliente.
 
@@ -65,7 +67,9 @@ IMPORTANTE: Aplica los ajustes de forma concreta. Si la fatiga es alta, reduce s
 
 FORMATO: Sé conciso. "descripcion", "ajustes_aplicados" y "notas" máximo 10 palabras cada uno, sin párrafos largos. El JSON completo debe caber en pocos tokens — prioriza incluir todos los días y ejercicios antes que texto descriptivo largo.
 
-JSON: {"nombre":"Rutina [mes] — [nombre]","descripcion":"[máx 10 palabras]","ajustes_aplicados":"${ajustesTxt}","semanas":4,"dias":[{"dia":1,"nombre":"Día A — [patrón]","patron_principal":"[tipo]","ejercicios":[{"orden":1,"nombre":"[ejercicio]","patron":"[fuerza/cardio/core]","series":3,"reps":"8-10","descanso":"90s","notas":""}]}]}`;
+El nombre de la rutina debe incluir el mes actual: ${mesActual} ${añoActual}
+
+JSON: {"nombre":"Rutina ${mesActual} ${añoActual} — [nombre]","descripcion":"[máx 10 palabras]","ajustes_aplicados":"${ajustesTxt}","semanas":4,"dias":[{"dia":1,"nombre":"Día A — [patrón]","patron_principal":"[tipo]","ejercicios":[{"orden":1,"nombre":"[ejercicio]","patron":"[fuerza/cardio/core]","series":3,"reps":"8-10","descanso":"90s","notas":""}]}]}`;
 
   for (let intento = 0; intento < 2; intento++) {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
