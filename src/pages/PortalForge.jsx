@@ -6,6 +6,18 @@ const qa = p => p.then(r => r.data || []).catch(() => [])
 const q1 = p => p.then(r => r.data?.[0] || r.data || null).catch(() => null)
 const hoyStr = () => new Date().toISOString().split('T')[0]
 const hace = d => new Date(Date.now() - d * 864e5).toISOString().split('T')[0]
+// Formatea una fecha de forma segura. Si viene como fecha pura "YYYY-MM-DD"
+// (10 caracteres, sin hora) le añade T12:00 para evitar que se muestre un día
+// antes por el cambio de zona horaria; si ya viene como timestamp completo
+// (p.ej. checkins.fecha, que es timestamptz) se usa tal cual. Nunca revienta
+// con "Invalid Date": si no hay fecha o no se puede parsear, devuelve '—'.
+const formatearFecha = (fecha, opciones = { day: 'numeric', month: 'short', year: 'numeric' }) => {
+  if (!fecha) return '—'
+  const valor = typeof fecha === 'string' && fecha.length === 10 ? fecha + 'T12:00' : fecha
+  const d = new Date(valor)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('es-ES', opciones)
+}
 const rmEpley = (peso, reps) => reps <= 1 ? peso : +(peso * (1 + reps / 30)).toFixed(1)
 const parseReps = (r) => { if (!r) return 1; const n = parseInt(String(r).split('-')[0]); return isNaN(n) ? 1 : n }
 const ZONAS_LESION = ['Rodilla','Hombro','Lumbar','Cervical','Tobillo','Cadera','Muñeca','Codo','Isquiotibial','Cuádriceps','Gemelo','Otro']
@@ -2010,7 +2022,7 @@ function SubPeso({ checkins, color }) {
             <div key={i} className="px-5 py-3.5 flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-black text-[#0A0A0A]">
-                  {new Date(c.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}
+                  {formatearFecha(c.fecha, {weekday:'short',day:'numeric',month:'short'})}
                 </p>
                 <div className="flex gap-2.5 mt-1.5 flex-wrap">
                   {c.energia  != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ {c.energia}/5</span>}
@@ -2190,7 +2202,7 @@ function SubFotos({ fotos, color, cliente, cargarTodo }) {
   const [subiendo, setSubiendo] = useState(false)
   const [tipo, setTipo] = useState('frente')
   const [errorMsg, setErrorMsg] = useState('')
-  const fileRef = React.useRef(null)
+  const fileRef = useRef(null)
 
   const TIPOS = [
     { id:'frente',  label:'Frente' },
