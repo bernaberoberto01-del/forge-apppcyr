@@ -25,6 +25,19 @@ import ImportarDatos from './pages/ImportarDatos'
 import PortalEntrenador from './pages/PortalEntrenador'
 import NotFound from './pages/NotFound'
 
+// Captura el hash/query de la URL en el momento en que se evalúa este módulo —
+// lo más pronto posible, antes de que el propio Supabase (detectSessionInUrl)
+// consuma y limpie la URL tras procesar un magic link. Sirve para distinguir
+// "este enlace ha caducado/ya se usó" de "esta cuenta es de un entrenador".
+const urlAuthInfo = (() => {
+  const hash = typeof window !== 'undefined' ? (window.location.hash || '') : ''
+  const search = typeof window !== 'undefined' ? (window.location.search || '') : ''
+  return {
+    tieneError: /error=/.test(hash) || /error=/.test(search) || /error_description=/.test(hash),
+    hashVacio: !hash,
+  }
+})()
+
 // Páginas públicas (sin sesión)
 import PortalCliente from './pages/PortalForge'
 import RegistroCliente from './pages/RegistroCliente'
@@ -87,32 +100,49 @@ function PortalEntrenadorRoute({ session }) {
   return <PortalEntrenador session={session} />
 }
 
+// Lee el mensaje de error real de una respuesta de Edge Function. supabase-js
+// no rellena `data` cuando la función responde con un status distinto de 2xx
+// (p.ej. el 403 de "es_entrenador") — el body real hay que leerlo de
+// error.context, si no error.message suele ser un texto genérico inútil
+// ("Edge Function returned a non-2xx status code").
+async function extraerErrorEdgeFunction(error) {
+  if (!error) return null
+  if (error.context && typeof error.context.json === 'function') {
+    try { const body = await error.context.clone().json(); if (body?.error) return body.error } catch {}
+  }
+  return error.message || null
+}
+
 // Entrada pública del portal de cliente (/portal): no exige sesión previa como
 // el resto del área privada — así, si no hay sesión, se ve el login de CLIENTE
 // (LoginPortal, dentro de PortalForge.jsx) en vez de caer en el Login.jsx
-// genérico de entrenador. Si hay sesión, detecta el rol antes de decidir qué
-// mostrar: evita que una sesión de entrenador ya abierta en el navegador
-// (p.ej. por usar el admin en el mismo ordenador) se cuele como "cuenta no
-// vinculada" al abrir el portal.
+// genérico de entrenador. Si hay sesión, detecta el rol y distingue 3 casos:
+// cliente vinculado, cuenta de entrenador, o magic link caducado/ya usado
+// (la sesión de entrenador persiste porque el intercambio de sesión falló).
 function PortalEntrada({ session }) {
-  const [esCliente, setEsCliente] = useState(undefined)
+  const [estado, setEstado] = useState(undefined) // undefined=comprobando | 'cliente' | 'entrenador' | 'link_caducado' | 'sin_vincular'
 
   useEffect(() => {
-    if (!session) { setEsCliente(undefined); return }
+    if (!session) { setEstado(undefined); return }
     let vivo = true
     async function detectar() {
       const uid = session.user.id
-      let { data: cli } = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
-      if (!cli) {
-        const res = await supabase.functions.invoke('vincular-cliente', { body: {} }).catch(() => ({ data: null }))
-        if (res?.data?.error === 'es_entrenador' || res?.error?.message?.includes('es_entrenador')) {
-          if (vivo) setEsCliente(false)
-          return
-        }
-        const r = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
-        cli = r.data
-      }
-      if (vivo) setEsCliente(!!cli)
+      const { data: cli } = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
+      if (cli) { if (vivo) setEstado('cliente'); return }
+
+      const res = await supabase.functions.invoke('vincular-cliente', { body: {} }).catch(e => ({ data: null, error: e }))
+      let errorVinculo = res?.data?.error || null
+      if (!errorVinculo && res?.error) errorVinculo = await extraerErrorEdgeFunction(res.error)
+
+      if (errorVinculo === 'es_entrenador') { if (vivo) setEstado('entrenador'); return }
+
+      // vincular-cliente pudo haber enlazado la ficha en este mismo intento — recomprobar
+      const r = await supabase.from('clientes').select('id').eq('auth_user_id', uid).maybeSingle()
+      if (r.data) { if (vivo) setEstado('cliente'); return }
+
+      // No es entrenador y no hay ficha vinculada: distinguir link caducado de cuenta sin vincular
+      if (!vivo) return
+      setEstado(urlAuthInfo.tieneError || urlAuthInfo.hashVacio ? 'link_caducado' : 'sin_vincular')
     }
     detectar()
     return () => { vivo = false }
@@ -121,23 +151,29 @@ function PortalEntrada({ session }) {
   // Sin sesión: PortalCliente (PortalForge.jsx) detecta !sesion internamente y muestra LoginPortal
   if (!session) return <PortalCliente />
 
-  if (esCliente === undefined) return (
+  if (estado === undefined) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
       <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
-  if (esCliente) return <PortalCliente />
+  if (estado === 'cliente') return <PortalCliente />
 
-  // Sesión de entrenador detectada en la ruta del portal de cliente
+  const MENSAJES = {
+    entrenador: { icono: '👤', titulo: 'Esta es una cuenta de entrenador', texto: 'Has iniciado sesión como entrenador en este navegador. Cierra sesión para acceder como cliente.' },
+    link_caducado: { icono: '⏰', titulo: 'Enlace caducado', texto: 'Este enlace ha caducado o ya fue usado. Pide a tu entrenador un enlace nuevo.' },
+    sin_vincular: { icono: '🔗', titulo: 'Cuenta no vinculada', texto: 'Este email no está asociado a ningún cliente. Contacta con tu entrenador.' },
+  }
+  const msg = MENSAJES[estado] || MENSAJES.sin_vincular
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
       <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
-        <p className="text-5xl mb-4">👤</p>
-        <p className="font-bold text-xl mb-2 text-[#0A0A0A]">Esta es una cuenta de entrenador</p>
-        <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">Has iniciado sesión como entrenador en este navegador. Cierra sesión e inicia con la cuenta del cliente para ver el portal.</p>
-        <button onClick={() => supabase.auth.signOut().then(() => window.location.reload())}
-          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: '#FF5C00' }}>Cerrar sesión</button>
+        <p className="text-5xl mb-4">{msg.icono}</p>
+        <p className="font-bold text-xl mb-2 text-[#0A0A0A]">{msg.titulo}</p>
+        <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">{msg.texto}</p>
+        <button onClick={() => supabase.auth.signOut().then(() => { window.location.href = '/portal' })}
+          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: '#FF5C00' }}>Cerrar sesión y volver</button>
       </div>
     </div>
   )
