@@ -1612,9 +1612,15 @@ export default function Clientes({ session }) {
                         📧 Reenviar acceso
                       </button>
                     )}
-                    <button onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}`)
-                      showToast('✓ Enlace del portal copiado')
+                    <button onClick={async () => {
+                      try {
+                        const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id, tipo: 'magiclink' } })
+                        if (error) throw error
+                        if (data?.link) {
+                          await navigator.clipboard.writeText(data.link)
+                          showToast('✓ Enlace copiado — compártelo con el cliente')
+                        } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
+                      } catch (e) { showToast('Error de conexión') }
                     }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">🔗 Enlace portal</button>
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${detalle.id}`); showToast('Enlace check-in copiado') }}
                       className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Enviar CI</button>

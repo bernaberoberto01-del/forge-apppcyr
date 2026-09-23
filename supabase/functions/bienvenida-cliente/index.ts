@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
   if (authErr || !user) return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401, headers: CORS })
 
   try {
-    const { cliente_id } = await req.json().catch(() => ({}))
+    const { cliente_id, tipo } = await req.json().catch(() => ({}))
     if (!cliente_id) return new Response(JSON.stringify({ error: 'cliente_id requerido' }), { status: 400, headers: CORS })
 
     const { data: cliente } = await sb.from('clientes').select('*').eq('id', cliente_id).single()
@@ -75,6 +75,11 @@ Deno.serve(async (req) => {
 
     // Guardar que se envió el acceso
     await sb.from('clientes').update({ ultimo_acceso_enviado: new Date().toISOString() }).eq('id', cliente_id).catch(() => {})
+
+    // Solo generar el link, sin enviar email (botón "Enlace portal" en Clientes.jsx)
+    if (tipo === 'magiclink') {
+      return new Response(JSON.stringify({ ok: true, link: accessLink }), { headers: CORS })
+    }
 
     const gmailUser = Deno.env.get('GMAIL_USER')
     const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD')

@@ -20,6 +20,15 @@ const formatearFecha = (fecha, opciones = { day: 'numeric', month: 'short', year
 }
 const rmEpley = (peso, reps) => reps <= 1 ? peso : +(peso * (1 + reps / 30)).toFixed(1)
 const parseReps = (r) => { if (!r) return 1; const n = parseInt(String(r).split('-')[0]); return isNaN(n) ? 1 : n }
+// Convierte textos de descanso tipo "90s", "2min", "3-4 min" a segundos (usa el número mayor del rango)
+const parseDescansoSegundos = (desc) => {
+  if (!desc || desc === '-') return null
+  const str = String(desc).toLowerCase()
+  const nums = str.match(/\d+(\.\d+)?/g)
+  if (!nums || !nums.length) return null
+  const ultimo = parseFloat(nums[nums.length - 1])
+  return Math.round(/min/.test(str) ? ultimo * 60 : ultimo)
+}
 const ZONAS_LESION = ['Rodilla','Hombro','Lumbar','Cervical','Tobillo','Cadera','Muñeca','Codo','Isquiotibial','Cuádriceps','Gemelo','Otro']
 const SEVERIDADES = [['leve','Leve'],['moderada','Moderada'],['grave','Grave']]
 const CATEGORIAS_SUPLEMENTO = [
@@ -119,7 +128,7 @@ export default function PortalForge() {
     const cid = cl.id, eid = cl.entrenador_id, hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
-      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar] = await Promise.all([
+      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones] = await Promise.all([
       q1(supabase.from('configuracion').select('*').eq('entrenador_id', eid)),
       q1(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
@@ -139,10 +148,11 @@ export default function PortalForge() {
       q1(supabase.from('suplementacion_cliente').select('*').eq('cliente_id', cid)),
       q1(supabase.from('planes_cobro').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(1)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('valoracion_pendiente', true).is('rpe', null).gte('fecha', hace(7)).order('fecha', { ascending: false })),
+      qa(supabase.from('lesiones_cliente').select('*').eq('cliente_id', cid).order('created_at', { ascending: false })),
     ])
 
     setConfig(cfg)
-    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar })
+    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones })
     supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
     setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
     setCargando(false)
@@ -235,19 +245,22 @@ export default function PortalForge() {
   async function guardarRegistroSesion() {
     if (!modalRegistro) return
     setGuardandoRegistro(true)
-    const { data: sesNueva } = await supabase.from('sesiones').insert({
+    const { data: sesNueva, error } = await supabase.from('sesiones').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
       fecha: hoyStr(), tipo: 'online', completada: true, cancelada: false, notas: modalRegistro.nombre,
     }).select().single()
-    if (sesNueva) {
-      const rows = (modalRegistro.ejercicios || []).map((ej, i) => ({
-        sesion_id: sesNueva.id, cliente_id: cliente.id,
-        ejercicio_nombre: ej.nombre, patron: ej.patron || null, orden: i,
-        sets: (registroSets[i] || []).filter(s => s.peso || s.reps),
-      })).filter(r => r.sets.length > 0)
-      if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
-      setSesionGuardadaId(sesNueva.id)
+    if (error || !sesNueva) {
+      setGuardandoRegistro(false)
+      showToast('⚠️ Error al guardar la sesión — inténtalo de nuevo')
+      return
     }
+    const rows = (modalRegistro.ejercicios || []).map((ej, i) => ({
+      sesion_id: sesNueva.id, cliente_id: cliente.id,
+      ejercicio_nombre: ej.nombre, patron: ej.patron || null, orden: i,
+      sets: (registroSets[i] || []).filter(s => s.peso || s.reps),
+    })).filter(r => r.sets.length > 0)
+    if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
+    setSesionGuardadaId(sesNueva.id)
     setGuardandoRegistro(false)
   }
 
@@ -299,7 +312,7 @@ export default function PortalForge() {
 
   if (!datos) return <div className="min-h-screen" style={{ background: '#F2F1EE' }} />
 
-  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar } = datos
+  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones } = datos
   const esOnline = cliente.tipo === 'online'
   const plan = (planCobro?.estado === 'activo' ? planCobro.plan : null) || cliente.plan_online || null
   const acceso = {
@@ -483,7 +496,7 @@ export default function PortalForge() {
           )}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} />}
           {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />}
-          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} />}
+          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} />}
         </div>
 
         {/* Bottom bar — negro total, 5 slots fijos */}
@@ -1011,6 +1024,46 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
 
 
 
+// ─── Botón temporizador de descanso ───────────────────────────────────────────
+function BotonTemporizador({ segundos, label, color }) {
+  const [restante, setRestante] = useState(null)
+  const intervalRef = useRef(null)
+
+  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current) }, [])
+
+  if (!segundos) return null
+
+  function iniciar() {
+    setRestante(segundos)
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    intervalRef.current = setInterval(() => {
+      setRestante(r => {
+        if (r <= 1) {
+          clearInterval(intervalRef.current)
+          intervalRef.current = null
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+          return null
+        }
+        return r - 1
+      })
+    }, 1000)
+  }
+
+  const enCurso = restante !== null
+  const urgente = enCurso && restante <= 10
+
+  return (
+    <button type="button" onClick={iniciar} disabled={enCurso}
+      className="text-xs font-bold px-1.5 py-0.5 rounded-md transition-all active:scale-95"
+      style={{
+        color: urgente ? '#ef4444' : enCurso ? color : '#9B9B9B',
+        background: urgente ? '#fef2f2' : enCurso ? `${color}15` : 'transparent',
+      }}>
+      {enCurso ? `⏱ ${restante}s` : `💤 ${label}`}
+    </button>
+  )
+}
+
 function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline }) {
   const [diaAbierto, setDiaAbierto] = useState(null) // null = todos cerrados
 
@@ -1089,7 +1142,10 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline 
                               {ej.reps && <span className="text-xs text-[#9B9B9B]">· {ej.reps} reps</span>}
                               {ej.peso && <span className="text-xs text-[#9B9B9B]">· {ej.peso}</span>}
                               {ej.descanso && ej.descanso !== '-' && (
-                                <span className="text-xs text-[#9B9B9B]">· 💤 {ej.descanso}</span>
+                                <>
+                                  <span className="text-xs text-[#9B9B9B]">·</span>
+                                  <BotonTemporizador segundos={parseDescansoSegundos(ej.descanso)} label={ej.descanso} color={color} />
+                                </>
                               )}
                             </div>
                             {ej.notas && (
@@ -1204,7 +1260,7 @@ function TabPagos({ pagos, color }) {
 }
 
 // ─── Tab Más ──────────────────────────────────────────────────────────────────
-function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0, seccionInicial, onConsumirSeccionInicial, solicitarCambioPlan }) {
+function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0, seccionInicial, onConsumirSeccionInicial, solicitarCambioPlan, lesiones, cargarTodo }) {
   const [seccion, setSeccion] = useState(seccionInicial || 'menu')
   const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
   const [guardando, setGuardando] = useState(false)
@@ -1212,10 +1268,29 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
   const [mostrarCambioPlan, setMostrarCambioPlan] = useState(false)
   const [solicitudEnviada, setSolicitudEnviada] = useState(false)
   const [enviandoSolicitud, setEnviandoSolicitud] = useState(null)
+  const [lesionForm, setLesionForm] = useState({ zona: '', severidad: 'leve', descripcion: '' })
+  const [guardandoLesion, setGuardandoLesion] = useState(false)
+  const [lesionEnviada, setLesionEnviada] = useState(false)
 
   useEffect(() => { if (seccionInicial && onConsumirSeccionInicial) onConsumirSeccionInicial() }, [])
 
   const pagosPendientes = pagos?.filter(p => p.estado !== 'cobrado').length || 0
+  const lesionesActivas = lesiones?.filter(l => l.estado === 'activa').length || 0
+
+  async function guardarLesion() {
+    if (!lesionForm.zona) return
+    setGuardandoLesion(true)
+    await supabase.from('lesiones_cliente').insert({
+      cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
+      zona: lesionForm.zona, severidad: lesionForm.severidad, descripcion: lesionForm.descripcion || null,
+      estado: 'activa', fecha_inicio: hoyStr(),
+    })
+    setLesionForm({ zona: '', severidad: 'leve', descripcion: '' })
+    setGuardandoLesion(false)
+    setLesionEnviada(true)
+    await cargarTodo?.()
+    setTimeout(() => setLesionEnviada(false), 3000)
+  }
 
   const ITEMS = [
     {
@@ -1226,7 +1301,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
       badge: msgNoLeidos,
       urgente: msgNoLeidos > 0,
     },
-    ...(pagos?.length ? [{
+    ...(pagos?.length || planCobro ? [{
       id: 'pagos',
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
       label: 'Pagos',
@@ -1234,6 +1309,14 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
       badge: pagosPendientes,
       urgente: pagosPendientes > 0,
     }] : []),
+    {
+      id: 'lesiones',
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M2 12h20"/></svg>,
+      label: 'Lesiones',
+      desc: lesionesActivas > 0 ? `${lesionesActivas} activa${lesionesActivas > 1 ? 's' : ''}` : 'Reportar una molestia',
+      badge: 0,
+      urgente: false,
+    },
     {
       id: 'ajustes',
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>,
@@ -1380,6 +1463,98 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
             ))}
             <p className="text-xs text-[#9B9B9B] text-right pt-1">Total facturado: {pagos.reduce((s,p)=>s+Number(p.importe||0),0)}€</p>
           </>
+        )}
+      </div>
+    )
+  }
+
+  if (seccion === 'lesiones') {
+    const SEVERIDAD_COLOR = { leve: 'bg-[#F4F3F0] text-[#6B6B6B]', moderada: 'bg-amber-50 text-amber-600', grave: 'bg-red-50 text-red-600' }
+    const ESTADO_LABEL = { activa: 'Activa', en_seguimiento: 'En seguimiento', resuelta: 'Resuelta' }
+    return (
+      <div className="space-y-4">
+        <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
+        <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Lesiones</p>
+
+        <div className="bg-white rounded-2xl p-4 space-y-3">
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Reportar una molestia</p>
+          <div>
+            <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Zona afectada</p>
+            <div className="grid grid-cols-3 gap-2">
+              {ZONAS_LESION.map(z => (
+                <button key={z} type="button" onClick={() => setLesionForm(f => ({ ...f, zona: z }))}
+                  className="py-2 rounded-xl text-xs font-bold border transition-all"
+                  style={lesionForm.zona === z ? { background: color, color: 'white', borderColor: color } : { borderColor: 'rgba(0,0,0,0.1)', color: '#6B6B6B' }}>
+                  {z}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Severidad</p>
+            <div className="flex gap-2">
+              {SEVERIDADES.map(([k, l]) => (
+                <button key={k} type="button" onClick={() => setLesionForm(f => ({ ...f, severidad: k }))}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold border transition-all"
+                  style={lesionForm.severidad === k ? { background: color, color: 'white', borderColor: color } : { borderColor: 'rgba(0,0,0,0.1)', color: '#6B6B6B' }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Descripción (opcional)</p>
+            <textarea value={lesionForm.descripcion} onChange={e => setLesionForm(f => ({ ...f, descripcion: e.target.value }))} rows={2}
+              placeholder="Qué ha pasado..."
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none" />
+          </div>
+          <button onClick={guardarLesion} disabled={!lesionForm.zona || guardandoLesion}
+            className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all"
+            style={{ background: lesionEnviada ? '#10b981' : color }}>
+            {guardandoLesion ? 'Enviando...' : lesionEnviada ? '✓ Reportada' : 'Reportar lesión'}
+          </button>
+        </div>
+
+        {!lesiones?.length ? (
+          <p className="text-sm text-[#6B6B6B] text-center py-4">Sin lesiones reportadas</p>
+        ) : (
+          <div className="space-y-3">
+            {lesiones.map(l => (
+              <div key={l.id} className="bg-white rounded-2xl p-4 border border-black/5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-sm font-black text-[#0A0A0A]">{l.zona}</p>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${SEVERIDAD_COLOR[l.severidad] || SEVERIDAD_COLOR.leve}`}>{(l.severidad || 'leve').toUpperCase()}</span>
+                </div>
+                <p className="text-[10px] text-[#9B9B9B] mb-1.5">{formatearFecha(l.fecha_inicio)} · {ESTADO_LABEL[l.estado] || l.estado}</p>
+                {l.descripcion && <p className="text-xs text-[#6B6B6B] leading-relaxed mb-2">{l.descripcion}</p>}
+                {l.protocolo_generado && l.protocolo_ia ? (
+                  <div className="mt-2 pt-2 border-t border-black/5 space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest" style={{ color }}>🩹 Protocolo de recuperación</p>
+                    {l.protocolo_ia.resumen && <p className="text-xs text-[#0A0A0A] leading-relaxed">{l.protocolo_ia.resumen}</p>}
+                    {Array.isArray(l.protocolo_ia.ejercicios_rehab) && l.protocolo_ia.ejercicios_rehab.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold text-[#9B9B9B] mb-1">Ejercicios de rehabilitación</p>
+                        <div className="space-y-1">
+                          {l.protocolo_ia.ejercicios_rehab.map((e, i) => (
+                            <p key={i} className="text-xs text-[#444]">• {e.ejercicio} — {e.series}x{e.reps}{e.notas ? ` (${e.notas})` : ''}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {Array.isArray(l.protocolo_ia.ejercicios_evitar) && l.protocolo_ia.ejercicios_evitar.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold text-red-500 mb-1">Evitar</p>
+                        <p className="text-xs text-[#444]">{l.protocolo_ia.ejercicios_evitar.join(', ')}</p>
+                      </div>
+                    )}
+                    {l.protocolo_ia.progresion && <p className="text-xs text-[#6B6B6B] italic">{l.protocolo_ia.progresion}</p>}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-[#9B9B9B] mt-1">⏳ Tu entrenador está preparando tu protocolo de recuperación</p>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     )
