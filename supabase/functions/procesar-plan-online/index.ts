@@ -36,8 +36,6 @@ Deno.serve(async (req) => {
   const { cliente_id } = await req.json().catch(() => ({}))
   if (!cliente_id) return new Response(JSON.stringify({ error: 'cliente_id requerido' }), { status: 400, headers: CORS })
 
-  await sb.from('clientes').update({ ia_estado: 'generando' }).eq('id', cliente_id)
-
   try {
     const [{ data: cliente }, { data: cuestionario }, { data: cuestNutri }] = await Promise.all([
       sb.from('clientes').select('*').eq('id', cliente_id).single(),
@@ -47,6 +45,8 @@ Deno.serve(async (req) => {
 
     if (!cliente) return new Response(JSON.stringify({ error: 'Cliente no encontrado' }), { status: 404, headers: CORS })
     if (cliente.entrenador_id !== user.id) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
+
+    await sb.from('clientes').update({ ia_estado: 'generando' }).eq('id', cliente_id)
 
     const plan = cliente.plan_online
     if (!plan) {

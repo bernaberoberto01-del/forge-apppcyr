@@ -203,7 +203,8 @@ JSON: {"nombre":"Rutina actualizada — ${nombreCorto}","descripcion":"resumen e
 // puede sincronizarse sin depender de gestionar secrets de Edge Functions.
 async function validarAdminSecret(header: string | null): Promise<boolean> {
   if (!header) return false
-  if (header === (Deno.env.get('ADMIN_SECRET') || 'forge-admin-2024')) return true
+  const expectedSecret = Deno.env.get('ADMIN_SECRET')
+  if (expectedSecret && header === expectedSecret) return true
   const { data } = await sb.schema('vault').from('decrypted_secrets')
     .select('decrypted_secret').eq('name', 'cron_admin_secret').maybeSingle()
   return !!data?.decrypted_secret && header === data.decrypted_secret

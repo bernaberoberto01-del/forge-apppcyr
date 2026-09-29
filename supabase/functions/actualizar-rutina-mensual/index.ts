@@ -110,7 +110,8 @@ JSON: {"nombre":"Rutina ${mesActual} ${añoActual} — [nombre]","descripcion":"
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
-  const adminOk = req.headers.get('x-admin-secret') === (Deno.env.get('ADMIN_SECRET') || 'forge-admin-2024');
+  const expectedAdminSecret = Deno.env.get('ADMIN_SECRET');
+  const adminOk = !!expectedAdminSecret && req.headers.get('x-admin-secret') === expectedAdminSecret;
   let entrenadorId: string | null = null;
   if (!adminOk) {
     const token = req.headers.get('authorization')?.replace('Bearer ', '');

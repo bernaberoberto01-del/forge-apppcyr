@@ -12,7 +12,8 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
     if (!user) return new Response(JSON.stringify({ error: 'Token inválido' }), { status: 401, headers: cors })
     const { cliente_id } = await req.json()
-    const { data: cliente } = await supabase.from('clientes').select('nombre, peso_actual, peso_objetivo, objetivo, edad').eq('id', cliente_id).single()
+    const { data: cliente } = await supabase.from('clientes').select('nombre, peso_actual, peso_objetivo, objetivo, edad, entrenador_id').eq('id', cliente_id).single()
+    if (!cliente || cliente.entrenador_id !== user.id) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: cors })
     const { data: cuest } = await supabase.from('cuestionarios_nutricion').select('tipo_dieta, nivel_actividad, suplementos, objetivo, entrena_cuando').eq('cliente_id', cliente_id).order('created_at', { ascending: false }).limit(1).single()
     const { data: checkins } = await supabase.from('checkins').select('energia, fatiga').eq('cliente_id', cliente_id).order('fecha', { ascending: false }).limit(4)
     const energiaMedia = checkins?.filter(c => c.energia).length ? (checkins.filter(c => c.energia).reduce((s, c) => s + c.energia, 0) / checkins.filter(c => c.energia).length).toFixed(1) : null
