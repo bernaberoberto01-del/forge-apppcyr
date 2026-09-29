@@ -6,7 +6,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
   const adminSecret = req.headers.get('x-admin-secret');
-  const isAdmin = adminSecret === (Deno.env.get('ADMIN_SECRET') || 'forge-admin-2024');
+  const expectedAdminSecret = Deno.env.get('ADMIN_SECRET');
+  const isAdmin = !!expectedAdminSecret && adminSecret === expectedAdminSecret;
   let entrenadorFiltro = null;
 
   if (!isAdmin) {

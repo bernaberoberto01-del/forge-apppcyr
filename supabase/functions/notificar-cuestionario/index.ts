@@ -9,11 +9,15 @@ serve(async (req) => {
     const { cliente_id, entrenador_id } = await req.json()
     if (!cliente_id || !entrenador_id) return new Response(JSON.stringify({ error: 'Faltan parámetros' }), { status: 400, headers: cors })
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+    const token = req.headers.get('Authorization')?.replace('Bearer ', '')
+    const { data: { user } } = await supabase.auth.getUser(token || '')
+    if (!user) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: cors })
     const [{ data: cliente }, { data: cuest }] = await Promise.all([
-      supabase.from('clientes').select('nombre, email').eq('id', cliente_id).single(),
+      supabase.from('clientes').select('nombre, email, auth_user_id').eq('id', cliente_id).single(),
       supabase.from('cuestionarios_nutricion').select('objetivo, tipo_dieta').eq('cliente_id', cliente_id).order('created_at', { ascending: false }).limit(1).single(),
     ])
     if (!cliente || !cuest) return new Response(JSON.stringify({ error: 'No encontrado' }), { status: 404, headers: cors })
+    if (cliente.auth_user_id !== user.id) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: cors })
     await supabase.from('notificaciones_admin').insert({ entrenador_id, cliente_id, tipo: 'cuestionario_nutricion', titulo: 'Nuevo cuestionario de ' + cliente.nombre?.trim(), descripcion: cliente.nombre?.trim() + ' ha enviado su cuestionario. Objetivo: ' + (cuest.objetivo || '—'), leida: false, url_destino: '/clientes?highlight=' + cliente_id })
     return new Response(JSON.stringify({ ok: true }), { headers: { ...cors, 'Content-Type': 'application/json' } })
   } catch (err) {

@@ -4,3 +4,6 @@ dist
 .env
 .secrets.local
 supabase/.temp/
+.sec-audit-tmp/
+test-results/
+playwright-report/
