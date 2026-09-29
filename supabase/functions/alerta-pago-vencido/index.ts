@@ -2,6 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c)=>({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+}
 Deno.serve(async (req)=>{
   if (!ADMIN_SECRET || req.headers.get('x-admin-secret') !== ADMIN_SECRET) {
     return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
@@ -30,10 +33,10 @@ Deno.serve(async (req)=>{
           subject: `Aviso de pago — ${msg}`,
           html: `
             <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px">
-              <h2 style="color:#111">Hola ${cliente.nombre} 👋</h2>
+              <h2 style="color:#111">Hola ${escapeHtml(cliente.nombre)} 👋</h2>
               <p style="color:#444;font-size:15px;line-height:1.6">${msg}.</p>
               <p style="color:#444;font-size:14px">Importe: <strong>${pago.importe}€</strong></p>
-              <p style="color:#444;font-size:14px">Concepto: ${pago.concepto || 'Mensualidad'}</p>
+              <p style="color:#444;font-size:14px">Concepto: ${escapeHtml(pago.concepto || 'Mensualidad')}</p>
               <p style="color:#999;font-size:12px;margin-top:20px">Para renovar contacta directamente con tu entrenador.</p>
             </div>
           `

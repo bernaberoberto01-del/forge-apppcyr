@@ -8,6 +8,16 @@ const CORS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 }
 
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c])
+}
+
+// El color se interpola dentro de atributos style=""; sin validar, un valor
+// con comillas permitiría inyectar atributos.
+function safeColor(c: string | null | undefined): string {
+  return c && /^#[0-9A-Fa-f]{3,8}$/.test(c) ? c : '#FF5C00'
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -29,8 +39,13 @@ Deno.serve(async (req) => {
 
     const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
     const nombreNegocio = config?.nombre_negocio || nombreEntrenador
-    const color = config?.color_acento || '#FF5C00'
+    const color = safeColor(config?.color_acento)
     const nombre = cliente.nombre.split(' ')[0]
+    // Versiones escapadas para interpolar en HTML. Las originales solo valen
+    // para asunto y remitente, donde las entidades se verían en crudo.
+    const eNombre = escapeHtml(nombre)
+    const eEntrenador = escapeHtml(nombreEntrenador)
+    const eNegocio = escapeHtml(nombreNegocio)
     const redirectTo = 'https://forge-studio-os.vercel.app/portal'
 
     // Estrategia: intentar invite (crea cuenta nueva) → si ya existe, usar magiclink
@@ -102,9 +117,9 @@ Deno.serve(async (req) => {
 .div{height:1px;background:#f0f0f0;margin:24px 0}
 .f{padding:20px 28px;background:#f7f6f3;font-size:12px;color:#aaa;text-align:center;line-height:1.7}
 </style></head><body><div class="w"><div class="c">
-<div class="h"><div class="hl">${nombreNegocio}</div><div class="hs">Tu portal personal de entrenamiento</div></div>
+<div class="h"><div class="hl">${eNegocio}</div><div class="hs">Tu portal personal de entrenamiento</div></div>
 <div class="b">
-<div class="hi">Hola ${nombre} 👋</div>
+<div class="hi">Hola ${eNombre} 👋</div>
 <p class="t">Tu portal personal ya está listo. Aquí encontrarás tu rutina, tu plan de nutrición y podrás hacer seguimiento de todo tu progreso.</p>
 <div class="cta">
   <a href="${accessLink}" class="btn">Acceder a mi portal →</a>
@@ -117,13 +132,13 @@ Deno.serve(async (req) => {
     💪 Tu rutina personalizada<br>
     🥗 Tu plan de nutrición<br>
     📊 Seguimiento de progreso<br>
-    ✉️ Chat directo con ${nombreEntrenador}
+    ✉️ Chat directo con ${eEntrenador}
   </div>
 </div>
 <p class="t" style="font-size:13px;color:#999">Si no puedes pulsar el botón, copia este enlace en tu navegador:<br><span style="color:${color};word-break:break-all;font-size:12px">${accessLink}</span></p>
 </div>
 <div class="f">
-  Un mensaje de ${nombreEntrenador} · ${nombreNegocio}<br>
+  Un mensaje de ${eEntrenador} · ${eNegocio}<br>
   Si tienes alguna duda, responde directamente a este email.
 </div>
 </div></div></body></html>`

@@ -3,6 +3,9 @@ const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 const RESEND_KEY = Deno.env.get('RESEND_API_KEY');
 const APP_URL = 'https://forge-studio-os.vercel.app';
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c)=>({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+}
 Deno.serve(async (req)=>{
   if (!ADMIN_SECRET || req.headers.get('x-admin-secret') !== ADMIN_SECRET) {
     return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
@@ -38,7 +41,7 @@ Deno.serve(async (req)=>{
                 </div>
                 <h2 style="color:white;margin:0;font-size:20px">Control mensual de progresión</h2>
               </div>
-              <p style="color:#444;font-size:15px;line-height:1.6">Hola <strong>${c.nombre.split(' ')[0]}</strong> 👋</p>
+              <p style="color:#444;font-size:15px;line-height:1.6">Hola <strong>${escapeHtml(c.nombre.split(' ')[0])}</strong> 👋</p>
               <p style="color:#444;font-size:14px;line-height:1.6">Han pasado 4 semanas desde tu último control. Tarda <strong>menos de 2 minutos</strong> en decirle a tu entrenador cuánto estás moviendo ahora en los ejercicios principales.</p>
               <p style="color:#444;font-size:14px">Con estos datos tu entrenador puede ver tu progresión real y ajustar tu rutina del próximo mes.</p>
               <a href="${enlace}" style="display:block;background:#FF5C00;color:white;text-decoration:none;text-align:center;padding:16px;border-radius:12px;font-size:16px;font-weight:bold;margin:24px 0">

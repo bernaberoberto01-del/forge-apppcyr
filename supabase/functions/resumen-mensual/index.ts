@@ -1,6 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c)=>({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+}
 Deno.serve(async (req)=>{
   const headers = {
     'Content-Type': 'application/json',
@@ -162,7 +165,7 @@ Responde SOLO con JSON: {"calorias_dia":0,"proteinas_g":0,"carbohidratos_g":0,"g
             })}</p>
               </div>
               <div style="background:#fff;border:1px solid #eee;border-radius:12px;padding:20px">
-                <p style="font-size:15px;color:#0A0A0A;line-height:1.6">${resumen.replace(/\n/g, '<br/>')}</p>
+                <p style="font-size:15px;color:#0A0A0A;line-height:1.6">${escapeHtml(resumen).replace(/\n/g, '<br/>')}</p>
               </div>
               <p style="text-align:center;margin-top:16px">
                 <a href="${Deno.env.get('SUPABASE_URL')?.replace('supabase.co', '') || ''}forge-studio-os.vercel.app/portal/${cliente.id}" style="background:#FF5C00;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Ver mi portal →</a>
