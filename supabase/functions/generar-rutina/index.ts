@@ -52,14 +52,49 @@ function nombresDias(tipo: string, fase: number, objetivo: string, formato: stri
   return ['Empuje','Tiron','Piernas','Upper','Full Fuerza'].slice(0,dias)
 }
 
-function generarDiaBase(i: number, nombre: string, perfil: any): any {
-  return { dia:i, nombre, patron_principal:'Fuerza Base', ejercicios:[
-    {orden:1,nombre:'Calentamiento',patron:'calentamiento',series:1,reps:'10 min',descanso:'-',notas:''},
+// Pools de ejercicios base por patron de movimiento — usados cuando no hay IA (fase<=1)
+// o como fallback si una llamada IA individual falla. Rotan por dia para que nunca
+// se repita el mismo bloque de ejercicios en dias distintos.
+const POOLS_DIA_BASE: Record<string, any[]> = {
+  empuje: [
     {orden:2,nombre:'Press pectoral maquina',patron:'fuerza',series:3,reps:'10-12',descanso:'2 min',notas:''},
-    {orden:3,nombre:'Remo sentado maquina',patron:'fuerza',series:3,reps:'10-12',descanso:'2 min',notas:''},
-    {orden:4,nombre:'Hip Thrust',patron:'fuerza',series:3,reps:'12-15',descanso:'90s',notas:''},
+    {orden:3,nombre:'Press militar mancuernas',patron:'fuerza',series:3,reps:'10-12',descanso:'90s',notas:''},
+    {orden:4,nombre:'Fondos en maquina',patron:'fuerza',series:3,reps:'10-12',descanso:'90s',notas:''},
     {orden:5,nombre:'Core',patron:'core',series:2,reps:'3x30s',descanso:'30s',notas:''},
-  ]}
+  ],
+  tiron: [
+    {orden:2,nombre:'Remo sentado maquina',patron:'fuerza',series:3,reps:'10-12',descanso:'2 min',notas:''},
+    {orden:3,nombre:'Jalon al pecho',patron:'fuerza',series:3,reps:'10-12',descanso:'90s',notas:''},
+    {orden:4,nombre:'Curl biceps mancuernas',patron:'fuerza',series:3,reps:'12-15',descanso:'60s',notas:''},
+    {orden:5,nombre:'Core',patron:'core',series:2,reps:'3x30s',descanso:'30s',notas:''},
+  ],
+  piernas: [
+    {orden:2,nombre:'Prensa de piernas',patron:'fuerza',series:3,reps:'10-12',descanso:'2 min',notas:''},
+    {orden:3,nombre:'Hip Thrust',patron:'fuerza',series:3,reps:'12-15',descanso:'90s',notas:''},
+    {orden:4,nombre:'Curl femoral maquina',patron:'fuerza',series:3,reps:'10-12',descanso:'90s',notas:''},
+    {orden:5,nombre:'Core',patron:'core',series:2,reps:'3x30s',descanso:'30s',notas:''},
+  ],
+  fullbody: [
+    {orden:2,nombre:'Sentadilla goblet',patron:'fuerza',series:3,reps:'10-12',descanso:'2 min',notas:''},
+    {orden:3,nombre:'Press pectoral maquina',patron:'fuerza',series:3,reps:'10-12',descanso:'90s',notas:''},
+    {orden:4,nombre:'Remo sentado maquina',patron:'fuerza',series:3,reps:'10-12',descanso:'90s',notas:''},
+    {orden:5,nombre:'Core',patron:'core',series:2,reps:'3x30s',descanso:'30s',notas:''},
+  ],
+}
+const ORDEN_ROTACION = ['empuje','tiron','piernas','fullbody']
+
+function generarDiaBase(i: number, nombre: string, perfil: any): any {
+  const nombreLow = nombre.toLowerCase()
+  let key: string
+  if (/empuje|push|pecho/.test(nombreLow)) key = 'empuje'
+  else if (/tir[oó]n|pull|espalda/.test(nombreLow)) key = 'tiron'
+  else if (/pierna|legs|lower/.test(nombreLow)) key = 'piernas'
+  else if (/upper/.test(nombreLow)) key = i % 2 === 1 ? 'empuje' : 'tiron'
+  // Nombres genericos (Dia A/B/C de fase<=1, WOD, Circuito...): rota por indice de dia
+  // para garantizar que nunca se repiten los mismos ejercicios entre dias.
+  else key = ORDEN_ROTACION[(i - 1) % ORDEN_ROTACION.length]
+  const calentamiento = { orden:1, nombre:'Calentamiento', patron:'calentamiento', series:1, reps:'10 min', descanso:'-', notas:'' }
+  return { dia:i, nombre, patron_principal:'Fuerza Base', ejercicios: [calentamiento, ...POOLS_DIA_BASE[key]] }
 }
 
 async function llamarIA(key: string, prompt: string, i: number): Promise<any> {
@@ -98,11 +133,17 @@ function buildPrompt(i: number, nombre: string, cliente: any, perfil: any, cuest
   const base = `${obj.replace(/_/g,' ')}|${nivel}|${material}|lesiones:${lesiones}${alertasTxt}${contrasTxt}`
   const nombreLow = nombre.toLowerCase()
   const esCardio = nombreLow.includes('cardio') || nombreLow.includes('z2') || nombreLow.includes('fartlek')
-  if (esCardio) return `Cardio dia${i}:${nombre}|${base}.${contexto}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Cardio","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"Cardio 30min","patron":"cardio","series":1,"reps":"30 min","descanso":"-","notas":""},{"orden":3,"nombre":"Core","patron":"core","series":3,"reps":"3x30s","descanso":"15s","notas":""}]}`
-  if (tipo === 'crossfit') return `WOD dia${i}:${nombre}|${base}${biblioPrompt}${contexto}.\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"CrossFit","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"10 min","descanso":"-","notas":""},{"orden":2,"nombre":"Fuerza","patron":"fuerza","series":4,"reps":"3-5","descanso":"3 min","notas":""},{"orden":3,"nombre":"MetCon","patron":"metabolico","series":1,"reps":"AMRAP 10min","descanso":"-","notas":""}]}`
+  // El contexto del entrenador (boton "Regenerar con mas contexto") va SIEMPRE al final,
+  // justo antes del JSON, con prioridad explicita sobre las reglas generales de variacion.
+  // Si no hay contexto, se recuerda la regla de variacion por dia como guia por defecto.
+  const trailer = contexto
+    ? ` CONTEXTO DEL ENTRENADOR (PRIORIDAD MAXIMA, sigue esto por encima de las reglas generales anteriores):${contexto}`
+    : ` Sin contexto adicional: usa ejercicios especificos del patron "${nombre}", nunca genericos de otro dia del bloque.`
+  if (esCardio) return `Cardio dia${i}:${nombre}|${base}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Cardio","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"Cardio 30min","patron":"cardio","series":1,"reps":"30 min","descanso":"-","notas":""},{"orden":3,"nombre":"Core","patron":"core","series":3,"reps":"3x30s","descanso":"15s","notas":""}]}`
+  if (tipo === 'crossfit') return `WOD dia${i}:${nombre}|${base}${biblioPrompt}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"CrossFit","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"10 min","descanso":"-","notas":""},{"orden":2,"nombre":"Fuerza","patron":"fuerza","series":4,"reps":"3-5","descanso":"3 min","notas":""},{"orden":3,"nombre":"MetCon","patron":"metabolico","series":1,"reps":"AMRAP 10min","descanso":"-","notas":""}]}`
   const agrup = formato==='superseries'?' Agrupacion A1/A2,B1/B2.' : formato==='circuitos'?' Agrupacion A1/A2/A3.' : ''
   const int = esFase3 ? '82-88%RM 3-5x3-5' : '70-80%RM 3-4x6-10'
-  return `Fuerza dia${i}:${nombre}|${base}|${int}.${agrup}${biblioPrompt}${contexto}${marcas}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Fuerza","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"[Compuesto1]","patron":"fuerza","series":${esFase3?5:4},"reps":"${esFase3?'3-5':'6-8'}","descanso":"${formato==='descanso_tradicional'?'3 min':'-'}","notas":""},{"orden":3,"nombre":"[Compuesto2]","patron":"fuerza","series":4,"reps":"8-10","descanso":"90s","notas":""},{"orden":4,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"10-12","descanso":"60s","notas":""},{"orden":5,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"12-15","descanso":"45s","notas":""}]}`
+  return `Fuerza dia${i}:${nombre}|${base}|${int}.${agrup}${biblioPrompt}${marcas}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Fuerza","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"[Compuesto1]","patron":"fuerza","series":${esFase3?5:4},"reps":"${esFase3?'3-5':'6-8'}","descanso":"${formato==='descanso_tradicional'?'3 min':'-'}","notas":""},{"orden":3,"nombre":"[Compuesto2]","patron":"fuerza","series":4,"reps":"8-10","descanso":"90s","notas":""},{"orden":4,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"10-12","descanso":"60s","notas":""},{"orden":5,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"12-15","descanso":"45s","notas":""}]}`
 }
 
 Deno.serve(async (req) => {
@@ -136,7 +177,7 @@ Deno.serve(async (req) => {
     const objetivo = cliente.objetivo || 'perdida_grasa'
     const formato = cliente.formato_entrenamiento || cuestionario?.formato_entrenamiento || ''
     const biblioPrompt = (biblioteca||[]).length ? ` Usa:${(biblioteca||[]).slice(0,12).map((e:any)=>e.nombre).join(',')}.` : ''
-    const contextoPrompt = contexto_extra?.trim() ? ` INSTRUCCIONES:${contexto_extra.trim()}` : ''
+    const contextoPrompt = contexto_extra?.trim() ? ` ${contexto_extra.trim()}` : ''
     const nombres = nombresDias(tipoEnt, perfil.fase, objetivo, formato, dias)
 
     // Todos los dias en paralelo con reintento automatico

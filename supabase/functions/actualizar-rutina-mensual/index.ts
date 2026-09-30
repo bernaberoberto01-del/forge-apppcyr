@@ -3,7 +3,7 @@ const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SE
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-secret', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
 
-async function procesarCliente(cliente: any) {
+async function procesarCliente(cliente: any, contextoExtra: string = '') {
   const hace30 = new Date(Date.now()-30*864e5).toISOString();
   const [{ data: checkins }, { data: sesiones }, { data: rutinaActual }, { data: marcas }] = await Promise.all([
     sb.from('checkins').select('*').eq('cliente_id', cliente.id).gte('fecha', hace30).order('fecha', { ascending: false }),
@@ -48,6 +48,17 @@ async function procesarCliente(cliente: any) {
   const mesActual = new Date().toLocaleString('es-ES', { month: 'long' });
   const añoActual = new Date().getFullYear();
 
+  // El contexto del entrenador (si llega) va SIEMPRE al final del prompt, con prioridad
+  // explícita sobre las reglas generales de variación. Sin contexto, esas reglas actúan
+  // como guía por defecto para evitar que los días salgan con los mismos ejercicios.
+  const reglasVariacion = `IMPORTANTE: Cada día debe tener ejercicios COMPLETAMENTE DISTINTOS entre sí. Nunca repitas el mismo ejercicio en días diferentes. Distribuye los patrones de movimiento así:
+- Si son 3 días: Día 1 = empuje + pierna dominante rodilla, Día 2 = tirón + pierna dominante cadera, Día 3 = full body con variaciones y core
+- Si son 4 días: Upper/Lower/Upper/Lower
+- Si son 5 días: Push/Pull/Legs/Upper/Lower`;
+  const bloqueFinal = contextoExtra?.trim()
+    ? `CONTEXTO DEL ENTRENADOR (PRIORIDAD MÁXIMA — sigue esto por encima de las reglas generales anteriores): ${contextoExtra.trim()}`
+    : reglasVariacion;
+
   const prompt = `Eres entrenador personal experto. Genera rutina mes siguiente con datos reales del cliente.
 
 CLIENTE: ${cliente.nombre} | Objetivo: ${(cliente.objetivo||'').replace(/_/g,' ')} | Nivel: ${cliente.nivel||'principiante'} | Material: ${cliente.material||'gimnasio'} | Días/sem: ${cliente.dias_semana||3} | Lesiones: ${cliente.lesiones||'ninguna'}
@@ -68,6 +79,8 @@ IMPORTANTE: Aplica los ajustes de forma concreta. Si la fatiga es alta, reduce s
 FORMATO: Sé conciso. "descripcion", "ajustes_aplicados" y "notas" máximo 10 palabras cada uno, sin párrafos largos. El JSON completo debe caber en pocos tokens — prioriza incluir todos los días y ejercicios antes que texto descriptivo largo.
 
 El nombre de la rutina debe incluir el mes actual: ${mesActual} ${añoActual}
+
+${bloqueFinal}
 
 JSON: {"nombre":"Rutina ${mesActual} ${añoActual} — [nombre]","descripcion":"[máx 10 palabras]","ajustes_aplicados":"${ajustesTxt}","semanas":4,"dias":[{"dia":1,"nombre":"Día A — [patrón]","patron_principal":"[tipo]","ejercicios":[{"orden":1,"nombre":"[ejercicio]","patron":"[fuerza/cardio/core]","series":3,"reps":"8-10","descanso":"90s","notas":""}]}]}`;
 
@@ -122,11 +135,12 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const clienteIdFiltro = body?.cliente_id || null;
+    const contextoExtra = body?.contexto_extra || '';
     if (clienteIdFiltro) {
       const { data: cliente } = await sb.from('clientes').select('*').eq('id', clienteIdFiltro).eq('estado', 'activo').single();
       if (!cliente) return new Response(JSON.stringify({ error: 'Cliente no encontrado' }), { status: 404, headers: CORS });
       if (entrenadorId && cliente.entrenador_id !== entrenadorId) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS });
-      const resultado = await procesarCliente(cliente);
+      const resultado = await procesarCliente(cliente, contextoExtra);
       if (resultado.skip) return new Response(JSON.stringify({ ok: false, razon: resultado.razon }), { headers: CORS });
       return new Response(JSON.stringify({ ok: true, generadas: 1, ajustes: resultado.ajustesTxt, rutina_id: resultado.rutina_id }), { headers: CORS });
     }
