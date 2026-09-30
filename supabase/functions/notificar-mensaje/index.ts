@@ -3,8 +3,22 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
 
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c])
+}
+
+// El color se interpola dentro de atributos style=""; sin validar, un valor
+// con comillas permitiría inyectar atributos.
+function safeColor(c: string | null | undefined): string {
+  return c && /^#[0-9A-Fa-f]{3,8}$/.test(c) ? c : '#FF5C00'
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+
+  const token = req.headers.get('Authorization')?.replace('Bearer ', '')
+  const { data: { user } } = await sb.auth.getUser(token || '')
+  if (!user) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: CORS })
 
   try {
     const { cliente_id, tipo, preview } = await req.json().catch(() => ({}))
@@ -14,14 +28,22 @@ Deno.serve(async (req) => {
     const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD')
     if (!gmailUser || !gmailPass) return new Response(JSON.stringify({ ok: false, motivo: 'SMTP no configurado' }), { headers: CORS })
 
-    const { data: cliente } = await sb.from('clientes').select('nombre, email, entrenador_id').eq('id', cliente_id).single()
+    const { data: cliente } = await sb.from('clientes').select('nombre, email, entrenador_id, auth_user_id').eq('id', cliente_id).single()
     if (!cliente?.email) return new Response(JSON.stringify({ ok: false, motivo: 'Sin email' }), { headers: CORS })
+    if (cliente.entrenador_id !== user.id && cliente.auth_user_id !== user.id) {
+      return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
+    }
 
     const { data: config } = await sb.from('configuracion').select('nombre_entrenador, nombre_negocio, color_acento').eq('entrenador_id', cliente.entrenador_id).maybeSingle()
     const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
     const nombreNegocio = config?.nombre_negocio || nombreEntrenador
-    const color = config?.color_acento || '#FF5C00'
+    const color = safeColor(config?.color_acento)
     const nombre = cliente.nombre.split(' ')[0]
+    // Versiones escapadas para interpolar en HTML. Las originales solo valen
+    // para asunto y remitente, donde las entidades se verían en crudo.
+    const eNombre = escapeHtml(nombre)
+    const eEntrenador = escapeHtml(nombreEntrenador)
+    const eNegocio = escapeHtml(nombreNegocio)
     const portalUrl = `https://forge-studio-os.vercel.app/portal/${cliente_id}`
 
     let asunto = ''
@@ -31,9 +53,9 @@ Deno.serve(async (req) => {
       // Notificación al cliente: el entrenador le ha escrito
       asunto = `Tienes un mensaje de ${nombreEntrenador}`
       cuerpo = `
-        <p style="font-size:16px;font-weight:600;color:#0A0A0A;margin-bottom:8px">Hola ${nombre},</p>
-        <p style="font-size:15px;color:#444;line-height:1.6;margin-bottom:16px">${nombreEntrenador} te ha enviado un mensaje en tu portal.</p>
-        ${preview ? `<div style="background:#f5f5f0;border-left:3px solid ${color};border-radius:4px;padding:12px 16px;margin-bottom:16px"><p style="font-size:14px;color:#555;font-style:italic">&ldquo;${preview.slice(0,120)}${preview.length > 120 ? '...' : ''}&rdquo;</p></div>` : ''}
+        <p style="font-size:16px;font-weight:600;color:#0A0A0A;margin-bottom:8px">Hola ${eNombre},</p>
+        <p style="font-size:15px;color:#444;line-height:1.6;margin-bottom:16px">${eEntrenador} te ha enviado un mensaje en tu portal.</p>
+        ${preview ? `<div style="background:#f5f5f0;border-left:3px solid ${color};border-radius:4px;padding:12px 16px;margin-bottom:16px"><p style="font-size:14px;color:#555;font-style:italic">&ldquo;${escapeHtml(preview.slice(0,120))}${preview.length > 120 ? '...' : ''}&rdquo;</p></div>` : ''}
         <p style="font-size:15px;color:#444;margin-bottom:24px">Entra en tu portal para leerlo y responder.</p>
       `
     } else if (tipo === 'mensaje_cliente') {
@@ -42,7 +64,7 @@ Deno.serve(async (req) => {
       const { data: cfg2 } = await sb.from('configuracion').select('email_contacto').eq('entrenador_id', cliente.entrenador_id).maybeSingle()
       const emailEntrenador = cfg2?.email_contacto || gmailUser
       asunto = `${nombre} te ha enviado un mensaje`
-      const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#f5f5f0;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#111;padding:24px"><span style="color:${color};font-size:18px;font-weight:800">${nombreNegocio}</span></div><div style="padding:24px"><p style="font-size:16px;font-weight:600;margin-bottom:8px">${nombre} te ha escrito:</p>${preview ? `<div style="background:#f5f5f0;border-left:3px solid ${color};border-radius:4px;padding:12px 16px;margin-bottom:16px"><p style="font-size:14px;color:#555;font-style:italic">&ldquo;${preview.slice(0,200)}&rdquo;</p></div>` : ''}<a href="https://forge-studio-os.vercel.app/mensajes" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Ver mensaje →</a></div></div></body></html>`
+      const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#f5f5f0;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#111;padding:24px"><span style="color:${color};font-size:18px;font-weight:800">${eNegocio}</span></div><div style="padding:24px"><p style="font-size:16px;font-weight:600;margin-bottom:8px">${eNombre} te ha escrito:</p>${preview ? `<div style="background:#f5f5f0;border-left:3px solid ${color};border-radius:4px;padding:12px 16px;margin-bottom:16px"><p style="font-size:14px;color:#555;font-style:italic">&ldquo;${escapeHtml(preview.slice(0,200))}&rdquo;</p></div>` : ''}<a href="https://forge-studio-os.vercel.app/mensajes" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Ver mensaje →</a></div></div></body></html>`
       const { SMTPClient } = await import('https://deno.land/x/denomailer@1.6.0/mod.ts')
       const client = new SMTPClient({ connection: { hostname: 'smtp.gmail.com', port: 465, tls: true, auth: { username: gmailUser, password: gmailPass } } })
       await client.send({ from: `${nombreNegocio} <${gmailUser}>`, to: emailEntrenador, subject: asunto, html })
@@ -51,7 +73,7 @@ Deno.serve(async (req) => {
     }
 
     // Email al cliente
-    const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#f5f5f0;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#111;padding:24px"><span style="color:${color};font-size:18px;font-weight:800">${nombreNegocio}</span></div><div style="padding:24px">${cuerpo}<a href="${portalUrl}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Abrir mi portal →</a></div><div style="padding:16px 24px;background:#f5f5f0;font-size:12px;color:#888">Este mensaje va dirigido a ti como cliente de ${nombreNegocio}.</div></div></body></html>`
+    const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#f5f5f0;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#111;padding:24px"><span style="color:${color};font-size:18px;font-weight:800">${eNegocio}</span></div><div style="padding:24px">${cuerpo}<a href="${portalUrl}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Abrir mi portal →</a></div><div style="padding:16px 24px;background:#f5f5f0;font-size:12px;color:#888">Este mensaje va dirigido a ti como cliente de ${eNegocio}.</div></div></body></html>`
 
     const { SMTPClient } = await import('https://deno.land/x/denomailer@1.6.0/mod.ts')
     const client = new SMTPClient({ connection: { hostname: 'smtp.gmail.com', port: 465, tls: true, auth: { username: gmailUser, password: gmailPass } } })

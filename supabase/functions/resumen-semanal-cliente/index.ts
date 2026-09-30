@@ -3,9 +3,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY')
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-secret' }
+const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET')
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+  if (!ADMIN_SECRET || req.headers.get('x-admin-secret') !== ADMIN_SECRET) {
+    return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: CORS })
+  }
 
   try {
     const hace7 = new Date(Date.now() - 7 * 864e5).toISOString().split('T')[0]

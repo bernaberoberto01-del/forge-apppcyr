@@ -4,6 +4,16 @@ const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SE
 const APP_URL = 'https://forge-studio-os.vercel.app'
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
 
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c])
+}
+
+// El color se interpola dentro de atributos style=""; sin validar, un valor
+// con comillas permitiría inyectar atributos.
+function safeColor(c: string | null | undefined): string {
+  return c && /^#[0-9A-Fa-f]{3,8}$/.test(c) ? c : '#FF5C00'
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -46,7 +56,11 @@ Deno.serve(async (req) => {
         .select('nombre_entrenador,nombre_negocio,color_acento').eq('entrenador_id', eid).maybeSingle()
       const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
       const nombreNegocio = config?.nombre_negocio || nombreEntrenador
-      const color = config?.color_acento || '#FF5C00'
+      const color = safeColor(config?.color_acento)
+      // Versiones escapadas para interpolar en HTML. Las originales solo valen
+      // para asunto y remitente, donde las entidades se verían en crudo.
+      const eEntrenador = escapeHtml(nombreEntrenador)
+      const eNegocio = escapeHtml(nombreNegocio)
 
       // Obtener clientes activos vinculados con email
       const { data: clientes } = await sb.from('clientes')
@@ -85,6 +99,7 @@ Deno.serve(async (req) => {
 
       for (const cliente of clientesConNecesidad) {
         const nombre = cliente.nombre.split(' ')[0]
+        const eNombre = escapeHtml(nombre)
         const ultimoCI = ultimoPorCliente[cliente.id]
         const diasSin = ultimoCI
           ? Math.floor((hoy.getTime() - new Date(ultimoCI).getTime()) / 864e5)
@@ -107,9 +122,9 @@ Deno.serve(async (req) => {
 .item{font-size:13px;color:#444;padding:3px 0}
 .f{padding:16px 28px;background:#f7f6f3;font-size:11px;color:#aaa;text-align:center;line-height:1.7}
 </style></head><body><div class="w"><div class="c">
-<div class="h"><div class="hl">${nombreNegocio}</div><div class="hs">Tu check-in semanal</div></div>
+<div class="h"><div class="hl">${eNegocio}</div><div class="hs">Tu check-in semanal</div></div>
 <div class="b">
-<div class="hi">Hola ${nombre} 👋</div>
+<div class="hi">Hola ${eNombre} 👋</div>
 <p class="t">${mensajeUrgencia}</p>
 <div class="items">
   <div class="item">⚡ ¿Cómo va tu energía?</div>
@@ -123,7 +138,7 @@ Deno.serve(async (req) => {
 </div>
 <p class="note">Entra al portal → pulsa 📋 Check-in semanal</p>
 </div>
-<div class="f">Un mensaje de ${nombreEntrenador} · ${nombreNegocio}</div>
+<div class="f">Un mensaje de ${eEntrenador} · ${eNegocio}</div>
 </div></div></body></html>`
 
         try {

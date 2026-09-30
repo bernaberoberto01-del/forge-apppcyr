@@ -17,7 +17,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
   const adminSecret = req.headers.get('x-admin-secret')
-  if (adminSecret !== 'forge-setup-2024') {
+  const expectedSecret = Deno.env.get('ADMIN_SECRET')
+  if (!expectedSecret || adminSecret !== expectedSecret) {
     return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
   }
 

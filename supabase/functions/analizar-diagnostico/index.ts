@@ -117,6 +117,7 @@ JSON:
     await sb.from('cuestionarios').update({
       sugerencia_plan: result.plan,
       sugerencia_justificacion: result.justificacion,
+      procesado: true,
     }).eq('id', cuest.id)
 
     const plan = PLANES[result.plan as keyof typeof PLANES]

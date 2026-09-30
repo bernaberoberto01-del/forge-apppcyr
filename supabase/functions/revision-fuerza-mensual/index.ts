@@ -3,6 +3,9 @@ const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 const RESEND_KEY = Deno.env.get('RESEND_API_KEY');
 const APP_URL = 'https://forge-studio-os.vercel.app';
+function escapeHtml(str: string): string {
+  return str.replace(/[&<>"']/g, (c)=>({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+}
 Deno.serve(async (req)=>{
   if (!ADMIN_SECRET || req.headers.get('x-admin-secret') !== ADMIN_SECRET) {
     return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
@@ -39,7 +42,7 @@ Deno.serve(async (req)=>{
                 <h2 style="color:white;margin:0;font-size:20px">Revisión mensual de fuerza</h2>
                 <p style="color:rgba(255,255,255,0.5);margin:6px 0 0;font-size:13px">Solo 2 minutos · Sin complicaciones</p>
               </div>
-              <p style="color:#444;font-size:15px;line-height:1.6">Hola <strong>${cliente.nombre.split(' ')[0]}</strong> 👋</p>
+              <p style="color:#444;font-size:15px;line-height:1.6">Hola <strong>${escapeHtml(cliente.nombre.split(' ')[0])}</strong> 👋</p>
               <p style="color:#444;font-size:14px;line-height:1.6">Una vez al mes te preguntamos por tus marcas aproximadas para que tu entrenador pueda ver tu progreso real y ajustar tu rutina del mes que viene.</p>
               <p style="color:#444;font-size:14px;line-height:1.6">No hace falta que sean exactas — una aproximación es suficiente.</p>
               <a href="${enlace}" style="display:block;background:#FF5C00;color:white;text-decoration:none;text-align:center;padding:16px;border-radius:12px;font-size:16px;font-weight:bold;margin:24px 0">
