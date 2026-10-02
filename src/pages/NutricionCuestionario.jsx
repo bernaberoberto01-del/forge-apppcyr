@@ -27,7 +27,7 @@ export default function NutricionCuestionario() {
     async function precargar() {
       try {
         const res = await fetch(
-          `https://qdpqpbkppkhzcxpfypvf.supabase.co/functions/v1/datos-cuestionario?cliente_id=${clienteId}&entrenador_id=${entrenadorId}`
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/datos-cuestionario?cliente_id=${clienteId}&entrenador_id=${entrenadorId}`
         )
         if (!res.ok) return
         const d = await res.json()

@@ -778,7 +778,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             <p className="text-white font-bold text-xl leading-snug">{config?.nombre_entrenador||'Tu entrenador'} está preparando tu plan</p>
             <p className="text-white/60 text-sm mt-2">En breve tendrás tu rutina, plan de nutrición y progreso.</p>
             {verNutricion && !cuest && (
-              <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+              <a href={`${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
                 className="mt-4 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white font-black text-sm active:scale-95 transition-all"
                 style={{ color }}>
                 🥗 Rellenar cuestionario de nutrición →
@@ -794,7 +794,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
 
       {/* Cuestionario nutrición */}
       {verNutricion && !nutricion && !cuest && !esNuevo && (
-        <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+        <a href={`${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
           className="flex items-center gap-4 rounded-2xl p-4 active:scale-95 transition-all"
           style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><span className="text-xl">🥗</span></div>
@@ -1654,7 +1654,7 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
         {!cuest
           ? <div className="mt-5">
               <p className="text-sm text-[#6B6B6B] mb-4 leading-relaxed max-w-xs mx-auto">Tu entrenador necesita tu cuestionario para crear tu plan.</p>
-              <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
+              <a href={`${window.location.origin}/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
                 className="inline-block text-white text-sm font-black px-6 py-3 rounded-xl"
                 style={{ background: color }}>Rellenar cuestionario →</a>
             </div>

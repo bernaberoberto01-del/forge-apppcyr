@@ -301,7 +301,7 @@ export default function Mensajes({ session }) {
             {seleccionado?.plan_online && (seleccionado.plan_online === 'nutricion' || seleccionado.plan_online === 'completo') && (
               <button
                 onClick={() => {
-                  const link = `https://forge-studio-os.vercel.app/nutricion-cuest?e=${uid}&c=${seleccionado.id}`
+                  const link = `${window.location.origin}/nutricion-cuest?e=${uid}&c=${seleccionado.id}`
                   const msg = `Hola ${seleccionado.nombre.split(' ')[0]} 👋\n\nPara preparar tu plan de alimentación personalizado necesito que rellenes este breve cuestionario nutricional:\n\n${link}\n\nSolo te llevará 2-3 minutos. Con esa información podré crear un plan adaptado exactamente a ti. ¡Gracias!`
                   setTexto(msg)
                 }}
