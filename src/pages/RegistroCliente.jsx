@@ -476,7 +476,7 @@ export default function RegistroCliente() {
           )}
         </div>
 
-        <p className="text-center text-xs text-[#9B9B9B]">{BRAND.nombreCompleto} · Tus datos están protegidos</p>
+        <p className="text-center text-xs text-[#9B9B9B]">{`${BRAND.nombreCompleto} · Tus datos están protegidos`}</p>
       </div>
     </div>
   )

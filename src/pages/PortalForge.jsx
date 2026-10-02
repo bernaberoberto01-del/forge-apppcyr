@@ -772,7 +772,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
       {esNuevo && (
         <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
           <div className="px-5 py-6">
-            <p className="text-white/60 text-xs font-semibold mb-1.5">Bienvenido a {BRAND.nombre}</p>
+            <p className="text-white/60 text-xs font-semibold mb-1.5">{`Bienvenido a ${BRAND.nombre}`}</p>
             <p className="text-white font-bold text-xl leading-snug">{config?.nombre_entrenador||'Tu entrenador'} está preparando tu plan</p>
             <p className="text-white/60 text-sm mt-2">En breve tendrás tu rutina, plan de nutrición y progreso.</p>
             {verNutricion && !cuest && (

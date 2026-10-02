@@ -596,7 +596,7 @@ export default function Dashboard({ session }) {
                 {/* Onboarding — sistema vacío, usuario nuevo */}
                 {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && d.activos.length === 0 && (
                   <div className="px-5 py-6 space-y-3">
-                    <p className="text-sm font-bold text-[#0A0A0A]">👋 Bienvenido a {BRAND.nombre}</p>
+                    <p className="text-sm font-bold text-[#0A0A0A]">{`👋 Bienvenido a ${BRAND.nombre}`}</p>
                     <p className="text-xs text-[#6B6B6B]">Empieza en 3 pasos:</p>
                     {[
                       ['1', 'Configura tu perfil', 'Tu nombre, logo y colores', '/configuracion', BRAND.color],

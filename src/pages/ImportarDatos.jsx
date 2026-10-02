@@ -194,7 +194,7 @@ export default function ImportarDatos({ session }) {
             <p className="text-xs text-[#6B6B6B] mt-1">Columnas detectadas: {csvData.headers.join(', ')}</p>
           </div>
 
-          <p className="text-sm font-semibold text-[#0A0A0A]">Relaciona las columnas de tu archivo con los campos de {BRAND.nombre}:</p>
+          <p className="text-sm font-semibold text-[#0A0A0A]">{`Relaciona las columnas de tu archivo con los campos de ${BRAND.nombre}:`}</p>
 
           <div className="space-y-2">
             {CAMPOS_CSV.map(campo => (

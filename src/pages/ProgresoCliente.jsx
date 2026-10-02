@@ -97,7 +97,7 @@ export default function ProgresoCliente() {
             <div className="w-7 h-7 bg-acento rounded-lg flex items-center justify-center flex-shrink-0">
               <BrandMark size={14} />
             </div>
-            <span className="text-white/60 text-xs font-medium">{BRAND.nombre} · Control mensual</span>
+            <span className="text-white/60 text-xs font-medium">{`${BRAND.nombre} · Control mensual`}</span>
           </div>
           <h1 className="text-white font-bold text-xl">Hola {cliente.nombre.split(' ')[0]} 👋</h1>
           <p className="text-white/50 text-sm mt-1">¿Cuánto estás moviendo ahora? Tarda menos de 2 minutos.</p>
@@ -198,7 +198,7 @@ export default function ProgresoCliente() {
           {guardando ? 'Enviando...' : '💪 Enviar mis marcas'}
         </button>
 
-        <p className="text-center text-xs text-[#6B6B6B]">{BRAND.nombreCompleto} · Datos protegidos</p>
+        <p className="text-center text-xs text-[#6B6B6B]">{`${BRAND.nombreCompleto} · Datos protegidos`}</p>
       </div>
     </div>
   )

@@ -517,7 +517,7 @@ export default function SesionCliente() {
     <div className="min-h-screen bg-[#F5F5F0]">
       <div className="bg-[#111] px-4 pt-10 pb-5">
         <div className="max-w-lg mx-auto">
-          <p className="text-white/50 text-xs mb-1">{BRAND.nombre} · Registro de sesión</p>
+          <p className="text-white/50 text-xs mb-1">{`${BRAND.nombre} · Registro de sesión`}</p>
           <h1 className="text-white font-bold text-lg">{cliente.nombre.split(' ')[0]}</h1>
           <p className="text-white/50 text-xs mt-0.5">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>

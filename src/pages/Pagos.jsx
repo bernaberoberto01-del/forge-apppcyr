@@ -354,7 +354,7 @@ export default function Pagos({ session }) {
               <p className="text-4xl mb-3">💳</p>
               <p className="font-bold text-[#0A0A0A]">Sin planes de cobro activos</p>
               <p className="text-sm text-[#6B6B6B] mt-2 mb-5 leading-relaxed max-w-xs mx-auto">
-                Crea un plan por cada cliente con el importe y la fecha de cobro. {BRAND.nombre} te avisará cuando toque cobrar.
+                {`Crea un plan por cada cliente con el importe y la fecha de cobro. ${BRAND.nombre} te avisará cuando toque cobrar.`}
               </p>
               <button onClick={() => setModalPlan(true)} className="bg-acento text-white text-sm font-bold px-6 py-3 rounded-xl">
                 + Crear primer plan de cobro

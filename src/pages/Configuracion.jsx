@@ -136,7 +136,7 @@ export default function Configuracion({ session, onConfigChange }) {
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Configuración</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">Personaliza {BRAND.nombre} a tu imagen y metodología</p>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">{`Personaliza ${BRAND.nombre} a tu imagen y metodología`}</p>
         </div>
         <div className="flex gap-2">
           <a href={`/p/${config.slug_publico || 'mi-perfil'}`} target="_blank" rel="noopener noreferrer"
