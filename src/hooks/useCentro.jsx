@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 const CentroContext = createContext(null)
 
@@ -60,7 +61,7 @@ export function CentroProvider({ session, children }) {
           if (!(todos || []).find(m => m.user_id === uid)) {
             await supabase.from('miembros_centro').insert({
               centro_id: centroOwner.id, user_id: uid, rol: 'admin',
-              nombre: 'Admin', email: '', color: '#FF5C00', activo: true
+              nombre: 'Admin', email: '', color: BRAND.color, activo: true
             })
           }
         } else {
@@ -74,7 +75,7 @@ export function CentroProvider({ session, children }) {
   }
 
   const esAdmin = miembro?.rol === 'admin' || (centro && centro.owner_id === uid)
-  const colorPropio = miembro?.color || '#FF5C00'
+  const colorPropio = miembro?.color || BRAND.color
 
   return (
     <CentroContext.Provider value={{ centro, miembro, miembros, loading, esAdmin, colorPropio, recargar: cargar }}>

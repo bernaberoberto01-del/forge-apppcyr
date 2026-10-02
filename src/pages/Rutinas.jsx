@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { useCentro } from '../hooks/useCentro.jsx'
 import ClienteQuickView from '../components/ClienteQuickView'
 import EjercicioInput from '../components/EjercicioInput'
+import { BRAND } from '../lib/brand'
 
 const PATRONES = ['empuje_horizontal','empuje_vertical','tiron_vertical','tiron_horizontal','sentadilla','bisagra','hip_extension','core','cardio','aislamiento','movilidad']
 const GRUPOS_MUSCULARES = ['Pecho','Espalda','Hombros','Bíceps','Tríceps','Piernas','Glúteos','Posterior','Isquios','Core','Full body','Cardio','Cadera','Gemelos','Movilidad']
@@ -43,7 +44,7 @@ function VideoModal({ ejercicio, onClose }) {
         )}
         <div className="p-4 space-y-3">
           <div className="flex flex-wrap gap-2">
-            <span className="text-xs bg-[#FF5C00]/20 text-[#FF5C00] px-2.5 py-1 rounded-full font-medium">🎯 {ejercicio.grupo_muscular}</span>
+            <span className="text-xs bg-acento/20 text-acento px-2.5 py-1 rounded-full font-medium">🎯 {ejercicio.grupo_muscular}</span>
             {ejercicio.grupo_secundario && ejercicio.grupo_secundario.split(';').map(g=>(
               <span key={g} className="text-xs bg-white/10 text-white/60 px-2.5 py-1 rounded-full">{g}</span>
             ))}
@@ -286,27 +287,27 @@ export default function Rutinas({ session }) {
       <div>
         <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre *</label>
         <input value={formEj.nombre} onChange={e => setFormEj(f=>({...f,nombre:e.target.value}))}
-          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
           placeholder="Ej: Press de banca" />
       </div>
       <div>
         <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Sinónimos (separados por coma)</label>
         <input value={formEj.sinonimos} onChange={e => setFormEj(f=>({...f,sinonimos:e.target.value}))}
-          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
           placeholder="bench press, press banca, press con barra" />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Grupo muscular</label>
           <select value={formEj.grupo_muscular} onChange={e => setFormEj(f=>({...f,grupo_muscular:e.target.value}))}
-            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
             {GRUPOS_MUSCULARES.map(g=><option key={g} value={g}>{g}</option>)}
           </select>
         </div>
         <div>
           <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nivel</label>
           <select value={formEj.nivel} onChange={e => setFormEj(f=>({...f,nivel:e.target.value}))}
-            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
             <option value="principiante">Principiante</option>
             <option value="intermedio">Intermedio</option>
             <option value="avanzado">Avanzado</option>
@@ -317,13 +318,13 @@ export default function Rutinas({ session }) {
         <div>
           <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Grupo secundario</label>
           <input value={formEj.grupo_secundario} onChange={e => setFormEj(f=>({...f,grupo_secundario:e.target.value}))}
-            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
             placeholder="Tríceps;Hombros" />
         </div>
         <div>
           <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Patrón</label>
           <select value={formEj.patron} onChange={e => setFormEj(f=>({...f,patron:e.target.value}))}
-            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
             {PATRONES.map(p=><option key={p} value={p}>{p.replace(/_/g,' ')}</option>)}
           </select>
         </div>
@@ -331,24 +332,24 @@ export default function Rutinas({ session }) {
       <div>
         <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Consejos de técnica</label>
         <textarea value={formEj.consejos_tecnica} onChange={e => setFormEj(f=>({...f,consejos_tecnica:e.target.value}))}
-          rows={3} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+          rows={3} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
           placeholder="Puntos clave de ejecución correcta..." />
       </div>
       <div>
         <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">URL YouTube (embed)</label>
         <input value={formEj.youtube_url} onChange={e => setFormEj(f=>({...f,youtube_url:e.target.value}))}
-          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
           placeholder="https://www.youtube.com/embed/VIDEO_ID" />
         <p className="text-xs text-[#6B6B6B] mt-1">YouTube → Compartir → Insertar → copia la URL del src del iframe</p>
         {formEj.youtube_url && (
           <button onClick={() => setVideoActivo({ ...formEj, id:'preview' })}
-            className="mt-2 text-xs text-[#FF5C00] font-medium">▶ Previsualizar vídeo</button>
+            className="mt-2 text-xs text-acento font-medium">▶ Previsualizar vídeo</button>
         )}
       </div>
       <div className="flex gap-2 pt-1">
         <button onClick={onCancel} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
         <button onClick={onSave} disabled={!formEj.nombre}
-          className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+          className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
           {isEdit ? '💾 Guardar cambios' : '+ Añadir'}
         </button>
       </div>
@@ -359,7 +360,7 @@ export default function Rutinas({ session }) {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin"/>
     </div>
   )
 
@@ -399,7 +400,7 @@ export default function Rutinas({ session }) {
           )}
           {tabPrincipal === 'biblioteca' && (
             <button onClick={() => { setFormEj({ nombre:'', sinonimos:'', grupo_muscular:'Pecho', grupo_secundario:'', patron:'empuje_horizontal', nivel:'principiante', modalidad:'fuerza', consejos_tecnica:'', youtube_url:'' }); setModalNuevoEj(true) }}
-              className="bg-[#FF5C00] text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
+              className="bg-acento text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
               + Ejercicio
             </button>
           )}
@@ -423,7 +424,7 @@ export default function Rutinas({ session }) {
         <>
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mb-4">
-            {[['Total',stats.total,'#FF5C00'],['Por revisar',stats.borradores,'#f59e0b'],['Publicadas',stats.publicadas,'#10b981']].map(([l,v,c])=>(
+            {[['Total',stats.total,BRAND.color],['Por revisar',stats.borradores,'#f59e0b'],['Publicadas',stats.publicadas,'#10b981']].map(([l,v,c])=>(
               <div key={l} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 text-center">
                 <p className="text-2xl font-bold" style={{color:c}}>{v}</p>
                 <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
@@ -435,7 +436,7 @@ export default function Rutinas({ session }) {
           <div className="relative mb-3">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente o nombre de rutina..."
-              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
             {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]">×</button>}
           </div>
 
@@ -443,7 +444,7 @@ export default function Rutinas({ session }) {
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
             {[['activas','Todas'],['borrador','Por revisar'],['publicada','Publicadas']].map(([v,l])=>(
               <button key={v} onClick={() => setFiltroEstado(v)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroEstado===v?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroEstado===v?'bg-acento text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
                 {l}
               </button>
             ))}
@@ -465,14 +466,14 @@ export default function Rutinas({ session }) {
                 <div className="p-4 space-y-3 bg-white">
                   {clientesSinRutina.map(c => (
                     <div key={c.id} className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{ini(c.nombre)}</div>
+                      <div className="w-8 h-8 bg-acento rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{ini(c.nombre)}</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-[#0A0A0A] truncate">{c.nombre}</p>
                         <p className="text-xs text-[#6B6B6B]">{c.nivel} · {c.tipo}</p>
                       </div>
                       <div className="flex gap-1.5 flex-shrink-0">
                         <button onClick={() => generarRutina(c.id)} disabled={generando === c.id}
-                          className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
+                          className="bg-acento text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
                           {generando === c.id ? '⏳ Generando...' : '✨ Generar con IA'}
                         </button>
                         <button onClick={() => generarEvaluacion(c.id)} disabled={generando === c.id}
@@ -502,9 +503,9 @@ export default function Rutinas({ session }) {
             ) : rutinasFiltradas.map(r => (
               <div key={r.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">{ini(r.clientes?.nombre)}</div>
+                  <div className="w-9 h-9 bg-acento/10 rounded-xl flex items-center justify-center text-acento font-bold text-xs flex-shrink-0">{ini(r.clientes?.nombre)}</div>
                   <div className="flex-1 min-w-0">
-                    <button onClick={() => setQuickView(r.cliente_id)} className="text-sm font-semibold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors truncate block text-left">{r.clientes?.nombre}</button>
+                    <button onClick={() => setQuickView(r.cliente_id)} className="text-sm font-semibold text-[#0A0A0A] hover:text-acento transition-colors truncate block text-left">{r.clientes?.nombre}</button>
                     <p className="text-xs text-[#6B6B6B] truncate">{r.borrador?.nombre || r.contenido?.nombre || 'Rutina'} · {r.dias_semana} días/sem</p>
                   </div>
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${r.estado==='publicada'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
@@ -536,7 +537,7 @@ export default function Rutinas({ session }) {
           <div className="relative mb-3">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
             <input value={bibBusqueda} onChange={e => setBibBusqueda(e.target.value)} placeholder="Buscar ejercicio, músculo o sinónimo..."
-              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
             {bibBusqueda && <button onClick={() => setBibBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]">×</button>}
           </div>
 
@@ -544,7 +545,7 @@ export default function Rutinas({ session }) {
           <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
             {['Todos', ...GRUPOS_MUSCULARES].map(g => (
               <button key={g} onClick={() => setBibGrupo(g)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${bibGrupo===g?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${bibGrupo===g?'bg-acento text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
                 {g}
               </button>
             ))}
@@ -578,7 +579,7 @@ export default function Rutinas({ session }) {
                         <img src={`https://img.youtube.com/vi/${e.youtube_url.split('/').pop()}/mqdefault.jpg`}
                           alt={e.nombre} className="w-full h-full object-cover"
                           onError={ev => { ev.target.style.display='none'; ev.target.nextSibling.style.display='flex' }} />
-                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center hover:bg-[#FF5C00]/80 transition-colors">
+                        <div className="absolute inset-0 bg-black/30 flex items-center justify-center hover:bg-acento/80 transition-colors">
                           <span className="text-white text-lg">▶</span>
                         </div>
                       </div>
@@ -592,7 +593,7 @@ export default function Rutinas({ session }) {
                       <p className="text-sm font-bold text-[#0A0A0A] leading-tight">{e.nombre}</p>
                       <div className="flex gap-1 flex-shrink-0">
                         <button onClick={() => abrirEditar(e)}
-                          className="text-[#6B6B6B] hover:text-[#FF5C00] transition-colors text-sm p-1">✏️</button>
+                          className="text-[#6B6B6B] hover:text-acento transition-colors text-sm p-1">✏️</button>
                         <button onClick={() => eliminarEjercicio(e.id)}
                           className="text-[#6B6B6B] hover:text-red-500 transition-colors text-sm p-1">×</button>
                       </div>
@@ -602,14 +603,14 @@ export default function Rutinas({ session }) {
                     </p>
                     <div className="flex gap-1.5 mt-1.5 flex-wrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${nivelColor(e.nivel)}`}>{e.nivel}</span>
-                      {e.usos > 0 && <span className="text-xs bg-[#FF5C00]/8 text-[#FF5C00] px-2 py-0.5 rounded-full">{e.usos} usos</span>}
+                      {e.usos > 0 && <span className="text-xs bg-acento/8 text-acento px-2 py-0.5 rounded-full">{e.usos} usos</span>}
                       {!e.youtube_url && <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Sin vídeo</span>}
                     </div>
                   </div>
                 </div>
                 {e.consejos_tecnica && (
                   <details className="mt-2">
-                    <summary className="text-xs text-[#6B6B6B] cursor-pointer hover:text-[#FF5C00]">📋 Ver técnica</summary>
+                    <summary className="text-xs text-[#6B6B6B] cursor-pointer hover:text-acento">📋 Ver técnica</summary>
                     <p className="text-xs text-[#6B6B6B] mt-1.5 leading-relaxed">{e.consejos_tecnica}</p>
                   </details>
                 )}
@@ -629,7 +630,7 @@ export default function Rutinas({ session }) {
               <div className="absolute top-2 left-1/2 -translate-x-1/2 w-10 h-1 bg-black/15 rounded-full md:hidden"/>
               <div>
                 <h2 className="font-bold text-[#0A0A0A] text-sm">{detalle.borrador?.nombre||detalle.contenido?.nombre}</h2>
-                <button onClick={() => setQuickView(detalle.cliente_id)} className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">{detalle.clientes?.nombre} →</button>
+                <button onClick={() => setQuickView(detalle.cliente_id)} className="text-xs text-[#6B6B6B] hover:text-acento transition-colors">{detalle.clientes?.nombre} →</button>
               </div>
               <button onClick={() => { setDetalle(null); setModoEdicion(false); setRutinaBorrador(null) }} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center hover:bg-black/5 rounded-xl">×</button>
             </div>
@@ -657,7 +658,7 @@ export default function Rutinas({ session }) {
                   } else {
                     setModoEdicion(false); setRutinaBorrador(null)
                   }
-                }} className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${modoEdicion ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-[#FF5C00]/10 text-[#FF5C00]'}`}>
+                }} className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-all ${modoEdicion ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-acento/10 text-acento'}`}>
                   {modoEdicion ? '✗ Cancelar edición' : '✏️ Editar rutina'}
                 </button>
               </div>
@@ -670,7 +671,7 @@ export default function Rutinas({ session }) {
                         const d = {...rutinaBorrador}
                         d.dias[diaIdx].nombre = e.target.value
                         setRutinaBorrador(d)
-                      }} className="bg-transparent text-white text-sm font-semibold border-b border-white/20 focus:outline-none focus:border-[#FF5C00] flex-1 mr-2" />
+                      }} className="bg-transparent text-white text-sm font-semibold border-b border-white/20 focus:outline-none focus:border-acento flex-1 mr-2" />
                     ) : (
                       <p className="text-white text-sm font-semibold">{dia.nombre}</p>
                     )}
@@ -687,7 +688,7 @@ export default function Rutinas({ session }) {
                               const d = {...rutinaBorrador}
                               d.dias[diaIdx].ejercicios[ejIdx].nombre = e.target.value
                               setRutinaBorrador(d)
-                            }} className="flex-1 text-sm font-medium border border-black/10 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#FF5C00] bg-white" placeholder="Nombre del ejercicio" />
+                            }} className="flex-1 text-sm font-medium border border-black/10 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-acento bg-white" placeholder="Nombre del ejercicio" />
                             <button onClick={() => {
                               const d = {...rutinaBorrador}
                               d.dias[diaIdx].ejercicios.splice(ejIdx, 1)
@@ -700,46 +701,46 @@ export default function Rutinas({ session }) {
                               <div className="flex gap-1 mt-0.5">
                                 <input value={ej.series} onChange={e => {
                                   const d = {...rutinaBorrador}; d.dias[diaIdx].ejercicios[ejIdx].series = e.target.value; setRutinaBorrador(d)
-                                }} className="w-14 text-sm font-bold text-[#FF5C00] border border-black/10 rounded-lg px-2 py-1 focus:outline-none focus:border-[#FF5C00] text-center bg-white" placeholder="4" />
+                                }} className="w-14 text-sm font-bold text-acento border border-black/10 rounded-lg px-2 py-1 focus:outline-none focus:border-acento text-center bg-white" placeholder="4" />
                                 <span className="text-[#6B6B6B] self-center">×</span>
                                 <input value={ej.reps} onChange={e => {
                                   const d = {...rutinaBorrador}; d.dias[diaIdx].ejercicios[ejIdx].reps = e.target.value; setRutinaBorrador(d)
-                                }} className="flex-1 text-sm border border-black/10 rounded-lg px-2 py-1 focus:outline-none focus:border-[#FF5C00] bg-white" placeholder="12-15" />
+                                }} className="flex-1 text-sm border border-black/10 rounded-lg px-2 py-1 focus:outline-none focus:border-acento bg-white" placeholder="12-15" />
                               </div>
                             </div>
                             <div className="flex-1">
                               <label className="text-xs text-[#6B6B6B]">Descanso</label>
                               <input value={ej.descanso} onChange={e => {
                                 const d = {...rutinaBorrador}; d.dias[diaIdx].ejercicios[ejIdx].descanso = e.target.value; setRutinaBorrador(d)
-                              }} className="w-full text-sm border border-black/10 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-[#FF5C00] bg-white" placeholder="60s" />
+                              }} className="w-full text-sm border border-black/10 rounded-lg px-2 py-1.5 mt-0.5 focus:outline-none focus:border-acento bg-white" placeholder="60s" />
                             </div>
                           </div>
                           <div className="pl-6">
                             <input value={ej.notas||''} onChange={e => {
                               const d = {...rutinaBorrador}; d.dias[diaIdx].ejercicios[ejIdx].notas = e.target.value; setRutinaBorrador(d)
-                            }} className="w-full text-xs border border-black/10 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#FF5C00] text-[#6B6B6B] bg-white" placeholder="Notas técnicas (opcional)" />
+                            }} className="w-full text-xs border border-black/10 rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-acento text-[#6B6B6B] bg-white" placeholder="Notas técnicas (opcional)" />
                           </div>
                         </div>
                       ) : (
                         <div key={ejIdx} className="px-4 py-3 flex items-start gap-3">
                           {ejBib?.youtube_url ? (
                             <button onClick={() => setVideoActivo(ejBib)}
-                              className="w-8 h-8 bg-[#111] hover:bg-[#FF5C00] rounded-lg flex items-center justify-center flex-shrink-0 transition-colors mt-0.5">
+                              className="w-8 h-8 bg-[#111] hover:bg-acento rounded-lg flex items-center justify-center flex-shrink-0 transition-colors mt-0.5">
                               <span className="text-white text-xs">▶</span>
                             </button>
                           ) : (
-                            <div className="w-6 h-6 bg-[#FF5C00]/10 text-[#FF5C00] rounded-lg text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{ej.orden||ejIdx+1}</div>
+                            <div className="w-6 h-6 bg-acento/10 text-acento rounded-lg text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{ej.orden||ejIdx+1}</div>
                           )}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-[#0A0A0A]">{ej.nombre}</p>
                             {ej.notas && <p className="text-xs text-[#6B6B6B] mt-0.5">{ej.notas}</p>}
                             {ejBib?.consejos_tecnica && (
-                              <details className="mt-0.5"><summary className="text-xs text-[#FF5C00] cursor-pointer">📋 Técnica</summary>
+                              <details className="mt-0.5"><summary className="text-xs text-acento cursor-pointer">📋 Técnica</summary>
                               <p className="text-xs text-[#6B6B6B] mt-1 leading-relaxed">{ejBib.consejos_tecnica}</p></details>
                             )}
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className="text-sm font-bold text-[#FF5C00]">{ej.series}×{ej.reps}</p>
+                            <p className="text-sm font-bold text-acento">{ej.series}×{ej.reps}</p>
                             <p className="text-xs text-[#6B6B6B]">{ej.descanso}</p>
                           </div>
                         </div>
@@ -750,7 +751,7 @@ export default function Rutinas({ session }) {
                         const d = {...rutinaBorrador}
                         d.dias[diaIdx].ejercicios.push({ nombre: '', series: 3, reps: '10-12', descanso: '60s', notas: '' })
                         setRutinaBorrador(d)
-                      }} className="w-full text-center text-xs text-[#FF5C00] py-2.5 hover:bg-[#FF5C00]/5 transition-colors">
+                      }} className="w-full text-center text-xs text-acento py-2.5 hover:bg-acento/5 transition-colors">
                         + Añadir ejercicio
                       </button>
                     )}
@@ -775,13 +776,13 @@ export default function Rutinas({ session }) {
               {!modoEdicion && (
                 <div>
                   <button onClick={() => setMostrarContextoIA(!mostrarContextoIA)}
-                    className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors flex items-center gap-1">
+                    className="text-xs text-[#6B6B6B] hover:text-acento transition-colors flex items-center gap-1">
                     🤖 {mostrarContextoIA ? 'Ocultar' : 'Regenerar con más contexto'}
                   </button>
                   {mostrarContextoIA && (
                     <div className="mt-2 space-y-2">
                       <textarea value={contextoIA} onChange={e => setContextoIA(e.target.value)} rows={3}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                         placeholder="Ej: Sustituir sentadilla por prensa porque tiene dolor de rodilla. Añadir más trabajo de espalda. Quitar ejercicios de impacto." />
                       <button onClick={async () => {
                         if (!confirm('¿Regenerar con este contexto adicional?')) return
@@ -807,12 +808,12 @@ export default function Rutinas({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas para el cliente</label>
                 <textarea value={notasEdit} onChange={e => setNotasEdit(e.target.value)} rows={3}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                   placeholder="Indicaciones especiales..." />
               </div>
               <div className="flex gap-2">
                 {detalle.estado==='borrador' && (
-                  <button onClick={() => publicar(detalle)} className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">✅ Publicar</button>
+                  <button onClick={() => publicar(detalle)} className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl">✅ Publicar</button>
                 )}
                 <button onClick={() => guardarComoPlantilla(detalle)} className="border border-[#6366f1]/30 text-[#6366f1] text-sm py-3 px-3 rounded-xl hover:bg-[#6366f1]/5">📋</button>
                 <button onClick={async () => {
@@ -846,7 +847,7 @@ export default function Rutinas({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
                 <select value={manualClienteId} onChange={e => setManualClienteId(e.target.value)}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
@@ -854,12 +855,12 @@ export default function Rutinas({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre de la rutina *</label>
                 <input value={manualNombre} onChange={e => setManualNombre(e.target.value)} placeholder="Ej: Rutina Full Body 3 días"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Descripción</label>
                 <input value={manualDescripcion} onChange={e => setManualDescripcion(e.target.value)} placeholder="Breve descripción del enfoque"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
               {manualDias.map((dia, di) => (
                 <div key={di} className="border border-black/8 rounded-2xl overflow-hidden">
@@ -887,7 +888,7 @@ export default function Rutinas({ session }) {
                         {ej.nombre && (() => {
                           const ejBib = biblioteca.find(b => b.nombre.toLowerCase() === ej.nombre.toLowerCase() || b.sinonimos?.toLowerCase().split(',').some(s => s.trim() === ej.nombre.toLowerCase()))
                           return ejBib?.youtube_url ? (
-                            <button onClick={() => setVideoActivo(ejBib)} className="flex items-center gap-1 text-xs text-[#FF5C00] font-medium">
+                            <button onClick={() => setVideoActivo(ejBib)} className="flex items-center gap-1 text-xs text-acento font-medium">
                               ▶ Ver vídeo técnica
                             </button>
                           ) : null
@@ -897,24 +898,24 @@ export default function Rutinas({ session }) {
                             <div key={k}>
                               <label className="text-xs text-[#6B6B6B] mb-0.5 block">{l}</label>
                               <input type={t} value={ej[k]} onChange={e => updateEj(di,ei,k,t==='number'?Number(e.target.value):e.target.value)}
-                                className="w-full border border-black/10 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:border-[#FF5C00]" />
+                                className="w-full border border-black/10 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:border-acento" />
                             </div>
                           ))}
                         </div>
                         <input value={ej.notas} onChange={e => updateEj(di,ei,'notas',e.target.value)} placeholder="Notas del ejercicio (opcional)"
-                          className="w-full border border-black/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#FF5C00]" />
+                          className="w-full border border-black/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-acento" />
                       </div>
                     ))}
-                    <button onClick={() => addEj(di)} className="w-full border border-dashed border-black/15 text-xs text-[#6B6B6B] py-2 rounded-lg hover:border-[#FF5C00] hover:text-[#FF5C00]">+ Ejercicio</button>
+                    <button onClick={() => addEj(di)} className="w-full border border-dashed border-black/15 text-xs text-[#6B6B6B] py-2 rounded-lg hover:border-acento hover:text-acento">+ Ejercicio</button>
                   </div>
                 </div>
               ))}
-              <button onClick={addDia} className="w-full border-2 border-dashed border-black/15 text-sm font-medium text-[#6B6B6B] py-3 rounded-2xl hover:border-[#FF5C00] hover:text-[#FF5C00]">+ Añadir día</button>
+              <button onClick={addDia} className="w-full border-2 border-dashed border-black/15 text-sm font-medium text-[#6B6B6B] py-3 rounded-2xl hover:border-acento hover:text-acento">+ Añadir día</button>
             </div>
             <div className="p-4 border-t border-black/5 sticky bottom-0 bg-white flex gap-2">
               <button onClick={() => setModalManual(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm font-medium py-3 rounded-xl">Cancelar</button>
               <button onClick={guardarManual} disabled={!manualClienteId||!manualNombre||guardandoManual}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-bold py-3 rounded-xl disabled:opacity-40">
+                className="flex-1 bg-acento text-white text-sm font-bold py-3 rounded-xl disabled:opacity-40">
                 {guardandoManual?'Guardando...':'💾 Guardar rutina'}
               </button>
             </div>
@@ -957,7 +958,7 @@ export default function Rutinas({ session }) {
                     <button onClick={() => eliminarPlantilla(p.id)} className="text-[#6B6B6B] hover:text-red-500 text-lg">×</button>
                   </div>
                   <select onChange={e => e.target.value && aplicarPlantilla(p, e.target.value)}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white">
                     <option value="">Aplicar a cliente →</option>
                     {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                   </select>
@@ -973,11 +974,11 @@ export default function Rutinas({ session }) {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setMsgModal(null)}>
           <div className="bg-white rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}><h2 className="font-bold text-[#0A0A0A] mb-3">Enviar mensaje</h2>
             <textarea value={msgTexto} onChange={e => setMsgTexto(e.target.value)} rows={4}
-              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none mb-3" placeholder="Escribe tu mensaje..." />
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none mb-3" placeholder="Escribe tu mensaje..." />
             <div className="flex gap-2">
               <button onClick={() => setMsgModal(null)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={() => enviarMensaje(msgModal)} disabled={!msgTexto.trim()}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">Enviar ✉️</button>
+                className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">Enviar ✉️</button>
             </div>
           </div>
         </div>

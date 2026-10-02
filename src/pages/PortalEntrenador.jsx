@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const DIAS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
@@ -132,12 +133,12 @@ export default function PortalEntrenador({ session }) {
   // ─── Loading ───────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin"/>
     </div>
   )
 
   const d = datos
-  const acento = d.miembro?.centros?.color_acento || '#FF5C00'
+  const acento = d.miembro?.centros?.color_acento || BRAND.color
   const nombre = session.user?.user_metadata?.nombre || d.miembro?.nombre || session.user?.email?.split('@')[0] || 'Entrenador'
   const hoy    = new Date().toISOString().split('T')[0]
 

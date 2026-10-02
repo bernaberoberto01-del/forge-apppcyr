@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 export default function UnirseACentro() {
   const { token } = useParams()
@@ -79,11 +80,11 @@ export default function UnirseACentro() {
     setLoading(false)
   }
 
-  const acento = centro?.color_acento || '#FF5C00'
+  const acento = centro?.color_acento || BRAND.color
 
   if (estado === 'cargando') return (
     <div className="min-h-screen bg-[#111] flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -126,14 +127,14 @@ export default function UnirseACentro() {
               <label className="text-white/60 text-xs font-medium mb-1.5 block">Tu nombre *</label>
               <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
                 placeholder="Nombre completo" autoFocus
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-acento" />
             </div>
           )}
           <div>
             <label className="text-white/60 text-xs font-medium mb-1.5 block">Email</label>
             <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
               autoFocus={modoLogin}
-              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
+              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-acento" />
           </div>
           <div>
             <label className="text-white/60 text-xs font-medium mb-1.5 block">
@@ -142,7 +143,7 @@ export default function UnirseACentro() {
             <input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
               onKeyDown={e => e.key === 'Enter' && aceptar()}
               placeholder={modoLogin ? '••••••••' : 'Mínimo 6 caracteres'}
-              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00]" />
+              className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-acento" />
           </div>
 
           {error && (

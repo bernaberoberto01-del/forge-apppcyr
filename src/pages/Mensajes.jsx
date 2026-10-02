@@ -147,14 +147,14 @@ export default function Mensajes({ session }) {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h1 className="text-lg font-bold text-[#0A0A0A]">Mensajes</h1>
-              {totalNoLeidos > 0 && <p className="text-xs text-[#FF5C00] font-medium">{totalNoLeidos} sin leer</p>}
+              {totalNoLeidos > 0 && <p className="text-xs text-acento font-medium">{totalNoLeidos} sin leer</p>}
             </div>
           </div>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
               placeholder="Buscar cliente..."
-              className="w-full bg-[#F5F5F0] border-0 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#FF5C00]" />
+              className="w-full bg-[#F5F5F0] border-0 rounded-xl pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-acento" />
           </div>
         </div>
 
@@ -162,7 +162,7 @@ export default function Mensajes({ session }) {
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-32">
-              <div className="w-6 h-6 border-3 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+              <div className="w-6 h-6 border-3 border-acento border-t-transparent rounded-full animate-spin"/>
             </div>
           ) : clientesFiltrados.length === 0 ? (
             <div className="p-8 text-center">
@@ -174,14 +174,14 @@ export default function Mensajes({ session }) {
             const isSelected = seleccionado?.id === c.id
             return (
               <button key={c.id} onClick={() => setSeleccionado(c)}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-black/5 transition-all ${isSelected ? 'bg-[#FF5C00]/5 border-l-2 border-l-[#FF5C00]' : 'hover:bg-[#F5F5F0]'}`}>
+                className={`w-full flex items-center gap-3 px-4 py-3.5 text-left border-b border-black/5 transition-all ${isSelected ? 'bg-acento/5 border-l-2 border-l-acento' : 'hover:bg-[#F5F5F0]'}`}>
                 <div className="relative flex-shrink-0">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
                     style={{ background: avatarColor(c.nombre) }}>
                     {ini(c.nombre)}
                   </div>
                   {nl > 0 && (
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#FF5C00] rounded-full flex items-center justify-center">
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-acento rounded-full flex items-center justify-center">
                       <span className="text-white text-[10px] font-bold">{nl}</span>
                     </div>
                   )}
@@ -226,7 +226,7 @@ export default function Mensajes({ session }) {
                 <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
                   {PLANTILLAS.slice(0,4).map(p => (
                     <button key={p.id} onClick={() => enviar(p.texto)}
-                      className="bg-white border border-black/10 rounded-xl p-3 text-left hover:border-[#FF5C00] transition-all">
+                      className="bg-white border border-black/10 rounded-xl p-3 text-left hover:border-acento transition-all">
                       <p className="text-base mb-1">{p.icon}</p>
                       <p className="text-xs font-semibold text-[#0A0A0A]">{p.label}</p>
                     </button>
@@ -277,7 +277,7 @@ export default function Mensajes({ session }) {
               <div className="flex gap-2">
                 {PLANTILLAS.map(p => (
                   <button key={p.id} onClick={() => { setTexto(p.texto); setShowPlantillas(false) }}
-                    className="flex-shrink-0 bg-[#F5F5F0] border border-black/10 rounded-xl px-3 py-2 text-left hover:border-[#FF5C00] transition-all">
+                    className="flex-shrink-0 bg-[#F5F5F0] border border-black/10 rounded-xl px-3 py-2 text-left hover:border-acento transition-all">
                     <p className="text-base">{p.icon}</p>
                     <p className="text-xs font-semibold text-[#0A0A0A] whitespace-nowrap mt-0.5">{p.label}</p>
                   </button>
@@ -289,13 +289,13 @@ export default function Mensajes({ session }) {
           {/* Input */}
           <div className="bg-white border-t border-black/5 p-3 flex items-end gap-2 flex-shrink-0">
             <button onClick={() => setShowPlantillas(v => !v)}
-              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all flex-shrink-0 ${showPlantillas ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
+              className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all flex-shrink-0 ${showPlantillas ? 'bg-acento text-white' : 'border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
               ⚡
             </button>
             {/* Botón link de pago */}
             <button onClick={() => setModalPago(true)} disabled={generandoLink}
               className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] transition-all flex-shrink-0 disabled:opacity-40">
-              {generandoLink ? <span className="w-4 h-4 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/> : '💳'}
+              {generandoLink ? <span className="w-4 h-4 border-2 border-acento border-t-transparent rounded-full animate-spin"/> : '💳'}
             </button>
             {/* Botón cuestionario nutrición — solo para clientes online con plan nutrición/completo */}
             {seleccionado?.plan_online && (seleccionado.plan_online === 'nutricion' || seleccionado.plan_online === 'completo') && (
@@ -314,7 +314,7 @@ export default function Mensajes({ session }) {
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); enviar() } }}
               rows={texto.split('\n').length > 2 ? 3 : 1}
               placeholder="Escribe un mensaje... (Enter para enviar)"
-              className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none transition-all" />
+              className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none transition-all" />
             <button onClick={() => enviar()} disabled={!texto.trim() || enviando}
               className="w-9 h-9 flex items-center justify-center rounded-xl text-white disabled:opacity-40 transition-all flex-shrink-0"
               style={{ background: 'var(--acento)' }}>
@@ -352,12 +352,12 @@ export default function Mensajes({ session }) {
                 <div className="space-y-2">
                   {tarifas.filter(t => t.tipo === 'online').map(t => (
                     <button key={t.id} onClick={() => generarLinkPago(t.id, t.nombre)}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-black/10 hover:border-[#FF5C00] hover:bg-[#FF5C00]/5 transition-all text-left">
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-black/10 hover:border-acento hover:bg-acento/5 transition-all text-left">
                       <div>
                         <p className="text-sm font-semibold text-[#0A0A0A]">{t.nombre}</p>
                         <p className="text-xs text-[#9B9B9B]">Suscripción mensual</p>
                       </div>
-                      <p className="text-sm font-bold text-[#FF5C00]">{t.precio}€/mes</p>
+                      <p className="text-sm font-bold text-acento">{t.precio}€/mes</p>
                     </button>
                   ))}
                 </div>
@@ -371,12 +371,12 @@ export default function Mensajes({ session }) {
                 <div className="space-y-2">
                   {tarifas.filter(t => t.tipo !== 'online').map(t => (
                     <button key={t.id} onClick={() => generarLinkPago(t.id, t.nombre)}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-black/10 hover:border-[#FF5C00] hover:bg-[#FF5C00]/5 transition-all text-left">
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-black/10 hover:border-acento hover:bg-acento/5 transition-all text-left">
                       <div>
                         <p className="text-sm font-semibold text-[#0A0A0A]">{t.nombre}</p>
                         <p className="text-xs text-[#9B9B9B]">{t.modalidad} · {t.dias_semana}d/sem</p>
                       </div>
-                      <p className="text-sm font-bold text-[#FF5C00]">{t.precio}€/mes</p>
+                      <p className="text-sm font-bold text-acento">{t.precio}€/mes</p>
                     </button>
                   ))}
                 </div>

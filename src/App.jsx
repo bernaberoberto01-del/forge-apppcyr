@@ -48,6 +48,7 @@ import SesionCliente from './pages/SesionCliente'
 import ProgresoCliente from './pages/ProgresoCliente'
 import UnirseACentro from './pages/UnirseACentro'
 import HealthCheck from './pages/HealthCheck'
+import { BRAND } from './lib/brand'
 
 // Rutas privadas con layout
 function AppPrivada({ session }) {
@@ -153,7 +154,7 @@ function PortalEntrada({ session }) {
 
   if (estado === undefined) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -173,7 +174,7 @@ function PortalEntrada({ session }) {
         <p className="font-bold text-xl mb-2 text-[#0A0A0A]">{msg.titulo}</p>
         <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">{msg.texto}</p>
         <button onClick={() => supabase.auth.signOut().then(() => { window.location.href = '/portal' })}
-          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: '#FF5C00' }}>Cerrar sesión y volver</button>
+          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: BRAND.color }}>Cerrar sesión y volver</button>
       </div>
     </div>
   )
@@ -209,7 +210,7 @@ function AreaPrivada({ session }) {
 
   if (esCliente === undefined) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -239,7 +240,7 @@ export default function App() {
   // Cargando sesión
   if (session === undefined) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 

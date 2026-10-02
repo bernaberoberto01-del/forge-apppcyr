@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useCentro } from '../hooks/useCentro.jsx'
+import { BRAND } from '../lib/brand'
 
 const COLORES = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6']
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
@@ -23,7 +24,7 @@ export default function AdminCentro({ session }) {
   const [invitaciones, setInvitaciones] = useState([])
   const [statsEntrenadores, setStatsEntrenadores] = useState({})
   const [formInvitar, setFormInvitar] = useState({ email:'', rol:'entrenador', nombre:'', color: COLORES[1] })
-  const [formCentro, setFormCentro] = useState({ nombre:'', color_acento:'#FF5C00' })
+  const [formCentro, setFormCentro] = useState({ nombre:'', color_acento:BRAND.color })
   const [loading, setLoading] = useState(false)
   const uid = session.user.id
 
@@ -71,7 +72,7 @@ export default function AdminCentro({ session }) {
     await supabase.from('miembros_centro').insert({
       centro_id: nuevoCentro.id, user_id: uid, rol: 'admin',
       nombre: session.user.user_metadata?.nombre || session.user.email?.split('@')[0],
-      email: session.user.email, color: '#FF5C00'
+      email: session.user.email, color: BRAND.color
     })
     setModalCrearCentro(false)
     setToast({ msg: `Centro "${formCentro.nombre}" creado` })
@@ -129,7 +130,7 @@ export default function AdminCentro({ session }) {
       <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-2xl mx-auto">
         {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
         <div className="text-center py-12">
-          <div className="w-20 h-20 bg-[#FF5C00]/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 bg-acento/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
             <span className="text-4xl">🏋️</span>
           </div>
           <h1 className="text-2xl font-bold text-[#0A0A0A] mb-2">Crear tu centro</h1>
@@ -137,7 +138,7 @@ export default function AdminCentro({ session }) {
             Conecta a varios entrenadores bajo un mismo espacio. Agenda compartida, gestión de clientes y panel de control unificado.
           </p>
           <button onClick={() => setModalCrearCentro(true)}
-            className="bg-[#FF5C00] text-white text-sm font-bold px-8 py-3.5 rounded-2xl active:scale-95 transition-all">
+            className="bg-acento text-white text-sm font-bold px-8 py-3.5 rounded-2xl active:scale-95 transition-all">
             Crear centro →
           </button>
           <p className="text-xs text-[#6B6B6B] mt-4">O pide a tu centro que te envíe un enlace de invitación</p>
@@ -152,7 +153,7 @@ export default function AdminCentro({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre del centro *</label>
                   <input value={formCentro.nombre} onChange={e => setFormCentro(f=>({...f,nombre:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
                     placeholder="Ej: Box CrossFit Murcia, Studio 3" />
                 </div>
                 <div>
@@ -169,7 +170,7 @@ export default function AdminCentro({ session }) {
               <div className="flex gap-2 mt-4">
                 <button onClick={() => setModalCrearCentro(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
                 <button onClick={crearCentro} disabled={!formCentro.nombre||loading}
-                  className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                  className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                   {loading ? 'Creando...' : 'Crear centro'}
                 </button>
               </div>
@@ -192,7 +193,7 @@ export default function AdminCentro({ session }) {
         </div>
         {esAdmin && (
           <button onClick={() => setModalInvitar(true)}
-            className="bg-[#FF5C00] text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
+            className="bg-acento text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
             + Invitar
           </button>
         )}
@@ -201,7 +202,7 @@ export default function AdminCentro({ session }) {
       {/* Stats centro */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          ['Entrenadores', miembros.length, '#FF5C00'],
+          ['Entrenadores', miembros.length, BRAND.color],
           ['Total sesiones/mes', Object.values(statsEntrenadores).reduce((s,x)=>s+x.sesiones,0), '#6366f1'],
           ['Total clientes', Object.values(statsEntrenadores).reduce((s,x)=>s+x.clientes,0), '#10b981'],
         ].map(([l,v,c])=>(
@@ -232,13 +233,13 @@ export default function AdminCentro({ session }) {
               <div key={m.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-white font-bold flex-shrink-0"
-                    style={{ background: m.color || '#FF5C00' }}>
+                    style={{ background: m.color || BRAND.color }}>
                     {ini(m.nombre || m.email)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-bold text-[#0A0A0A] truncate">{m.nombre || m.email?.split('@')[0]}</p>
-                      {esYo && <span className="text-xs bg-[#FF5C00]/10 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium">Tú</span>}
+                      {esYo && <span className="text-xs bg-acento/10 text-acento px-2 py-0.5 rounded-full font-medium">Tú</span>}
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.rol==='admin'?'bg-purple-50 text-purple-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
                         {m.rol}
                       </span>
@@ -315,20 +316,20 @@ export default function AdminCentro({ session }) {
               <div key={m.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                    style={{ background: m.color || '#FF5C00' }}>
+                    style={{ background: m.color || BRAND.color }}>
                     {ini(m.nombre || m.email)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#0A0A0A] truncate">{m.nombre || m.email?.split('@')[0]}</p>
                     <p className="text-xs text-[#6B6B6B]">{m.rol}</p>
                   </div>
-                  <p className="text-lg font-bold flex-shrink-0" style={{ color: m.color||'#FF5C00' }}>
+                  <p className="text-lg font-bold flex-shrink-0" style={{ color: m.color||BRAND.color }}>
                     {st.horas||0}h
                   </p>
                 </div>
                 <div className="h-2 bg-black/5 rounded-full overflow-hidden">
                   <div className="h-full rounded-full transition-all"
-                    style={{ width: `${((st.horas||0)/maxHoras)*100}%`, background: m.color||'#FF5C00' }} />
+                    style={{ width: `${((st.horas||0)/maxHoras)*100}%`, background: m.color||BRAND.color }} />
                 </div>
                 <div className="grid grid-cols-3 gap-2 mt-3">
                   {[
@@ -358,13 +359,13 @@ export default function AdminCentro({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Email *</label>
                 <input type="email" value={formInvitar.email} onChange={e=>setFormInvitar(f=>({...f,email:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
                   placeholder="entrenador@email.com" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre</label>
                 <input value={formInvitar.nombre} onChange={e=>setFormInvitar(f=>({...f,nombre:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
                   placeholder="Nombre del entrenador" />
               </div>
               <div>
@@ -372,7 +373,7 @@ export default function AdminCentro({ session }) {
                 <div className="flex gap-2">
                   {[['entrenador','Entrenador'],['admin','Admin']].map(([v,l])=>(
                     <button key={v} onClick={()=>setFormInvitar(f=>({...f,rol:v}))}
-                      className={`flex-1 py-2 text-sm font-medium rounded-xl border transition-all ${formInvitar.rol===v?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 text-[#6B6B6B]'}`}>
+                      className={`flex-1 py-2 text-sm font-medium rounded-xl border transition-all ${formInvitar.rol===v?'bg-acento border-acento text-white':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
@@ -392,7 +393,7 @@ export default function AdminCentro({ session }) {
             <div className="flex gap-2 mt-4">
               <button onClick={()=>setModalInvitar(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={invitar} disabled={!formInvitar.email||loading}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading?'Generando...':'📋 Copiar enlace'}
               </button>
             </div>

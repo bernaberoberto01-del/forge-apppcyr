@@ -3,6 +3,10 @@ import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
+import { BRAND } from '../lib/brand'
+import { useConfig } from '../hooks/useConfig'
+
+const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
 
 function Toast({ msg, tipo='ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
@@ -27,6 +31,7 @@ function diasRestantes(plan) {
 }
 
 export default function Pagos({ session }) {
+  const config = useConfig()
   const [tab, setTab] = useState('estado')
   const [pagos, setPagos] = useState([])
   const [clientes, setClientes] = useState([])
@@ -47,6 +52,8 @@ export default function Pagos({ session }) {
   const { completar, completado } = useOnboarding(uid)
 
   function generarRecibo(pago) {
+    const negocio = escapeHtml(config?.nombre_negocio || BRAND.nombreCompleto)
+    const colorRecibo = /^#[0-9A-Fa-f]{6}$/.test(config?.color_acento || '') ? config.color_acento : BRAND.color
     const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -54,15 +61,15 @@ export default function Pagos({ session }) {
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: -apple-system, sans-serif; color: #0A0A0A; padding: 40px; max-width: 600px; margin: 0 auto; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid #FF5C00; }
-  .logo { font-size: 24px; font-weight: 800; color: #FF5C00; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 2px solid ${colorRecibo}; }
+  .logo { font-size: 24px; font-weight: 800; color: ${colorRecibo}; }
   .recibo-num { font-size: 13px; color: #6B6B6B; text-align: right; }
   .recibo-num strong { display: block; font-size: 16px; color: #0A0A0A; }
   .section { margin-bottom: 24px; }
   .label { font-size: 11px; color: #6B6B6B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
   .value { font-size: 15px; font-weight: 500; }
   .amount-box { background: #F5F5F0; border-radius: 12px; padding: 24px; text-align: center; margin: 32px 0; }
-  .amount { font-size: 48px; font-weight: 800; color: #FF5C00; }
+  .amount { font-size: 48px; font-weight: 800; color: ${colorRecibo}; }
   .amount-label { font-size: 13px; color: #6B6B6B; margin-top: 4px; }
   .footer { font-size: 11px; color: #6B6B6B; text-align: center; padding-top: 20px; border-top: 1px solid #eee; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -70,7 +77,7 @@ export default function Pagos({ session }) {
 </head>
 <body>
   <div class="header">
-    <div class="logo">Forge Studio</div>
+    <div class="logo">${negocio}</div>
     <div class="recibo-num">
       <span>Recibo</span>
       <strong>#${pago.id?.slice(-6).toUpperCase()}</strong>
@@ -99,7 +106,7 @@ export default function Pagos({ session }) {
     <div class="amount-label">Importe total pagado</div>
   </div>
   <div class="footer">
-    Recibo generado el ${new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})} · Forge Studio OS
+    Recibo generado el ${new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})} · ${negocio}
   </div>
 </body>
 </html>`
@@ -271,7 +278,7 @@ export default function Pagos({ session }) {
             className="border border-[#6366f1]/30 text-[#6366f1] text-sm font-semibold px-3 py-2.5 rounded-xl hover:bg-[#6366f1]/5">
             ↻ Plan
           </button>
-          <button onClick={() => setModal(true)} className="bg-[#FF5C00] text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
+          <button onClick={() => setModal(true)} className="bg-acento text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
             + Pago
           </button>
         </div>
@@ -281,7 +288,7 @@ export default function Pagos({ session }) {
       <div className="bg-[#111] rounded-2xl p-4 mb-4">
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <p className="text-2xl font-bold text-[#FF5C00]">{ingresosMes.toFixed(0)}€</p>
+            <p className="text-2xl font-bold text-acento">{ingresosMes.toFixed(0)}€</p>
             <p className="text-white/40 text-xs mt-0.5">Cobrado este mes</p>
           </div>
           <div>
@@ -347,9 +354,9 @@ export default function Pagos({ session }) {
               <p className="text-4xl mb-3">💳</p>
               <p className="font-bold text-[#0A0A0A]">Sin planes de cobro activos</p>
               <p className="text-sm text-[#6B6B6B] mt-2 mb-5 leading-relaxed max-w-xs mx-auto">
-                Crea un plan por cada cliente con el importe y la fecha de cobro. Forge te avisará cuando toque cobrar.
+                Crea un plan por cada cliente con el importe y la fecha de cobro. {BRAND.nombre} te avisará cuando toque cobrar.
               </p>
-              <button onClick={() => setModalPlan(true)} className="bg-[#FF5C00] text-white text-sm font-bold px-6 py-3 rounded-xl">
+              <button onClick={() => setModalPlan(true)} className="bg-acento text-white text-sm font-bold px-6 py-3 rounded-xl">
                 + Crear primer plan de cobro
               </button>
             </div>
@@ -428,7 +435,7 @@ export default function Pagos({ session }) {
                 <p className="text-sm font-bold text-[#0A0A0A] mb-3">Resumen</p>
                 <div className="space-y-2.5">
                   {[
-                    ['Planes activos', planes.length, '#FF5C00'],
+                    ['Planes activos', planes.length, BRAND.color],
                     ['Cobro automático', planes.filter(p=>p.clientes?.suscripcion_activa).length, '#10b981'],
                     ['Cobros próximos', planes.filter(p=>{ const d=diasRestantes(p); return d!==null&&d>=0&&d<=7}).length, '#f59e0b'],
                     ['Vencidos', planes.filter(p=>{ const d=diasRestantes(p); return d!==null&&d<0}).length, '#ef4444'],
@@ -442,7 +449,7 @@ export default function Pagos({ session }) {
               </div>
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
                 <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">Ingreso mensual</p>
-                <p className="text-2xl font-bold text-[#FF5C00]">{planes.reduce((s,p)=>s+Number(p.importe||0),0)}€</p>
+                <p className="text-2xl font-bold text-acento">{planes.reduce((s,p)=>s+Number(p.importe||0),0)}€</p>
                 <p className="text-xs text-[#9B9B9B] mt-1">/ mes si todos activos</p>
               </div>
             </div>
@@ -461,7 +468,7 @@ export default function Pagos({ session }) {
           <div className="relative mb-3">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente..."
-              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
           </div>
           <div className="space-y-2">
             {pagosFiltrados.length === 0 ? (
@@ -473,12 +480,12 @@ export default function Pagos({ session }) {
               <div key={p.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 flex items-center gap-3">
                 <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold text-xs flex-shrink-0">{ini(p.clientes?.nombre)}</div>
                 <div className="flex-1 min-w-0">
-                  <button onClick={() => setQuickView(p.cliente_id)} className="text-sm font-semibold text-[#0A0A0A] hover:text-[#FF5C00] truncate block text-left">{p.clientes?.nombre}</button>
+                  <button onClick={() => setQuickView(p.cliente_id)} className="text-sm font-semibold text-[#0A0A0A] hover:text-acento truncate block text-left">{p.clientes?.nombre}</button>
                   <p className="text-xs text-[#6B6B6B]">{p.concepto} · {new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <p className="text-sm font-bold text-emerald-600">+{Number(p.importe).toFixed(0)}€</p>
-                  <button onClick={() => generarRecibo(p)} className="text-[#6B6B6B] hover:text-[#FF5C00] text-sm transition-colors">🧾</button>
+                  <button onClick={() => generarRecibo(p)} className="text-[#6B6B6B] hover:text-acento text-sm transition-colors">🧾</button>
                   <button onClick={() => eliminarPago(p.id)} className="text-[#6B6B6B] hover:text-red-500 text-lg">×</button>
                 </div>
               </div>
@@ -496,7 +503,7 @@ export default function Pagos({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
                 <select value={form.cliente_id} onChange={e => { const c = clientes.find(x=>x.id===e.target.value); setForm(f=>({...f,cliente_id:e.target.value,importe:c?.precio_mensual?String(c.precio_mensual):''})) }}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}{c.precio_mensual?` · ${c.precio_mensual}€`:''}</option>)}
                 </select>
@@ -505,24 +512,24 @@ export default function Pagos({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Importe (€) *</label>
                   <input type="number" value={form.importe} onChange={e=>setForm(f=>({...f,importe:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Fecha</label>
                   <input type="date" value={form.fecha_pago} onChange={e=>setForm(f=>({...f,fecha_pago:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Concepto</label>
                 <input value={form.concepto} onChange={e=>setForm(f=>({...f,concepto:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setModal(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={registrarPago} disabled={!form.cliente_id||!form.importe||loading}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading?'Guardando...':'Registrar'}
               </button>
             </div>
@@ -541,7 +548,7 @@ export default function Pagos({ session }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
                 <select value={formPlan.cliente_id} onChange={e => { const c = clientes.find(x=>x.id===e.target.value); setFormPlan(f=>({...f,cliente_id:e.target.value,importe:c?.precio_mensual?String(c.precio_mensual):''})) }}
                   disabled={!!editandoPlan}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white disabled:opacity-60">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white disabled:opacity-60">
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
@@ -550,12 +557,12 @@ export default function Pagos({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Importe (€) *</label>
                   <input type="number" value={formPlan.importe} onChange={e=>setFormPlan(f=>({...f,importe:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Frecuencia</label>
                   <select value={formPlan.frecuencia} onChange={e=>setFormPlan(f=>({...f,frecuencia:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                     <option value="mensual">Mensual</option>
                     <option value="quincenal">Quincenal</option>
                     <option value="semanal">Semanal</option>
@@ -568,7 +575,7 @@ export default function Pagos({ session }) {
                   <div className="flex gap-2 flex-wrap">
                     {[1,5,10,15,20,25,30].map(d => (
                       <button key={d} type="button" onClick={() => setFormPlan(f=>({...f,dia_cobro:d}))}
-                        className={`w-10 h-10 rounded-xl text-sm font-semibold transition-all ${formPlan.dia_cobro===d?'bg-[#FF5C00] text-white':'border border-black/10 text-[#6B6B6B]'}`}>
+                        className={`w-10 h-10 rounded-xl text-sm font-semibold transition-all ${formPlan.dia_cobro===d?'bg-acento text-white':'border border-black/10 text-[#6B6B6B]'}`}>
                         {d}
                       </button>
                     ))}
@@ -578,7 +585,7 @@ export default function Pagos({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Concepto</label>
                 <input value={formPlan.concepto} onChange={e=>setFormPlan(f=>({...f,concepto:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
             </div>
             <div className="flex gap-2 mt-4">

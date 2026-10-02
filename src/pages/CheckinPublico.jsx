@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import BrandMark from '../components/BrandMark'
+import { BRAND } from '../lib/brand'
 
 export default function CheckinPublico() {
   const [clienteSession, setClienteSession] = useState(undefined)
@@ -79,7 +81,7 @@ export default function CheckinPublico() {
 
   if (clienteSession === undefined || loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F7F7F7]">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin"/>
     </div>
   )
 
@@ -118,12 +120,8 @@ export default function CheckinPublico() {
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-[#FF5C00] rounded-xl flex items-center justify-center flex-shrink-0">
-                <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
-                  <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-                  <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-                  <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-                </svg>
+              <div className="w-7 h-7 bg-acento rounded-xl flex items-center justify-center flex-shrink-0">
+                <BrandMark size={14} />
               </div>
               <div>
                 <p className="text-white font-semibold text-sm">Check-in semanal</p>
@@ -134,7 +132,7 @@ export default function CheckinPublico() {
           </div>
           {/* Progress */}
           <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-[#FF5C00] rounded-full transition-all duration-500" style={{width:`${progreso}%`}}/>
+            <div className="h-full bg-acento rounded-full transition-all duration-500" style={{width:`${progreso}%`}}/>
           </div>
         </div>
       </div>
@@ -156,7 +154,7 @@ export default function CheckinPublico() {
               <div className="flex gap-2">
                 {[0,1,2,3,4,5,6,7].map(v => (
                   <button key={v} type="button" onClick={() => set('sesiones_semana', v)}
-                    className={`flex-1 aspect-square rounded-xl text-sm font-bold transition-all ${form.sesiones_semana === v ? 'bg-[#FF5C00] text-white shadow-md scale-105' : 'border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]/50'}`}>
+                    className={`flex-1 aspect-square rounded-xl text-sm font-bold transition-all ${form.sesiones_semana === v ? 'bg-acento text-white shadow-md scale-105' : 'border border-black/10 text-[#6B6B6B] hover:border-acento/50'}`}>
                     {v}
                   </button>
                 ))}
@@ -186,8 +184,8 @@ export default function CheckinPublico() {
                   ['muy_duro', '😤 Muy duro', 'Tuve que reducir'],
                 ].map(([v, l, sub]) => (
                   <button key={v} type="button" onClick={() => set('cargas_sensacion', v)}
-                    className={`p-3 rounded-xl border text-left transition-all ${form.cargas_sensacion === v ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/10 hover:border-[#FF5C00]/30'}`}>
-                    <p className={`text-xs font-bold ${form.cargas_sensacion === v ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>{l}</p>
+                    className={`p-3 rounded-xl border text-left transition-all ${form.cargas_sensacion === v ? 'border-acento bg-acento/5' : 'border-black/10 hover:border-acento/30'}`}>
+                    <p className={`text-xs font-bold ${form.cargas_sensacion === v ? 'text-acento' : 'text-[#0A0A0A]'}`}>{l}</p>
                     <p className="text-xs text-[#9B9B9B] mt-0.5">{sub}</p>
                   </button>
                 ))}
@@ -198,7 +196,7 @@ export default function CheckinPublico() {
             <div className="bg-white rounded-2xl border border-black/5 p-5">
               <p className="text-sm font-bold text-[#0A0A0A] mb-1">Peso esta semana <span className="text-[#9B9B9B] font-normal text-xs">— opcional</span></p>
               <input type="number" step="0.1" value={form.peso} onChange={e => set('peso', e.target.value)}
-                className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] mt-2"
+                className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-acento mt-2"
                 placeholder="70.5 kg"/>
             </div>
           </>
@@ -226,17 +224,17 @@ export default function CheckinPublico() {
                     <button key={v} type="button" onClick={() => set(field, v)}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${
                         form[field] === v
-                          ? red && v >= 4 ? 'border-red-400 bg-red-50' : 'border-[#FF5C00] bg-[#FF5C00]/5'
+                          ? red && v >= 4 ? 'border-red-400 bg-red-50' : 'border-acento bg-acento/5'
                           : 'border-black/10 hover:border-black/20'
                       }`}>
                       <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
                         form[field] === v
-                          ? red && v >= 4 ? 'border-red-400' : 'border-[#FF5C00]'
+                          ? red && v >= 4 ? 'border-red-400' : 'border-acento'
                           : 'border-black/20'
                       }`}>
-                        {form[field] === v && <div className={`w-2.5 h-2.5 rounded-full ${red && v >= 4 ? 'bg-red-400' : 'bg-[#FF5C00]'}`}/>}
+                        {form[field] === v && <div className={`w-2.5 h-2.5 rounded-full ${red && v >= 4 ? 'bg-red-400' : 'bg-acento'}`}/>}
                       </div>
-                      <span className={`text-sm font-medium ${form[field] === v ? red && v >= 4 ? 'text-red-700' : 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>{l}</span>
+                      <span className={`text-sm font-medium ${form[field] === v ? red && v >= 4 ? 'text-red-700' : 'text-acento' : 'text-[#0A0A0A]'}`}>{l}</span>
                     </button>
                   ))}
                 </div>
@@ -257,7 +255,7 @@ export default function CheckinPublico() {
               <p className="text-sm font-bold text-[#0A0A0A] mb-1">🏆 ¿Cuál fue tu logro de esta semana?</p>
               <p className="text-xs text-[#9B9B9B] mb-3">Puede ser grande o pequeño — lo que a ti te haya parecido un avance</p>
               <textarea value={form.logro_semana} onChange={e => set('logro_semana', e.target.value)} rows={2}
-                className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-acento resize-none"
                 placeholder="Ej: Por primera vez hice las 5 series completas sin parar"/>
             </div>
 
@@ -265,7 +263,7 @@ export default function CheckinPublico() {
               <p className="text-sm font-bold text-[#0A0A0A] mb-1">💬 ¿Algo más que quieras contarme?</p>
               <p className="text-xs text-[#9B9B9B] mb-3">Dudas, molestias, cambios en tu vida, lo que sea. Tu entrenador lo leerá.</p>
               <textarea value={form.comentario} onChange={e => set('comentario', e.target.value)} rows={4}
-                className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-acento resize-none"
                 placeholder="Esta semana tuve mucho trabajo y no dormí bien. También noté que el hombro me molesta un poco en el press..."/>
             </div>
 
@@ -299,18 +297,18 @@ export default function CheckinPublico() {
           )}
           {paso < 3 ? (
             <button onClick={() => setPaso(p => p + 1)} disabled={!pasoCompleto()}
-              className="flex-1 bg-[#FF5C00] text-white font-bold py-4 rounded-2xl text-sm disabled:opacity-40 transition-all active:scale-98">
+              className="flex-1 bg-acento text-white font-bold py-4 rounded-2xl text-sm disabled:opacity-40 transition-all active:scale-98">
               Siguiente →
             </button>
           ) : (
             <button onClick={enviar} disabled={sending}
-              className="flex-1 bg-[#FF5C00] text-white font-bold py-4 rounded-2xl text-sm disabled:opacity-50 transition-all">
+              className="flex-1 bg-acento text-white font-bold py-4 rounded-2xl text-sm disabled:opacity-50 transition-all">
               {sending ? 'Enviando...' : 'Enviar check-in 💪'}
             </button>
           )}
         </div>
 
-        <p className="text-center text-xs text-[#9B9B9B]">Forge Studio OS · Tus datos están protegidos</p>
+        <p className="text-center text-xs text-[#9B9B9B]">{BRAND.nombreCompleto} · Tus datos están protegidos</p>
       </div>
     </div>
   )

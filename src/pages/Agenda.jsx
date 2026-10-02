@@ -4,6 +4,7 @@ import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { useCentro } from '../hooks/useCentro.jsx'
+import { BRAND } from '../lib/brand'
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -121,8 +122,8 @@ function VistaMensual({ mesVista, setMesVista, sesiones, hoy, abrirModalEnDia, s
           const esHoyDia = fechaDia === hoy
           return (
             <div key={dia} onClick={() => abrirModalEnDia(new Date(fechaDia+'T12:00'), '09:00')}
-              className={`bg-white min-h-[72px] p-1.5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoyDia?'bg-[#FF5C00]/5':''}`}>
-              <p className={`text-xs font-bold mb-1 w-5 h-5 flex items-center justify-center rounded-full ${esHoyDia?'bg-[#FF5C00] text-white':'text-[#0A0A0A]'}`}>{dia}</p>
+              className={`bg-white min-h-[72px] p-1.5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoyDia?'bg-acento/5':''}`}>
+              <p className={`text-xs font-bold mb-1 w-5 h-5 flex items-center justify-center rounded-full ${esHoyDia?'bg-acento text-white':'text-[#0A0A0A]'}`}>{dia}</p>
               <div className="space-y-0.5">
                 {sessDia.slice(0,3).map((s,si) => {
                   const miem = miembros?.find(m => m.user_id === s.entrenador_id)
@@ -706,8 +707,8 @@ export default function Agenda({ session }) {
               <button key={m.id}
                 onClick={() => setFiltroEntrenador(filtroEntrenador === m.user_id ? 'todos' : m.user_id)}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all border ${filtroEntrenador === m.user_id ? 'border-current shadow-sm' : 'border-transparent bg-black/5 opacity-70 hover:opacity-100'}`}
-                style={{ color: m.color || '#FF5C00', background: filtroEntrenador === m.user_id ? `${m.color || '#FF5C00'}15` : '' }}>
-                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: m.color || '#FF5C00' }} />
+                style={{ color: m.color || BRAND.color, background: filtroEntrenador === m.user_id ? `${m.color || BRAND.color}15` : '' }}>
+                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: m.color || BRAND.color }} />
                 {(m.nombre || m.email?.split('@')[0])?.split(' ')[0]}
               </button>
             ))}
@@ -740,7 +741,7 @@ export default function Agenda({ session }) {
             🔄 Recurrentes {recurrentes.length > 0 ? `(${recurrentes.length})` : ''}
           </button>
           <button onClick={() => { setEditandoRecId(null); setModalRecurrente(true) }}
-            className="border border-[#FF5C00]/30 text-[#FF5C00] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-[#FF5C00]/5">↻ Nueva regla</button>
+            className="border border-acento/30 text-acento text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-acento/5">↻ Nueva regla</button>
           <button onClick={() => setModalClase(true)}
             className="border border-emerald-300 text-emerald-700 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-emerald-50">
             👥 Nueva clase
@@ -748,7 +749,7 @@ export default function Agenda({ session }) {
 
         </div>
         <button onClick={() => { setDiaClick(hoy); setModal(true) }}
-          className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg">+ Sesión</button>
+          className="bg-acento text-white text-xs font-semibold px-3 py-1.5 rounded-lg">+ Sesión</button>
       </div>
 
       {/* VISTA MENSUAL */}
@@ -783,7 +784,7 @@ export default function Agenda({ session }) {
                       {dia.getDate()}
                     </div>
                     <div>
-                      <p className={`text-sm font-bold ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>
+                      <p className={`text-sm font-bold ${esHoy ? 'text-acento' : 'text-[#0A0A0A]'}`}>
                         {DIAS_LABEL[i]}{esHoy ? ' — Hoy' : ''}
                       </p>
                       {sesionesDia.length > 0 && (
@@ -852,13 +853,13 @@ export default function Agenda({ session }) {
             const esHoy = formatFecha(dia) === hoy
             const nSes = sesionesFiltradas.filter(s => s.fecha === formatFecha(dia)).length
             return (
-              <div key={i} className={`flex-1 text-center py-1.5 border-l border-black/5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoy ? 'bg-[#FF5C00]/8 border-b-2 border-b-[#FF5C00]' : ''}`}
+              <div key={i} className={`flex-1 text-center py-1.5 border-l border-black/5 cursor-pointer hover:bg-[#F5F5F0] transition-all ${esHoy ? 'bg-acento/8 border-b-2 border-b-acento' : ''}`}
                 onClick={() => abrirModalEnDia(dia, '09:00')}>
-                <p className={`text-xs font-bold ${esHoy ? 'text-[#FF5C00]' : 'text-[#6B6B6B]'}`}>{DIAS_LABEL[i]}</p>
-                <p className={`text-sm font-bold leading-tight ${esHoy ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>
-                  {esHoy ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#FF5C00] text-white text-xs">{dia.getDate()}</span> : dia.getDate()}
+                <p className={`text-xs font-bold ${esHoy ? 'text-acento' : 'text-[#6B6B6B]'}`}>{DIAS_LABEL[i]}</p>
+                <p className={`text-sm font-bold leading-tight ${esHoy ? 'text-acento' : 'text-[#0A0A0A]'}`}>
+                  {esHoy ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-acento text-white text-xs">{dia.getDate()}</span> : dia.getDate()}
                 </p>
-                {nSes > 0 && <div className={`w-1 h-1 rounded-full mx-auto mt-0.5 ${esHoy ? 'bg-[#FF5C00]' : 'bg-black/30'}`} />}
+                {nSes > 0 && <div className={`w-1 h-1 rounded-full mx-auto mt-0.5 ${esHoy ? 'bg-acento' : 'bg-black/30'}`} />}
               </div>
             )
           })}
@@ -886,7 +887,7 @@ export default function Agenda({ session }) {
                 .sort((a,b) => (a.hora||'00:00').localeCompare(b.hora||'00:00'))
 
               return (
-                <div key={diaIdx} className={`flex-1 border-l border-black/5 relative ${esHoy ? 'bg-[#FF5C00]/5' : ''}`}
+                <div key={diaIdx} className={`flex-1 border-l border-black/5 relative ${esHoy ? 'bg-acento/5' : ''}`}
                   style={{ height: HORAS.length * pxH }}>
                   {/* Líneas de hora */}
                   {HORAS.map(h => (
@@ -1029,7 +1030,7 @@ export default function Agenda({ session }) {
               </div>
               <div className="flex-1 min-w-0">
                 <button onClick={() => { setQuickView(sesionDetalle.cliente_id); setSesionDetalle(null) }}
-                  className="font-bold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors text-left">
+                  className="font-bold text-[#0A0A0A] hover:text-acento transition-colors text-left">
                   {sesionDetalle.clientes?.nombre}
                 </button>
                 <p className="text-xs text-[#6B6B6B]">
@@ -1087,9 +1088,9 @@ export default function Agenda({ session }) {
                         return (
                           <button key={m.user_id} type="button"
                             onClick={e => { e.stopPropagation(); setEntrenadorSel(m.user_id) }}
-                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${seleccionado ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}
-                            style={seleccionado ? {background: m.color || '#FF5C00'} : {}}>
-                            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{background: m.color || '#FF5C00'}}/>
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${seleccionado ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B] hover:border-acento'}`}
+                            style={seleccionado ? {background: m.color || BRAND.color} : {}}>
+                            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{background: m.color || BRAND.color}}/>
                             {m.nombre?.split(' ')[0] || m.email?.split('@')[0]}
                             {seleccionado && <span className="ml-0.5">✓</span>}
                           </button>
@@ -1109,13 +1110,13 @@ export default function Agenda({ session }) {
                         <input type="date" value={moverForm.fecha}
                           min={new Date().toISOString().split('T')[0]}
                           onChange={e => setMoverForm(f => ({...f, fecha: e.target.value}))}
-                          className="w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                          className="w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-acento"/>
                       </div>
                       <div>
                         <label className="text-xs text-[#6B6B6B] mb-1 block">Hora</label>
                         <input type="time" value={moverForm.hora}
                           onChange={e => setMoverForm(f => ({...f, hora: e.target.value}))}
-                          className="w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                          className="w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-acento"/>
                       </div>
                     </div>
                     <div className="flex gap-2 pt-1">
@@ -1125,14 +1126,14 @@ export default function Agenda({ session }) {
                       </button>
                       <button onClick={() => moverSesionVirtual(sesionDetalle, moverForm.fecha, moverForm.hora)}
                         disabled={!moverForm.fecha || !moverForm.hora}
-                        className="flex-1 bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40">
+                        className="flex-1 bg-acento text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40">
                         Confirmar cambio
                       </button>
                     </div>
                   </div>
                 ) : (
                   <button onClick={() => setMoverForm({ fecha: sesionDetalle.fecha, hora: sesionDetalle.hora })}
-                    className="w-full border border-[#FF5C00]/30 text-[#FF5C00] text-sm font-semibold py-2.5 rounded-xl hover:bg-[#FF5C00]/5">
+                    className="w-full border border-acento/30 text-acento text-sm font-semibold py-2.5 rounded-xl hover:bg-acento/5">
                     📅 Mover esta sesión
                   </button>
                 )}
@@ -1164,9 +1165,9 @@ export default function Agenda({ session }) {
                               await cargar(centro?.id)
                               setToast({ msg: `Entrenador cambiado a ${m.nombre?.split(' ')[0]}` })
                             }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${seleccionado ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}
-                            style={seleccionado ? {background: m.color || '#FF5C00'} : {}}>
-                            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{background: m.color || '#FF5C00'}}/>
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${seleccionado ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B] hover:border-acento'}`}
+                            style={seleccionado ? {background: m.color || BRAND.color} : {}}>
+                            <div className="w-4 h-4 rounded-full flex-shrink-0" style={{background: m.color || BRAND.color}}/>
                             {m.nombre?.split(' ')[0] || m.email?.split('@')[0]}
                             {seleccionado && <span>✓</span>}
                           </button>
@@ -1203,7 +1204,7 @@ export default function Agenda({ session }) {
                     const cli = clientes.find(c => c.id === e.target.value)
                     setForm(f => ({ ...f, cliente_id: e.target.value, entrenador_id: f.entrenador_id || cli?.entrenador_id || '' }))
                   }}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
@@ -1216,11 +1217,11 @@ export default function Agenda({ session }) {
                       <button key={m.id} type="button" onClick={() => setForm(f => ({ ...f, entrenador_id: m.user_id }))}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border"
                         style={{
-                          color: (form.entrenador_id || uid) === m.user_id ? 'white' : (m.color || '#FF5C00'),
-                          background: (form.entrenador_id || uid) === m.user_id ? (m.color || '#FF5C00') : `${m.color || '#FF5C00'}10`,
-                          borderColor: (form.entrenador_id || uid) === m.user_id ? (m.color || '#FF5C00') : 'transparent'
+                          color: (form.entrenador_id || uid) === m.user_id ? 'white' : (m.color || BRAND.color),
+                          background: (form.entrenador_id || uid) === m.user_id ? (m.color || BRAND.color) : `${m.color || BRAND.color}10`,
+                          borderColor: (form.entrenador_id || uid) === m.user_id ? (m.color || BRAND.color) : 'transparent'
                         }}>
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: (form.entrenador_id || uid) === m.user_id ? 'white' : (m.color || '#FF5C00') }} />
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: (form.entrenador_id || uid) === m.user_id ? 'white' : (m.color || BRAND.color) }} />
                         {(m.nombre || m.email?.split('@')[0])?.split(' ')[0]}
                       </button>
                     ))}
@@ -1231,12 +1232,12 @@ export default function Agenda({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Hora</label>
                   <input type="time" value={form.hora} onChange={e => setForm(f=>({...f,hora:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración</label>
                   <select value={form.duracion_minutos} onChange={e => setForm(f=>({...f,duracion_minutos:Number(e.target.value)}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                     {[30,45,60,75,90,120].map(v=><option key={v} value={v}>{v}min</option>)}
                   </select>
                 </div>
@@ -1244,7 +1245,7 @@ export default function Agenda({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tipo</label>
                 <select value={form.tipo} onChange={e => setForm(f=>({...f,tipo:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="presencial">📍 Presencial</option>
                   <option value="online">🌐 Online</option>
                   <option value="pareja_grupo">👥 Pareja/Grupo</option>
@@ -1254,13 +1255,13 @@ export default function Agenda({ session }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas</label>
                 <input value={form.notas} onChange={e => setForm(f=>({...f,notas:e.target.value}))}
                   placeholder="Ej: Día de pierna, traer rodilleras..."
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setModal(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={guardarSesion} disabled={!form.cliente_id || loading}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading ? 'Guardando...' : 'Añadir'}
               </button>
             </div>
@@ -1281,7 +1282,7 @@ export default function Agenda({ session }) {
                     const cli = clientes.find(c => c.id === e.target.value)
                     setFormRec(f => ({ ...f, cliente_id: e.target.value, entrenador_id: f.entrenador_id || cli?.entrenador_id || '' }))
                   }}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
@@ -1294,11 +1295,11 @@ export default function Agenda({ session }) {
                       <button key={m.id} type="button" onClick={() => setFormRec(f => ({ ...f, entrenador_id: m.user_id }))}
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all border"
                         style={{
-                          color: (formRec.entrenador_id || uid) === m.user_id ? 'white' : (m.color || '#FF5C00'),
-                          background: (formRec.entrenador_id || uid) === m.user_id ? (m.color || '#FF5C00') : `${m.color || '#FF5C00'}10`,
-                          borderColor: (formRec.entrenador_id || uid) === m.user_id ? (m.color || '#FF5C00') : 'transparent'
+                          color: (formRec.entrenador_id || uid) === m.user_id ? 'white' : (m.color || BRAND.color),
+                          background: (formRec.entrenador_id || uid) === m.user_id ? (m.color || BRAND.color) : `${m.color || BRAND.color}10`,
+                          borderColor: (formRec.entrenador_id || uid) === m.user_id ? (m.color || BRAND.color) : 'transparent'
                         }}>
-                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: (formRec.entrenador_id || uid) === m.user_id ? 'white' : (m.color || '#FF5C00') }} />
+                        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: (formRec.entrenador_id || uid) === m.user_id ? 'white' : (m.color || BRAND.color) }} />
                         {(m.nombre || m.email?.split('@')[0])?.split(' ')[0]}
                       </button>
                     ))}
@@ -1313,7 +1314,7 @@ export default function Agenda({ session }) {
                     const sel = formRec.dias_semana.includes(diaNum)
                     return (
                       <button key={d} type="button" onClick={() => setFormRec(f=>({...f, dias_semana: sel ? f.dias_semana.filter(x=>x!==diaNum) : [...f.dias_semana,diaNum].sort()}))}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${sel?'bg-[#FF5C00] text-white':'border border-black/10 text-[#6B6B6B]'}`}>
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all ${sel?'bg-acento text-white':'border border-black/10 text-[#6B6B6B]'}`}>
                         {d}
                       </button>
                     )
@@ -1331,7 +1332,7 @@ export default function Agenda({ session }) {
                       <div className="flex justify-end mb-2">
                         <button type="button"
                           onClick={() => setFormRec(f => ({...f, horasPorDia: usaHorasPorDia ? {} : Object.fromEntries(f.dias_semana.map(d=>[d, f.hora]))}))}
-                          className="text-xs text-[#FF5C00] font-semibold">
+                          className="text-xs text-acento font-semibold">
                           {usaHorasPorDia ? '← Misma hora todos los días' : 'Hora distinta por día →'}
                         </button>
                       </div>
@@ -1344,7 +1345,7 @@ export default function Agenda({ session }) {
                             <input type="time"
                               value={formRec.horasPorDia[dNum] || '09:00'}
                               onChange={e => setFormRec(f=>({...f, horasPorDia:{...f.horasPorDia,[dNum]:e.target.value}}))}
-                              className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                              className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" />
                           </div>
                         ))}
                       </div>
@@ -1352,13 +1353,13 @@ export default function Agenda({ session }) {
                       <div className="mb-3">
                         <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Hora</label>
                         <input type="time" value={formRec.hora} onChange={e => setFormRec(f=>({...f,hora:e.target.value}))}
-                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                       </div>
                     )}
                     <div>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración</label>
                       <select value={formRec.duracion_minutos} onChange={e => setFormRec(f=>({...f,duracion_minutos:Number(e.target.value)}))}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                         {[30,45,60,75,90,120].map(v=><option key={v} value={v}>{v}min</option>)}
                       </select>
                     </div>
@@ -1369,18 +1370,18 @@ export default function Agenda({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Desde</label>
                   <input type="date" value={formRec.fecha_inicio} onChange={e => setFormRec(f=>({...f,fecha_inicio:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Hasta (opcional)</label>
                   <input type="date" value={formRec.fecha_fin} onChange={e => setFormRec(f=>({...f,fecha_fin:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tipo</label>
                 <select value={formRec.tipo} onChange={e => setFormRec(f=>({...f,tipo:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="presencial">📍 Presencial</option>
                   <option value="online">🌐 Online</option>
                   <option value="pareja_grupo">👥 Pareja/Grupo</option>
@@ -1390,7 +1391,7 @@ export default function Agenda({ session }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas</label>
                 <input value={formRec.notas} onChange={e => setFormRec(f=>({...f,notas:e.target.value}))}
                   placeholder="Ej: L/X/V 9am Carlos+Pablo"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
@@ -1435,8 +1436,8 @@ export default function Agenda({ session }) {
                         </p>
                         <p className="text-xs text-[#6B6B6B]">Desde {new Date(r.fecha_inicio+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}{r.fecha_fin ? ` hasta ${new Date(r.fecha_fin+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}` : ''}</p>
                         {miem && (
-                          <p className="text-xs font-medium mt-1 flex items-center gap-1.5" style={{color: miem.color || '#FF5C00'}}>
-                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{background: miem.color || '#FF5C00'}} />
+                          <p className="text-xs font-medium mt-1 flex items-center gap-1.5" style={{color: miem.color || BRAND.color}}>
+                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{background: miem.color || BRAND.color}} />
                             {(miem.nombre || miem.email?.split('@')[0])?.split(' ')[0]}
                           </p>
                         )}
@@ -1475,7 +1476,7 @@ export default function Agenda({ session }) {
                 <div className="grid grid-cols-3 gap-2">
                   {TIPOS_EXTRA.map(t => (
                     <button key={t.id} type="button" onClick={() => setFormExtra(f=>({...f,tipo:t.id}))}
-                      className={`p-2 rounded-xl border text-center transition-all ${formExtra.tipo===t.id?'bg-[#FF5C00] border-[#FF5C00]':'border-black/10 hover:border-[#FF5C00]/50'}`}>
+                      className={`p-2 rounded-xl border text-center transition-all ${formExtra.tipo===t.id?'bg-acento border-acento':'border-black/10 hover:border-acento/50'}`}>
                       <p className="text-lg">{t.icon}</p>
                       <p className={`text-xs font-medium mt-0.5 ${formExtra.tipo===t.id?'text-white':'text-[#0A0A0A]'}`}>{t.label}</p>
                     </button>
@@ -1486,18 +1487,18 @@ export default function Agenda({ session }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Descripción</label>
                 <input value={formExtra.concepto} onChange={e => setFormExtra(f=>({...f,concepto:e.target.value}))}
                   placeholder="Ej: Desplazamiento a casa de Carlos y Pablo"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Horas</label>
                   <input type="number" step="0.25" min="0.25" value={formExtra.horas} onChange={e => setFormExtra(f=>({...f,horas:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Fecha</label>
                   <input type="date" value={formExtra.fecha} onChange={e => setFormExtra(f=>({...f,fecha:e.target.value}))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
               </div>
             </div>
@@ -1524,7 +1525,7 @@ export default function Agenda({ session }) {
               <div className="bg-[#111] rounded-xl p-4">
                 <p className="text-white/40 text-xs mb-2">Esta semana</p>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div><p className="text-[#FF5C00] font-bold">{formatH(horasAutoSemana)}</p><p className="text-white/40 text-xs">Sesiones</p></div>
+                  <div><p className="text-acento font-bold">{formatH(horasAutoSemana)}</p><p className="text-white/40 text-xs">Sesiones</p></div>
                   <div><p className="text-[#6366f1] font-bold">{extraSemana}h</p><p className="text-white/40 text-xs">Extras</p></div>
                   <div><p className="text-white font-bold">{formatH(horasAutoSemana + extraSemana*60)}</p><p className="text-white/40 text-xs">Total</p></div>
                 </div>
@@ -1607,7 +1608,7 @@ function EditarGrupoModal({ grupo, onClose, onGuardado }) {
           <div>
             <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
             <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})}
-              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
           </div>
 
           {/* Días */}
@@ -1618,7 +1619,7 @@ function EditarGrupoModal({ grupo, onClose, onGuardado }) {
                 const sel = form.dias_semana.includes(d)
                 return (
                   <button key={d} type="button" onClick={() => toggleDia(d)}
-                    className={`py-2 rounded-xl text-xs font-semibold transition-all ${sel ? 'text-white' : 'border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}
+                    className={`py-2 rounded-xl text-xs font-semibold transition-all ${sel ? 'text-white' : 'border border-black/10 text-[#6B6B6B] hover:border-acento'}`}
                     style={sel ? {background:'#0A0A0A'} : {}}>
                     {DIAS_SEMANA[d]}
                   </button>
@@ -1632,12 +1633,12 @@ function EditarGrupoModal({ grupo, onClose, onGuardado }) {
             <div>
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Hora</label>
               <input type="time" value={form.hora} onChange={e => setForm({...form, hora: e.target.value})}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
             </div>
             <div>
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Duración (min)</label>
               <input type="number" value={form.duracion_minutos} onChange={e => setForm({...form, duracion_minutos: e.target.value})}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
             </div>
           </div>
 
@@ -1662,7 +1663,7 @@ function EditarGrupoModal({ grupo, onClose, onGuardado }) {
               Cancelar
             </button>
             <button onClick={guardar} disabled={!form.nombre.trim() || form.dias_semana.length === 0 || guardando}
-              className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-[#e05200] transition-all">
+              className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-acento-hover transition-all">
               {guardando ? 'Guardando...' : 'Guardar'}
             </button>
           </div>
@@ -1730,7 +1731,7 @@ function ModalNuevaClase({ uid, onClose, onGuardada }) {
           <div>
             <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre de la clase *</label>
             <input value={form.nombre} onChange={e => set('nombre', e.target.value)}
-              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
               placeholder="Ej: Pilates Matinal, Funcional 7am..."/>
           </div>
           <div>
@@ -1738,7 +1739,7 @@ function ModalNuevaClase({ uid, onClose, onGuardada }) {
             <div className="grid grid-cols-3 gap-1.5">
               {TIPOS.map(([v,l]) => (
                 <button key={v} type="button" onClick={() => set('tipo', v)}
-                  className={`py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center ${form.tipo===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                  className={`py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center ${form.tipo===v?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                   {l}
                 </button>
               ))}
@@ -1748,24 +1749,24 @@ function ModalNuevaClase({ uid, onClose, onGuardada }) {
             <div>
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Fecha</label>
               <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
             </div>
             <div>
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Hora</label>
               <input type="time" value={form.hora} onChange={e => set('hora', e.target.value)}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Duración (min)</label>
               <input type="number" value={form.duracion_minutos} onChange={e => set('duracion_minutos', e.target.value)}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
             </div>
             <div>
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Plazas máx</label>
               <input type="number" value={form.plazas_max} onChange={e => set('plazas_max', e.target.value)}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
             </div>
           </div>
           <div>
@@ -1781,7 +1782,7 @@ function ModalNuevaClase({ uid, onClose, onGuardada }) {
           <div>
             <button type="button" onClick={() => set('es_recurrente', !form.es_recurrente)}
               className="flex items-center gap-2 text-sm font-medium text-[#0A0A0A]">
-              <div className={`w-10 h-5 rounded-full transition-all relative ${form.es_recurrente?'bg-[#FF5C00]':'bg-black/20'}`}>
+              <div className={`w-10 h-5 rounded-full transition-all relative ${form.es_recurrente?'bg-acento':'bg-black/20'}`}>
                 <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all shadow ${form.es_recurrente?'left-5':'left-0.5'}`}/>
               </div>
               Clase recurrente semanal

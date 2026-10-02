@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import BrandMark from '../components/BrandMark'
+import { BRAND } from '../lib/brand'
 
 export default function Login() {
   const [modo, setModo] = useState('entrar') // entrar | registrar
@@ -53,7 +55,7 @@ export default function Login() {
           Revisa tu email para confirmar la cuenta y vuelve aquí para entrar.
         </p>
         <button onClick={() => { setRegistrado(false); setModo('entrar') }}
-          className="mt-6 text-[#FF5C00] text-sm font-semibold">
+          className="mt-6 text-acento text-sm font-semibold">
           Ir al login →
         </button>
       </div>
@@ -69,7 +71,7 @@ export default function Login() {
           Si <strong className="text-white/80">{email}</strong> tiene una cuenta, te hemos mandado un enlace para restablecer la contraseña.
         </p>
         <button onClick={() => { setRecuperarEnviado(false); setRecuperar(false); setModo('entrar') }}
-          className="mt-6 text-[#FF5C00] text-sm font-semibold">
+          className="mt-6 text-acento text-sm font-semibold">
           Ir al login →
         </button>
       </div>
@@ -89,11 +91,11 @@ export default function Login() {
               <label className="text-white/60 text-xs font-medium mb-1.5 block">Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="tu@email.com" required autoFocus
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00] transition-colors" />
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-acento transition-colors" />
             </div>
             {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</p>}
             <button type="submit" disabled={loading || !email}
-              className="w-full bg-[#FF5C00] hover:bg-[#E05200] text-white font-bold py-3.5 rounded-xl transition-all active:scale-95 disabled:opacity-40 mt-1">
+              className="w-full bg-acento hover:bg-acento-hover text-white font-bold py-3.5 rounded-xl transition-all active:scale-95 disabled:opacity-40 mt-1">
               {loading ? '...' : 'Enviar enlace →'}
             </button>
             <button type="button" onClick={() => { setRecuperar(false); setError('') }}
@@ -110,15 +112,11 @@ export default function Login() {
     <div className="min-h-screen bg-[#111] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#FF5C00] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
-              <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-              <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-              <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-            </svg>
+          <div className="w-16 h-16 bg-acento rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <BrandMark size={32} />
           </div>
-          <h1 className="text-white text-2xl font-bold">Forge</h1>
-          <p className="text-white/40 text-sm mt-1">Studio OS</p>
+          <h1 className="text-white text-2xl font-bold">{BRAND.nombre}</h1>
+          <p className="text-white/40 text-sm mt-1">{BRAND.subtitulo}</p>
         </div>
 
         {/* Tabs */}
@@ -138,32 +136,32 @@ export default function Login() {
                 <label className="text-white/60 text-xs font-medium mb-1.5 block">Nombre</label>
                 <input value={nombre} onChange={e => setNombre(e.target.value)}
                   placeholder="Tu nombre completo" autoFocus
-                  className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00] transition-colors" />
+                  className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-acento transition-colors" />
               </div>
             )}
             <div>
               <label className="text-white/60 text-xs font-medium mb-1.5 block">Email</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                 placeholder="tu@email.com" required autoFocus={modo === 'entrar'}
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00] transition-colors" />
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-acento transition-colors" />
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-white/60 text-xs font-medium block">Contraseña</label>
                 {modo === 'entrar' && (
                   <button type="button" onClick={() => { setRecuperar(true); setError('') }}
-                    className="text-[#FF5C00] text-xs font-medium hover:underline">
+                    className="text-acento text-xs font-medium hover:underline">
                     ¿Has olvidado tu contraseña?
                   </button>
                 )}
               </div>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                 placeholder={modo === 'registrar' ? 'Mínimo 6 caracteres' : '••••••••'} required
-                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-[#FF5C00] transition-colors" />
+                className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-acento transition-colors" />
             </div>
             {error && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{error}</p>}
             <button type="submit" disabled={loading || !email || !password}
-              className="w-full bg-[#FF5C00] hover:bg-[#E05200] text-white font-bold py-3.5 rounded-xl transition-all active:scale-95 disabled:opacity-40 mt-1">
+              className="w-full bg-acento hover:bg-acento-hover text-white font-bold py-3.5 rounded-xl transition-all active:scale-95 disabled:opacity-40 mt-1">
               {loading ? '...' : modo === 'entrar' ? 'Entrar →' : 'Crear cuenta →'}
             </button>
           </form>

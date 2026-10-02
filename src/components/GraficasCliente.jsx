@@ -4,9 +4,10 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area, BarChart, Bar
 } from 'recharts'
+import { BRAND } from '../lib/brand'
 
 const EJERCICIOS_FUERZA = [
-  { key: 'press_banca', label: 'Press banca', color: '#FF5C00' },
+  { key: 'press_banca', label: 'Press banca', color: BRAND.color },
   { key: 'sentadilla', label: 'Sentadilla', color: '#6366f1' },
   { key: 'peso_muerto', label: 'Peso muerto', color: '#10b981' },
   { key: 'dominadas', label: 'Dominadas', color: '#f59e0b' },
@@ -90,7 +91,7 @@ export default function GraficasCliente({ clienteId }) {
     { id: 'fuerza', label: '🏋️ Fuerza' },
   ]
 
-  if (loading) return <div className="h-40 flex items-center justify-center"><div className="w-6 h-6 border-3 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div className="h-40 flex items-center justify-center"><div className="w-6 h-6 border-3 border-acento border-t-transparent rounded-full animate-spin" /></div>
 
   return (
     <div>
@@ -99,7 +100,7 @@ export default function GraficasCliente({ clienteId }) {
         {tabs.map(t => (
           <button key={t.id} onClick={() => setTabGrafica(t.id)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-all ${
-              tabGrafica === t.id ? 'bg-[#FF5C00] text-white' : 'bg-[#F5F5F0] text-[#6B6B6B] hover:bg-black/5'
+              tabGrafica === t.id ? 'bg-acento text-white' : 'bg-[#F5F5F0] text-[#6B6B6B] hover:bg-black/5'
             }`}>
             {t.label}
           </button>
@@ -132,15 +133,15 @@ export default function GraficasCliente({ clienteId }) {
                 <AreaChart data={dataPeso}>
                   <defs>
                     <linearGradient id="gradPeso" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#FF5C00" stopOpacity={0.15}/>
-                      <stop offset="95%" stopColor="#FF5C00" stopOpacity={0}/>
+                      <stop offset="5%" stopColor={BRAND.color} stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor={BRAND.color} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: '#6B6B6B' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: '#6B6B6B' }} axisLine={false} tickLine={false} domain={['auto','auto']} unit="kg" width={40} />
                   <Tooltip content={<TooltipCustom />} />
-                  <Area type="monotone" dataKey="Peso" stroke="#FF5C00" strokeWidth={2.5} fill="url(#gradPeso)" dot={{ fill: '#FF5C00', r: 3 }} activeDot={{ r: 5 }} unit="kg" />
+                  <Area type="monotone" dataKey="Peso" stroke={BRAND.color} strokeWidth={2.5} fill="url(#gradPeso)" dot={{ fill: BRAND.color, r: 3 }} activeDot={{ r: 5 }} unit="kg" />
                 </AreaChart>
               </ResponsiveContainer>
             </>
@@ -159,7 +160,7 @@ export default function GraficasCliente({ clienteId }) {
             <>
               <p className="text-xs text-[#6B6B6B] mb-2">Energía, motivación y estrés semanal</p>
               <div className="flex gap-3 mb-2">
-                {[['Energía','#FF5C00'],['Motivación','#6366f1'],['Estrés','#ef4444']].map(([l,c]) => (
+                {[['Energía',BRAND.color],['Motivación','#6366f1'],['Estrés','#ef4444']].map(([l,c]) => (
                   <div key={l} className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full" style={{background:c}} />
                     <span className="text-xs text-[#6B6B6B]">{l}</span>
@@ -172,7 +173,7 @@ export default function GraficasCliente({ clienteId }) {
                   <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: '#6B6B6B' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: '#6B6B6B' }} axisLine={false} tickLine={false} domain={[0,10]} width={25} />
                   <Tooltip content={<TooltipCustom />} />
-                  <Line type="monotone" dataKey="Energía" stroke="#FF5C00" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="Energía" stroke={BRAND.color} strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                   <Line type="monotone" dataKey="Motivación" stroke="#6366f1" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                   <Line type="monotone" dataKey="Estrés" stroke="#ef4444" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} />
                 </LineChart>
@@ -193,7 +194,7 @@ export default function GraficasCliente({ clienteId }) {
             <>
               <p className="text-xs text-[#6B6B6B] mb-2">Adherencia al entreno y nutrición (1-10)</p>
               <div className="flex gap-3 mb-2">
-                {[['Entreno','#FF5C00'],['Nutrición','#10b981']].map(([l,c]) => (
+                {[['Entreno',BRAND.color],['Nutrición','#10b981']].map(([l,c]) => (
                   <div key={l} className="flex items-center gap-1.5">
                     <div className="w-2 h-2 rounded-full" style={{background:c}} />
                     <span className="text-xs text-[#6B6B6B]">{l}</span>
@@ -206,7 +207,7 @@ export default function GraficasCliente({ clienteId }) {
                   <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: '#6B6B6B' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: '#6B6B6B' }} axisLine={false} tickLine={false} domain={[0,10]} width={25} />
                   <Tooltip content={<TooltipCustom />} />
-                  <Bar dataKey="Entreno" fill="#FF5C00" radius={[4,4,0,0]} />
+                  <Bar dataKey="Entreno" fill={BRAND.color} radius={[4,4,0,0]} />
                   <Bar dataKey="Nutrición" fill="#10b981" radius={[4,4,0,0]} />
                 </BarChart>
               </ResponsiveContainer>

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { getPesoRecomendado } from '../utils/pesos'
 import EjercicioInput from '../components/EjercicioInput'
+import { BRAND } from '../lib/brand'
 
 function Toast({ msg, tipo = 'ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
@@ -169,8 +170,8 @@ export default function Sesiones({ session }) {
     return (
       <button type="button" onClick={() => setForm(f => ({ ...f, [field]: val }))}
         className={`w-10 h-10 rounded-xl text-sm font-semibold transition-all ${active
-          ? (red && val >= 4 ? 'bg-red-500 text-white' : 'bg-[#FF5C00] text-white')
-          : 'border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+          ? (red && val >= 4 ? 'bg-red-500 text-white' : 'bg-acento text-white')
+          : 'border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
         {val}
       </button>
     )
@@ -190,7 +191,7 @@ export default function Sesiones({ session }) {
           <p className="text-sm text-[#6B6B6B] mt-0.5">Registra entrenamientos con pesos, reps y valoración</p>
         </div>
         <button onClick={() => { setForm(initForm); setEjercicios([]); setPaso(1); setModal(true) }}
-          className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95 flex-shrink-0">
+          className="bg-acento hover:bg-acento-hover text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95 flex-shrink-0">
           + Nueva
         </button>
       </div>
@@ -198,7 +199,7 @@ export default function Sesiones({ session }) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          ['Hoy', sesiones.filter(s => s.fecha === hoy).length, '#FF5C00'],
+          ['Hoy', sesiones.filter(s => s.fecha === hoy).length, BRAND.color],
           ['Esta semana', sesiones.filter(s => s.fecha >= lunStr).length, '#6366f1'],
           ['Total', sesiones.length, '#6B6B6B'],
         ].map(([l, v, c]) => (
@@ -213,7 +214,7 @@ export default function Sesiones({ session }) {
       <div className="relative mb-3">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente..."
-          className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+          className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
         {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]">×</button>}
       </div>
 
@@ -221,7 +222,7 @@ export default function Sesiones({ session }) {
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
         {[['todos', 'Todas'], ['hoy', 'Hoy'], ['presencial', 'Presencial'], ['online', 'Online']].map(([v, l]) => (
           <button key={v} onClick={() => setFiltroTipo(v)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo === v ? 'bg-[#FF5C00] text-white' : 'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+            className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo === v ? 'bg-acento text-white' : 'bg-white border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
             {l}
           </button>
         ))}
@@ -237,14 +238,14 @@ export default function Sesiones({ session }) {
           </div>
         ) : sesionesFiltradas.map(s => (
           <div key={s.id} onClick={() => abrirDetalle(s)}
-            className="bg-white rounded-xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
+            className="bg-white rounded-xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-acento/20 transition-all">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-sm flex-shrink-0">
+              <div className="w-10 h-10 bg-acento/10 rounded-xl flex items-center justify-center text-acento font-bold text-sm flex-shrink-0">
                 {ini(s.clientes?.nombre)}
               </div>
               <div className="flex-1 min-w-0">
                 <button onClick={e => { e.stopPropagation(); setQuickView(s.cliente_id) }}
-                  className="text-sm font-semibold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors truncate block text-left">
+                  className="text-sm font-semibold text-[#0A0A0A] hover:text-acento transition-colors truncate block text-left">
                   {s.clientes?.nombre}
                 </button>
                 <p className="text-xs text-[#6B6B6B]">
@@ -267,7 +268,7 @@ export default function Sesiones({ session }) {
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
               <div>
-                <button onClick={() => setQuickView(detalle.cliente_id)} className="font-bold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors">
+                <button onClick={() => setQuickView(detalle.cliente_id)} className="font-bold text-[#0A0A0A] hover:text-acento transition-colors">
                   {detalle.clientes?.nombre}
                 </button>
                 <p className="text-xs text-[#6B6B6B]">{new Date(detalle.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
@@ -277,7 +278,7 @@ export default function Sesiones({ session }) {
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  ['RPE', detalle.rpe ? `${detalle.rpe}/10` : '—', '#FF5C00'],
+                  ['RPE', detalle.rpe ? `${detalle.rpe}/10` : '—', BRAND.color],
                   ['Fatiga', detalle.fatiga_post ? `${detalle.fatiga_post}/5` : '—', detalle.fatiga_post >= 4 ? '#ef4444' : '#10b981'],
                   ['Duración', detalle.duracion_minutos ? `${detalle.duracion_minutos}min` : '—', '#6B6B6B'],
                 ].map(([l, v, c]) => (
@@ -329,7 +330,7 @@ export default function Sesiones({ session }) {
               <div className="flex items-center gap-1.5">
                 {[['1', 'Info'], ['2', 'Ejercicios'], ['3', 'Valoración']].map(([n, l], i) => (
                   <div key={n} className="flex items-center gap-1.5">
-                    <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${paso > i + 1 ? 'bg-emerald-500 text-white' : paso === i + 1 ? 'bg-[#FF5C00] text-white' : 'bg-black/10 text-[#6B6B6B]'}`}>
+                    <div className={`w-6 h-6 rounded-full text-xs font-bold flex items-center justify-center ${paso > i + 1 ? 'bg-emerald-500 text-white' : paso === i + 1 ? 'bg-acento text-white' : 'bg-black/10 text-[#6B6B6B]'}`}>
                       {paso > i + 1 ? '✓' : n}
                     </div>
                     <span className={`text-xs ${paso === i + 1 ? 'font-semibold text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>{l}</span>
@@ -349,7 +350,7 @@ export default function Sesiones({ session }) {
                       const val = e.target.value
                       setForm(f => ({ ...f, cliente_id: val, dia_rutina: 1 }))
                       if (val) await cargarRutina(val, 1)
-                    }} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                    }} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                       <option value="">Selecciona cliente</option>
                       {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} {c.tipo === 'online' ? '🌐' : '📍'}</option>)}
                     </select>
@@ -363,12 +364,12 @@ export default function Sesiones({ session }) {
                     <div>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Fecha</label>
                       <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                     </div>
                     <div>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tipo</label>
                       <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                         <option value="presencial">Presencial</option>
                         <option value="online">Online</option>
                         <option value="pareja_grupo">Pareja/Grupo</option>
@@ -376,11 +377,11 @@ export default function Sesiones({ session }) {
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración: <span className="text-[#FF5C00]">{form.duracion_minutos} min</span></label>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración: <span className="text-acento">{form.duracion_minutos} min</span></label>
                     <div className="flex gap-2 flex-wrap">
                       {[30, 45, 60, 75, 90, 120].map(v => (
                         <button key={v} type="button" onClick={() => setForm(f => ({ ...f, duracion_minutos: v }))}
-                          className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${form.duracion_minutos === v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                          className={`px-3.5 py-2 rounded-xl text-sm font-medium transition-all ${form.duracion_minutos === v ? 'bg-acento text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                           {v}min
                         </button>
                       ))}
@@ -409,7 +410,7 @@ export default function Sesiones({ session }) {
               {paso === 2 && (
                 <>
                   {rutinaCliente && ejercicios.length > 0 && (
-                    <div className="bg-[#FF5C00]/5 border border-[#FF5C00]/20 rounded-xl p-3 text-xs text-[#FF5C00] font-medium">
+                    <div className="bg-acento/5 border border-acento/20 rounded-xl p-3 text-xs text-acento font-medium">
                       ✓ Ejercicios precargados desde la rutina · Pesos orientativos por nivel
                     </div>
                   )}
@@ -417,7 +418,7 @@ export default function Sesiones({ session }) {
                     {ejercicios.map((ej, ejIdx) => (
                       <div key={ejIdx} className="border border-black/8 rounded-2xl overflow-hidden">
                         <div className="bg-[#F5F5F0] px-4 py-3 flex items-center gap-2">
-                          <span className="w-6 h-6 bg-[#FF5C00] text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
+                          <span className="w-6 h-6 bg-acento text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
                           <EjercicioInput
                             value={ej.ejercicio_nombre}
                             onChange={val => updateEjercicio(ejIdx, 'ejercicio_nombre', val)}
@@ -426,7 +427,7 @@ export default function Sesiones({ session }) {
                             className="flex-1 bg-transparent text-sm font-semibold border-0 focus:ring-0 p-0"
                             placeholder="Nombre del ejercicio" />
                           {ej.peso_recomendado && (
-                            <span className="text-xs bg-[#FF5C00]/15 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                            <span className="text-xs bg-acento/15 text-acento px-2 py-0.5 rounded-full font-medium flex-shrink-0">
                               ~{ej.peso_recomendado}kg
                             </span>
                           )}
@@ -442,9 +443,9 @@ export default function Sesiones({ session }) {
                               <span className="col-span-1 text-xs font-bold text-[#6B6B6B]">{setIdx + 1}</span>
                               <input type="number" step="0.5" value={s.peso} onChange={e => updateSet(ejIdx, setIdx, 'peso', e.target.value)}
                                 placeholder={ej.peso_recomendado || '—'}
-                                className="col-span-4 border border-black/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                                className="col-span-4 border border-black/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-acento" />
                               <input value={s.reps} onChange={e => updateSet(ejIdx, setIdx, 'reps', e.target.value)}
-                                placeholder="—" className="col-span-4 border border-black/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                                placeholder="—" className="col-span-4 border border-black/10 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:border-acento" />
                               <button type="button" onClick={() => updateSet(ejIdx, setIdx, 'completado', !s.completado)}
                                 className={`col-span-2 h-8 rounded-lg text-sm font-bold transition-all ${s.completado ? 'bg-emerald-500 text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                                 {s.completado ? '✓' : '○'}
@@ -454,7 +455,7 @@ export default function Sesiones({ session }) {
                             </div>
                           ))}
                           <button type="button" onClick={() => addSet(ejIdx)}
-                            className="w-full border border-dashed border-black/15 text-[#6B6B6B] text-xs py-2 rounded-xl hover:border-[#FF5C00] hover:text-[#FF5C00] transition-all">
+                            className="w-full border border-dashed border-black/15 text-[#6B6B6B] text-xs py-2 rounded-xl hover:border-acento hover:text-acento transition-all">
                             + Set
                           </button>
                         </div>
@@ -462,7 +463,7 @@ export default function Sesiones({ session }) {
                     ))}
                   </div>
                   <button type="button" onClick={addEjercicio}
-                    className="w-full border-2 border-dashed border-black/15 text-[#6B6B6B] text-sm font-medium py-3.5 rounded-2xl hover:border-[#FF5C00] hover:text-[#FF5C00] transition-all">
+                    className="w-full border-2 border-dashed border-black/15 text-[#6B6B6B] text-sm font-medium py-3.5 rounded-2xl hover:border-acento hover:text-acento transition-all">
                     + Añadir ejercicio
                   </button>
                 </>
@@ -476,13 +477,13 @@ export default function Sesiones({ session }) {
                     <p className="text-xs text-[#6B6B6B] mt-0.5">La IA usará esta valoración para ajustar las próximas rutinas</p>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Esfuerzo (RPE): <span className="text-[#FF5C00] font-bold">{form.rpe}/10</span></label>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Esfuerzo (RPE): <span className="text-acento font-bold">{form.rpe}/10</span></label>
                     <div className="flex gap-1.5 flex-wrap">
                       {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => <Btn key={v} field="rpe" val={v} />)}
                     </div>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Fatiga generada: <span className="text-[#FF5C00] font-bold">{form.fatiga_post}/5</span></label>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Fatiga generada: <span className="text-acento font-bold">{form.fatiga_post}/5</span></label>
                     <div className="flex gap-1.5">
                       {[1, 2, 3, 4, 5].map(v => <Btn key={v} field="fatiga_post" val={v} red />)}
                     </div>
@@ -490,7 +491,7 @@ export default function Sesiones({ session }) {
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Sensaciones</label>
                     <textarea value={form.sensaciones} onChange={e => setForm(f => ({ ...f, sensaciones: e.target.value }))}
-                      rows={3} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                      rows={3} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                       placeholder="¿Algo destacable? Dolor, energía, progresión..." />
                   </div>
                 </>
@@ -506,7 +507,7 @@ export default function Sesiones({ session }) {
               )}
               {paso < 3 ? (
                 <button onClick={() => setPaso(p => p + 1)} disabled={paso === 1 && !form.cliente_id}
-                  className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40 transition-all">
+                  className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40 transition-all">
                   Siguiente →
                 </button>
               ) : (

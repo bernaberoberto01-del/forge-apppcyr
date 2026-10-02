@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 const COLORES = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6']
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
@@ -14,7 +15,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
   const [modalInvitar, setModalInvitar] = useState(false)
   const [modalCrear, setModalCrear] = useState(false)
   const [formInvitar, setFormInvitar] = useState({ email:'', rol:'entrenador', nombre:'', color: COLORES[1] })
-  const [formCentro, setFormCentro] = useState({ nombre:'', color_acento:'#FF5C00' })
+  const [formCentro, setFormCentro] = useState({ nombre:'', color_acento:BRAND.color })
   const [loading, setLoading] = useState(false)
 
   useEffect(() => { if (centro && miembros?.length) cargarStats() }, [centro, miembros])
@@ -67,7 +68,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
     const { error: e2 } = await supabase.from('miembros_centro').insert({
       centro_id: nuevo.id, user_id: uid, rol: 'admin',
       nombre: session?.user?.user_metadata?.nombre || session?.user?.email?.split('@')[0] || 'Admin',
-      email: session?.user?.email || '', color: '#FF5C00', activo: true
+      email: session?.user?.email || '', color: BRAND.color, activo: true
     })
     
     if (e2) {
@@ -148,10 +149,10 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
   // Sin centro
   if (!centro) return (
     <div className="text-center py-8">
-      <div className="w-16 h-16 bg-[#FF5C00]/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🏋️</div>
+      <div className="w-16 h-16 bg-acento/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🏋️</div>
       <p className="font-bold text-[#0A0A0A] mb-1">Sin centro configurado</p>
       <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed max-w-xs mx-auto">Crea un centro para gestionar varios entrenadores, ver su agenda compartida y el registro de horas.</p>
-      <button onClick={() => setModalCrear(true)} className="bg-[#FF5C00] text-white text-sm font-bold px-6 py-3 rounded-xl">Crear centro</button>
+      <button onClick={() => setModalCrear(true)} className="bg-acento text-white text-sm font-bold px-6 py-3 rounded-xl">Crear centro</button>
 
       {modalCrear && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
@@ -161,7 +162,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre del centro *</label>
                 <input value={formCentro.nombre} onChange={e=>setFormCentro(f=>({...f,nombre:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
                   placeholder="Ej: Studio Fitness Murcia" />
               </div>
               <div>
@@ -178,7 +179,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
             <div className="flex gap-2 mt-4">
               <button onClick={()=>setModalCrear(false)} className="flex-1 border border-black/10 text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={crearCentro} disabled={!formCentro.nombre||loading}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading?'Creando...':'Crear centro'}
               </button>
             </div>
@@ -206,7 +207,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
         </div>
         {esAdmin && (
           <button onClick={()=>setModalInvitar(true)}
-            className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-2 rounded-lg">
+            className="bg-acento text-white text-xs font-semibold px-3 py-2 rounded-lg">
             + Invitar
           </button>
         )}
@@ -218,12 +219,12 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
           <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-4">Editar nombre del centro</h2>
             <input value={nombreCentro} onChange={e => setNombreCentro(e.target.value)} autoFocus
-              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
               placeholder="Nombre del centro" />
             <div className="flex gap-2 mt-4">
               <button onClick={() => setModalNombre(false)} className="flex-1 border border-black/10 text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={guardarNombreCentro} disabled={!nombreCentro.trim()||loading}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading?'Guardando...':'Guardar'}
               </button>
             </div>
@@ -245,7 +246,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
                 </div>
                 <div className="flex gap-1.5 flex-shrink-0">
                   <button onClick={() => reenviar(inv)} disabled={reenviando === inv.id}
-                    className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:border-[#FF5C00] disabled:opacity-50">
+                    className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-2.5 py-1.5 rounded-lg hover:border-acento disabled:opacity-50">
                     {reenviando === inv.id ? '⏳' : '📧 Reenviar'}
                   </button>
                   <button onClick={() => cancelarInvitacion(inv)}
@@ -267,13 +268,13 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
             <div key={m.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                  style={{background:m.color||'#FF5C00'}}>
+                  style={{background:m.color||BRAND.color}}>
                   {ini(m.nombre||m.email)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-[#0A0A0A] truncate">{m.nombre||m.email?.split('@')[0]}</p>
-                    {esYo && <span className="text-xs bg-[#FF5C00]/10 text-[#FF5C00] px-2 py-0.5 rounded-full">Tú</span>}
+                    {esYo && <span className="text-xs bg-acento/10 text-acento px-2 py-0.5 rounded-full">Tú</span>}
                     <span className={`text-xs px-2 py-0.5 rounded-full ${m.rol==='admin'?'bg-purple-50 text-purple-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>{m.rol}</span>
                   </div>
                   <p className="text-xs text-[#6B6B6B]">{st.clientes||0} clientes · {st.sesiones||0} sesiones/mes</p>
@@ -292,7 +293,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
                         await navigator.clipboard.writeText(`${window.location.origin}/unirse/${token}`)
                         showToast('Enlace de acceso copiado')
                       }
-                    }} className="text-[#6B6B6B] hover:text-[#FF5C00] text-sm border border-black/10 rounded-lg px-2.5 py-1.5 transition-colors" title="Copiar enlace">
+                    }} className="text-[#6B6B6B] hover:text-acento text-sm border border-black/10 rounded-lg px-2.5 py-1.5 transition-colors" title="Copiar enlace">
                       🔗
                     </button>
                     <button onClick={()=>eliminarMiembro(m.id)} className="text-[#6B6B6B] hover:text-red-500 text-xl">×</button>
@@ -303,7 +304,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
               {/* Horas semana/mes */}
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {[
-                  [`${st.horasSem||0}h`, 'Esta semana', '#FF5C00'],
+                  [`${st.horasSem||0}h`, 'Esta semana', BRAND.color],
                   [`${st.horasMes||0}h`, 'Sesiones mes', '#6366f1'],
                   [`${totalMes.toFixed(1)}h`, 'Total mes', '#10b981'],
                 ].map(([v,l,col])=>(
@@ -317,7 +318,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
               {/* Barra de horas mes */}
               <div className="mb-3">
                 <div className="h-1.5 bg-black/5 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{width:`${Math.min((totalMes/maxHorasMes)*100,100)}%`,background:m.color||'#FF5C00'}} />
+                  <div className="h-full rounded-full transition-all" style={{width:`${Math.min((totalMes/maxHorasMes)*100,100)}%`,background:m.color||BRAND.color}} />
                 </div>
               </div>
 
@@ -348,13 +349,13 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Email *</label>
                 <input type="email" value={formInvitar.email} onChange={e=>setFormInvitar(f=>({...f,email:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
                   placeholder="entrenador@email.com" />
               </div>
               <div className="flex gap-2">
                 {[['entrenador','Entrenador'],['admin','Admin']].map(([v,l])=>(
                   <button key={v} onClick={()=>setFormInvitar(f=>({...f,rol:v}))} type="button"
-                    className={`flex-1 py-2 text-sm font-medium rounded-xl border transition-all ${formInvitar.rol===v?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 text-[#6B6B6B]'}`}>
+                    className={`flex-1 py-2 text-sm font-medium rounded-xl border transition-all ${formInvitar.rol===v?'bg-acento border-acento text-white':'border-black/10 text-[#6B6B6B]'}`}>
                     {l}
                   </button>
                 ))}
@@ -373,7 +374,7 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
             <div className="flex gap-2 mt-4">
               <button onClick={()=>setModalInvitar(false)} className="flex-1 border border-black/10 text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={invitar} disabled={!formInvitar.email||loading}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading?'Generando...':'📋 Copiar enlace'}
               </button>
             </div>

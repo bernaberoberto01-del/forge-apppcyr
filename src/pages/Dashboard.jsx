@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import TutorialBanner, { BarraProgreso } from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
@@ -38,7 +39,7 @@ function BarChart({ datos, max }) {
             </p>
             <div className="w-full rounded-t-lg transition-all" style={{
               height: `${Math.max(pct, pct > 0 ? 8 : 0)}%`,
-              background: esActual ? '#FF5C00' : '#FF5C00',
+              background: esActual ? BRAND.color : BRAND.color,
               opacity: esActual ? 1 : 0.3 + (i / datos.length) * 0.5,
               minHeight: pct > 0 ? '4px' : '0'
             }} />
@@ -240,7 +241,7 @@ export default function Dashboard({ session }) {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -250,7 +251,7 @@ export default function Dashboard({ session }) {
   return (
     <div className="flex-1 overflow-y-auto">
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl bg-[#FF5C00] whitespace-nowrap">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl bg-acento whitespace-nowrap">
           {toast}
         </div>
       )}
@@ -273,7 +274,7 @@ export default function Dashboard({ session }) {
             </p>
           </div>
           {totalPendiente > 0 && (
-            <div className="bg-[#FF5C00] text-white text-sm font-bold px-3 py-1.5 rounded-full">
+            <div className="bg-acento text-white text-sm font-bold px-3 py-1.5 rounded-full">
               {totalPendiente} pendiente{totalPendiente > 1 ? 's' : ''}
             </div>
           )}
@@ -299,8 +300,8 @@ export default function Dashboard({ session }) {
                 {cuestPendientes.map(c => {
                   const planLabel = {entrenamiento:'💪',nutricion:'🥗',completo:'⚡'}[c.necesidades] || '📋'
                   return (
-                    <div key={c.id} className="flex items-center gap-3 px-5 py-3.5 bg-[#FF5C00]/4">
-                      <div className="w-8 h-8 bg-[#FF5C00] rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">{planLabel}</div>
+                    <div key={c.id} className="flex items-center gap-3 px-5 py-3.5 bg-acento/4">
+                      <div className="w-8 h-8 bg-acento rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">{planLabel}</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-[#0A0A0A]">Nuevo: {c.nombre.split(' ')[0]}</p>
                         <p className="text-xs text-[#6B6B6B]">
@@ -309,7 +310,7 @@ export default function Dashboard({ session }) {
                         </p>
                       </div>
                       <button onClick={() => navigate('/clientes?tab=cuestionarios')}
-                        className="text-xs bg-[#FF5C00] text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
+                        className="text-xs bg-acento text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
                         Aprobar →
                       </button>
                     </div>
@@ -359,7 +360,7 @@ export default function Dashboard({ session }) {
                 {/* Mensajes sin leer */}
                 {d.mensajesNL.length > 0 && (
                   <div className="flex items-center gap-3 px-5 py-3.5">
-                    <div className="w-8 h-8 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] text-sm flex-shrink-0">✉️</div>
+                    <div className="w-8 h-8 bg-acento/10 rounded-xl flex items-center justify-center text-acento text-sm flex-shrink-0">✉️</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#0A0A0A]">
                         {d.mensajesNL.length} mensaje{d.mensajesNL.length>1?'s':''} sin leer
@@ -369,7 +370,7 @@ export default function Dashboard({ session }) {
                       </p>
                     </div>
                     <button onClick={() => navigate('/mensajes')}
-                      className="text-xs bg-[#FF5C00] text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      className="text-xs bg-acento text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Ver {d.mensajesNL.length} →
                     </button>
                   </div>
@@ -595,10 +596,10 @@ export default function Dashboard({ session }) {
                 {/* Onboarding — sistema vacío, usuario nuevo */}
                 {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && d.activos.length === 0 && (
                   <div className="px-5 py-6 space-y-3">
-                    <p className="text-sm font-bold text-[#0A0A0A]">👋 Bienvenido a Forge</p>
+                    <p className="text-sm font-bold text-[#0A0A0A]">👋 Bienvenido a {BRAND.nombre}</p>
                     <p className="text-xs text-[#6B6B6B]">Empieza en 3 pasos:</p>
                     {[
-                      ['1', 'Configura tu perfil', 'Tu nombre, logo y colores', '/configuracion', '#FF5C00'],
+                      ['1', 'Configura tu perfil', 'Tu nombre, logo y colores', '/configuracion', BRAND.color],
                       ['2', 'Añade tu primer cliente', 'Presencial u online', '/clientes', '#6366f1'],
                       ['3', 'Genera su rutina con IA', 'En menos de 30 segundos', '/rutinas', '#10b981'],
                     ].map(([n, t, s, ruta, c]) => (
@@ -631,7 +632,7 @@ export default function Dashboard({ session }) {
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
                   <p className="text-sm font-bold text-[#0A0A0A]">🔄 Análisis pendientes — {d.analisisPendientes.length}</p>
-                  <button onClick={() => navigate('/seguimiento')} className="text-xs text-[#FF5C00] font-medium">Ver todo →</button>
+                  <button onClick={() => navigate('/seguimiento')} className="text-xs text-acento font-medium">Ver todo →</button>
                 </div>
                 <div className="divide-y divide-black/4">
                   {d.analisisPendientes.map(a => (
@@ -663,7 +664,7 @@ export default function Dashboard({ session }) {
                 <p className="text-sm font-bold text-[#0A0A0A]">
                   {sesionesHoy.length > 0 ? `Hoy — ${sesionesHoy.length} sesión${sesionesHoy.length>1?'es':''}` : 'Agenda de hoy'}
                 </p>
-                <button onClick={() => navigate('/agenda')} className="text-xs text-[#FF5C00] font-medium">Ver agenda →</button>
+                <button onClick={() => navigate('/agenda')} className="text-xs text-acento font-medium">Ver agenda →</button>
               </div>
               {sesionesHoy.length === 0 ? (
                 <div className="text-center py-8">
@@ -676,7 +677,7 @@ export default function Dashboard({ session }) {
                     const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                     return (
                       <div key={s.id} className={`flex items-center gap-3 px-5 py-3 ${s.completada?'bg-emerald-50':''}`}>
-                        <div className="w-8 h-8 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">
+                        <div className="w-8 h-8 bg-acento/10 rounded-xl flex items-center justify-center text-acento font-bold text-xs flex-shrink-0">
                           {ini(s.clientes?.nombre)}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -719,7 +720,7 @@ export default function Dashboard({ session }) {
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  ['Clientes', d.activos.length, '#FF5C00', '/clientes'],
+                  ['Clientes', d.activos.length, BRAND.color, '/clientes'],
                   ['Ingresos', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos'],
                   ['Sesiones hoy', sesionesHoy.length, '#6366f1', '/agenda'],
                   ['Adherencia', d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento'],
@@ -748,7 +749,7 @@ export default function Dashboard({ session }) {
               <div className="space-y-2">
                 {[
                   ['Total activos', d.activos.length, '#0A0A0A'],
-                  ['Online', d.activos.filter(c=>c.tipo==='online').length, '#FF5C00'],
+                  ['Online', d.activos.filter(c=>c.tipo==='online').length, BRAND.color],
                   ['Presencial', d.activos.filter(c=>c.tipo!=='online').length, '#6366f1'],
                   ['Retención', `${d.tasaRetencion}%`, '#10b981'],
                 ].map(([l,v,c]) => (

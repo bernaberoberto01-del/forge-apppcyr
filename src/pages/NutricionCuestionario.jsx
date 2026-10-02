@@ -102,12 +102,12 @@ export default function NutricionCuestionario() {
       <div className="max-w-lg mx-auto px-4 pt-12 pb-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-[#FF5C00] rounded-2xl flex items-center justify-center mx-auto mb-3">🥗</div>
+          <div className="w-12 h-12 bg-acento rounded-2xl flex items-center justify-center mx-auto mb-3">🥗</div>
           <h1 className="text-white text-xl font-bold">Cuestionario nutricional</h1>
           {cliente && <p className="text-white/50 text-sm mt-1">Hola, {cliente.nombre.split(' ')[0]}</p>}
           <div className="flex gap-1.5 justify-center mt-4">
             {PASOS.map((p,i)=>(
-              <div key={i} className={`h-1.5 rounded-full transition-all ${i<=paso?'bg-[#FF5C00]':'bg-white/20'}`} style={{width: i===paso?'32px':'12px'}} />
+              <div key={i} className={`h-1.5 rounded-full transition-all ${i<=paso?'bg-acento':'bg-white/20'}`} style={{width: i===paso?'32px':'12px'}} />
             ))}
           </div>
           <p className="text-white/40 text-xs mt-2">{PASOS[paso]}</p>
@@ -120,12 +120,12 @@ export default function NutricionCuestionario() {
               {[['Peso (kg)','peso','number'],['Altura (cm)','altura','number'],['Edad','edad','number']].map(([l,k,t])=>(
                 <div key={k}>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
-                  <input type={t} value={form[k]} onChange={e=>set(k,e.target.value)} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  <input type={t} value={form[k]} onChange={e=>set(k,e.target.value)} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
               ))}
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Sexo</label>
-                <select value={form.sexo} onChange={e=>set('sexo',e.target.value)} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                <select value={form.sexo} onChange={e=>set('sexo',e.target.value)} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="">—</option>
                   <option value="hombre">Hombre</option>
                   <option value="mujer">Mujer</option>
@@ -137,7 +137,7 @@ export default function NutricionCuestionario() {
               <div className="space-y-2">
                 {[['sedentario','Sedentario — trabajo de oficina, sin deporte'],['ligero','Ligero — 1-2 días de ejercicio/sem'],['moderado','Moderado — 3-4 días de ejercicio/sem'],['activo','Activo — 5-6 días de ejercicio/sem'],['muy_activo','Muy activo — entreno 2 veces al día']].map(([v,l])=>(
                   <button key={v} onClick={()=>set('nivel_actividad',v)} type="button"
-                    className={`w-full text-left px-3 py-2.5 rounded-xl text-sm border transition-all ${form.nivel_actividad===v?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 text-[#0A0A0A] hover:border-[#FF5C00]'}`}>
+                    className={`w-full text-left px-3 py-2.5 rounded-xl text-sm border transition-all ${form.nivel_actividad===v?'bg-acento border-acento text-white':'border-black/10 text-[#0A0A0A] hover:border-acento'}`}>
                     {l}
                   </button>
                 ))}
@@ -150,7 +150,7 @@ export default function NutricionCuestionario() {
             <div className="space-y-2">
               {[['perdida_grasa','🔥 Pérdida de grasa'],['ganancia_muscular','💪 Ganancia muscular'],['recomposicion','⚡ Recomposición corporal'],['mantenimiento','✓ Mantenimiento'],['rendimiento','🏆 Rendimiento deportivo']].map(([v,l])=>(
                 <button key={v} onClick={()=>set('objetivo',v)} type="button"
-                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium border transition-all ${form.objetivo===v?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 text-[#0A0A0A] hover:border-[#FF5C00]'}`}>
+                  className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium border transition-all ${form.objetivo===v?'bg-acento border-acento text-white':'border-black/10 text-[#0A0A0A] hover:border-acento'}`}>
                   {l}
                 </button>
               ))}
@@ -159,7 +159,7 @@ export default function NutricionCuestionario() {
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Velocidad de progreso</label>
               {[['lento','🐢 Lento y sostenible'],['moderado','🚶 Moderado'],['rapido','🏃 Rápido']].map(([v,l])=>(
                 <button key={v} onClick={()=>set('velocidad_progreso',v)} type="button"
-                  className={`w-full text-left px-3 py-2.5 rounded-xl text-sm border transition-all mb-1.5 ${form.velocidad_progreso===v?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 text-[#0A0A0A] hover:border-[#FF5C00]'}`}>
+                  className={`w-full text-left px-3 py-2.5 rounded-xl text-sm border transition-all mb-1.5 ${form.velocidad_progreso===v?'bg-acento border-acento text-white':'border-black/10 text-[#0A0A0A] hover:border-acento'}`}>
                   {l}
                 </button>
               ))}
@@ -181,7 +181,7 @@ export default function NutricionCuestionario() {
                     ['0','Ayuno 16:8','Ventana 12-20h'],
                   ].map(([v,l,sub]) => (
                     <button key={v} onClick={() => set('comidas_dia', v)} type="button"
-                      className={`px-2 py-2.5 rounded-xl border text-center transition-all ${form.comidas_dia===v?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 hover:border-[#FF5C00]'}`}>
+                      className={`px-2 py-2.5 rounded-xl border text-center transition-all ${form.comidas_dia===v?'bg-acento border-acento text-white':'border-black/10 hover:border-acento'}`}>
                       <p className={`text-sm font-bold ${form.comidas_dia===v?'text-white':'text-[#0A0A0A]'}`}>{l}</p>
                       <p className={`text-xs mt-0.5 ${form.comidas_dia===v?'text-white/70':'text-[#6B6B6B]'}`}>{sub}</p>
                     </button>
@@ -190,7 +190,7 @@ export default function NutricionCuestionario() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Tiempo cocina</label>
-                <select value={form.tiempo_cocina} onChange={e=>set('tiempo_cocina',e.target.value)} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                <select value={form.tiempo_cocina} onChange={e=>set('tiempo_cocina',e.target.value)} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="">—</option>
                   <option value="10-15 minutos">Muy poco</option>
                   <option value="30 minutos">Normal</option>
@@ -213,8 +213,8 @@ export default function NutricionCuestionario() {
                   ['ayuno_16_8',    '⏱ Ayuno 16:8',    'Come en una ventana de 8 horas (ej: 12:00-20:00). Las otras 16h, solo agua o café.'],
                 ].map(([v,l,desc]) => (
                   <button key={v} onClick={() => set('tipo_dieta', v)} type="button"
-                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all ${form.tipo_dieta===v?'border-[#FF5C00] bg-[#FF5C00]/8':'border-black/10 bg-white hover:border-black/20'}`}>
-                    <p className={`text-sm font-semibold ${form.tipo_dieta===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                    className={`w-full text-left px-3.5 py-3 rounded-xl border transition-all ${form.tipo_dieta===v?'border-acento bg-acento/8':'border-black/10 bg-white hover:border-black/20'}`}>
+                    <p className={`text-sm font-semibold ${form.tipo_dieta===v?'text-acento':'text-[#0A0A0A]'}`}>{l}</p>
                     <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{desc}</p>
                   </button>
                 ))}
@@ -224,7 +224,7 @@ export default function NutricionCuestionario() {
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">¿Cuándo entrenas?</label>
               {[['mañana en ayunas','🌅 Mañana en ayunas'],['mañana','☀️ Mañana (con desayuno)'],['mediodía','🌤 Mediodía'],['tarde','🌇 Tarde'],['noche','🌙 Noche']].map(([v,l])=>(
                 <button key={v} onClick={()=>set('entrena_cuando',v)} type="button"
-                  className={`w-full text-left px-3 py-2 rounded-xl text-sm border transition-all mb-1.5 ${form.entrena_cuando===v?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 text-[#0A0A0A] hover:border-[#FF5C00]'}`}>
+                  className={`w-full text-left px-3 py-2 rounded-xl text-sm border transition-all mb-1.5 ${form.entrena_cuando===v?'bg-acento border-acento text-white':'border-black/10 text-[#0A0A0A] hover:border-acento'}`}>
                   {l}
                 </button>
               ))}
@@ -235,7 +235,7 @@ export default function NutricionCuestionario() {
             <p className="text-sm font-bold text-[#0A0A0A]">Condiciones de salud</p>
             <label className="flex items-start gap-3 cursor-pointer">
               <input type="checkbox" checked={form.tiene_condicion_salud} onChange={e=>set('tiene_condicion_salud', e.target.checked)}
-                className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                className="mt-0.5 w-4 h-4 accent-acento flex-shrink-0"/>
               <span className="text-sm text-[#0A0A0A]">¿Tienes alguna condición de salud que afecte a tu alimentación?</span>
             </label>
             {form.tiene_condicion_salud && (
@@ -243,25 +243,25 @@ export default function NutricionCuestionario() {
                 {CONDICIONES_SALUD_OPTS.map(c => (
                   <label key={c} className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" checked={form.condiciones_salud.includes(c)} onChange={()=>toggleCondicion(c)}
-                      className="w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                      className="w-4 h-4 accent-acento flex-shrink-0"/>
                     <span className="text-sm text-[#0A0A0A]">{c}</span>
                   </label>
                 ))}
                 <label className="flex items-center gap-3 cursor-pointer">
                   <input type="checkbox" checked={form.condiciones_salud.includes('Otro')} onChange={()=>toggleCondicion('Otro')}
-                    className="w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                    className="w-4 h-4 accent-acento flex-shrink-0"/>
                   <span className="text-sm text-[#0A0A0A]">Otro</span>
                 </label>
                 {form.condiciones_salud.includes('Otro') && (
                   <input value={form.condicion_otro} onChange={e=>set('condicion_otro', e.target.value)} placeholder="Especifica..."
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 )}
               </div>
             )}
             <div>
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">¿Tomas medicación que deba tenerse en cuenta? (opcional)</label>
               <textarea value={form.medicacion} onChange={e=>set('medicacion', e.target.value)} rows={2}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                 placeholder="Ej: Metformina, Levotiroxina..." />
             </div>
           </>)}
@@ -272,7 +272,7 @@ export default function NutricionCuestionario() {
               <div key={k}>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
                 <input value={form[k]} onChange={e=>set(k,e.target.value)} placeholder={ph}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
             ))}
           </>)}
@@ -284,25 +284,25 @@ export default function NutricionCuestionario() {
             <button onClick={()=>setPaso(p=>p-1)} className="flex-1 border border-white/20 text-white text-sm font-medium py-3 rounded-xl hover:bg-white/5">← Atrás</button>
           )}
           {paso < PASOS.length-1 ? (
-            <button onClick={()=>setPaso(p=>p+1)} className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">Siguiente →</button>
+            <button onClick={()=>setPaso(p=>p+1)} className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl">Siguiente →</button>
           ) : (
             <div className="flex-1 space-y-3">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={aceptaRgpd} onChange={e=>setAceptaRgpd(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                  className="mt-0.5 w-4 h-4 accent-acento flex-shrink-0"/>
                 <span className="text-xs text-white/60 leading-relaxed">
-                  Acepto la <span className="text-[#FF5C00] underline">Política de Privacidad</span> y el tratamiento de mis datos de salud y nutrición conforme al RGPD.
+                  Acepto la <span className="text-acento underline">Política de Privacidad</span> y el tratamiento de mis datos de salud y nutrición conforme al RGPD.
                 </span>
               </label>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input type="checkbox" checked={aceptaIa} onChange={e=>setAceptaIa(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 accent-[#FF5C00] flex-shrink-0"/>
+                  className="mt-0.5 w-4 h-4 accent-acento flex-shrink-0"/>
                 <span className="text-xs text-white/60 leading-relaxed">
                   Entiendo que mis datos nutricionales (peso, alergias, objetivos) serán procesados por Inteligencia Artificial (Anthropic/Claude) para generar mi plan personalizado.
                 </span>
               </label>
               <button onClick={enviar} disabled={loading||!aceptaRgpd||!aceptaIa}
-                className="w-full bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
+                className="w-full bg-acento text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
                 {loading ? '⏳ Enviando...' : '✅ Enviar cuestionario'}
               </button>
             </div>

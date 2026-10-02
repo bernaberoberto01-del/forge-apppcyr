@@ -26,7 +26,7 @@ export default class ErrorBoundary extends Component {
             </p>
             <button
               onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload() }}
-              className="bg-[#FF5C00] text-white text-sm font-semibold px-6 py-3 rounded-xl">
+              className="bg-acento text-white text-sm font-semibold px-6 py-3 rounded-xl">
               Recargar
             </button>
           </div>

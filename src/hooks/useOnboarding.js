@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 export const PASOS_ONBOARDING = {
   PERFIL:           'perfil',
@@ -17,7 +18,7 @@ export const PASOS_ONBOARDING = {
 
 export const TUTORIALES = {
   dashboard: {
-    titulo: '¡Bienvenido a Forge! 👋',
+    titulo: `¡Bienvenido a ${BRAND.nombre}! 👋`,
     desc: 'Aquí ves todo de un vistazo: clientes nuevos, sesiones de hoy y lo que necesita tu atención. Empieza configurando tu perfil.',
     accion: 'Ir a Configuración',
     ruta: '/configuracion',
@@ -30,7 +31,7 @@ export const TUTORIALES = {
   },
   rutinas: {
     titulo: 'Planes de entrenamiento 💪',
-    desc: 'Selecciona un cliente y pulsa "Generar con IA" — Forge crea una rutina personalizada en segundos. Luego la revisas y la publicas.',
+    desc: `Selecciona un cliente y pulsa "Generar con IA" — ${BRAND.nombre} crea una rutina personalizada en segundos. Luego la revisas y la publicas.`,
     paso: 'primera_rutina',
   },
   agenda: {
@@ -40,12 +41,12 @@ export const TUTORIALES = {
   },
   seguimiento: {
     titulo: 'Seguimiento semanal 📋',
-    desc: 'Cada domingo Forge envía automáticamente el check-in a tus clientes. El lunes los ves aquí y puedes generar un mensaje de feedback con IA.',
+    desc: `Cada domingo ${BRAND.nombre} envía automáticamente el check-in a tus clientes. El lunes los ves aquí y puedes generar un mensaje de feedback con IA.`,
     paso: 'primer_checkin',
   },
   pagos: {
     titulo: 'Gestión de cobros 💶',
-    desc: 'Crea un plan de cobro por cliente y Forge te avisará cuándo toca cobrar.',
+    desc: `Crea un plan de cobro por cliente y ${BRAND.nombre} te avisará cuándo toca cobrar.`,
     paso: 'primer_pago',
   },
   mensajes: {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 export default function PerfilPublico() {
   const { slug } = useParams()
@@ -45,7 +46,7 @@ export default function PerfilPublico() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#F7F6F3] flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin"/>
     </div>
   )
 
@@ -59,7 +60,7 @@ export default function PerfilPublico() {
     </div>
   )
 
-  const acento = config.color_acento || '#FF5C00'
+  const acento = config.color_acento || BRAND.color
   const tarifas = [
     { nombre: 'Asesoría Online — Entrenamiento', precio: '35€/mes', desc: 'Rutina personalizada + seguimiento semanal + mensajería directa', icono: '💪' },
     { nombre: 'Asesoría Online — Nutrición', precio: '29€/mes', desc: 'Plan de alimentación personalizado + ajuste mensual', icono: '🥗' },
@@ -174,15 +175,15 @@ export default function PerfilPublico() {
             <form onSubmit={enviarContacto} className="p-5 space-y-3">
               <input required value={formData.nombre} onChange={e=>setFormData(f=>({...f,nombre:e.target.value}))}
                 placeholder="Tu nombre *"
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
               <input required type="email" value={formData.email} onChange={e=>setFormData(f=>({...f,email:e.target.value}))}
                 placeholder="Tu email *"
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
               <input value={formData.telefono} onChange={e=>setFormData(f=>({...f,telefono:e.target.value}))}
                 placeholder="Teléfono (opcional)"
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
               <select value={formData.objetivo} onChange={e=>setFormData(f=>({...f,objetivo:e.target.value}))}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                 <option value="">¿Cuál es tu objetivo?</option>
                 <option value="perdida_grasa">Perder grasa</option>
                 <option value="ganancia_muscular">Ganar músculo</option>
@@ -193,7 +194,7 @@ export default function PerfilPublico() {
               <textarea value={formData.mensaje} onChange={e=>setFormData(f=>({...f,mensaje:e.target.value}))}
                 placeholder="Cuéntame un poco más sobre ti y lo que buscas..."
                 rows={3}
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"/>
+                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"/>
               <button type="submit" disabled={enviando || !formData.nombre || !formData.email}
                 className="w-full py-3 rounded-xl text-white font-bold text-sm disabled:opacity-40 transition-all"
                 style={{background:acento}}>

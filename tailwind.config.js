@@ -3,8 +3,13 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Color de marca de la instancia/entrenador; lo fija aplicarColor() en useConfig.js
+        acento: {
+          DEFAULT: 'rgb(var(--acento-rgb) / <alpha-value>)',
+          hover: 'var(--acento-hover)',
+        },
         forge: {
-          orange: '#FF5C00',
+          orange: 'rgb(var(--acento-rgb) / <alpha-value>)',
           dark: '#111111',
           bg: '#F5F5F0',
           text: '#0A0A0A',

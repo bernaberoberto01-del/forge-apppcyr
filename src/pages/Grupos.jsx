@@ -148,7 +148,7 @@ export default function Grupos({ session }) {
 
   if (loading) return (
     <div className="flex-1 flex items-center justify-center">
-      <div className="w-6 h-6 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-6 h-6 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -175,7 +175,7 @@ export default function Grupos({ session }) {
               <p className="font-semibold text-[#6B6B6B]">Sin grupos todavía</p>
               <p className="text-sm text-[#9B9B9B] mt-1 leading-relaxed">Crea un grupo para gestionar parejas o grupos de entrenamiento con tarifa compartida</p>
               <button onClick={abrirNuevo}
-                className="mt-4 bg-[#FF5C00] text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#e55200] transition-all">
+                className="mt-4 bg-acento text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#e55200] transition-all">
                 Crear primer grupo
               </button>
             </div>
@@ -187,7 +187,7 @@ export default function Grupos({ session }) {
             const activo = sel?.id === g.id
             return (
               <div key={g.id} onClick={() => setSel(g)}
-                className={`rounded-2xl p-4 cursor-pointer transition-all border ${activo ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'bg-white border-black/8 hover:border-black/20 hover:shadow-sm'}`}>
+                className={`rounded-2xl p-4 cursor-pointer transition-all border ${activo ? 'border-acento bg-acento/5' : 'bg-white border-black/8 hover:border-black/20 hover:shadow-sm'}`}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{g.tipo === 'pareja' ? '👫' : '👥'}</span>
@@ -197,7 +197,7 @@ export default function Grupos({ session }) {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    {t && <p className="text-sm font-bold text-[#FF5C00]">{t.pp}€/p</p>}
+                    {t && <p className="text-sm font-bold text-acento">{t.pp}€/p</p>}
                     <p className={`text-xs font-medium mt-0.5 ${miembros.length >= max ? 'text-emerald-600' : 'text-[#9B9B9B]'}`}>
                       {miembros.length}/{max} {miembros.length >= max ? '· Completo' : ''}
                     </p>
@@ -267,8 +267,8 @@ export default function Grupos({ session }) {
                     <p className="text-xs text-[#9B9B9B] mt-0.5">por persona</p>
                   </div>
                   {tarifaSel.total && (
-                    <div className="bg-[#FF5C00]/8 rounded-xl p-3 text-center">
-                      <p className="text-xl font-bold text-[#FF5C00]">{tarifaSel.total}€</p>
+                    <div className="bg-acento/8 rounded-xl p-3 text-center">
+                      <p className="text-xl font-bold text-acento">{tarifaSel.total}€</p>
                       <p className="text-xs text-[#9B9B9B] mt-0.5">total grupo</p>
                     </div>
                   )}
@@ -311,7 +311,7 @@ export default function Grupos({ session }) {
                       <p className="text-xs text-[#9B9B9B]">{m.clientes?.email}</p>
                     </div>
                     {tarifaSel && (
-                      <span className="text-xs font-bold text-[#FF5C00] flex-shrink-0">{tarifaSel.pp}€/mes</span>
+                      <span className="text-xs font-bold text-acento flex-shrink-0">{tarifaSel.pp}€/mes</span>
                     )}
                     <button onClick={() => quitarCliente(m)}
                       className="text-xs text-red-400 hover:text-red-600 border border-red-100 hover:border-red-300 px-2.5 py-1 rounded-lg transition-all flex-shrink-0">
@@ -325,7 +325,7 @@ export default function Grupos({ session }) {
               {miembrosSel.length < maxSel && (
                 <div className="flex gap-2">
                   <select value={clienteAdd} onChange={e => setClienteAdd(e.target.value)}
-                    className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#FF5C00]">
+                    className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-acento">
                     <option value="">— Añadir cliente al grupo —</option>
                     {clientesDisponibles.map(c => (
                       <option key={c.id} value={c.id}>{c.nombre}</option>
@@ -383,7 +383,7 @@ export default function Grupos({ session }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
                 <input value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})}
                   placeholder="Ej: Pareja Lunes/Miércoles · Ana y Carlos"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
               </div>
 
               {/* Tipo */}
@@ -396,9 +396,9 @@ export default function Grupos({ session }) {
                   ].map(([v, ic, l, sub, info]) => (
                     <button key={v} type="button"
                       onClick={() => setForm({...form, tipo: v, dias_semana: []})}
-                      className={`py-3 px-3 rounded-xl border text-left transition-all ${form.tipo===v ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/10 hover:border-black/20'}`}>
+                      className={`py-3 px-3 rounded-xl border text-left transition-all ${form.tipo===v ? 'border-acento bg-acento/5' : 'border-black/10 hover:border-black/20'}`}>
                       <p className="text-xl mb-1">{ic}</p>
-                      <p className={`text-sm font-bold ${form.tipo===v ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>{l}</p>
+                      <p className={`text-sm font-bold ${form.tipo===v ? 'text-acento' : 'text-[#0A0A0A]'}`}>{l}</p>
                       <p className="text-xs text-[#9B9B9B] mt-0.5">{sub}</p>
                       <p className="text-xs text-[#C0C0C0] mt-0.5">{info}</p>
                     </button>
@@ -450,12 +450,12 @@ export default function Grupos({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Hora</label>
                   <input type="time" value={form.hora} onChange={e => setForm({...form, hora: e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Duración (min)</label>
                   <input type="number" value={form.duracion_minutos} onChange={e => setForm({...form, duracion_minutos: e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
                 </div>
               </div>
 
@@ -464,7 +464,7 @@ export default function Grupos({ session }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Notas (opcional)</label>
                 <textarea value={form.notas} onChange={e => setForm({...form, notas: e.target.value})}
                   rows={2} placeholder="Ej: amigos del trabajo, nivel intermedio…"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"/>
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"/>
               </div>
 
               <div className="flex gap-2 pt-1">

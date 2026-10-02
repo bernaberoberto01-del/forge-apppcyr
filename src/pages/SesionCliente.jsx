@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
   const nombreLow = ej.ejercicio_nombre?.toLowerCase() || ''
@@ -163,7 +164,7 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
       {/* Cuenta atrás EMOM — ocupa toda la pantalla del bloque */}
       {cuentaAtras && (
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-          <p className="text-8xl font-black text-white animate-ping" style={{ color: '#FF5C00' }}>
+          <p className="text-8xl font-black text-white animate-ping" style={{ color: BRAND.color }}>
             {cuentaAtras}
           </p>
         </div>
@@ -172,13 +173,13 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
         {/* TABATA */}
         {esTabata ? (
           <div className="p-4 text-center relative">
-            <div className={`rounded-xl py-3 mb-3 transition-all ${tabataFase==='trabajo'?'bg-[#FF5C00]':'bg-[#6B6B6B]'}`}>
+            <div className={`rounded-xl py-3 mb-3 transition-all ${tabataFase==='trabajo'?'bg-acento':'bg-[#6B6B6B]'}`}>
               <p className="text-white text-xs font-bold uppercase tracking-widest">{tabataFase==='trabajo'?'🔥 TRABAJO':'💤 DESCANSO'}</p>
               <p className="text-white text-5xl font-bold font-mono mt-1">{String(tabataSeg).padStart(2,'0')}s</p>
             </div>
             <div className="flex justify-center gap-1 mb-3">
               {[1,2,3,4,5,6,7,8].map(r=>(
-                <div key={r} className={`w-6 h-2 rounded-full transition-all ${r<tabataRonda?'bg-emerald-400':r===tabataRonda?'bg-[#FF5C00]':'bg-white/20'}`}/>
+                <div key={r} className={`w-6 h-2 rounded-full transition-all ${r<tabataRonda?'bg-emerald-400':r===tabataRonda?'bg-acento':'bg-white/20'}`}/>
               ))}
             </div>
             <p className="text-white/50 text-xs mb-3">Ronda {tabataRonda} de 8 · 20s trabajo / 10s descanso</p>
@@ -188,14 +189,14 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
         {durSeg > 0 && (
           <div className="h-1.5 bg-white/10 rounded-full mb-4 overflow-hidden">
             <div className="h-full rounded-full transition-all duration-1000"
-              style={{ width: pct + '%', background: enRojo ? '#ef4444' : '#FF5C00' }} />
+              style={{ width: pct + '%', background: enRojo ? '#ef4444' : BRAND.color }} />
           </div>
         )}
 
         {/* Cuenta atrás 3-2-1 inline */}
         {cuentaAtras ? (
           <div className="py-2">
-            <p className="text-7xl font-black" style={{ color: '#FF5C00' }}>{cuentaAtras}</p>
+            <p className="text-7xl font-black" style={{ color: BRAND.color }}>{cuentaAtras}</p>
             <p className="text-white/40 text-sm mt-1">¡Prepárate!</p>
           </div>
         ) : (
@@ -216,7 +217,7 @@ function CronometroMetCon({ ej, ejIdx, datosCardio, updateCardio }) {
         <div className="flex gap-2 justify-center mt-2">
           <button onClick={toggle}
             className="px-8 py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-all"
-            style={{ background: activo ? '#6B6B6B' : '#FF5C00' }}>
+            style={{ background: activo ? '#6B6B6B' : BRAND.color }}>
             {activo ? '⏸ Parar' : esTabata ? '▶ Iniciar Tabata' : '▶ ' + (seg === (esPorTiempo ? 0 : durSeg) ? 'Iniciar' : 'Continuar')}
           </button>
           <button onClick={reset} className="px-4 py-3 rounded-xl text-white/50 border border-white/10 text-sm">↺</button>
@@ -483,14 +484,14 @@ export default function SesionCliente() {
     return (
       <button type="button" onClick={() => field === 'rpe' ? setRpe(val) : setFatiga(val)}
         className={`w-10 h-10 rounded-xl text-sm font-semibold transition-all ${active
-          ? isRed ? 'bg-red-500 text-white' : 'bg-[#FF5C00] text-white'
+          ? isRed ? 'bg-red-500 text-white' : 'bg-acento text-white'
           : 'border border-black/10 text-[#6B6B6B]'}`}>
         {val}
       </button>
     )
   }
 
-  if (clienteSession === undefined || loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
+  if (clienteSession === undefined || loading) return <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]"><div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" /></div>
   if (!cliente) return <div className="min-h-screen flex items-center justify-center"><p className="text-[#6B6B6B]">No hemos podido cargar tus datos.</p></div>
   if (enviado) return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[#F5F5F0]">
@@ -499,7 +500,7 @@ export default function SesionCliente() {
         <h2 className="text-2xl font-bold text-[#0A0A0A] mb-2">¡Sesión registrada!</h2>
         <p className="text-[#6B6B6B] text-sm">Tu entrenador ya puede ver tu entrenamiento de hoy.</p>
         <a href="/"
-          className="block mt-6 bg-[#FF5C00] text-white font-semibold py-3.5 rounded-2xl text-sm text-center">
+          className="block mt-6 bg-acento text-white font-semibold py-3.5 rounded-2xl text-sm text-center">
           Ver mi portal →
         </a>
         <button onClick={() => { setEnviado(false); setPaso(1) }}
@@ -516,7 +517,7 @@ export default function SesionCliente() {
     <div className="min-h-screen bg-[#F5F5F0]">
       <div className="bg-[#111] px-4 pt-10 pb-5">
         <div className="max-w-lg mx-auto">
-          <p className="text-white/50 text-xs mb-1">Forge · Registro de sesión</p>
+          <p className="text-white/50 text-xs mb-1">{BRAND.nombre} · Registro de sesión</p>
           <h1 className="text-white font-bold text-lg">{cliente.nombre.split(' ')[0]}</h1>
           <p className="text-white/50 text-xs mt-0.5">{new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
         </div>
@@ -530,8 +531,8 @@ export default function SesionCliente() {
             <div className="space-y-2">
               {dias.map(dia => (
                 <button key={dia.dia} type="button" onClick={() => { setDiaSeleccionado(dia.dia); cargarDia(rutina, dia.dia, cliente, marcasCliente) }}
-                  className={`w-full p-3.5 rounded-xl border text-left transition-all ${diaSeleccionado === dia.dia ? 'border-[#FF5C00] bg-[#FF5C00]/5' : 'border-black/8 hover:border-black/20'}`}>
-                  <p className={`text-sm font-semibold ${diaSeleccionado === dia.dia ? 'text-[#FF5C00]' : 'text-[#0A0A0A]'}`}>{dia.nombre}</p>
+                  className={`w-full p-3.5 rounded-xl border text-left transition-all ${diaSeleccionado === dia.dia ? 'border-acento bg-acento/5' : 'border-black/8 hover:border-black/20'}`}>
+                  <p className={`text-sm font-semibold ${diaSeleccionado === dia.dia ? 'text-acento' : 'text-[#0A0A0A]'}`}>{dia.nombre}</p>
                   <p className="text-xs text-[#6B6B6B] mt-0.5">{dia.ejercicios?.length} ejercicios · {dia.patron_principal}</p>
                 </button>
               ))}
@@ -542,11 +543,11 @@ export default function SesionCliente() {
         {/* Duración */}
         {paso === 1 && (
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
-            <p className="text-sm font-bold text-[#0A0A0A] mb-3">Duración: <span className="text-[#FF5C00]">{duracion} min</span></p>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-3">Duración: <span className="text-acento">{duracion} min</span></p>
             <div className="flex gap-2 flex-wrap">
               {[30, 45, 60, 75, 90].map(v => (
                 <button key={v} type="button" onClick={() => setDuracion(v)}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${duracion === v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${duracion === v ? 'bg-acento text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                   {v}min
                 </button>
               ))}
@@ -573,10 +574,10 @@ export default function SesionCliente() {
           return (
           <div key={ejIdx} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
             <div className="bg-[#0A0A0A] px-4 py-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-[#FF5C00] text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
+              <span className="w-6 h-6 bg-acento text-white rounded-lg text-xs font-bold flex items-center justify-center">{ejIdx + 1}</span>
               <p className="text-white text-sm font-semibold flex-1">{ej.ejercicio_nombre}</p>
               {tipo === 'fuerza' && ej.peso_recomendado && (
-                <span className="text-xs bg-[#FF5C00]/20 text-[#FF5C00] px-2 py-0.5 rounded-full font-medium flex-shrink-0">~{ej.peso_recomendado}kg</span>
+                <span className="text-xs bg-acento/20 text-acento px-2 py-0.5 rounded-full font-medium flex-shrink-0">~{ej.peso_recomendado}kg</span>
               )}
               {tipo === 'metcon' && <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full font-medium">⏱ MetCon</span>}
               {tipo === 'carrera' && <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full font-medium">🏃 Carrera</span>}
@@ -594,13 +595,13 @@ export default function SesionCliente() {
                       <label className="text-xs text-[#6B6B6B] mb-1 block">Rondas completadas</label>
                       <input type="number" value={datosCardio[ejIdx]?.rondas || ''}
                         onChange={e => updateCardio(ejIdx, 'rondas', e.target.value)}
-                        placeholder="5" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                        placeholder="5" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                     </div>
                     <div>
                       <label className="text-xs text-[#6B6B6B] mb-1 block">Reps ronda extra</label>
                       <input type="number" value={datosCardio[ejIdx]?.reps_extra || ''}
                         onChange={e => updateCardio(ejIdx, 'reps_extra', e.target.value)}
-                        placeholder="12" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                        placeholder="12" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                     </div>
                   </>}
                   {ej.ejercicio_nombre?.toLowerCase().includes('emom') && <>
@@ -608,13 +609,13 @@ export default function SesionCliente() {
                       <label className="text-xs text-[#6B6B6B] mb-1 block">Minutos completados</label>
                       <input type="number" value={datosCardio[ejIdx]?.minutos || ''}
                         onChange={e => updateCardio(ejIdx, 'minutos', e.target.value)}
-                        placeholder="16" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                        placeholder="16" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                     </div>
                     <div>
                       <label className="text-xs text-[#6B6B6B] mb-1 block">¿Fallaste algún minuto?</label>
                       <select value={datosCardio[ejIdx]?.fallo || 'no'}
                         onChange={e => updateCardio(ejIdx, 'fallo', e.target.value)}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]">
+                        className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento">
                         <option value="no">No, todo completado</option>
                         <option value="si">Sí, algún minuto</option>
                       </select>
@@ -625,26 +626,26 @@ export default function SesionCliente() {
                       <label className="text-xs text-[#6B6B6B] mb-1 block">Tiempo total (se rellena al parar)</label>
                       <input type="text" value={datosCardio[ejIdx]?.tiempo || ''}
                         onChange={e => updateCardio(ejIdx, 'tiempo', e.target.value)}
-                        placeholder="00:00" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00] font-mono text-lg" />
+                        placeholder="00:00" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento font-mono text-lg" />
                     </div>
                   )}
                   <div>
                     <label className="text-xs text-[#6B6B6B] mb-1 block">Esfuerzo RPE (1-10)</label>
                     <input type="number" min="1" max="10" value={datosCardio[ejIdx]?.rpe_metcon || ''}
                       onChange={e => updateCardio(ejIdx, 'rpe_metcon', e.target.value)}
-                      placeholder="8" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      placeholder="8" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                   </div>
                   <div>
                     <label className="text-xs text-[#6B6B6B] mb-1 block">Pesos usados</label>
                     <input type="text" value={datosCardio[ejIdx]?.pesos || ''}
                       onChange={e => updateCardio(ejIdx, 'pesos', e.target.value)}
-                      placeholder="KB 24kg, barra 60kg" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                      placeholder="KB 24kg, barra 60kg" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" />
                   </div>
                 </div>
                 <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
                   onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
                   placeholder="Sensaciones, qué fue bien o mal..."
-                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento resize-none" />
               </div>
             )}
 
@@ -657,31 +658,31 @@ export default function SesionCliente() {
                     <label className="text-xs text-[#6B6B6B] mb-1 block">Distancia (km)</label>
                     <input type="number" step="0.1" value={datosCardio[ejIdx]?.km || ''}
                       onChange={e => updateCardio(ejIdx, 'km', e.target.value)}
-                      placeholder="8.5" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      placeholder="8.5" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                   </div>
                   <div>
                     <label className="text-xs text-[#6B6B6B] mb-1 block">Ritmo (min/km)</label>
                     <input type="text" value={datosCardio[ejIdx]?.ritmo || ''}
                       onChange={e => updateCardio(ejIdx, 'ritmo', e.target.value)}
-                      placeholder="5:30" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      placeholder="5:30" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                   </div>
                   <div>
                     <label className="text-xs text-[#6B6B6B] mb-1 block">FC media (ppm)</label>
                     <input type="number" value={datosCardio[ejIdx]?.fc_media || ''}
                       onChange={e => updateCardio(ejIdx, 'fc_media', e.target.value)}
-                      placeholder="145" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      placeholder="145" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                   </div>
                   <div>
                     <label className="text-xs text-[#6B6B6B] mb-1 block">FC máxima (ppm)</label>
                     <input type="number" value={datosCardio[ejIdx]?.fc_max || ''}
                       onChange={e => updateCardio(ejIdx, 'fc_max', e.target.value)}
-                      placeholder="168" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      placeholder="168" className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                   </div>
                 </div>
                 <textarea value={datosCardio[ejIdx]?.notas || ''} rows={2}
                   onChange={e => updateCardio(ejIdx, 'notas', e.target.value)}
                   placeholder="Sensaciones, condiciones, molestias..."
-                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento resize-none" />
               </div>
             )}
 
@@ -697,7 +698,7 @@ export default function SesionCliente() {
                   <div key={setIdx} className="grid grid-cols-8 gap-2 items-center">
                     <span className="col-span-1 text-xs font-bold text-[#6B6B6B]">{setIdx + 1}</span>
                     <input value={s.reps} onChange={e => updateSet(ejIdx, setIdx, 'reps', e.target.value)}
-                      placeholder={s.reps || '—'} className="col-span-5 border border-black/10 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                      placeholder={s.reps || '—'} className="col-span-5 border border-black/10 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                     <button type="button" onClick={() => updateSet(ejIdx, setIdx, 'completado', !s.completado)}
                       className={`col-span-2 h-9 rounded-lg text-sm font-bold transition-all ${s.completado ? 'bg-emerald-500 text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                       {s.completado ? '✓' : '○'}
@@ -721,9 +722,9 @@ export default function SesionCliente() {
                 <div key={setIdx} className="grid grid-cols-12 gap-2 items-center">
                   <span className="col-span-1 text-xs font-bold text-[#6B6B6B]">{setIdx + 1}</span>
                   <input type="number" step="0.5" value={s.peso} onChange={e => updateSet(ejIdx, setIdx, 'peso', e.target.value)}
-                    placeholder="—" className="col-span-5 border border-black/10 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                    placeholder="—" className="col-span-5 border border-black/10 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                   <input value={s.reps} onChange={e => updateSet(ejIdx, setIdx, 'reps', e.target.value)}
-                    placeholder={s.reps || '—'} className="col-span-4 border border-black/10 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-[#FF5C00]" />
+                    placeholder={s.reps || '—'} className="col-span-4 border border-black/10 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-acento" />
                   <button type="button" onClick={() => updateSet(ejIdx, setIdx, 'completado', !s.completado)}
                     className={`col-span-2 h-9 rounded-lg text-sm font-bold transition-all ${s.completado ? 'bg-emerald-500 text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                     {s.completado ? '✓' : '○'}
@@ -746,19 +747,19 @@ export default function SesionCliente() {
             </div>
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4 space-y-5">
               <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-1">Esfuerzo percibido (RPE): <span className="text-[#FF5C00]">{rpe}/10</span></p>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-1">Esfuerzo percibido (RPE): <span className="text-acento">{rpe}/10</span></p>
                 <p className="text-xs text-[#6B6B6B] mb-3">1 = Muy ligero · 10 = Máximo esfuerzo</p>
                 <div className="flex gap-1.5 flex-wrap">{[1,2,3,4,5,6,7,8,9,10].map(v => <Btn key={v} val={v} field="rpe" />)}</div>
               </div>
               <div>
-                <p className="text-sm font-bold text-[#0A0A0A] mb-1">Fatiga generada: <span className="text-[#FF5C00]">{fatiga}/5</span></p>
+                <p className="text-sm font-bold text-[#0A0A0A] mb-1">Fatiga generada: <span className="text-acento">{fatiga}/5</span></p>
                 <p className="text-xs text-[#6B6B6B] mb-3">1 = Fresco · 5 = Muy fatigado</p>
                 <div className="flex gap-1.5">{[1,2,3,4,5].map(v => <Btn key={v} val={v} field="fatiga" />)}</div>
               </div>
               <div>
                 <p className="text-sm font-bold text-[#0A0A0A] mb-1.5">Sensaciones (opcional)</p>
                 <textarea value={sensaciones} onChange={e => setSensaciones(e.target.value)} rows={3}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                   placeholder="¿Algún dolor, mejora en peso, algo que destacar?" />
               </div>
             </div>
@@ -771,7 +772,7 @@ export default function SesionCliente() {
             <button onClick={() => setPaso(1)} className="flex-1 border border-black/10 text-[#0A0A0A] font-semibold py-4 rounded-2xl text-sm">← Atrás</button>
           )}
           {paso === 1 ? (
-            <button onClick={() => setPaso(2)} className="flex-1 bg-[#FF5C00] text-white font-bold py-4 rounded-2xl text-sm active:scale-98 transition-all">
+            <button onClick={() => setPaso(2)} className="flex-1 bg-acento text-white font-bold py-4 rounded-2xl text-sm active:scale-98 transition-all">
               Valorar sesión →
             </button>
           ) : (
@@ -781,7 +782,7 @@ export default function SesionCliente() {
           )}
         </div>
 
-        <p className="text-center text-xs text-[#6B6B6B]">Forge Studio OS</p>
+        <p className="text-center text-xs text-[#6B6B6B]">{BRAND.nombreCompleto}</p>
       </div>
     </div>
   )
