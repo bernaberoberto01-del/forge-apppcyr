@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const APP_URL = Deno.env.get('APP_URL') || 'https://forge-studio-os.vercel.app';
+const MAIL_FROM = Deno.env.get('MAIL_FROM') || 'Forge Studio <noreply@forge-studio.es>';
 const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 function escapeHtml(str: string): string {
@@ -150,7 +152,7 @@ Responde SOLO con JSON: {"calorias_dia":0,"proteinas_g":0,"carbohidratos_g":0,"g
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            from: 'Forge Studio <noreply@forge-studio.es>',
+            from: MAIL_FROM,
             to: cliente.email,
             subject: `Tu resumen de este mes — ${new Date().toLocaleDateString('es-ES', {
               month: 'long',
@@ -168,7 +170,7 @@ Responde SOLO con JSON: {"calorias_dia":0,"proteinas_g":0,"carbohidratos_g":0,"g
                 <p style="font-size:15px;color:#0A0A0A;line-height:1.6">${escapeHtml(resumen).replace(/\n/g, '<br/>')}</p>
               </div>
               <p style="text-align:center;margin-top:16px">
-                <a href="${Deno.env.get('SUPABASE_URL')?.replace('supabase.co', '') || ''}forge-studio-os.vercel.app/portal/${cliente.id}" style="background:#FF5C00;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Ver mi portal →</a>
+                <a href="${APP_URL}/portal/${cliente.id}" style="background:#FF5C00;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Ver mi portal →</a>
               </p>
             </div>`
           })

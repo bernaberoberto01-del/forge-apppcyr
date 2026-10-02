@@ -1,8 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const MAIL_FROM = Deno.env.get('MAIL_FROM') || 'Forge <onboarding@resend.dev>';
 const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 const RESEND_KEY = Deno.env.get('RESEND_API_KEY');
-const APP_URL = 'https://forge-studio-os.vercel.app';
+const APP_URL = Deno.env.get('APP_URL') || 'https://forge-studio-os.vercel.app';
 function escapeHtml(str: string): string {
   return str.replace(/[&<>"']/g, (c)=>({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
 }
@@ -30,7 +31,7 @@ Deno.serve(async (req)=>{
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: 'Forge <onboarding@resend.dev>',
+          from: MAIL_FROM,
           to: c.email,
           subject: `${c.nombre.split(' ')[0]}, ¿cuánto mueves ahora? 💪`,
           html: `

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+const APP_URL = Deno.env.get('APP_URL') || 'https://forge-studio-os.vercel.app'
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const CORS = {
@@ -46,7 +47,7 @@ Deno.serve(async (req) => {
     const eNombre = escapeHtml(nombre)
     const eEntrenador = escapeHtml(nombreEntrenador)
     const eNegocio = escapeHtml(nombreNegocio)
-    const redirectTo = 'https://forge-studio-os.vercel.app/portal'
+    const redirectTo = `${APP_URL}/portal`
 
     // Estrategia: intentar invite (crea cuenta nueva) → si ya existe, usar magiclink
     let accessLink = ''

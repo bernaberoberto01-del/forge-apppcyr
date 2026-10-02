@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14'
+const APP_URL = Deno.env.get('APP_URL') || 'https://forge-studio-os.vercel.app'
 
 const PLANES = {
   nutricion:     { importe: 29, concepto: 'Asesoría Nutrición',     lookup_key: 'forge_nutricion_mensual' },
@@ -44,8 +45,8 @@ serve(async (req) => {
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: price.id, quantity: 1 }],
-      success_url: 'https://forge-studio-os.vercel.app/?checkout=success',
-      cancel_url: 'https://forge-studio-os.vercel.app/?checkout=cancelled',
+      success_url: `${APP_URL}/?checkout=success`,
+      cancel_url: `${APP_URL}/?checkout=cancelled`,
       metadata: { cliente_id, entrenador_id: user.id, plan },
       subscription_data: { metadata: { cliente_id, entrenador_id: user.id, plan } },
     })

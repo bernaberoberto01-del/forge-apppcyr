@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+const APP_URL = Deno.env.get('APP_URL') || 'https://forge-studio-os.vercel.app'
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
@@ -44,7 +45,7 @@ Deno.serve(async (req) => {
     const eNombre = escapeHtml(nombre)
     const eEntrenador = escapeHtml(nombreEntrenador)
     const eNegocio = escapeHtml(nombreNegocio)
-    const portalUrl = `https://forge-studio-os.vercel.app/portal/${cliente_id}`
+    const portalUrl = `${APP_URL}/portal/${cliente_id}`
 
     let asunto = ''
     let cuerpo = ''
@@ -64,7 +65,7 @@ Deno.serve(async (req) => {
       const { data: cfg2 } = await sb.from('configuracion').select('email_contacto').eq('entrenador_id', cliente.entrenador_id).maybeSingle()
       const emailEntrenador = cfg2?.email_contacto || gmailUser
       asunto = `${nombre} te ha enviado un mensaje`
-      const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#f5f5f0;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#111;padding:24px"><span style="color:${color};font-size:18px;font-weight:800">${eNegocio}</span></div><div style="padding:24px"><p style="font-size:16px;font-weight:600;margin-bottom:8px">${eNombre} te ha escrito:</p>${preview ? `<div style="background:#f5f5f0;border-left:3px solid ${color};border-radius:4px;padding:12px 16px;margin-bottom:16px"><p style="font-size:14px;color:#555;font-style:italic">&ldquo;${escapeHtml(preview.slice(0,200))}&rdquo;</p></div>` : ''}<a href="https://forge-studio-os.vercel.app/mensajes" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Ver mensaje →</a></div></div></body></html>`
+      const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#f5f5f0;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#111;padding:24px"><span style="color:${color};font-size:18px;font-weight:800">${eNegocio}</span></div><div style="padding:24px"><p style="font-size:16px;font-weight:600;margin-bottom:8px">${eNombre} te ha escrito:</p>${preview ? `<div style="background:#f5f5f0;border-left:3px solid ${color};border-radius:4px;padding:12px 16px;margin-bottom:16px"><p style="font-size:14px;color:#555;font-style:italic">&ldquo;${escapeHtml(preview.slice(0,200))}&rdquo;</p></div>` : ''}<a href="${APP_URL}/mensajes" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Ver mensaje →</a></div></div></body></html>`
       const { SMTPClient } = await import('https://deno.land/x/denomailer@1.6.0/mod.ts')
       const client = new SMTPClient({ connection: { hostname: 'smtp.gmail.com', port: 465, tls: true, auth: { username: gmailUser, password: gmailPass } } })
       await client.send({ from: `${nombreNegocio} <${gmailUser}>`, to: emailEntrenador, subject: asunto, html })

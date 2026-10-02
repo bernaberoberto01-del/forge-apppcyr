@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+const APP_URL = Deno.env.get('APP_URL') || 'https://forge-studio-os.vercel.app'
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
@@ -37,7 +38,7 @@ Deno.serve(async (req) => {
     // asunto y remitente, donde las entidades se verían en crudo.
     const eCentro = escapeHtml(nombreCentro)
     const rolLabel = inv.rol === 'admin' ? 'administrador/a' : 'entrenador/a'
-    const enlace = `${Deno.env.get('SITE_URL') || 'https://forge-studio-os.vercel.app'}/unirse/${inv.token}`
+    const enlace = `${APP_URL}/unirse/${inv.token}`
 
     const gmailUser = Deno.env.get('GMAIL_USER')
     const gmailPass = Deno.env.get('GMAIL_APP_PASSWORD')

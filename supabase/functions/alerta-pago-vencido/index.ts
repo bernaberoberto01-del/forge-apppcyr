@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const MAIL_FROM = Deno.env.get('MAIL_FROM') || 'Forge <noreply@forgeapp.es>';
 const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
@@ -28,7 +29,7 @@ Deno.serve(async (req)=>{
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: 'Forge <noreply@forgeapp.es>',
+          from: MAIL_FROM,
           to: cliente.email,
           subject: `Aviso de pago — ${msg}`,
           html: `
