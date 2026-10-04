@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     }
 
     // Guardar que se envió el acceso
-    await sb.from('clientes').update({ ultimo_acceso_enviado: new Date().toISOString() }).eq('id', cliente_id).catch(() => {})
+    await sb.from('clientes').update({ ultimo_acceso_enviado: new Date().toISOString() }).eq('id', cliente_id).then(() => {}).catch(() => {})
 
     // Solo generar el link, sin enviar email (botón "Enlace portal" en Clientes.jsx)
     if (tipo === 'magiclink') {
