@@ -123,7 +123,7 @@ JSON:
       clienteId = clienteExistente.id
     } else {
       const { data: nuevoCliente, error: errCliente } = await sb.from('clientes').insert({
-        nombre: cuest.nombre, email: cuest.email, tipo: 'online', estado: 'pendiente', entrenador_id,
+        nombre: cuest.nombre, email: cuest.email, telefono: cuest.telefono || null, tipo: 'online', estado: 'pendiente', entrenador_id,
       }).select('id').single()
       if (errCliente) console.error('analizar-diagnostico: error creando cliente', errCliente.message)
       clienteId = nuevoCliente?.id || null

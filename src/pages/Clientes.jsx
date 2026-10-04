@@ -1559,6 +1559,12 @@ export default function Clientes({ session }) {
                     </div>
                     {detalle.telefono && <a href={`tel:${detalle.telefono}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-[#FF5C00] pt-1 border-t border-black/5 transition-colors">📞 {detalle.telefono}</a>}
                     {detalle.email && <a href={`mailto:${detalle.email}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">✉️ {detalle.email}</a>}
+                    {detalle.telefono && (
+                      <a href={`https://wa.me/${detalle.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 text-xs font-bold py-2.5 rounded-xl hover:bg-emerald-100 transition-colors mt-1">
+                        📱 Abrir WhatsApp
+                      </a>
+                    )}
                   </div>
 
                   {/* Cuestionario de registro (formulario público /registro) — distinto del de nutrición */}
