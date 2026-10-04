@@ -532,7 +532,7 @@ export default function Clientes({ session }) {
 
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen'); setLesionExpandida(null); setMostrarLesiones(false)
-    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }, { data: cn }, { data: scp }] = await Promise.all([
+    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }, { data: cn }, { data: scp }, { data: cr }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
@@ -542,8 +542,9 @@ export default function Clientes({ session }) {
       supabase.from('planes_cobro').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('cuestionarios_nutricion').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('solicitudes_cambio_plan').select('*').eq('cliente_id', c.id).eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('cuestionarios').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
-    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null })
+    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null, cuestRegistro: cr||null })
     setPlanSeleccionado((pc?.estado === 'activo' ? pc.plan : null) || c.plan_online || 'nutricion')
     setTareasExtra(te||[])
   }
@@ -1467,6 +1468,46 @@ export default function Clientes({ session }) {
                     {detalle.email && <a href={`mailto:${detalle.email}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">✉️ {detalle.email}</a>}
                   </div>
 
+                  {/* Cuestionario de registro (formulario público /registro) — distinto del de nutrición */}
+                  {dData.cuestRegistro && (
+                    <div className="bg-white border border-black/5 rounded-xl p-3 space-y-2">
+                      <p className="text-xs font-bold text-[#0A0A0A]">📋 Cuestionario de registro</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {[
+                          ['Objetivo', OBJ[dData.cuestRegistro.objetivo]?.label || dData.cuestRegistro.objetivo],
+                          ['Días/sem', dData.cuestRegistro.dias_semana ? `${dData.cuestRegistro.dias_semana} días` : null],
+                          ['Dónde entrena', dData.cuestRegistro.donde_entrena],
+                          ['Plan sugerido (IA)', dData.cuestRegistro.sugerencia_plan],
+                        ].filter(([,v]) => v).map(([l, v]) => (
+                          <div key={l} className="flex items-center justify-between">
+                            <p className="text-xs text-[#6B6B6B]">{l}</p>
+                            <p className="text-xs font-semibold text-[#0A0A0A] capitalize text-right">{v}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {dData.cuestRegistro.alimentacion_actual && (
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed border-t border-black/5 pt-2">
+                          <span className="font-semibold text-[#444]">Alimentación actual:</span> {dData.cuestRegistro.alimentacion_actual}
+                        </p>
+                      )}
+                      {dData.cuestRegistro.que_no_funciono && (
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                          <span className="font-semibold text-[#444]">Qué no funcionó:</span> {dData.cuestRegistro.que_no_funciono}
+                        </p>
+                      )}
+                      {dData.cuestRegistro.expectativas_30dias && (
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                          <span className="font-semibold text-[#444]">Expectativas 30 días:</span> {dData.cuestRegistro.expectativas_30dias}
+                        </p>
+                      )}
+                      {dData.cuestRegistro.sugerencia_justificacion && (
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed bg-[#F5F5F0] rounded-lg p-2">
+                          <span className="font-semibold text-[#444]">Análisis IA:</span> {dData.cuestRegistro.sugerencia_justificacion}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* Último CI */}
                   {ci0 && (
                     <div className="bg-[#F5F5F0] rounded-xl p-3">
@@ -1658,10 +1699,10 @@ export default function Clientes({ session }) {
                         if (error) throw error
                         if (data?.link) {
                           await navigator.clipboard.writeText(data.link)
-                          showToast('✓ Enlace copiado — compártelo con el cliente')
+                          setModalAccesoManual({ nombre: detalle.nombre, link: data.link })
                         } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
                       } catch (e) { showToast('Error de conexión') }
-                    }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">🔗 Enlace portal</button>
+                    }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Copiar enlace de acceso</button>
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${detalle.id}`); showToast('Enlace check-in copiado') }}
                       className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Enviar CI</button>
                     <button onClick={() => eliminar(detalle.id)} className="border border-red-100 text-red-500 text-sm font-medium py-2.5 rounded-xl hover:bg-red-50">🗑 Eliminar</button>
