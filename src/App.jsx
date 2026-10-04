@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { ConfigContext, useConfigLoader } from './hooks/useConfig'
 import { CentroProvider } from './hooks/useCentro.jsx'
+import { moduloVisible } from './lib/modulos'
 
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -74,14 +75,14 @@ function AppPrivada({ session }) {
         <Layout session={session} config={config}>
           <Routes>
             <Route path="/dashboard" element={<Dashboard session={session} />} />
-            <Route path="/clientes" element={<Clientes session={session} />} />
-            <Route path="/grupos" element={<Grupos session={session} />} />
-            <Route path="/rutinas" element={<Rutinas session={session} />} />
-            <Route path="/seguimiento" element={<Seguimiento session={session} />} />
-            <Route path="/pagos" element={<Pagos session={session} />} />
-            <Route path="/agenda" element={<Agenda session={session} />} />
-            <Route path="/nutricion" element={<Nutricion session={session} />} />
-            <Route path="/mensajes" element={<Mensajes session={session} />} />
+            <Route path="/clientes" element={moduloVisible('clientes') ? <Clientes session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/grupos" element={moduloVisible('clientes') ? <Grupos session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/rutinas" element={moduloVisible('rutinas') ? <Rutinas session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/seguimiento" element={moduloVisible('seguimiento') ? <Seguimiento session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/pagos" element={moduloVisible('pagos') ? <Pagos session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/agenda" element={moduloVisible('agenda') ? <Agenda session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/nutricion" element={moduloVisible('nutricion') ? <Nutricion session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/mensajes" element={moduloVisible('mensajes') ? <Mensajes session={session} /> : <Navigate to="/dashboard" replace />} />
             <Route path="/biblioteca" element={<Biblioteca session={session} />} />
             <Route path="/centro" element={<AdminCentro session={session} />} />
             <Route path="/importar" element={<ImportarDatos session={session} />} />

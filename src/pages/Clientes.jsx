@@ -9,6 +9,7 @@ import GraficasCliente from '../components/GraficasCliente'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
+import { moduloVisible } from '../lib/modulos'
 
 
 function Toast({ msg, tipo='ok', onClose }) {
@@ -725,7 +726,7 @@ export default function Clientes({ session }) {
           { label: 'Activos', value: stats.activos, color: BRAND.color, filtro: 'activos' },
           { label: 'Sin seguimiento', value: stats.sinCI, color: '#f59e0b', filtro: 'sinCI' },
           { label: 'Pago vencido', value: stats.vencidos, color: '#ef4444', filtro: 'vencidos' },
-        ].map(s => (
+        ].filter(s => s.filtro !== 'sinCI' || moduloVisible('seguimiento')).map(s => (
           <div key={s.label} onClick={() => s.filtro && (setFiltroTipo(filtroTipo === s.filtro ? 'todos' : s.filtro), setPagina(1))}
             className={`bg-white rounded-2xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md transition-all`}>
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
@@ -758,10 +759,10 @@ export default function Clientes({ session }) {
           <Chip key={k} field="obj" label={v.label} value={k} count={clientes.filter(c=>c.objetivo===k).length} />
         ))}
         <div className="w-px bg-black/10 flex-shrink-0" />
-        <button onClick={() => { setFiltroTipo('sinCI'); setPagina(1) }}
+        {moduloVisible('seguimiento') && <button onClick={() => { setFiltroTipo('sinCI'); setPagina(1) }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo==='sinCI' ? 'bg-amber-500 text-white' : 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>
           ⚠ Sin seguimiento
-        </button>
+        </button>}
         <button onClick={() => { setFiltroTipo('vencidos'); setPagina(1) }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo==='vencidos' ? 'bg-red-500 text-white' : 'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100'}`}>
           💳 Pago vencido
@@ -804,7 +805,7 @@ export default function Clientes({ session }) {
                 : null
               const estadoBadge = al.pagoVencido
                 ? { label: '💳 Vencido', cls: 'bg-red-50 text-red-700' }
-                : al.sinCI
+                : al.sinCI && moduloVisible('seguimiento')
                 ? { label: '⚠ Sin CI', cls: 'bg-amber-50 text-amber-700' }
                 : c.estado === 'activo'
                 ? { label: '✓ Activo', cls: 'bg-emerald-50 text-emerald-700' }
@@ -1361,7 +1362,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],...(moduloVisible('seguimiento')?[['seguimientos','Check-ins']]:[]),['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all relative ${dTab===id ? 'bg-acento text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}

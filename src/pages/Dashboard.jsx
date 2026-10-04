@@ -5,6 +5,7 @@ import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
+import { moduloVisible } from '../lib/modulos'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
@@ -248,7 +249,7 @@ export default function Dashboard({ session }) {
   )
 
   const d = datos
-  const totalPendiente = d.mensajesNL.length + d.clientesSinCI.length + d.rutinasIA.length + d.alertasPagos.length
+  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -341,7 +342,7 @@ export default function Dashboard({ session }) {
                 ))}
 
                 {/* Rutinas IA por revisar */}
-                {d.rutinasIA.length > 0 && (
+                {moduloVisible('rutinas') && d.rutinasIA.length > 0 && (
                   <div className="flex items-center gap-3 px-5 py-3.5">
                     <div className="w-8 h-8 bg-[#6366f1]/10 rounded-xl flex items-center justify-center text-[#6366f1] text-sm flex-shrink-0">🤖</div>
                     <div className="flex-1 min-w-0">
@@ -360,7 +361,7 @@ export default function Dashboard({ session }) {
                 )}
 
                 {/* Mensajes sin leer */}
-                {d.mensajesNL.length > 0 && (
+                {moduloVisible('mensajes') && d.mensajesNL.length > 0 && (
                   <div className="flex items-center gap-3 px-5 py-3.5">
                     <div className="w-8 h-8 bg-acento/10 rounded-xl flex items-center justify-center text-acento text-sm flex-shrink-0">✉️</div>
                     <div className="flex-1 min-w-0">
@@ -502,7 +503,7 @@ export default function Dashboard({ session }) {
                 )}
 
                 {/* Suplementación activada pendiente de generar */}
-                {d.suplementacionPendiente?.length > 0 && (
+                {moduloVisible('nutricion') && d.suplementacionPendiente?.length > 0 && (
                   <div className="flex items-center gap-3 px-5 py-3.5">
                     <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-700 text-sm flex-shrink-0">💊</div>
                     <div className="flex-1 min-w-0">
@@ -523,7 +524,7 @@ export default function Dashboard({ session }) {
                 )}
 
                 {/* Check-ins sin hacer — con urgencia y días */}
-                {d.clientesSinCI.length > 0 && (() => {
+                {moduloVisible('seguimiento') && d.clientesSinCI.length > 0 && (() => {
                   // clientesSinCI ya filtra los que llevan +7 días — todos son al menos warning
                   // Los críticos son los que no tienen NINGÚN check-in o llevan +14 días
                   const hace14d = new Date(Date.now() - 14*864e5).toISOString().split('T')[0]
@@ -562,7 +563,7 @@ export default function Dashboard({ session }) {
                 })()}
 
                 {/* Más de 2 semanas sin check-in — alerta separada, más urgente */}
-                {d.clientesSinCI14d?.length > 0 && (
+                {moduloVisible('seguimiento') && d.clientesSinCI14d?.length > 0 && (
                   <div className="flex items-center gap-3 px-5 py-3.5 bg-red-50">
                     <div className="w-8 h-8 bg-red-500 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">⏰</div>
                     <div className="flex-1 min-w-0">

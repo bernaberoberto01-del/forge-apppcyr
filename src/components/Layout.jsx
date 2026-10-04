@@ -5,6 +5,7 @@ import TutorialBanner, { BarraProgreso } from './TutorialBanner'
 import { useOnboarding } from '../hooks/useOnboarding'
 import { BRAND, colorMarca, nombreMarca } from '../lib/brand'
 import BrandMark from './BrandMark'
+import { moduloVisible } from '../lib/modulos'
 
 const TODOS_MODULOS = [
   { id: 'dashboard',  path: '/dashboard',  label: 'Dashboard',  icon: '📊' },
@@ -57,7 +58,7 @@ export default function Layout({ children, session, config }) {
     return () => window.removeEventListener('alertas-leidas', actualizarBadges)
   }, [location.pathname, config, session])
 
-  const modulosActivos = TODOS_MODULOS.filter(m => !config?.modulos || config.modulos[m.id] !== false)
+  const modulosActivos = TODOS_MODULOS.filter(m => moduloVisible(m.id) && (!config?.modulos || config.modulos[m.id] !== false))
   const nombre = config?.nombre_entrenador || session?.user?.email?.split('@')[0] || 'Entrenador'
   const negocio = nombreMarca(config?.nombre_negocio)
   const acento = colorMarca(config?.color_acento)
@@ -107,7 +108,7 @@ export default function Layout({ children, session, config }) {
       </nav>
 
       {/* Progreso onboarding — solo hasta que el usuario lo descarte */}
-      {porcentaje < 100 && <BarraProgreso porcentaje={porcentaje} onClick={() => navigate('/dashboard')} />}
+      {moduloVisible('tutorial') && porcentaje < 100 && <BarraProgreso porcentaje={porcentaje} onClick={() => navigate('/dashboard')} />}
 
       {/* Footer */}
       <div className="px-3 py-3 border-t border-white/8 space-y-1">

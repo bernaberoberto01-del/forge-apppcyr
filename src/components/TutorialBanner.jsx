@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { moduloVisible } from '../lib/modulos'
 
 /**
  * Banner de tutorial que aparece la primera vez que el usuario
@@ -10,7 +11,12 @@ import { useState, useEffect } from 'react'
  *   onCompletar: () => void — marcar como visto
  *   onAccion: () => void — acción del botón (opcional)
  */
-export default function TutorialBanner({ tutorial, completado, onCompletar, onAccion }) {
+// Oculto en las instancias que esconden el módulo "tutorial" (ficha del centro)
+export default function TutorialBanner(props) {
+  return moduloVisible('tutorial') ? <TutorialBannerContenido {...props} /> : null
+}
+
+function TutorialBannerContenido({ tutorial, completado, onCompletar, onAccion }) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
