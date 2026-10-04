@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
+import { useEquipo } from '../hooks/useCentro'
 
 const GRUPOS = ['Todos','Pecho','Espalda','Hombros','Bíceps','Tríceps','Piernas','Glúteos','Posterior','Isquios','Core','Full body','Cardio','Cadera','Gemelos','Movilidad']
 const NIVELES = ['Todos','principiante','intermedio','avanzado']
@@ -80,12 +81,13 @@ export default function Biblioteca({ session }) {
   const [modalNuevo, setModalNuevo] = useState(false)
   const [formNuevo, setFormNuevo] = useState({ nombre:'', grupo_muscular:'Pecho', patron:'empuje_horizontal', nivel:'principiante', modalidad:'fuerza', consejos_tecnica:'', youtube_url:'' })
   const uid = session.user.id
+  const equipo = useEquipo(uid)
 
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
     const { data } = await supabase.from('ejercicios_biblioteca').select('*')
-      .eq('entrenador_id', uid).order('grupo_muscular').order('nombre')
+      .in('entrenador_id', equipo).order('grupo_muscular').order('nombre')
     setEjercicios(data || [])
     setLoading(false)
   }

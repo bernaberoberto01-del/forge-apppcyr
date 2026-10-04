@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { BRAND } from '../lib/brand'
 import { useConfig } from '../hooks/useConfig'
+import { useEquipo } from '../hooks/useCentro'
 
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
 
@@ -49,6 +50,7 @@ export default function Pagos({ session }) {
   const [loading, setLoading] = useState(false)
   const [generandoStripe, setGenerandoStripe] = useState(null)
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const { completar, completado } = useOnboarding(uid)
 
   function generarRecibo(pago) {
@@ -120,9 +122,9 @@ export default function Pagos({ session }) {
 
   async function cargar() {
     const [{ data: pg }, { data: cl }, { data: pl }] = await Promise.all([
-      supabase.from('pagos').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha_pago', { ascending: false }),
-      supabase.from('clientes').select('id,nombre,tipo,precio_mensual').eq('entrenador_id', uid).eq('estado','activo'),
-      supabase.from('planes_cobro').select('*, clientes(nombre,suscripcion_activa,proxima_factura)').eq('entrenador_id', uid).eq('activo', true).order('proximo_cobro'),
+      supabase.from('pagos').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).order('fecha_pago', { ascending: false }),
+      supabase.from('clientes').select('id,nombre,tipo,precio_mensual').in('entrenador_id', equipo).eq('estado','activo'),
+      supabase.from('planes_cobro').select('*, clientes(nombre,suscripcion_activa,proxima_factura)').in('entrenador_id', equipo).eq('activo', true).order('proximo_cobro'),
     ])
     setPagos(pg || [])
     setClientes(cl || [])

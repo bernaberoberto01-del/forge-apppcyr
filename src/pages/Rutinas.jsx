@@ -3,7 +3,7 @@ import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useCentro } from '../hooks/useCentro.jsx'
+import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import ClienteQuickView from '../components/ClienteQuickView'
 import EjercicioInput from '../components/EjercicioInput'
 import { BRAND } from '../lib/brand'
@@ -100,6 +100,7 @@ export default function Rutinas({ session }) {
   const [modalNuevoEj, setModalNuevoEj] = useState(false)
   const [formEj, setFormEj] = useState({ nombre:'', sinonimos:'', grupo_muscular:'Pecho', grupo_secundario:'', patron:'empuje_horizontal', nivel:'principiante', modalidad:'fuerza', consejos_tecnica:'', youtube_url:'' })
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const { completar, completado } = useOnboarding(uid)
   const { centro } = useCentro() || {}
 
@@ -116,10 +117,10 @@ export default function Rutinas({ session }) {
   async function cargar() {
     setLoading(true)
     const [{ data: ru }, { data: cl }, { data: pl }, { data: bib }] = await Promise.all([
-      supabase.from('rutinas').select('*, clientes(nombre,tipo,objetivo)').eq('entrenador_id', uid).order('created_at', { ascending: false }),
-      supabase.from('clientes').select('id,nombre,objetivo,nivel,tipo').eq('entrenador_id', uid).eq('estado','activo'),
-      supabase.from('plantillas_rutina').select('*').eq('entrenador_id', uid).order('usos', { ascending: false }),
-      supabase.from('ejercicios_biblioteca').select('*').eq('entrenador_id', uid).order('grupo_muscular').order('nombre'),
+      supabase.from('rutinas').select('*, clientes(nombre,tipo,objetivo)').in('entrenador_id', equipo).order('created_at', { ascending: false }),
+      supabase.from('clientes').select('id,nombre,objetivo,nivel,tipo').in('entrenador_id', equipo).eq('estado','activo'),
+      supabase.from('plantillas_rutina').select('*').in('entrenador_id', equipo).order('usos', { ascending: false }),
+      supabase.from('ejercicios_biblioteca').select('*').in('entrenador_id', equipo).order('grupo_muscular').order('nombre'),
     ])
     setRutinas(ru || [])
     setClientes(cl || [])

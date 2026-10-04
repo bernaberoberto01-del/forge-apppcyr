@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useEquipo } from '../hooks/useCentro'
 
 const DIAS = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -28,6 +29,7 @@ export default function Grupos({ session }) {
   const [clienteAdd,  setClienteAdd]  = useState('')
   const [añadiendo,   setAñadiendo]   = useState(false)
   const uid = session?.user?.id
+  const equipo = useEquipo(uid)
 
   useEffect(() => { cargar() }, [])
 
@@ -36,10 +38,10 @@ export default function Grupos({ session }) {
     const [{ data: gs }, { data: cs }] = await Promise.all([
       supabase.from('grupos')
         .select('*, grupo_clientes(id, cliente_id, activo, clientes(id, nombre, email, tipo, dias_semana, precio_mensual))')
-        .eq('entrenador_id', uid).eq('activo', true).order('created_at'),
+        .in('entrenador_id', equipo).eq('activo', true).order('created_at'),
       supabase.from('clientes')
         .select('id, nombre, email, tipo, dias_semana, precio_mensual, modalidad, grupo_id')
-        .eq('entrenador_id', uid).eq('estado', 'activo').order('nombre'),
+        .in('entrenador_id', equipo).eq('estado', 'activo').order('nombre'),
     ])
     setGrupos(gs || [])
     setClientes(cs || [])

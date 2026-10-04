@@ -4,6 +4,7 @@ import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
+import { useEquipo } from '../hooks/useCentro'
 
 const PLANTILLAS = [
   { id: 'bienvenida', icon: '👋', label: 'Bienvenida', texto: '¡Hola! Bienvenido/a al equipo. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve tendrás tu rutina lista. Cualquier duda, escríbeme aquí o por WhatsApp. ¡Vamos a por ello! 💪' },
@@ -22,6 +23,7 @@ const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCas
 
 export default function Mensajes({ session }) {
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const location = useLocation()
   const { completar, completado } = useOnboarding(uid)
   const [clientes, setClientes] = useState([])
@@ -39,7 +41,7 @@ export default function Mensajes({ session }) {
   useEffect(() => {
     if (!uid) return
     supabase.from('tarifas').select('id,nombre,tipo,precio,stripe_price_id,modalidad,dias_semana')
-      .eq('entrenador_id', uid).eq('activa', true).not('stripe_price_id', 'is', null)
+      .in('entrenador_id', equipo).eq('activa', true).not('stripe_price_id', 'is', null)
       .then(({ data }) => setTarifas(data || []))
   }, [uid])
 
@@ -83,9 +85,9 @@ export default function Mensajes({ session }) {
   async function cargarClientes() {
     setLoading(true)
     const [{ data: cl }, { data: ms }] = await Promise.all([
-      supabase.from('clientes').select('id,nombre,tipo,estado,plan_online,suscripcion_activa,email').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
+      supabase.from('clientes').select('id,nombre,tipo,estado,plan_online,suscripcion_activa,email').in('entrenador_id', equipo).eq('estado','activo').order('nombre'),
       supabase.from('mensajes_cliente').select('cliente_id,leido_entrenador,tipo,created_at')
-        .eq('entrenador_id', uid).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema')
+        .in('entrenador_id', equipo).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema')
     ])
     setClientes(cl || [])
     const nl = {}
@@ -102,7 +104,7 @@ export default function Mensajes({ session }) {
     await supabase.from('mensajes_cliente')
       .update({ leido_entrenador: true })
       .eq('cliente_id', clienteId)
-      .eq('entrenador_id', uid)
+      .in('entrenador_id', equipo)
       .neq('tipo', 'entrenador')
     setNoLeidos(prev => { const n = {...prev}; delete n[clienteId]; return n })
   }

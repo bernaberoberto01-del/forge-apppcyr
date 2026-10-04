@@ -1,4 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+// ¿Puede `uid` gestionar los clientes del entrenador `entrenadorId`? Sí si es él
+// mismo o si ambos están en un centro que comparte clientes (migración 0006).
+// `db` debe ser el cliente con service role. Sin la migración, solo él mismo.
+async function puedeGestionar(db: any, uid: string, entrenadorId: string): Promise<boolean> {
+  if (entrenadorId === uid) return true
+  const { data, error } = await db.rpc('es_mismo_equipo', { a: uid, b: entrenadorId })
+  return !error && data === true
+}
 const APP_URL = Deno.env.get('APP_URL') || 'https://forge-studio-os.vercel.app'
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
@@ -31,7 +40,7 @@ Deno.serve(async (req) => {
 
     const { data: cliente } = await sb.from('clientes').select('nombre, email, entrenador_id, auth_user_id').eq('id', cliente_id).single()
     if (!cliente?.email) return new Response(JSON.stringify({ ok: false, motivo: 'Sin email' }), { headers: CORS })
-    if (cliente.entrenador_id !== user.id && cliente.auth_user_id !== user.id) {
+    if (cliente.auth_user_id !== user.id && !(await puedeGestionar(sb, user.id, cliente.entrenador_id))) {
       return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
     }
 

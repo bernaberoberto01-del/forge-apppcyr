@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
+import { useEquipo } from '../hooks/useCentro'
 
 const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
 
@@ -45,14 +46,15 @@ export default function Nutricion({ session }) {
   const [suplementacion, setSuplementacion] = useState(null)
   const [generandoSup, setGenerandoSup] = useState(false)
   const uid = session.user.id
+  const equipo = useEquipo(uid)
 
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
     const [{ data: cl }, { data: pl }, { data: cu }] = await Promise.all([
-      supabase.from('clientes').select('id,nombre,tipo,nivel,peso_actual,peso_objetivo,objetivo,nutricion_activa,plan_online').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
-      supabase.from('planes_nutricion').select('*, clientes(nombre)').eq('entrenador_id', uid).order('created_at', { ascending: false }),
-      supabase.from('cuestionarios_nutricion').select('cliente_id, created_at').eq('entrenador_id', uid)
+      supabase.from('clientes').select('id,nombre,tipo,nivel,peso_actual,peso_objetivo,objetivo,nutricion_activa,plan_online').in('entrenador_id', equipo).eq('estado','activo').order('nombre'),
+      supabase.from('planes_nutricion').select('*, clientes(nombre)').in('entrenador_id', equipo).order('created_at', { ascending: false }),
+      supabase.from('cuestionarios_nutricion').select('cliente_id, created_at').in('entrenador_id', equipo)
     ])
     setClientes(cl || [])
     setPlanes(pl || [])

@@ -4,6 +4,7 @@ import TutorialBanner, { BarraProgreso } from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
+import { useEquipo } from '../hooks/useCentro'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
@@ -61,6 +62,7 @@ export default function Dashboard({ session }) {
   const [toast, setToast] = useState('')
   const navigate = useNavigate()
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const { completar, completado, porcentaje } = useOnboarding(uid)
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -130,29 +132,29 @@ export default function Dashboard({ session }) {
       { data: solicitudesCambioPlan },
       { data: cuestNutricionPendiente },
     ] = await Promise.all([
-      supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
-      supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
-      supabase.from('planes_cobro').select('cliente_id,importe,concepto,proximo_cobro').eq('entrenador_id', uid).eq('activo', true),
-      supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').eq('entrenador_id', uid).gte('fecha', inicioSemana),
-      supabase.from('checkins').select('cliente_id,fecha,adherencia_entreno,energia,fatiga,contenido').eq('entrenador_id', uid).gte('fecha', hace6m).order('fecha', {ascending:false}),
-      supabase.from('alertas').select('*').eq('entrenador_id', uid).eq('leida', false).order('created_at',{ascending:false}).limit(20),
-      supabase.from('mensajes_cliente').select('id,cliente_id,contenido,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('leido_entrenador', false).eq('tipo','cliente').order('created_at',{ascending:false}).limit(10),
-      supabase.from('rutinas').select('id,cliente_id,estado,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('estado','borrador').order('created_at',{ascending:false}).limit(10),
-      supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
-      supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
-      supabase.from('cuestionarios').select('id,nombre,email,necesidades,objetivo,created_at').eq('entrenador_id', uid).eq('procesado', false).order('created_at', {ascending:false}),
-      supabase.from('clientes').select('id,nombre,plan_online,ia_estado').eq('entrenador_id', uid).eq('tipo','online').in('ia_estado',['generando','error','pendiente_datos']).eq('estado','activo'),
-      supabase.from('configuracion').select('nombre_entrenador').eq('entrenador_id', uid).maybeSingle(),
-      supabase.from('analisis_mensual').select('id,cliente_id,accion,clientes(nombre)').eq('entrenador_id', uid).eq('revisado', false).order('created_at',{ascending:false}).limit(5),
-      supabase.from('cuestionarios_nutricion').select('cliente_id,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('interes_suplementacion', true).order('created_at',{ascending:false}),
-      supabase.from('suplementacion_cliente').select('cliente_id').eq('entrenador_id', uid),
-      supabase.from('planes_cobro').select('cliente_id,estado,importe,concepto,clientes(nombre)').eq('entrenador_id', uid),
-      supabase.from('solicitudes_cambio_plan').select('cliente_id,plan_actual,plan_solicitado,clientes(nombre)').eq('entrenador_id', uid).eq('estado', 'pendiente'),
-      supabase.from('cuestionarios_nutricion').select('id,cliente_id,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('procesado', false).order('created_at',{ascending:false}),
+      supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').in('entrenador_id', equipo),
+      supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').in('entrenador_id', equipo).gte('fecha_pago', hace6m),
+      supabase.from('planes_cobro').select('cliente_id,importe,concepto,proximo_cobro').in('entrenador_id', equipo).eq('activo', true),
+      supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').in('entrenador_id', equipo).gte('fecha', inicioSemana),
+      supabase.from('checkins').select('cliente_id,fecha,adherencia_entreno,energia,fatiga,contenido').in('entrenador_id', equipo).gte('fecha', hace6m).order('fecha', {ascending:false}),
+      supabase.from('alertas').select('*').in('entrenador_id', equipo).eq('leida', false).order('created_at',{ascending:false}).limit(20),
+      supabase.from('mensajes_cliente').select('id,cliente_id,contenido,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('leido_entrenador', false).eq('tipo','cliente').order('created_at',{ascending:false}).limit(10),
+      supabase.from('rutinas').select('id,cliente_id,estado,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('estado','borrador').order('created_at',{ascending:false}).limit(10),
+      supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
+      supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
+      supabase.from('cuestionarios').select('id,nombre,email,necesidades,objetivo,created_at').in('entrenador_id', equipo).eq('procesado', false).order('created_at', {ascending:false}),
+      supabase.from('clientes').select('id,nombre,plan_online,ia_estado').in('entrenador_id', equipo).eq('tipo','online').in('ia_estado',['generando','error','pendiente_datos']).eq('estado','activo'),
+      supabase.from('configuracion').select('nombre_entrenador').in('entrenador_id', equipo).maybeSingle(),
+      supabase.from('analisis_mensual').select('id,cliente_id,accion,clientes(nombre)').in('entrenador_id', equipo).eq('revisado', false).order('created_at',{ascending:false}).limit(5),
+      supabase.from('cuestionarios_nutricion').select('cliente_id,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('interes_suplementacion', true).order('created_at',{ascending:false}),
+      supabase.from('suplementacion_cliente').select('cliente_id').in('entrenador_id', equipo),
+      supabase.from('planes_cobro').select('cliente_id,estado,importe,concepto,clientes(nombre)').in('entrenador_id', equipo),
+      supabase.from('solicitudes_cambio_plan').select('cliente_id,plan_actual,plan_solicitado,clientes(nombre)').in('entrenador_id', equipo).eq('estado', 'pendiente'),
+      supabase.from('cuestionarios_nutricion').select('id,cliente_id,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('procesado', false).order('created_at',{ascending:false}),
     ])
 
     if (alertas?.length > 0) {
-      await supabase.from('alertas').update({ leida:true }).eq('entrenador_id', uid).eq('leida', false)
+      await supabase.from('alertas').update({ leida:true }).in('entrenador_id', equipo).eq('leida', false)
       window.dispatchEvent(new Event('alertas-leidas'))
     }
 

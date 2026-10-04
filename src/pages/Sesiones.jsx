@@ -4,6 +4,7 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import { getPesoRecomendado } from '../utils/pesos'
 import EjercicioInput from '../components/EjercicioInput'
 import { BRAND } from '../lib/brand'
+import { useEquipo } from '../hooks/useCentro'
 
 function Toast({ msg, tipo = 'ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
@@ -38,6 +39,7 @@ export default function Sesiones({ session }) {
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [quickView, setQuickView] = useState(null)
   const uid = session.user.id
+  const equipo = useEquipo(uid)
 
   useEffect(() => { cargar() }, [uid])
 
@@ -52,8 +54,8 @@ export default function Sesiones({ session }) {
 
   async function cargar() {
     const [{ data: se }, { data: cl }] = await Promise.all([
-      supabase.from('sesiones').select('*, clientes(nombre, tipo, nivel)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(50),
-      supabase.from('clientes').select('id,nombre,tipo,nivel').eq('entrenador_id', uid).eq('estado', 'activo'),
+      supabase.from('sesiones').select('*, clientes(nombre, tipo, nivel)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(50),
+      supabase.from('clientes').select('id,nombre,tipo,nivel').in('entrenador_id', equipo).eq('estado', 'activo'),
     ])
     setSesiones(se || [])
     setClientes(cl || [])

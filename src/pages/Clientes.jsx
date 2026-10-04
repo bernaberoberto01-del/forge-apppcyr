@@ -8,6 +8,7 @@ import { TIPOS_ENTRENAMIENTO, TIPOS_MAP } from '../utils/tiposEntrenamiento'
 import GraficasCliente from '../components/GraficasCliente'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
+import { useEquipo } from '../hooks/useCentro'
 
 
 function Toast({ msg, tipo='ok', onClose }) {
@@ -189,6 +190,7 @@ export default function Clientes({ session }) {
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const enlaceRegistro = `${window.location.origin}/registro?e=${uid}`
 
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
@@ -304,12 +306,12 @@ export default function Clientes({ session }) {
   async function cargar() {
     const hace10 = new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0]
     const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([
-      supabase.from('clientes').select('*').eq('entrenador_id', uid).order('created_at', { ascending: false }),
-      supabase.from('cuestionarios').select('*').eq('entrenador_id', uid).eq('procesado', false).order('created_at', { ascending: false }),
-      supabase.from('checkins').select('cliente_id,fecha').eq('entrenador_id', uid).gte('fecha', hace10),
-      supabase.from('pagos').select('cliente_id,valido_hasta').eq('entrenador_id', uid),
-      supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').eq('entrenador_id', uid).eq('activo', true),
-      supabase.from('tarifas').select('*').eq('entrenador_id', uid).eq('activa', true).order('modalidad').order('dias_semana'),
+      supabase.from('clientes').select('*').in('entrenador_id', equipo).order('created_at', { ascending: false }),
+      supabase.from('cuestionarios').select('*').in('entrenador_id', equipo).eq('procesado', false).order('created_at', { ascending: false }),
+      supabase.from('checkins').select('cliente_id,fecha').in('entrenador_id', equipo).gte('fecha', hace10),
+      supabase.from('pagos').select('cliente_id,valido_hasta').in('entrenador_id', equipo),
+      supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').in('entrenador_id', equipo).eq('activo', true),
+      supabase.from('tarifas').select('*').in('entrenador_id', equipo).eq('activa', true).order('modalidad').order('dias_semana'),
     ])
     setClientes(cl || [])
     setGrupos(gs || [])

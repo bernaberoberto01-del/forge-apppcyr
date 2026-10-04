@@ -1,5 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// ¿Puede `uid` gestionar los clientes del entrenador `entrenadorId`? Sí si es él
+// mismo o si ambos están en un centro que comparte clientes (migración 0006).
+// `db` debe ser el cliente con service role. Sin la migración, solo él mismo.
+async function puedeGestionar(db: any, uid: string, entrenadorId: string): Promise<boolean> {
+  if (entrenadorId === uid) return true
+  const { data, error } = await db.rpc('es_mismo_equipo', { a: uid, b: entrenadorId })
+  return !error && data === true
+}
+
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const STRIPE_SECRET = Deno.env.get('STRIPE_SECRET_KEY')
 const APP_URL = Deno.env.get('APP_URL') || 'https://forge-studio-os.vercel.app'
@@ -18,7 +27,7 @@ Deno.serve(async (req) => {
 
     const { data: cliente } = await supabase.from('clientes').select('*').eq('id', cliente_id).single()
     if (!cliente) return new Response(JSON.stringify({ error: 'Cliente no encontrado' }), { status: 404, headers })
-    if (cliente.entrenador_id !== user.id) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers })
+    if (!(await puedeGestionar(supabase, user.id, cliente.entrenador_id))) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers })
 
     const stripeRes = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',

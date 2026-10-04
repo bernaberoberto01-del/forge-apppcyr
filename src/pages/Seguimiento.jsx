@@ -5,6 +5,7 @@ import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { BRAND } from '../lib/brand'
+import { useEquipo } from '../hooks/useCentro'
 
 const ESCALAS = [
   { label: 'Energía', field: 'energia', min: 1, max: 5, suffix: '/5', color: 'blue' },
@@ -61,6 +62,7 @@ export default function Seguimiento({ session }) {
   const [loading, setLoading] = useState(false)
   const [filtroCliente, setFiltroCliente] = useState('todos')
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const navigate = useNavigate()
   const [analisisExpandido, setAnalisisExpandido] = useState(null)
   const { completar, completado } = useOnboarding(uid)
@@ -106,11 +108,11 @@ export default function Seguimiento({ session }) {
 
   async function cargar() {
     const [{ data: ci }, { data: cl }, { data: se }, { data: bors }, { data: an }] = await Promise.all([
-      supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(200),
-      supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
-      supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(300),
-      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'por revisar').order('created_at', { ascending: false }),
-      supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('enviado_cliente', false).order('created_at', { ascending: false }).limit(20),
+      supabase.from('checkins').select('*, clientes(nombre, tipo)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(200),
+      supabase.from('clientes').select('id,nombre,tipo').in('entrenador_id', equipo).eq('estado', 'activo'),
+      supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(300),
+      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').in('entrenador_id', equipo).eq('estado', 'por revisar').order('created_at', { ascending: false }),
+      supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', false).order('created_at', { ascending: false }).limit(20),
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
@@ -121,7 +123,7 @@ export default function Seguimiento({ session }) {
 
   async function cargarHistorialAnalisis() {
     setCargandoHistorial(true)
-    const { data } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(50)
+    const { data } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(50)
     setHistorialAnalisis(data || [])
     setHistorialCargado(true)
     setCargandoHistorial(false)

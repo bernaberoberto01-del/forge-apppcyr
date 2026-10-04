@@ -1,6 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// ¿Puede `uid` gestionar los clientes del entrenador `entrenadorId`? Sí si es él
+// mismo o si ambos están en un centro que comparte clientes (migración 0006).
+// `db` debe ser el cliente con service role. Sin la migración, solo él mismo.
+async function puedeGestionar(db: any, uid: string, entrenadorId: string): Promise<boolean> {
+  if (entrenadorId === uid) return true
+  const { data, error } = await db.rpc('es_mismo_equipo', { a: uid, b: entrenadorId })
+  return !error && data === true
+}
+
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
 
 serve(async (req) => {
@@ -12,8 +21,8 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
     if (!user) return new Response(JSON.stringify({ error: 'Token inválido' }), { status: 401, headers: cors })
     const { lesion_id } = await req.json()
-    const { data: lesion } = await supabase.from('lesiones_cliente').select('*, clientes(nombre, peso_actual, edad, objetivo)').eq('id', lesion_id).eq('entrenador_id', user.id).single()
-    if (!lesion) return new Response(JSON.stringify({ error: 'Lesión no encontrada' }), { status: 404, headers: cors })
+    const { data: lesion } = await supabase.from('lesiones_cliente').select('*, clientes(nombre, peso_actual, edad, objetivo)').eq('id', lesion_id).single()
+    if (!lesion || !(await puedeGestionar(supabase, user.id, lesion.entrenador_id))) return new Response(JSON.stringify({ error: 'Lesión no encontrada' }), { status: 404, headers: cors })
     const cliente = lesion.clientes
     const prompt = `Eres un fisioterapeuta y preparador físico experto. Genera un protocolo de recuperación para:\nCLIENTE: ${cliente?.nombre}, ${cliente?.edad || '?'} años, ${cliente?.peso_actual || '?'}kg\nZONA: ${lesion.zona}, SEVERIDAD: ${lesion.severidad}\nDESCRIPCIÓN: ${lesion.descripcion || 'Sin descripción'}\nLIMITACIONES: ${lesion.limitaciones || 'No especificadas'}\nMÉDICO: ${lesion.visito_medico ? 'Sí' : 'No'}, DIAGNÓSTICO: ${lesion.diagnostico_medico || 'Ninguno'}\nRECURRENTE: ${lesion.es_recurrente ? 'Sí' : 'No'}, OBJETIVO: ${cliente?.objetivo || 'General'}\n\nResponde SOLO con JSON:\n{"fase_actual":"","duracion_estimada":"","resumen":"","calentamiento_especifico":[{"ejercicio":"","series":2,"reps":"10","notas":""}],"ejercicios_rehab":[{"ejercicio":"","series":3,"reps":"12","notas":""}],"ejercicios_evitar":[],"ejercicios_adaptar":[{"original":"","alternativa":"","motivo":""}],"recomendaciones_generales":[],"señales_de_alarma":[],"progresion":""}`
     const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': Deno.env.get('ANTHROPIC_API_KEY'), 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] }) })

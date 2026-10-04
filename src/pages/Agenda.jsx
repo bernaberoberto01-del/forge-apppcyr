@@ -3,7 +3,7 @@ import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
-import { useCentro } from '../hooks/useCentro.jsx'
+import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
@@ -186,6 +186,7 @@ export default function Agenda({ session }) {
   const { centro, miembros, esAdmin } = useCentro() || {}
   const timelineRef = useRef()
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const { completar, completado } = useOnboarding(uid)
   const [pxH, setPxH] = useState(PIXELS_POR_HORA)
 
@@ -261,17 +262,17 @@ export default function Agenda({ session }) {
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').or(`entrenador_id.eq.${uid},grupo_id.not.is.null`).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
       centroId
         ? supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('centro_id', centroId).eq('estado','activo')
-        : supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('entrenador_id', uid).eq('estado','activo'),
-      supabase.from('horas_extra').select('*').eq('entrenador_id', uid).gte('fecha', hace60).order('fecha', { ascending: false }),
+        : supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').in('entrenador_id', equipo).eq('estado','activo'),
+      supabase.from('horas_extra').select('*').in('entrenador_id', equipo).gte('fecha', hace60).order('fecha', { ascending: false }),
       centroId
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centroId).eq('activa', true)
         : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
       // Grupos: buscar SIEMPRE por entrenador_id (funciona sin centro)
       // Y también por centro_id si hay centro — combinar para no perder ninguno
-      supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').eq('entrenador_id', uid).eq('activo', true),
+      supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').in('entrenador_id', equipo).eq('activo', true),
       supabase.from('miembros_centro').select('user_id,nombre,rol,color,email').eq('activo', true),
-      supabase.from('sesiones_excepcion').select('*').eq('entrenador_id', uid),
-      supabase.from('sesiones_excepcion_individual').select('*').eq('entrenador_id', uid),
+      supabase.from('sesiones_excepcion').select('*').in('entrenador_id', equipo),
+      supabase.from('sesiones_excepcion_individual').select('*').in('entrenador_id', equipo),
     ])
     setSesiones(se || [])
     setClientes(cl || [])
@@ -283,7 +284,7 @@ export default function Agenda({ session }) {
     // Cargar clases — en try propio para no abortar el resto si falla
     try {
       const { data: cls } = await supabase.from('clases_con_plazas')
-        .select('*').eq('entrenador_id', uid).eq('cancelada', false)
+        .select('*').in('entrenador_id', equipo).eq('cancelada', false)
         .gte('fecha', hace60).order('fecha').order('hora')
       setClases(cls || [])
     } catch { setClases([]) }
