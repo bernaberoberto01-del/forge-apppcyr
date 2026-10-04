@@ -1,0 +1,45 @@
+# Despliega en Vercel cada centro que tenga "vercel" en su ficha (centros/<id>.json).
+# Forge no lo necesita: se despliega con la integración de Git de su propio proyecto.
+# Requiere el secreto VERCEL_TOKEN (token de la cuenta de Vercel donde están los centros).
+name: Desplegar centros
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: desplegar-centros
+  cancel-in-progress: false
+
+jobs:
+  centros:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar Vercel CLI
+        run: npm i -g vercel@latest
+      - name: Sincronizar variables y desplegar cada centro
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN}" ]; then echo "::error::Falta el secreto VERCEL_TOKEN"; exit 1; fi
+          for f in centros/*.json; do
+            ID=$(jq -r '.id' "$f")
+            PROYECTO=$(jq -r '.vercel.proyecto // empty' "$f")
+            EQUIPO=$(jq -r '.vercel.equipo // empty' "$f")
+            [ -z "$PROYECTO" ] && continue
+            echo "::group::$ID"
+            # La ficha es la fuente de verdad: sus variables se suben al proyecto antes de desplegar
+            node scripts/centro.mjs "$ID" --env \
+              | jq -R -s 'split("\n") | map(select(length>0) | capture("^(?<key>[^=]+)=(?<value>.*)$") + {type:"plain", target:["production","preview","development"]})' \
+              > /tmp/env-$ID.json
+            curl -sf -X POST -H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json" \
+              "https://api.vercel.com/v10/projects/$PROYECTO/env?teamId=$EQUIPO&upsert=true" -d @/tmp/env-$ID.json > /dev/null
+            VERCEL_ORG_ID="$EQUIPO" VERCEL_PROJECT_ID="$PROYECTO" vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+            echo "::endgroup::"
+          done
