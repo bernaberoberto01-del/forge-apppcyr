@@ -87,6 +87,7 @@ export default function PortalForge() {
   const [textoMsg, setTextoMsg] = useState('')
   const [enviandoMsg, setEnviandoMsg] = useState(false)
   const [toast, setToast] = useState('')
+  const [activandoPlan, setActivandoPlan] = useState(false)
   const mensajesEndRef = useRef(null)
 
   const color = colorMarca(config?.color_acento)
@@ -316,7 +317,8 @@ export default function PortalForge() {
 
   const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones } = datos
   const esOnline = cliente.tipo === 'online'
-  const plan = (planCobro?.estado === 'activo' ? planCobro.plan : null) || cliente.plan_online || null
+  // Cuenta demo del entrenador: acceso completo siempre, sin pasar por pago ni suscripción.
+  const plan = cliente.is_demo ? 'completo' : ((planCobro?.estado === 'activo' ? planCobro.plan : null) || cliente.plan_online || null)
   const acceso = {
     rutinas: ['entrenamiento', 'completo'].includes(plan),
     nutricion: ['nutricion', 'completo'].includes(plan),
@@ -336,8 +338,50 @@ export default function PortalForge() {
   const ultimoPago = pagos?.[0] || null
   const diasDesdeUltimoPago = ultimoPago?.fecha_pago ? Math.floor((Date.now() - new Date(ultimoPago.fecha_pago + 'T00:00').getTime()) / 864e5) : null
   const tieneSuscripcionStripeActiva = planCobro?.estado === 'activo'
-  const pagoVencido = esOnline && !tieneSuscripcionStripeActiva && diasDesdeUltimoPago !== null && diasDesdeUltimoPago > 35
+  const pagoVencido = esOnline && !cliente.is_demo && !tieneSuscripcionStripeActiva && diasDesdeUltimoPago !== null && diasDesdeUltimoPago > 35
   const diasVencido = pagoVencido ? diasDesdeUltimoPago - 30 : 0
+
+  // Lead aceptado con un plan sugerido pero aún sin pagar — plan_online está puesto
+  // pero plan_activo sigue en false hasta que llegue checkout.session.completed.
+  // No se mezcla con el blur de pagoVencido: aquí no hay nada que mostrar todavía,
+  // así que se sustituye toda la pantalla por la activación.
+  // is_demo (cuenta de prueba del entrenador) nunca pasa por esta pantalla.
+  const faltaActivarPlan = esOnline && !cliente.is_demo && !!cliente.plan_online && !cliente.plan_activo && !tieneSuscripcionStripeActiva
+
+  if (faltaActivarPlan) {
+    const planInfo = PLANES_INFO.find(p => p.id === cliente.plan_online)
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
+          <p className="text-5xl mb-4">💳</p>
+          <p className="font-bold text-xl mb-2 text-[#0A0A0A]">Activa tu plan para acceder</p>
+          <p className="text-sm text-[#6B6B6B] mb-1 leading-relaxed">
+            Tu entrenador te ha preparado el plan <strong>{planInfo?.nombre || cliente.plan_online}</strong>
+            {planInfo ? ` (${planInfo.precio}€/mes)` : ''}.
+          </p>
+          <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">
+            Activa tu suscripción para empezar a usar tu rutina, tu plan de nutrición y todo tu seguimiento.
+          </p>
+          <button onClick={async () => {
+            setActivandoPlan(true)
+            try {
+              const { data, error } = await supabase.functions.invoke('crear-checkout-suscripcion', { body: { cliente_id: cliente.id, plan: cliente.plan_online } })
+              if (error) throw error
+              if (data?.url) { window.location.href = data.url; return }
+              showToast('Error al generar el pago — contacta con tu entrenador')
+            } catch (e) {
+              showToast('Error al generar el pago — contacta con tu entrenador')
+            }
+            setActivandoPlan(false)
+          }} disabled={activandoPlan}
+            className="w-full font-bold py-3.5 rounded-2xl text-white text-sm disabled:opacity-50" style={{ background: color }}>
+            {activandoPlan ? 'Abriendo pago...' : '💳 Activar plan'}
+          </button>
+          {toast && <p className="text-xs text-red-500 mt-3">{toast}</p>}
+        </div>
+      </div>
+    )
+  }
 
   function irAPagos() { setSeccionMasInicial('pagos'); setTab('mas') }
 

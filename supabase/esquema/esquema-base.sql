@@ -314,6 +314,7 @@ CREATE TABLE IF NOT EXISTS "public"."clientes" (
     "plan_online" "text",
     "plan_activo" boolean DEFAULT false,
     "ia_estado" "text",
+    "is_demo" boolean DEFAULT false,
     CONSTRAINT "clientes_estado_check" CHECK (("estado" = ANY (ARRAY['activo'::"text", 'pausado'::"text", 'baja'::"text", 'pendiente'::"text", 'rechazado'::"text"]))),
     CONSTRAINT "clientes_ia_estado_check" CHECK (("ia_estado" = ANY (ARRAY['pendiente'::"text", 'generando'::"text", 'listo'::"text", 'error'::"text", 'pendiente_datos'::"text"]))),
     CONSTRAINT "clientes_material_check" CHECK (("material" = ANY (ARRAY['sin_material'::"text", 'material_basico'::"text", 'gimnasio'::"text"]))),

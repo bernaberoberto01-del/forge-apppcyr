@@ -21,6 +21,17 @@ const OBJETIVOS = [
   { v: 'cambio_rapido_30dias',l: 'Las dos primeras a la vez',              emoji: '⚡' },
 ]
 
+// Quita espacios y guiones; si queda en formato nacional (empieza por 6/7/9,
+// sin prefijo de país) le añade +34. Números ya con prefijo (+34, +33...) no se tocan.
+function normalizarTelefono(raw) {
+  const limpio = raw.replace(/[\s-]/g, '')
+  if (/^[679]/.test(limpio)) return '+34' + limpio
+  return limpio
+}
+function telefonoValido(raw) {
+  return raw.replace(/\D/g, '').length >= 9
+}
+
 const MATERIALES = [
   { v: 'sin_material',    l: 'Sin material',           sub: 'Solo cuerpo' },
   { v: 'material_basico', l: 'Mancuernas y gomas',     sub: 'En casa' },
@@ -54,7 +65,7 @@ export default function RegistroCliente() {
 
   const [form, setForm] = useState({
     // Bloque 1
-    nombre: '', email: '', edad: '', sexo: '', ciudad: '',
+    nombre: '', email: '', telefono: '', edad: '', sexo: '', ciudad: '',
     // Bloque 2
     objetivo: '',
     // Bloque 3
@@ -87,6 +98,7 @@ export default function RegistroCliente() {
     if (paso === 0) {
       if (!form.nombre.trim()) return 'El nombre es obligatorio'
       if (!form.email.trim() || !form.email.includes('@')) return 'Email válido obligatorio'
+      if (!form.telefono.trim() || !telefonoValido(form.telefono)) return 'Número de WhatsApp válido obligatorio (mínimo 9 dígitos)'
       if (!form.edad) return 'La edad es obligatoria'
       if (!form.sexo) return 'Selecciona tu sexo biológico'
     }
@@ -123,6 +135,7 @@ export default function RegistroCliente() {
       entrenador_id: entrenadorId,
       nombre: form.nombre.trim(),
       email: form.email.trim().toLowerCase(),
+      telefono: normalizarTelefono(form.telefono.trim()),
       edad: Number(form.edad) || null,
       sexo: form.sexo || null,
       ciudad: form.ciudad.trim() || null,
@@ -221,6 +234,7 @@ export default function RegistroCliente() {
             <div className="bg-white rounded-2xl border border-black/5 p-5 space-y-4">
               <Input label="Nombre completo" value={form.nombre} onChange={e=>set('nombre',e.target.value)} placeholder="Tu nombre" required/>
               <Input label="Email" type="email" value={form.email} onChange={e=>set('email',e.target.value)} placeholder="tu@email.com" required/>
+              <Input label="Número de WhatsApp" type="tel" value={form.telefono} onChange={e=>set('telefono',e.target.value)} placeholder="+34 600 000 000" required/>
               <div className="grid grid-cols-2 gap-3">
                 <Input label="Edad" type="number" value={form.edad} onChange={e=>set('edad',e.target.value)} placeholder="28" required/>
                 <Input label="Ciudad" value={form.ciudad} onChange={e=>set('ciudad',e.target.value)} placeholder="Murcia"/>

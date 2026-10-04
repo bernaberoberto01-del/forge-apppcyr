@@ -171,6 +171,9 @@ export default function Clientes({ session }) {
   const [modalRegistros, setModalRegistros] = useState(false)
   const [modalEnlace, setModalEnlace] = useState(false)
   const [modalAccesoManual, setModalAccesoManual] = useState(null)
+  const [modalMensajeBienvenida, setModalMensajeBienvenida] = useState(null)
+  const [mensajePendiente, setMensajePendiente] = useState(null)
+  const [aceptandoLead, setAceptandoLead] = useState(false)
   const [modalEditarCI, setModalEditarCI] = useState(null)
   const [formEditarCI, setFormEditarCI] = useState(null)
   const [guardandoCI, setGuardandoCI] = useState(false)
@@ -197,6 +200,62 @@ export default function Clientes({ session }) {
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
   const manejarRespuestaAcceso = (data, nombre) => {
     if (data?.sin_email && data?.link) setModalAccesoManual({ nombre, link: data.link })
+  }
+
+  // El modal de mensaje de bienvenida espera a que se cierre el de enlace manual
+  // (si lo hubo) para no solaparse — ver aceptarLeadDesdeFicha().
+  useEffect(() => {
+    if (!modalAccesoManual && mensajePendiente) {
+      setModalMensajeBienvenida(mensajePendiente)
+      setMensajePendiente(null)
+    }
+  }, [modalAccesoManual, mensajePendiente])
+
+  async function generarMensajeBienvenida(cliente, plan, justificacion, esperaModalAcceso, dondeEntrena) {
+    if (!justificacion) return
+    try {
+      const { data } = await supabase.functions.invoke('generar-mensaje-bienvenida', {
+        body: { cliente_id: cliente.id, nombre: cliente.nombre, plan, justificacion, donde_entrena: dondeEntrena }
+      })
+      if (data?.mensaje) {
+        if (esperaModalAcceso) setMensajePendiente(data.mensaje)
+        else setModalMensajeBienvenida(data.mensaje)
+      }
+    } catch {}
+  }
+
+  async function aceptarLeadDesdeFicha() {
+    if (!detalle) return
+    setAceptandoLead(true)
+    try {
+      // Si la IA sugirió un plan, se asigna ahora — plan_online es lo único que
+      // determina qué módulos ve el cliente en el portal (ver acceso.rutinas/
+      // acceso.nutricion en PortalForge.jsx), así que fijarlo activa el módulo.
+      const planSugerido = dData.cuestRegistro?.sugerencia_plan || null
+      const camposAceptar = { estado: 'activo' }
+      // plan_activo queda en false aquí a propósito — el cliente no tiene acceso
+      // al portal hasta que pague; stripe-webhook lo pone a true cuando llega
+      // checkout.session.completed.
+      if (planSugerido) { camposAceptar.plan_online = planSugerido; camposAceptar.plan_activo = false }
+      await supabase.from('clientes').update(camposAceptar).eq('id', detalle.id)
+      const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
+      if (error) throw error
+      setDetalle(d => ({ ...d, ...camposAceptar }))
+      setClientes(cs => cs.map(c => c.id === detalle.id ? { ...c, ...camposAceptar } : c))
+      let huboModalAcceso = false
+      if (data?.sin_email && data?.link) {
+        setModalAccesoManual({ nombre: detalle.nombre, link: data.link })
+        huboModalAcceso = true
+      } else if (data?.email_enviado) {
+        showToast('✓ Acceso enviado a ' + detalle.email)
+      } else {
+        showToast('✓ Cliente activado')
+      }
+      generarMensajeBienvenida(detalle, dData.cuestRegistro?.sugerencia_plan, dData.cuestRegistro?.sugerencia_justificacion, huboModalAcceso, dData.cuestRegistro?.donde_entrena)
+    } catch (e) {
+      showToast('Error al aceptar el lead')
+    }
+    setAceptandoLead(false)
   }
   function abrirEditarCI(ci) {
     setFormEditarCI({
@@ -307,7 +366,7 @@ export default function Clientes({ session }) {
   async function cargar() {
     const hace10 = new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0]
     const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([
-      supabase.from('clientes').select('*').in('entrenador_id', equipo).neq('estado', 'externo').order('created_at', { ascending: false }),
+      supabase.from('clientes').select('*').in('entrenador_id', equipo).not('estado', 'in', '(rechazado,externo)').order('created_at', { ascending: false }),
       supabase.from('cuestionarios').select('*').in('entrenador_id', equipo).eq('procesado', false).order('created_at', { ascending: false }),
       supabase.from('checkins').select('cliente_id,fecha').in('entrenador_id', equipo).gte('fecha', hace10),
       supabase.from('pagos').select('cliente_id,valido_hasta').in('entrenador_id', equipo),
@@ -335,9 +394,19 @@ export default function Clientes({ session }) {
     return map
   }, [clientes, checkins, pagos])
 
+  // Leads pendientes de aceptar/rechazar — sección separada, nunca mezclados con el listado general
+  const leadsPendientes = useMemo(() => {
+    let r = clientes.filter(c => c.estado === 'pendiente')
+    if (busqueda) {
+      const b = busqueda.toLowerCase()
+      r = r.filter(c => c.nombre?.toLowerCase().includes(b) || c.email?.toLowerCase().includes(b))
+    }
+    return r
+  }, [clientes, busqueda])
+
   // Filtrado y búsqueda
   const filtrados = useMemo(() => {
-    let r = [...clientes]
+    let r = clientes.filter(c => c.estado !== 'pendiente')
     if (busqueda) {
       const b = busqueda.toLowerCase()
       r = r.filter(c => c.nombre?.toLowerCase().includes(b) || c.email?.toLowerCase().includes(b) || c.telefono?.includes(b))
@@ -526,7 +595,7 @@ export default function Clientes({ session }) {
 
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen'); setLesionExpandida(null); setMostrarLesiones(false)
-    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }, { data: cn }, { data: scp }] = await Promise.all([
+    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }, { data: cn }, { data: scp }, { data: cr }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
@@ -536,8 +605,9 @@ export default function Clientes({ session }) {
       supabase.from('planes_cobro').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('cuestionarios_nutricion').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('solicitudes_cambio_plan').select('*').eq('cliente_id', c.id).eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('cuestionarios').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     ])
-    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null })
+    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null, cuestRegistro: cr||null })
     setPlanSeleccionado((pc?.estado === 'activo' ? pc.plan : null) || c.plan_online || 'nutricion')
     setTareasExtra(te||[])
   }
@@ -547,6 +617,17 @@ export default function Clientes({ session }) {
     const { error } = await supabase.from('cuestionarios_nutricion').update({ procesado: true }).eq('id', dData.cuestNutricion.id)
     if (!error) {
       setDData(d => ({ ...d, cuestNutricion: { ...d.cuestNutricion, procesado: true } }))
+      showToast('✓ Cuestionario marcado como procesado')
+    } else {
+      showToast('Error al marcar: ' + error.message)
+    }
+  }
+
+  async function marcarCuestionarioRegistroProcesado() {
+    if (!dData.cuestRegistro) return
+    const { error } = await supabase.from('cuestionarios').update({ procesado: true }).eq('id', dData.cuestRegistro.id)
+    if (!error) {
+      setDData(d => ({ ...d, cuestRegistro: { ...d.cuestRegistro, procesado: true } }))
       showToast('✓ Cuestionario marcado como procesado')
     } else {
       showToast('Error al marcar: ' + error.message)
@@ -777,6 +858,36 @@ export default function Clientes({ session }) {
         <span className="ml-auto text-white/40 text-xs">{enlaceRegistro.slice(0, 40)}...</span>
       </button>
 
+      {/* Leads pendientes — separados del listado general, nunca mezclados */}
+      {leadsPendientes.length > 0 && (
+        <div className="mb-5">
+          <div className="flex items-center gap-2 mb-2 px-1">
+            <p className="text-sm font-bold text-[#0A0A0A]">🧲 Leads pendientes</p>
+            <span className="text-xs bg-acento text-white font-bold px-2 py-0.5 rounded-full">{leadsPendientes.length}</span>
+          </div>
+          <div className="space-y-1.5">
+            {leadsPendientes.map(c => (
+              <div key={c.id} onClick={() => abrirDetalle(c)}
+                className="bg-acento/5 border border-acento/20 rounded-xl flex items-center gap-3 p-3.5 cursor-pointer hover:border-acento/40 transition-all">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                  style={{ background: avatarColor(c.nombre) }}>{ini(c.nombre)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{c.nombre}</p>
+                    <span className="text-[10px] font-bold bg-acento text-white px-1.5 py-0.5 rounded-full flex-shrink-0">Lead</span>
+                  </div>
+                  <p className="text-xs text-[#6B6B6B] truncate">{c.email}</p>
+                </div>
+                <p className="text-xs text-[#9B9B9B] flex-shrink-0">
+                  {c.created_at && new Date(c.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="h-px bg-black/8 mt-4" />
+        </div>
+      )}
+
       {/* Tabla */}
       {filtrados.length === 0 ? (
         <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-12 text-center">
@@ -913,9 +1024,12 @@ export default function Clientes({ session }) {
         </>
       )}
 
-      {/* Modal acceso manual — email no configurado, hay que copiar el link */}
-      {modalAccesoManual && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalAccesoManual(null)}>
+      {/* Modal acceso manual — email no configurado, hay que copiar el link.
+          createPortal + z-[60]: la ficha del cliente ({detalle && (...)}) es
+          z-50 y aparece después en el DOM, así que sin portal se pintaba
+          encima y se tragaba los clics (mismo bug que el de editar check-in). */}
+      {modalAccesoManual && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setModalAccesoManual(null)}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
             <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
             <h2 className="font-bold text-[#0A0A0A] text-center mb-2">No se pudo enviar el email</h2>
@@ -927,7 +1041,27 @@ export default function Clientes({ session }) {
                 className="flex-1 bg-acento text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar enlace</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal mensaje de presentación del plan — tras aceptar un lead.
+          Mismo motivo de createPortal + z-[60] que el modal de arriba. */}
+      {modalMensajeBienvenida && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setModalMensajeBienvenida(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h2 className="font-bold text-[#0A0A0A] mb-1">💬 Mensaje de presentación del plan</h2>
+            <p className="text-xs text-[#6B6B6B] mb-3">Revísalo o edítalo antes de copiarlo a WhatsApp.</p>
+            <textarea value={modalMensajeBienvenida} onChange={e => setModalMensajeBienvenida(e.target.value)} rows={7}
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none mb-3" />
+            <div className="flex gap-2">
+              <button onClick={() => { navigator.clipboard.writeText(modalMensajeBienvenida); showToast('✓ Mensaje copiado') }}
+                className="flex-1 bg-acento text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar mensaje</button>
+              <button onClick={() => setModalMensajeBienvenida(null)} className="px-4 py-3 rounded-xl border border-black/10 text-sm text-[#6B6B6B] hover:bg-[#F5F5F0]">✓ Listo</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal editar check-in — el entrenador puede editar cualquier check-in, sin restricción de fecha.
@@ -1429,7 +1563,53 @@ export default function Clientes({ session }) {
                     </div>
                     {detalle.telefono && <a href={`tel:${detalle.telefono}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-acento pt-1 border-t border-black/5 transition-colors">📞 {detalle.telefono}</a>}
                     {detalle.email && <a href={`mailto:${detalle.email}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-acento transition-colors">✉️ {detalle.email}</a>}
+                    {detalle.telefono && (
+                      <a href={`https://wa.me/${detalle.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 text-xs font-bold py-2.5 rounded-xl hover:bg-emerald-100 transition-colors mt-1">
+                        📱 Abrir WhatsApp
+                      </a>
+                    )}
                   </div>
+
+                  {/* Cuestionario de registro (formulario público /registro) — distinto del de nutrición */}
+                  {dData.cuestRegistro && (
+                    <div className="bg-white border border-black/5 rounded-xl p-3 space-y-2">
+                      <p className="text-xs font-bold text-[#0A0A0A]">📋 Cuestionario de registro</p>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        {[
+                          ['Objetivo', OBJ[dData.cuestRegistro.objetivo]?.label || dData.cuestRegistro.objetivo],
+                          ['Días/sem', dData.cuestRegistro.dias_semana ? `${dData.cuestRegistro.dias_semana} días` : null],
+                          ['Dónde entrena', dData.cuestRegistro.donde_entrena],
+                          ['Plan sugerido (IA)', dData.cuestRegistro.sugerencia_plan],
+                        ].filter(([,v]) => v).map(([l, v]) => (
+                          <div key={l} className="flex items-center justify-between">
+                            <p className="text-xs text-[#6B6B6B]">{l}</p>
+                            <p className="text-xs font-semibold text-[#0A0A0A] capitalize text-right">{v}</p>
+                          </div>
+                        ))}
+                      </div>
+                      {dData.cuestRegistro.alimentacion_actual && (
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed border-t border-black/5 pt-2">
+                          <span className="font-semibold text-[#444]">Alimentación actual:</span> {dData.cuestRegistro.alimentacion_actual}
+                        </p>
+                      )}
+                      {dData.cuestRegistro.que_no_funciono && (
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                          <span className="font-semibold text-[#444]">Qué no funcionó:</span> {dData.cuestRegistro.que_no_funciono}
+                        </p>
+                      )}
+                      {dData.cuestRegistro.expectativas_30dias && (
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                          <span className="font-semibold text-[#444]">Expectativas 30 días:</span> {dData.cuestRegistro.expectativas_30dias}
+                        </p>
+                      )}
+                      {dData.cuestRegistro.sugerencia_justificacion && (
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed bg-[#F5F5F0] rounded-lg p-2">
+                          <span className="font-semibold text-[#444]">Análisis IA:</span> {dData.cuestRegistro.sugerencia_justificacion}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Último CI */}
                   {ci0 && (
@@ -1602,6 +1782,12 @@ export default function Clientes({ session }) {
                         📧 Enviar acceso al portal
                       </button>
                     )}
+                    {detalle.estado === 'pendiente' && (
+                      <button onClick={aceptarLeadDesdeFicha} disabled={aceptandoLead}
+                        className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-acento hover:bg-[#E54E00] active:scale-95 transition-all disabled:opacity-40">
+                        {aceptandoLead ? 'Activando...' : '✓ Aceptar lead'}
+                      </button>
+                    )}
                     <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
                     {detalle.email && detalle.auth_user_id && (
                       <button onClick={async () => {
@@ -1622,10 +1808,14 @@ export default function Clientes({ session }) {
                         if (error) throw error
                         if (data?.link) {
                           await navigator.clipboard.writeText(data.link)
-                          showToast('✓ Enlace copiado — compártelo con el cliente')
+                          setModalAccesoManual({ nombre: detalle.nombre, link: data.link })
                         } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
                       } catch (e) { showToast('Error de conexión') }
-                    }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">🔗 Enlace portal</button>
+                    }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Copiar enlace de acceso</button>
+                    {detalle.tipo === 'online' && dData.cuestRegistro?.sugerencia_plan && (
+                      <button onClick={() => generarMensajeBienvenida(detalle, dData.cuestRegistro.sugerencia_plan, dData.cuestRegistro.sugerencia_justificacion, false, dData.cuestRegistro.donde_entrena)}
+                        className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">💬 Generar mensaje de plan</button>
+                    )}
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${detalle.id}`); showToast('Enlace check-in copiado') }}
                       className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Enviar CI</button>
                     <button onClick={() => eliminar(detalle.id)} className="border border-red-100 text-red-500 text-sm font-medium py-2.5 rounded-xl hover:bg-red-50">🗑 Eliminar</button>
@@ -1829,16 +2019,33 @@ export default function Clientes({ session }) {
                 </div>
               )}
               {dTab==='cuestionario' && (() => {
+                const cr = dData.cuestRegistro
                 const cn = dData.cuestNutricion
-                if (!cn) return (
+                if (!cr && !cn) return (
                   <div className="text-center py-8">
                     <p className="text-3xl mb-2">📋</p>
                     <p className="text-sm text-[#6B6B6B]">El cliente aún no ha rellenado el cuestionario</p>
                   </div>
                 )
-                const OBJETIVOS = { perdida_grasa: 'Pérdida de grasa', hipertrofia: 'Hipertrofia', ganancia_muscular: 'Ganancia muscular', mantenimiento: 'Mantenimiento', rendimiento: 'Rendimiento' }
-                const campos = [
-                  ['Objetivo', OBJETIVOS[cn.objetivo] || cn.objetivo],
+                const PLAN_LABEL = { nutricion: 'Hábitos & Alimentación', entrenamiento: 'Entrenamiento', completo: 'Plan Completo' }
+                const camposRegistro = cr ? [
+                  ['Objetivo', OBJ[cr.objetivo]?.label || cr.objetivo],
+                  ['Edad', cr.edad ? `${cr.edad} años` : null],
+                  ['Sexo', cr.sexo],
+                  ['Ciudad', cr.ciudad],
+                  ['Días/semana', cr.dias_semana ? `${cr.dias_semana} días` : null],
+                  ['Dónde entrena', cr.donde_entrena],
+                  ['Material', cr.material],
+                  ['Lesiones', cr.tiene_lesion ? (cr.lesiones || 'Sí (sin detalle)') : null],
+                  ['Alimentación actual', cr.alimentacion_actual],
+                  ['Qué no funcionó', cr.que_no_funciono],
+                  ['Expectativas 30 días', cr.expectativas_30dias],
+                  ['Plan sugerido (IA)', cr.sugerencia_plan ? (PLAN_LABEL[cr.sugerencia_plan] || cr.sugerencia_plan) : null],
+                  ['Justificación IA', cr.sugerencia_justificacion],
+                ].filter(([, v]) => v) : []
+                const OBJETIVOS_NUTRI = { perdida_grasa: 'Pérdida de grasa', hipertrofia: 'Hipertrofia', ganancia_muscular: 'Ganancia muscular', mantenimiento: 'Mantenimiento', rendimiento: 'Rendimiento' }
+                const camposNutri = cn ? [
+                  ['Objetivo', OBJETIVOS_NUTRI[cn.objetivo] || cn.objetivo],
                   ['Edad', cn.edad ? `${cn.edad} años` : null],
                   ['Sexo', cn.sexo],
                   ['Peso', cn.peso ? `${cn.peso} kg` : null],
@@ -1851,40 +2058,77 @@ export default function Clientes({ session }) {
                   ['Suplementos actuales', cn.suplementos],
                   ['Interés en suplementación', cn.interes_suplementacion ? 'Sí' : 'No'],
                   ['Notas', cn.notas],
-                ].filter(([, v]) => v)
+                ].filter(([, v]) => v) : []
                 return (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-[#9B9B9B]">
-                        Enviado el {new Date(cn.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </p>
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cn.procesado ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
-                        {cn.procesado ? '✓ Procesado' : '⏳ Pendiente'}
-                      </span>
-                    </div>
-
-                    {cn.tiene_condicion_salud && (
-                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                        <p className="text-xs font-bold text-amber-700 mb-1">⚕️ Condiciones de salud</p>
-                        {cn.condiciones_salud?.length > 0 && <p className="text-xs text-amber-700/90">{cn.condiciones_salud.join(', ')}</p>}
-                        {cn.medicacion && <p className="text-xs text-amber-700/80 mt-1">Medicación: {cn.medicacion}</p>}
+                  <div className="space-y-5">
+                    {cr && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[#0A0A0A]">📋 Cuestionario de registro</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-[#9B9B9B]">
+                              {new Date(cr.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cr.procesado ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
+                              {cr.procesado ? '✓ Procesado' : '⏳ Pendiente'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-white border border-black/5 rounded-xl divide-y divide-black/4">
+                          {camposRegistro.map(([label, valor]) => (
+                            <div key={label} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
+                              <p className="text-xs text-[#6B6B6B] flex-shrink-0">{label}</p>
+                              <p className="text-xs font-semibold text-[#0A0A0A] text-right">{valor}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {!cr.procesado && (
+                          <button onClick={marcarCuestionarioRegistroProcesado}
+                            className="w-full bg-acento text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
+                            ✓ Marcar como procesado
+                          </button>
+                        )}
                       </div>
                     )}
 
-                    <div className="bg-white border border-black/5 rounded-xl divide-y divide-black/4">
-                      {campos.map(([label, valor]) => (
-                        <div key={label} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
-                          <p className="text-xs text-[#6B6B6B] flex-shrink-0">{label}</p>
-                          <p className="text-xs font-semibold text-[#0A0A0A] text-right">{valor}</p>
+                    {cn && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[#0A0A0A]">🥗 Cuestionario de nutrición</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-[#9B9B9B]">
+                              {new Date(cn.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cn.procesado ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
+                              {cn.procesado ? '✓ Procesado' : '⏳ Pendiente'}
+                            </span>
+                          </div>
                         </div>
-                      ))}
-                    </div>
 
-                    {!cn.procesado && (
-                      <button onClick={marcarCuestionarioProcesado}
-                        className="w-full bg-acento text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
-                        ✓ Marcar como procesado
-                      </button>
+                        {cn.tiene_condicion_salud && (
+                          <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                            <p className="text-xs font-bold text-amber-700 mb-1">⚕️ Condiciones de salud</p>
+                            {cn.condiciones_salud?.length > 0 && <p className="text-xs text-amber-700/90">{cn.condiciones_salud.join(', ')}</p>}
+                            {cn.medicacion && <p className="text-xs text-amber-700/80 mt-1">Medicación: {cn.medicacion}</p>}
+                          </div>
+                        )}
+
+                        <div className="bg-white border border-black/5 rounded-xl divide-y divide-black/4">
+                          {camposNutri.map(([label, valor]) => (
+                            <div key={label} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
+                              <p className="text-xs text-[#6B6B6B] flex-shrink-0">{label}</p>
+                              <p className="text-xs font-semibold text-[#0A0A0A] text-right">{valor}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {!cn.procesado && (
+                          <button onClick={marcarCuestionarioProcesado}
+                            className="w-full bg-acento text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
+                            ✓ Marcar como procesado
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )

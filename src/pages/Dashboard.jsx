@@ -76,6 +76,72 @@ export default function Dashboard({ session }) {
     }) }))
   }
 
+  const [procesandoLead, setProcesandoLead] = useState(null)
+  const [leadExpandido, setLeadExpandido] = useState(null)
+  const [modalAccesoManual, setModalAccesoManual] = useState(null)
+  const [modalMensajeBienvenida, setModalMensajeBienvenida] = useState(null)
+  const [mensajePendiente, setMensajePendiente] = useState(null)
+
+  // El modal de mensaje de bienvenida espera a que se cierre el de enlace manual
+  // (si lo hubo) para no solaparse.
+  useEffect(() => {
+    if (!modalAccesoManual && mensajePendiente) {
+      setModalMensajeBienvenida(mensajePendiente)
+      setMensajePendiente(null)
+    }
+  }, [modalAccesoManual, mensajePendiente])
+
+  async function generarMensajeBienvenida(lead, esperaModalAcceso) {
+    if (!lead.justificacion) return
+    try {
+      const { data } = await supabase.functions.invoke('generar-mensaje-bienvenida', {
+        body: { cliente_id: lead.id, nombre: lead.nombre, plan: lead.planSugeridoKey, justificacion: lead.justificacion, donde_entrena: lead.dondeEntrena }
+      })
+      if (data?.mensaje) {
+        if (esperaModalAcceso) setMensajePendiente(data.mensaje)
+        else setModalMensajeBienvenida(data.mensaje)
+      }
+    } catch {}
+  }
+
+  async function aceptarLead(lead) {
+    setProcesandoLead(lead.id)
+    try {
+      // Si la IA sugirió un plan, se asigna ahora — plan_online es lo único que
+      // determina qué módulos ve el cliente en el portal (ver acceso.rutinas/
+      // acceso.nutricion en PortalForge.jsx), así que fijarlo activa el módulo.
+      const camposAceptar = { estado: 'activo' }
+      // plan_activo queda en false aquí a propósito — el cliente no tiene acceso
+      // al portal hasta que pague; stripe-webhook lo pone a true cuando llega
+      // checkout.session.completed.
+      if (lead.planSugeridoKey) { camposAceptar.plan_online = lead.planSugeridoKey; camposAceptar.plan_activo = false }
+      await supabase.from('clientes').update(camposAceptar).eq('id', lead.id)
+      const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: lead.id } })
+      if (error) throw error
+      setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
+      let huboModalAcceso = false
+      if (data?.sin_email && data?.link) {
+        setModalAccesoManual({ nombre: lead.nombre, link: data.link })
+        huboModalAcceso = true
+      } else if (data?.email_enviado) {
+        showToast(`✓ Acceso enviado a ${lead.email}`)
+      } else {
+        showToast(`✓ Cliente activado`)
+      }
+      generarMensajeBienvenida(lead, huboModalAcceso)
+    } catch (e) {
+      showToast('Error al aceptar el lead')
+    }
+    setProcesandoLead(null)
+  }
+
+  async function rechazarLead(lead) {
+    setProcesandoLead(lead.id)
+    await supabase.from('clientes').update({ estado: 'rechazado' }).eq('id', lead.id)
+    setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
+    setProcesandoLead(null)
+  }
+
   useEffect(() => { cargar() }, [uid])
 
   // Realtime — recargar cuando llega cuestionario nuevo o alerta nueva
@@ -132,6 +198,8 @@ export default function Dashboard({ session }) {
       { data: planesCobroAll },
       { data: solicitudesCambioPlan },
       { data: cuestNutricionPendiente },
+      { data: leadsPendientesRaw },
+      { data: cuestConLead },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').in('entrenador_id', equipo),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').in('entrenador_id', equipo).gte('fecha_pago', hace6m),
@@ -145,13 +213,15 @@ export default function Dashboard({ session }) {
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
       supabase.from('cuestionarios').select('id,nombre,email,necesidades,objetivo,created_at').in('entrenador_id', equipo).eq('procesado', false).order('created_at', {ascending:false}),
       supabase.from('clientes').select('id,nombre,plan_online,ia_estado').in('entrenador_id', equipo).eq('tipo','online').in('ia_estado',['generando','error','pendiente_datos']).eq('estado','activo'),
-      supabase.from('configuracion').select('nombre_entrenador').in('entrenador_id', equipo).maybeSingle(),
+      supabase.from('configuracion').select('nombre_entrenador').eq('entrenador_id', uid).maybeSingle(),
       supabase.from('analisis_mensual').select('id,cliente_id,accion,clientes(nombre)').in('entrenador_id', equipo).eq('revisado', false).order('created_at',{ascending:false}).limit(5),
       supabase.from('cuestionarios_nutricion').select('cliente_id,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('interes_suplementacion', true).order('created_at',{ascending:false}),
       supabase.from('suplementacion_cliente').select('cliente_id').in('entrenador_id', equipo),
       supabase.from('planes_cobro').select('cliente_id,estado,importe,concepto,clientes(nombre)').in('entrenador_id', equipo),
       supabase.from('solicitudes_cambio_plan').select('cliente_id,plan_actual,plan_solicitado,clientes(nombre)').in('entrenador_id', equipo).eq('estado', 'pendiente'),
       supabase.from('cuestionarios_nutricion').select('id,cliente_id,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('procesado', false).order('created_at',{ascending:false}),
+      supabase.from('clientes').select('id,nombre,email,created_at').in('entrenador_id', equipo).eq('estado', 'pendiente').order('created_at',{ascending:false}),
+      supabase.from('cuestionarios').select('cliente_id,sugerencia_plan,sugerencia_justificacion,edad,objetivo,ciudad,que_no_funciono,expectativas_30dias,dias_semana,donde_entrena').in('entrenador_id', equipo).not('cliente_id','is',null).order('created_at',{ascending:false}),
     ])
 
     if (alertas?.length > 0) {
@@ -212,6 +282,32 @@ export default function Dashboard({ session }) {
     ;(cuestNutricionPendiente||[]).forEach(c => { if (!cuestNutricionPorCliente[c.cliente_id]) cuestNutricionPorCliente[c.cliente_id] = c })
     const cuestionariosNutricionPendientes = Object.values(cuestNutricionPorCliente).filter(c => !estaDescartada(c.cliente_id, 'cuest_nutricion_pendiente'))
 
+    // Leads del formulario público de registro — pendientes de aceptar/rechazar
+    const sugerenciaPorCliente = {}
+    ;(cuestConLead||[]).forEach(c => { if (!sugerenciaPorCliente[c.cliente_id]) sugerenciaPorCliente[c.cliente_id] = c })
+    const PLAN_LABEL = { nutricion: 'Hábitos & Alimentación', entrenamiento: 'Entrenamiento', completo: 'Plan Completo' }
+    const OBJETIVO_LABEL = {
+      perdida_grasa: 'Pérdida de grasa', ganancia_muscular: 'Ganancia muscular',
+      rendimiento: 'Rendimiento deportivo', salud_general: 'Salud general',
+      cambio_rapido_30dias: 'Cambio rápido (30 días)',
+    }
+    const leadsPendientes = (leadsPendientesRaw||[]).map(c => {
+      const sug = sugerenciaPorCliente[c.id]
+      return {
+        ...c,
+        planSugeridoKey: sug?.sugerencia_plan || null,
+        planSugerido: sug ? (PLAN_LABEL[sug.sugerencia_plan] || sug.sugerencia_plan) : null,
+        justificacion: sug?.sugerencia_justificacion || null,
+        edad: sug?.edad || null,
+        objetivoLabel: sug?.objetivo ? (OBJETIVO_LABEL[sug.objetivo] || sug.objetivo) : null,
+        ciudad: sug?.ciudad || null,
+        queNoFunciono: sug?.que_no_funciono || null,
+        expectativas: sug?.expectativas_30dias || null,
+        diasSemana: sug?.dias_semana || null,
+        dondeEntrena: sug?.donde_entrena || null,
+      }
+    })
+
     // Cobros online: pagos fallidos y clientes online sin ninguna suscripción configurada
     const clientesPagoFallido = (planesCobroAll||[]).filter(pc => pc.estado === 'pago_fallido').filter(pc => !estaDescartada(pc.cliente_id, 'pago_fallido'))
     const clienteIdsConPlanCobro = new Set((planesCobroAll||[]).map(pc => pc.cliente_id))
@@ -227,6 +323,7 @@ export default function Dashboard({ session }) {
       checkins: checkins||[],
       suplementacionPendiente,
       cuestionariosNutricionPendientes,
+      leadsPendientes,
       clientesPagoFallido,
       clientesOnlineSinSuscripcion,
       solicitudesCambioPlan: (solicitudesCambioPlan || []).filter(s => !estaDescartada(s.cliente_id, 'cambio_plan')),
@@ -249,7 +346,7 @@ export default function Dashboard({ session }) {
   )
 
   const d = datos
-  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length
+  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length + (d.leadsPendientes?.length || 0)
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -258,6 +355,41 @@ export default function Dashboard({ session }) {
           {toast}
         </div>
       )}
+
+      {/* Modal acceso manual — email no configurado, hay que copiar el link */}
+      {modalAccesoManual && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalAccesoManual(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
+            <h2 className="font-bold text-[#0A0A0A] text-center mb-2">No hay email configurado</h2>
+            <p className="text-sm text-[#6B6B6B] text-center mb-4">Comparte este enlace con {modalAccesoManual.nombre.split(' ')[0]} manualmente (WhatsApp, SMS...):</p>
+            <div className="bg-[#F5F5F0] rounded-xl p-3 mb-4 break-all text-xs text-[#6B6B6B] font-mono">{modalAccesoManual.link}</div>
+            <div className="flex gap-2">
+              <button onClick={() => setModalAccesoManual(null)} className="flex-1 border border-black/10 text-sm font-medium py-3 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">Cerrar</button>
+              <button onClick={() => { navigator.clipboard.writeText(modalAccesoManual.link); showToast('✓ Enlace copiado') }}
+                className="flex-1 bg-acento text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar enlace</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal mensaje de presentación del plan — tras aceptar un lead */}
+      {modalMensajeBienvenida && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalMensajeBienvenida(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h2 className="font-bold text-[#0A0A0A] mb-1">💬 Mensaje de presentación del plan</h2>
+            <p className="text-xs text-[#6B6B6B] mb-3">Revísalo o edítalo antes de copiarlo a WhatsApp.</p>
+            <textarea value={modalMensajeBienvenida} onChange={e => setModalMensajeBienvenida(e.target.value)} rows={7}
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none mb-3" />
+            <div className="flex gap-2">
+              <button onClick={() => { navigator.clipboard.writeText(modalMensajeBienvenida); showToast('✓ Mensaje copiado') }}
+                className="flex-1 bg-acento text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar mensaje</button>
+              <button onClick={() => setModalMensajeBienvenida(null)} className="px-4 py-3 rounded-xl border border-black/10 text-sm text-[#6B6B6B] hover:bg-[#F5F5F0]">✓ Listo</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto space-y-4">
 
         {/* Tutorial primer acceso */}
@@ -316,6 +448,74 @@ export default function Dashboard({ session }) {
                         className="text-xs bg-acento text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
                         Aprobar →
                       </button>
+                    </div>
+                  )
+                })}
+
+                {/* Leads del formulario público de registro */}
+                {d.leadsPendientes?.map(lead => {
+                  const PLAN_BADGE = {
+                    completo: { label: '⚡ Plan Completo', cls: 'bg-acento text-white' },
+                    entrenamiento: { label: '💪 Entrenamiento', cls: 'bg-[#6366f1] text-white' },
+                    nutricion: { label: '🥗 Nutrición', cls: 'bg-emerald-500 text-white' },
+                  }
+                  const planBadge = lead.planSugeridoKey ? PLAN_BADGE[lead.planSugeridoKey] : null
+                  const expandido = leadExpandido === lead.id
+                  return (
+                    <div key={lead.id} className="px-5 py-3.5 bg-acento/4 space-y-2.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-acento rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">🧲</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-[#0A0A0A]">Nuevo lead: {lead.nombre}</p>
+                          <p className="text-xs text-[#6B6B6B] truncate">{lead.email}</p>
+                        </div>
+                        {planBadge && (
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${planBadge.cls}`}>{planBadge.label}</span>
+                        )}
+                      </div>
+
+                      {/* Datos del cuestionario */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#444] pl-11">
+                        {lead.edad && <span>🎂 {lead.edad} años</span>}
+                        {lead.objetivoLabel && <span>🎯 {lead.objetivoLabel}</span>}
+                        {lead.ciudad && <span>📍 {lead.ciudad}</span>}
+                        {lead.diasSemana && <span>📅 {lead.diasSemana} días/semana</span>}
+                        {lead.dondeEntrena && <span>🏋️ {lead.dondeEntrena}</span>}
+                      </div>
+
+                      {(lead.queNoFunciono || lead.expectativas) && (
+                        <div className="pl-11 space-y-1">
+                          {lead.queNoFunciono && (
+                            <p className="text-xs text-[#6B6B6B] leading-relaxed"><span className="font-semibold text-[#444]">Qué no funcionó:</span> {lead.queNoFunciono}</p>
+                          )}
+                          {lead.expectativas && (
+                            <p className="text-xs text-[#6B6B6B] leading-relaxed"><span className="font-semibold text-[#444]">Expectativas 30 días:</span> {lead.expectativas}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {lead.justificacion && (
+                        <div className="pl-11">
+                          <button onClick={() => setLeadExpandido(expandido ? null : lead.id)}
+                            className="text-xs font-semibold text-acento">
+                            {expandido ? '▾ Ocultar análisis IA' : '▸ Ver análisis IA'}
+                          </button>
+                          {expandido && (
+                            <p className="text-xs text-[#6B6B6B] leading-relaxed mt-1 bg-white rounded-lg p-2.5 border border-black/5">{lead.justificacion}</p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button onClick={() => rechazarLead(lead)} disabled={procesandoLead===lead.id}
+                          className="text-xs border border-black/10 text-[#6B6B6B] font-semibold px-3 py-1.5 rounded-xl flex-shrink-0 disabled:opacity-40">
+                          ✗ Rechazar
+                        </button>
+                        <button onClick={() => aceptarLead(lead)} disabled={procesandoLead===lead.id}
+                          className="text-xs bg-acento text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0 disabled:opacity-40">
+                          {procesandoLead===lead.id ? '…' : '✓ Aceptar'}
+                        </button>
+                      </div>
                     </div>
                   )
                 })}
