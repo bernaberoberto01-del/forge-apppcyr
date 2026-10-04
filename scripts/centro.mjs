@@ -56,6 +56,13 @@ const propia = Boolean(sb.url && sb.anonKey)
 if (propia) { env.VITE_SUPABASE_URL = sb.url; env.VITE_SUPABASE_ANON_KEY = sb.anonKey }
 const refUsada = propia ? (sb.url.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] : refEnv
 
+// --env: solo imprime las variables (para Vercel), sin arrancar nada
+if (args.includes('--env')) {
+  if (!propia) salir(`centros/${id}.json no trae supabase.url y anonKey: no se pueden generar las variables de despliegue`)
+  for (const [k, v] of Object.entries(env)) if (v) console.log(`${k}=${v}`)
+  process.exit(0)
+}
+
 console.log(`\n  Centro:  ${m.nombreCompleto}  (centros/${id}.json)`)
 console.log(`  Color:   ${m.color}`)
 console.log(`  Logo:    ${m.logo || '(sin logo: se usa la "F")'}`)

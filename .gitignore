@@ -8,3 +8,4 @@ supabase/.temp/
 test-results/
 playwright-report/
 datos-privados/
+.vercel
