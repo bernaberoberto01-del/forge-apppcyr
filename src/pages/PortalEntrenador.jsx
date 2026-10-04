@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { BRAND, colorMarca } from '../lib/brand'
+import { moduloVisible } from '../lib/modulos'
 
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const DIAS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
@@ -211,7 +212,7 @@ export default function PortalEntrenador({ session }) {
           ['semana',   'Semana'],
           ['clientes', `Clientes (${d.clientes.length})`],
           ['mensajes', 'Mensajes'],
-        ].map(([id,label])=>(
+        ].filter(([id]) => id !== 'mensajes' || moduloVisible('mensajes')).map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
             className={`px-5 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-all relative ${tab===id?'text-white':'text-white/40 border-transparent hover:text-white/70'}`}
             style={tab===id?{borderColor:acento}:{borderColor:'transparent'}}>
