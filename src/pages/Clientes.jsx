@@ -224,11 +224,17 @@ export default function Clientes({ session }) {
     if (!detalle) return
     setAceptandoLead(true)
     try {
-      await supabase.from('clientes').update({ estado: 'activo' }).eq('id', detalle.id)
+      // Si la IA sugirió un plan, se asigna ahora — plan_online es lo único que
+      // determina qué módulos ve el cliente en el portal (ver acceso.rutinas/
+      // acceso.nutricion en PortalForge.jsx), así que fijarlo activa el módulo.
+      const planSugerido = dData.cuestRegistro?.sugerencia_plan || null
+      const camposAceptar = { estado: 'activo' }
+      if (planSugerido) { camposAceptar.plan_online = planSugerido; camposAceptar.plan_activo = true }
+      await supabase.from('clientes').update(camposAceptar).eq('id', detalle.id)
       const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
       if (error) throw error
-      setDetalle(d => ({ ...d, estado: 'activo' }))
-      setClientes(cs => cs.map(c => c.id === detalle.id ? { ...c, estado: 'activo' } : c))
+      setDetalle(d => ({ ...d, ...camposAceptar }))
+      setClientes(cs => cs.map(c => c.id === detalle.id ? { ...c, ...camposAceptar } : c))
       let huboModalAcceso = false
       if (data?.sin_email && data?.link) {
         setModalAccesoManual({ nombre: detalle.nombre, link: data.link })
@@ -604,6 +610,17 @@ export default function Clientes({ session }) {
     const { error } = await supabase.from('cuestionarios_nutricion').update({ procesado: true }).eq('id', dData.cuestNutricion.id)
     if (!error) {
       setDData(d => ({ ...d, cuestNutricion: { ...d.cuestNutricion, procesado: true } }))
+      showToast('✓ Cuestionario marcado como procesado')
+    } else {
+      showToast('Error al marcar: ' + error.message)
+    }
+  }
+
+  async function marcarCuestionarioRegistroProcesado() {
+    if (!dData.cuestRegistro) return
+    const { error } = await supabase.from('cuestionarios').update({ procesado: true }).eq('id', dData.cuestRegistro.id)
+    if (!error) {
+      setDData(d => ({ ...d, cuestRegistro: { ...d.cuestRegistro, procesado: true } }))
       showToast('✓ Cuestionario marcado como procesado')
     } else {
       showToast('Error al marcar: ' + error.message)
@@ -1776,6 +1793,10 @@ export default function Clientes({ session }) {
                         } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
                       } catch (e) { showToast('Error de conexión') }
                     }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Copiar enlace de acceso</button>
+                    {detalle.tipo === 'online' && dData.cuestRegistro?.sugerencia_plan && (
+                      <button onClick={() => generarMensajeBienvenida(detalle, dData.cuestRegistro.sugerencia_plan, dData.cuestRegistro.sugerencia_justificacion, false)}
+                        className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">💬 Generar mensaje de plan</button>
+                    )}
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${detalle.id}`); showToast('Enlace check-in copiado') }}
                       className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Enviar CI</button>
                     <button onClick={() => eliminar(detalle.id)} className="border border-red-100 text-red-500 text-sm font-medium py-2.5 rounded-xl hover:bg-red-50">🗑 Eliminar</button>
@@ -1979,16 +2000,33 @@ export default function Clientes({ session }) {
                 </div>
               )}
               {dTab==='cuestionario' && (() => {
+                const cr = dData.cuestRegistro
                 const cn = dData.cuestNutricion
-                if (!cn) return (
+                if (!cr && !cn) return (
                   <div className="text-center py-8">
                     <p className="text-3xl mb-2">📋</p>
                     <p className="text-sm text-[#6B6B6B]">El cliente aún no ha rellenado el cuestionario</p>
                   </div>
                 )
-                const OBJETIVOS = { perdida_grasa: 'Pérdida de grasa', hipertrofia: 'Hipertrofia', ganancia_muscular: 'Ganancia muscular', mantenimiento: 'Mantenimiento', rendimiento: 'Rendimiento' }
-                const campos = [
-                  ['Objetivo', OBJETIVOS[cn.objetivo] || cn.objetivo],
+                const PLAN_LABEL = { nutricion: 'Hábitos & Alimentación', entrenamiento: 'Entrenamiento', completo: 'Plan Completo' }
+                const camposRegistro = cr ? [
+                  ['Objetivo', OBJ[cr.objetivo]?.label || cr.objetivo],
+                  ['Edad', cr.edad ? `${cr.edad} años` : null],
+                  ['Sexo', cr.sexo],
+                  ['Ciudad', cr.ciudad],
+                  ['Días/semana', cr.dias_semana ? `${cr.dias_semana} días` : null],
+                  ['Dónde entrena', cr.donde_entrena],
+                  ['Material', cr.material],
+                  ['Lesiones', cr.tiene_lesion ? (cr.lesiones || 'Sí (sin detalle)') : null],
+                  ['Alimentación actual', cr.alimentacion_actual],
+                  ['Qué no funcionó', cr.que_no_funciono],
+                  ['Expectativas 30 días', cr.expectativas_30dias],
+                  ['Plan sugerido (IA)', cr.sugerencia_plan ? (PLAN_LABEL[cr.sugerencia_plan] || cr.sugerencia_plan) : null],
+                  ['Justificación IA', cr.sugerencia_justificacion],
+                ].filter(([, v]) => v) : []
+                const OBJETIVOS_NUTRI = { perdida_grasa: 'Pérdida de grasa', hipertrofia: 'Hipertrofia', ganancia_muscular: 'Ganancia muscular', mantenimiento: 'Mantenimiento', rendimiento: 'Rendimiento' }
+                const camposNutri = cn ? [
+                  ['Objetivo', OBJETIVOS_NUTRI[cn.objetivo] || cn.objetivo],
                   ['Edad', cn.edad ? `${cn.edad} años` : null],
                   ['Sexo', cn.sexo],
                   ['Peso', cn.peso ? `${cn.peso} kg` : null],
@@ -2001,40 +2039,77 @@ export default function Clientes({ session }) {
                   ['Suplementos actuales', cn.suplementos],
                   ['Interés en suplementación', cn.interes_suplementacion ? 'Sí' : 'No'],
                   ['Notas', cn.notas],
-                ].filter(([, v]) => v)
+                ].filter(([, v]) => v) : []
                 return (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-[#9B9B9B]">
-                        Enviado el {new Date(cn.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </p>
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cn.procesado ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
-                        {cn.procesado ? '✓ Procesado' : '⏳ Pendiente'}
-                      </span>
-                    </div>
-
-                    {cn.tiene_condicion_salud && (
-                      <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                        <p className="text-xs font-bold text-amber-700 mb-1">⚕️ Condiciones de salud</p>
-                        {cn.condiciones_salud?.length > 0 && <p className="text-xs text-amber-700/90">{cn.condiciones_salud.join(', ')}</p>}
-                        {cn.medicacion && <p className="text-xs text-amber-700/80 mt-1">Medicación: {cn.medicacion}</p>}
+                  <div className="space-y-5">
+                    {cr && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[#0A0A0A]">📋 Cuestionario de registro</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-[#9B9B9B]">
+                              {new Date(cr.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cr.procesado ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
+                              {cr.procesado ? '✓ Procesado' : '⏳ Pendiente'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="bg-white border border-black/5 rounded-xl divide-y divide-black/4">
+                          {camposRegistro.map(([label, valor]) => (
+                            <div key={label} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
+                              <p className="text-xs text-[#6B6B6B] flex-shrink-0">{label}</p>
+                              <p className="text-xs font-semibold text-[#0A0A0A] text-right">{valor}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {!cr.procesado && (
+                          <button onClick={marcarCuestionarioRegistroProcesado}
+                            className="w-full bg-[#FF5C00] text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
+                            ✓ Marcar como procesado
+                          </button>
+                        )}
                       </div>
                     )}
 
-                    <div className="bg-white border border-black/5 rounded-xl divide-y divide-black/4">
-                      {campos.map(([label, valor]) => (
-                        <div key={label} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
-                          <p className="text-xs text-[#6B6B6B] flex-shrink-0">{label}</p>
-                          <p className="text-xs font-semibold text-[#0A0A0A] text-right">{valor}</p>
+                    {cn && (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[#0A0A0A]">🥗 Cuestionario de nutrición</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-[#9B9B9B]">
+                              {new Date(cn.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${cn.procesado ? 'bg-emerald-50 text-emerald-700' : 'bg-orange-50 text-orange-700'}`}>
+                              {cn.procesado ? '✓ Procesado' : '⏳ Pendiente'}
+                            </span>
+                          </div>
                         </div>
-                      ))}
-                    </div>
 
-                    {!cn.procesado && (
-                      <button onClick={marcarCuestionarioProcesado}
-                        className="w-full bg-[#FF5C00] text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
-                        ✓ Marcar como procesado
-                      </button>
+                        {cn.tiene_condicion_salud && (
+                          <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                            <p className="text-xs font-bold text-amber-700 mb-1">⚕️ Condiciones de salud</p>
+                            {cn.condiciones_salud?.length > 0 && <p className="text-xs text-amber-700/90">{cn.condiciones_salud.join(', ')}</p>}
+                            {cn.medicacion && <p className="text-xs text-amber-700/80 mt-1">Medicación: {cn.medicacion}</p>}
+                          </div>
+                        )}
+
+                        <div className="bg-white border border-black/5 rounded-xl divide-y divide-black/4">
+                          {camposNutri.map(([label, valor]) => (
+                            <div key={label} className="flex items-start justify-between gap-3 px-3.5 py-2.5">
+                              <p className="text-xs text-[#6B6B6B] flex-shrink-0">{label}</p>
+                              <p className="text-xs font-semibold text-[#0A0A0A] text-right">{valor}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {!cn.procesado && (
+                          <button onClick={marcarCuestionarioProcesado}
+                            className="w-full bg-[#FF5C00] text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
+                            ✓ Marcar como procesado
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )

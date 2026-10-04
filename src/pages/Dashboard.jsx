@@ -103,7 +103,12 @@ export default function Dashboard({ session }) {
   async function aceptarLead(lead) {
     setProcesandoLead(lead.id)
     try {
-      await supabase.from('clientes').update({ estado: 'activo' }).eq('id', lead.id)
+      // Si la IA sugirió un plan, se asigna ahora — plan_online es lo único que
+      // determina qué módulos ve el cliente en el portal (ver acceso.rutinas/
+      // acceso.nutricion en PortalForge.jsx), así que fijarlo activa el módulo.
+      const camposAceptar = { estado: 'activo' }
+      if (lead.planSugeridoKey) { camposAceptar.plan_online = lead.planSugeridoKey; camposAceptar.plan_activo = true }
+      await supabase.from('clientes').update(camposAceptar).eq('id', lead.id)
       const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: lead.id } })
       if (error) throw error
       setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
