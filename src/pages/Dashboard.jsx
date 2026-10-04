@@ -107,7 +107,10 @@ export default function Dashboard({ session }) {
       // determina qué módulos ve el cliente en el portal (ver acceso.rutinas/
       // acceso.nutricion en PortalForge.jsx), así que fijarlo activa el módulo.
       const camposAceptar = { estado: 'activo' }
-      if (lead.planSugeridoKey) { camposAceptar.plan_online = lead.planSugeridoKey; camposAceptar.plan_activo = true }
+      // plan_activo queda en false aquí a propósito — el cliente no tiene acceso
+      // al portal hasta que pague; stripe-webhook lo pone a true cuando llega
+      // checkout.session.completed.
+      if (lead.planSugeridoKey) { camposAceptar.plan_online = lead.planSugeridoKey; camposAceptar.plan_activo = false }
       await supabase.from('clientes').update(camposAceptar).eq('id', lead.id)
       const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: lead.id } })
       if (error) throw error

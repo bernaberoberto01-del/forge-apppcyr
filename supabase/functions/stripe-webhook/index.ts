@@ -43,7 +43,7 @@ serve(async (req) => {
           const { error: insError } = await supabase.from('planes_cobro').insert(payload)
           console.log('checkout.session.completed — insert planes_cobro', insError ? 'ERROR: ' + insError.message : 'OK')
         }
-        const { error: cliError } = await supabase.from('clientes').update({ stripe_subscription_id: subId, stripe_customer_id: session.customer, plan_online: plan }).eq('id', cliente_id)
+        const { error: cliError } = await supabase.from('clientes').update({ stripe_subscription_id: subId, stripe_customer_id: session.customer, plan_online: plan, plan_activo: true }).eq('id', cliente_id)
         console.log('checkout.session.completed — update clientes', cliError ? 'ERROR: ' + cliError.message : 'OK')
         break
       }
@@ -75,7 +75,9 @@ serve(async (req) => {
         const { data: plan } = await supabase.from('planes_cobro').select('id, cliente_id').eq('stripe_subscription_id', sub.id).single()
         if (!plan) break
         await supabase.from('planes_cobro').update({ estado: 'cancelado', activo: false }).eq('id', plan.id)
-        await supabase.from('clientes').update({ stripe_subscription_id: null, plan_online: null }).eq('id', plan.cliente_id)
+        // plan_activo también a false — si no, un cliente con suscripción cancelada
+        // se quedaría con plan_online=null pero plan_activo=true, un estado inconsistente.
+        await supabase.from('clientes').update({ stripe_subscription_id: null, plan_online: null, plan_activo: false }).eq('id', plan.cliente_id)
         break
       }
       case 'customer.subscription.updated': {

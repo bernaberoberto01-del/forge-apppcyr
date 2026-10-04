@@ -29,7 +29,11 @@ Deno.serve(async (req) => {
     const planLabel = PLAN_LABEL[plan] || plan || 'el plan recomendado'
     const nombreCliente = String(nombre).split(' ')[0]
 
-    const prompt = `Eres ${nombreEntrenador}, entrenador personal en Murcia. Genera un mensaje de WhatsApp directo y cercano (máximo 150 palabras) para enviarle a ${nombreCliente} explicándole por qué el plan ${planLabel} es el que mejor se adapta a su situación. Basa el mensaje en esto: ${justificacion}.${donde_entrena ? ` Entrena en: ${donde_entrena}.` : ''} El mensaje debe sonar personal, no comercial. No uses markdown ni asteriscos para negritas. Usa solo texto plano. Termina invitándole a entrar a la app con el enlace que ya tiene. Firma como ${firmaEntrenador}.`
+    // El cliente ya NO recibe acceso al portal antes de pagar — el mensaje invita
+    // a activar el plan vía el enlace de pago, no a "entrar con el enlace que ya
+    // tiene". El enlace real se añade después, fuera de lo que genera la IA, para
+    // no arriesgar que lo trunque, lo reescriba o lo rodee de markdown.
+    const prompt = `Eres ${nombreEntrenador}, entrenador personal en Murcia. Genera un mensaje de WhatsApp directo y cercano (máximo 150 palabras) para enviarle a ${nombreCliente} explicándole por qué el plan ${planLabel} es el que mejor se adapta a su situación. Basa el mensaje en esto: ${justificacion}.${donde_entrena ? ` Entrena en: ${donde_entrena}.` : ''} El mensaje debe sonar personal, no comercial. No uses markdown ni asteriscos para negritas. Usa solo texto plano. Termina invitándole a activar su plan — el enlace de pago se añadirá justo debajo del mensaje, así que no escribas tú ningún enlace ni lo menciones por nombre o URL, solo anímale a dar el paso. Firma como ${firmaEntrenador}.`
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -43,10 +47,31 @@ Deno.serve(async (req) => {
     }
 
     const aiData = await res.json()
-    const mensaje = aiData.content?.[0]?.text?.trim() || ''
+    let mensaje = aiData.content?.[0]?.text?.trim() || ''
     if (!mensaje) return new Response(JSON.stringify({ error: 'IA no generó mensaje' }), { status: 500, headers: CORS })
 
-    return new Response(JSON.stringify({ mensaje }), { headers: CORS })
+    // Enlace de pago para el plan sugerido — se pide a crear-checkout-suscripcion
+    // reenviando el mismo token del entrenador que ya autenticó esta llamada.
+    let checkoutUrl: string | null = null
+    try {
+      const checkoutRes = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/crear-checkout-suscripcion`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cliente_id, plan }),
+      })
+      if (checkoutRes.ok) {
+        const checkoutData = await checkoutRes.json()
+        checkoutUrl = checkoutData?.url || null
+      } else {
+        console.error('generar-mensaje-bienvenida: crear-checkout-suscripcion respondió', checkoutRes.status, await checkoutRes.text())
+      }
+    } catch (checkoutErr: any) {
+      console.error('generar-mensaje-bienvenida: error llamando a crear-checkout-suscripcion', checkoutErr.message)
+    }
+
+    if (checkoutUrl) mensaje += `\n\nActiva tu plan aquí: ${checkoutUrl}`
+
+    return new Response(JSON.stringify({ mensaje, checkout_url: checkoutUrl }), { headers: CORS })
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: CORS })
   }
