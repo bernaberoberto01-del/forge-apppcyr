@@ -91,7 +91,7 @@ export default function Dashboard({ session }) {
     if (!lead.justificacion) return
     try {
       const { data } = await supabase.functions.invoke('generar-mensaje-bienvenida', {
-        body: { cliente_id: lead.id, nombre: lead.nombre, plan: lead.planSugeridoKey, justificacion: lead.justificacion }
+        body: { cliente_id: lead.id, nombre: lead.nombre, plan: lead.planSugeridoKey, justificacion: lead.justificacion, donde_entrena: lead.dondeEntrena }
       })
       if (data?.mensaje) {
         if (esperaModalAcceso) setMensajePendiente(data.mensaje)
@@ -369,7 +369,7 @@ export default function Dashboard({ session }) {
       {/* Modal mensaje de presentación del plan — tras aceptar un lead */}
       {modalMensajeBienvenida && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalMensajeBienvenida(null)}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-1">💬 Mensaje de presentación del plan</h2>
             <p className="text-xs text-[#6B6B6B] mb-3">Revísalo o edítalo antes de copiarlo a WhatsApp.</p>
             <textarea value={modalMensajeBienvenida} onChange={e => setModalMensajeBienvenida(e.target.value)} rows={7}

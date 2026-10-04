@@ -14,7 +14,7 @@ Deno.serve(async (req) => {
   if (authErr || !user) return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401, headers: CORS })
 
   try {
-    const { cliente_id, nombre, plan, justificacion } = await req.json().catch(() => ({}))
+    const { cliente_id, nombre, plan, justificacion, donde_entrena } = await req.json().catch(() => ({}))
     if (!cliente_id || !nombre || !justificacion) {
       return new Response(JSON.stringify({ error: 'cliente_id, nombre y justificacion requeridos' }), { status: 400, headers: CORS })
     }
@@ -29,7 +29,7 @@ Deno.serve(async (req) => {
     const planLabel = PLAN_LABEL[plan] || plan || 'el plan recomendado'
     const nombreCliente = String(nombre).split(' ')[0]
 
-    const prompt = `Eres ${nombreEntrenador}, entrenador personal en Murcia. Genera un mensaje de WhatsApp directo y cercano (máximo 150 palabras) para enviarle a ${nombreCliente} explicándole por qué el plan ${planLabel} es el que mejor se adapta a su situación. Basa el mensaje en esto: ${justificacion}. El mensaje debe sonar personal, no comercial. Termina invitándole a entrar a la app con el enlace que ya tiene. Firma como ${firmaEntrenador}.`
+    const prompt = `Eres ${nombreEntrenador}, entrenador personal en Murcia. Genera un mensaje de WhatsApp directo y cercano (máximo 150 palabras) para enviarle a ${nombreCliente} explicándole por qué el plan ${planLabel} es el que mejor se adapta a su situación. Basa el mensaje en esto: ${justificacion}.${donde_entrena ? ` Entrena en: ${donde_entrena}.` : ''} El mensaje debe sonar personal, no comercial. No uses markdown ni asteriscos para negritas. Usa solo texto plano. Termina invitándole a entrar a la app con el enlace que ya tiene. Firma como ${firmaEntrenador}.`
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

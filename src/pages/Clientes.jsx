@@ -207,11 +207,11 @@ export default function Clientes({ session }) {
     }
   }, [modalAccesoManual, mensajePendiente])
 
-  async function generarMensajeBienvenida(cliente, plan, justificacion, esperaModalAcceso) {
+  async function generarMensajeBienvenida(cliente, plan, justificacion, esperaModalAcceso, dondeEntrena) {
     if (!justificacion) return
     try {
       const { data } = await supabase.functions.invoke('generar-mensaje-bienvenida', {
-        body: { cliente_id: cliente.id, nombre: cliente.nombre, plan, justificacion }
+        body: { cliente_id: cliente.id, nombre: cliente.nombre, plan, justificacion, donde_entrena: dondeEntrena }
       })
       if (data?.mensaje) {
         if (esperaModalAcceso) setMensajePendiente(data.mensaje)
@@ -244,7 +244,7 @@ export default function Clientes({ session }) {
       } else {
         showToast('✓ Cliente activado')
       }
-      generarMensajeBienvenida(detalle, dData.cuestRegistro?.sugerencia_plan, dData.cuestRegistro?.sugerencia_justificacion, huboModalAcceso)
+      generarMensajeBienvenida(detalle, dData.cuestRegistro?.sugerencia_plan, dData.cuestRegistro?.sugerencia_justificacion, huboModalAcceso, dData.cuestRegistro?.donde_entrena)
     } catch (e) {
       showToast('Error al aceptar el lead')
     }
@@ -1017,9 +1017,12 @@ export default function Clientes({ session }) {
         </>
       )}
 
-      {/* Modal acceso manual — email no configurado, hay que copiar el link */}
-      {modalAccesoManual && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalAccesoManual(null)}>
+      {/* Modal acceso manual — email no configurado, hay que copiar el link.
+          createPortal + z-[60]: la ficha del cliente ({detalle && (...)}) es
+          z-50 y aparece después en el DOM, así que sin portal se pintaba
+          encima y se tragaba los clics (mismo bug que el de editar check-in). */}
+      {modalAccesoManual && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setModalAccesoManual(null)}>
           <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
             <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">⚠️</div>
             <h2 className="font-bold text-[#0A0A0A] text-center mb-2">No se pudo enviar el email</h2>
@@ -1031,13 +1034,15 @@ export default function Clientes({ session }) {
                 className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar enlace</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Modal mensaje de presentación del plan — tras aceptar un lead */}
-      {modalMensajeBienvenida && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalMensajeBienvenida(null)}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+      {/* Modal mensaje de presentación del plan — tras aceptar un lead.
+          Mismo motivo de createPortal + z-[60] que el modal de arriba. */}
+      {modalMensajeBienvenida && createPortal(
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={() => setModalMensajeBienvenida(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-1">💬 Mensaje de presentación del plan</h2>
             <p className="text-xs text-[#6B6B6B] mb-3">Revísalo o edítalo antes de copiarlo a WhatsApp.</p>
             <textarea value={modalMensajeBienvenida} onChange={e => setModalMensajeBienvenida(e.target.value)} rows={7}
@@ -1048,7 +1053,8 @@ export default function Clientes({ session }) {
               <button onClick={() => setModalMensajeBienvenida(null)} className="px-4 py-3 rounded-xl border border-black/10 text-sm text-[#6B6B6B] hover:bg-[#F5F5F0]">✓ Listo</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal editar check-in — el entrenador puede editar cualquier check-in, sin restricción de fecha.
@@ -1794,7 +1800,7 @@ export default function Clientes({ session }) {
                       } catch (e) { showToast('Error de conexión') }
                     }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Copiar enlace de acceso</button>
                     {detalle.tipo === 'online' && dData.cuestRegistro?.sugerencia_plan && (
-                      <button onClick={() => generarMensajeBienvenida(detalle, dData.cuestRegistro.sugerencia_plan, dData.cuestRegistro.sugerencia_justificacion, false)}
+                      <button onClick={() => generarMensajeBienvenida(detalle, dData.cuestRegistro.sugerencia_plan, dData.cuestRegistro.sugerencia_justificacion, false, dData.cuestRegistro.donde_entrena)}
                         className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">💬 Generar mensaje de plan</button>
                     )}
                     <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/seguimiento/${detalle.id}`); showToast('Enlace check-in copiado') }}
