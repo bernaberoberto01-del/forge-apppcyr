@@ -2,7 +2,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' }
-const ENTRENADOR_ID = '0b908e25-f69f-472c-9972-87bc93d67e65'
+// Por defecto, el entrenador de Forge (respaldo temporal). Otro centro lo indica en
+// el cuerpo ({ entrenador_id }) o en la variable STRIPE_TARIFAS_ENTRENADOR_ID.
+const ENTRENADOR_POR_DEFECTO = Deno.env.get('STRIPE_TARIFAS_ENTRENADOR_ID') || '0b908e25-f69f-472c-9972-87bc93d67e65'
 
 async function stripePost(path: string, params: Record<string, string>, key: string) {
   const res = await fetch(`https://api.stripe.com/v1/${path}`, {
@@ -27,10 +29,13 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Clave no es live' }), { status: 400, headers: CORS })
   }
 
-  // Obtener todas las tarifas activas de Forge
+  const { entrenador_id } = await req.json().catch(() => ({}))
+  const entrenadorId = entrenador_id || ENTRENADOR_POR_DEFECTO
+
+  // Tarifas activas del entrenador
   const { data: tarifas } = await sb.from('tarifas')
     .select('*')
-    .eq('entrenador_id', ENTRENADOR_ID)
+    .eq('entrenador_id', entrenadorId)
     .eq('activa', true)
 
   const resultados: any[] = []

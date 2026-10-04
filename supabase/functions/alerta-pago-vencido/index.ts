@@ -1,4 +1,26 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+// Envía por Resend (Forge) o, con MAIL_PROVIDER=gmail, por el Gmail de GMAIL_USER
+// (centros sin dominio verificado en Resend). Misma firma que fetch para no tocar
+// las llamadas: el cuerpo es el JSON de Resend ({ from, to, subject, html }).
+async function enviarEmail(url: string, opts: RequestInit): Promise<Response> {
+  if (Deno.env.get('MAIL_PROVIDER') !== 'gmail') return fetch(url, opts)
+  const user = Deno.env.get('GMAIL_USER'), pass = Deno.env.get('GMAIL_APP_PASSWORD')
+  if (!user || !pass) return new Response(JSON.stringify({ error: 'SMTP no configurado' }), { status: 500 })
+  const m = JSON.parse(String(opts.body))
+  const nombre = String(m.from || '').replace(/\s*<[^>]*>\s*$/, '').trim()
+  const { SMTPClient } = await import('https://deno.land/x/denomailer@1.6.0/mod.ts')
+  const client = new SMTPClient({ connection: { hostname: 'smtp.gmail.com', port: 465, tls: true, auth: { username: user, password: pass } } })
+  try {
+    await client.send({ from: nombre ? `${nombre} <${user}>` : user, to: m.to, subject: m.subject, html: m.html })
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), { status: 502 })
+  } finally {
+    try { await client.close() } catch { // la conexión ya estaba cerrada
+    }
+  }
+  return new Response(JSON.stringify({ ok: true }), { status: 200 })
+}
 const MAIL_FROM = Deno.env.get('MAIL_FROM') || 'Forge <noreply@forgeapp.es>';
 const ADMIN_SECRET = Deno.env.get('ADMIN_SECRET');
 const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
@@ -22,7 +44,7 @@ Deno.serve(async (req)=>{
       if (!cliente?.email) continue;
       const dias = Math.ceil((new Date(pago.valido_hasta).getTime() - new Date().getTime()) / 86400000);
       const msg = dias < 0 ? 'Tu suscripción ha vencido' : dias === 0 ? 'Tu suscripción vence hoy' : `Tu suscripción vence en ${dias} días`;
-      const emailRes = await fetch('https://api.resend.com/emails', {
+      const emailRes = await enviarEmail('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${RESEND_API_KEY}`,
