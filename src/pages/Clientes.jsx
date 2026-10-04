@@ -168,6 +168,9 @@ export default function Clientes({ session }) {
   const [modalRegistros, setModalRegistros] = useState(false)
   const [modalEnlace, setModalEnlace] = useState(false)
   const [modalAccesoManual, setModalAccesoManual] = useState(null)
+  const [modalMensajeBienvenida, setModalMensajeBienvenida] = useState(null)
+  const [mensajePendiente, setMensajePendiente] = useState(null)
+  const [aceptandoLead, setAceptandoLead] = useState(false)
   const [modalEditarCI, setModalEditarCI] = useState(null)
   const [formEditarCI, setFormEditarCI] = useState(null)
   const [guardandoCI, setGuardandoCI] = useState(false)
@@ -193,6 +196,53 @@ export default function Clientes({ session }) {
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
   const manejarRespuestaAcceso = (data, nombre) => {
     if (data?.sin_email && data?.link) setModalAccesoManual({ nombre, link: data.link })
+  }
+
+  // El modal de mensaje de bienvenida espera a que se cierre el de enlace manual
+  // (si lo hubo) para no solaparse — ver aceptarLeadDesdeFicha().
+  useEffect(() => {
+    if (!modalAccesoManual && mensajePendiente) {
+      setModalMensajeBienvenida(mensajePendiente)
+      setMensajePendiente(null)
+    }
+  }, [modalAccesoManual, mensajePendiente])
+
+  async function generarMensajeBienvenida(cliente, plan, justificacion, esperaModalAcceso) {
+    if (!justificacion) return
+    try {
+      const { data } = await supabase.functions.invoke('generar-mensaje-bienvenida', {
+        body: { cliente_id: cliente.id, nombre: cliente.nombre, plan, justificacion }
+      })
+      if (data?.mensaje) {
+        if (esperaModalAcceso) setMensajePendiente(data.mensaje)
+        else setModalMensajeBienvenida(data.mensaje)
+      }
+    } catch {}
+  }
+
+  async function aceptarLeadDesdeFicha() {
+    if (!detalle) return
+    setAceptandoLead(true)
+    try {
+      await supabase.from('clientes').update({ estado: 'activo' }).eq('id', detalle.id)
+      const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
+      if (error) throw error
+      setDetalle(d => ({ ...d, estado: 'activo' }))
+      setClientes(cs => cs.map(c => c.id === detalle.id ? { ...c, estado: 'activo' } : c))
+      let huboModalAcceso = false
+      if (data?.sin_email && data?.link) {
+        setModalAccesoManual({ nombre: detalle.nombre, link: data.link })
+        huboModalAcceso = true
+      } else if (data?.email_enviado) {
+        showToast('✓ Acceso enviado a ' + detalle.email)
+      } else {
+        showToast('✓ Cliente activado')
+      }
+      generarMensajeBienvenida(detalle, dData.cuestRegistro?.sugerencia_plan, dData.cuestRegistro?.sugerencia_justificacion, huboModalAcceso)
+    } catch (e) {
+      showToast('Error al aceptar el lead')
+    }
+    setAceptandoLead(false)
   }
   function abrirEditarCI(ci) {
     setFormEditarCI({
@@ -967,6 +1017,23 @@ export default function Clientes({ session }) {
         </div>
       )}
 
+      {/* Modal mensaje de presentación del plan — tras aceptar un lead */}
+      {modalMensajeBienvenida && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalMensajeBienvenida(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="font-bold text-[#0A0A0A] mb-1">💬 Mensaje de presentación del plan</h2>
+            <p className="text-xs text-[#6B6B6B] mb-3">Revísalo o edítalo antes de copiarlo a WhatsApp.</p>
+            <textarea value={modalMensajeBienvenida} onChange={e => setModalMensajeBienvenida(e.target.value)} rows={7}
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none mb-3" />
+            <div className="flex gap-2">
+              <button onClick={() => { navigator.clipboard.writeText(modalMensajeBienvenida); showToast('✓ Mensaje copiado') }}
+                className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar mensaje</button>
+              <button onClick={() => setModalMensajeBienvenida(null)} className="px-4 py-3 rounded-xl border border-black/10 text-sm text-[#6B6B6B] hover:bg-[#F5F5F0]">✓ Listo</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal editar check-in — el entrenador puede editar cualquier check-in, sin restricción de fecha.
           Se monta con un portal a document.body y con z-index superior al panel de detalle del cliente
           (z-50) para que nunca quede debajo, sea cual sea el orden de renderizado. */}
@@ -1677,6 +1744,12 @@ export default function Clientes({ session }) {
                         } catch(e) { showToast('Error de conexión') }
                       }} className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-[#FF5C00] hover:bg-[#E54E00] active:scale-95 transition-all">
                         📧 Enviar acceso al portal
+                      </button>
+                    )}
+                    {detalle.estado === 'pendiente' && (
+                      <button onClick={aceptarLeadDesdeFicha} disabled={aceptandoLead}
+                        className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-[#FF5C00] hover:bg-[#E54E00] active:scale-95 transition-all disabled:opacity-40">
+                        {aceptandoLead ? 'Activando...' : '✓ Aceptar lead'}
                       </button>
                     )}
                     <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>

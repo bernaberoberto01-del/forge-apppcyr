@@ -1,0 +1,53 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const sb = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+const KEY = Deno.env.get('ANTHROPIC_API_KEY')!
+const CORS = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }
+
+const PLAN_LABEL: Record<string, string> = { nutricion: 'Hábitos & Alimentación', entrenamiento: 'Entrenamiento', completo: 'Plan Completo' }
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
+
+  const token = (req.headers.get('Authorization') || '').replace('Bearer ', '')
+  const { data: { user }, error: authErr } = await sb.auth.getUser(token)
+  if (authErr || !user) return new Response(JSON.stringify({ error: 'No autenticado' }), { status: 401, headers: CORS })
+
+  try {
+    const { cliente_id, nombre, plan, justificacion } = await req.json().catch(() => ({}))
+    if (!cliente_id || !nombre || !justificacion) {
+      return new Response(JSON.stringify({ error: 'cliente_id, nombre y justificacion requeridos' }), { status: 400, headers: CORS })
+    }
+
+    const { data: cliente } = await sb.from('clientes').select('entrenador_id').eq('id', cliente_id).single()
+    if (!cliente) return new Response(JSON.stringify({ error: 'Cliente no encontrado' }), { status: 404, headers: CORS })
+    if (cliente.entrenador_id !== user.id) return new Response(JSON.stringify({ error: 'No autorizado' }), { status: 403, headers: CORS })
+
+    const { data: config } = await sb.from('configuracion').select('nombre_entrenador').eq('entrenador_id', cliente.entrenador_id).maybeSingle()
+    const nombreEntrenador = config?.nombre_entrenador || 'Roberto Bernabé'
+    const firmaEntrenador = nombreEntrenador.split(' ')[0]
+    const planLabel = PLAN_LABEL[plan] || plan || 'el plan recomendado'
+    const nombreCliente = String(nombre).split(' ')[0]
+
+    const prompt = `Eres ${nombreEntrenador}, entrenador personal en Murcia. Genera un mensaje de WhatsApp directo y cercano (máximo 150 palabras) para enviarle a ${nombreCliente} explicándole por qué el plan ${planLabel} es el que mejor se adapta a su situación. Basa el mensaje en esto: ${justificacion}. El mensaje debe sonar personal, no comercial. Termina invitándole a entrar a la app con el enlace que ya tiene. Firma como ${firmaEntrenador}.`
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: prompt }] })
+    })
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}))
+      return new Response(JSON.stringify({ error: e.error?.message || 'Error IA' }), { status: 500, headers: CORS })
+    }
+
+    const aiData = await res.json()
+    const mensaje = aiData.content?.[0]?.text?.trim() || ''
+    if (!mensaje) return new Response(JSON.stringify({ error: 'IA no generó mensaje' }), { status: 500, headers: CORS })
+
+    return new Response(JSON.stringify({ mensaje }), { headers: CORS })
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: CORS })
+  }
+})

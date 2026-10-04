@@ -75,6 +75,30 @@ export default function Dashboard({ session }) {
   const [procesandoLead, setProcesandoLead] = useState(null)
   const [leadExpandido, setLeadExpandido] = useState(null)
   const [modalAccesoManual, setModalAccesoManual] = useState(null)
+  const [modalMensajeBienvenida, setModalMensajeBienvenida] = useState(null)
+  const [mensajePendiente, setMensajePendiente] = useState(null)
+
+  // El modal de mensaje de bienvenida espera a que se cierre el de enlace manual
+  // (si lo hubo) para no solaparse.
+  useEffect(() => {
+    if (!modalAccesoManual && mensajePendiente) {
+      setModalMensajeBienvenida(mensajePendiente)
+      setMensajePendiente(null)
+    }
+  }, [modalAccesoManual, mensajePendiente])
+
+  async function generarMensajeBienvenida(lead, esperaModalAcceso) {
+    if (!lead.justificacion) return
+    try {
+      const { data } = await supabase.functions.invoke('generar-mensaje-bienvenida', {
+        body: { cliente_id: lead.id, nombre: lead.nombre, plan: lead.planSugeridoKey, justificacion: lead.justificacion }
+      })
+      if (data?.mensaje) {
+        if (esperaModalAcceso) setMensajePendiente(data.mensaje)
+        else setModalMensajeBienvenida(data.mensaje)
+      }
+    } catch {}
+  }
 
   async function aceptarLead(lead) {
     setProcesandoLead(lead.id)
@@ -83,13 +107,16 @@ export default function Dashboard({ session }) {
       const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: lead.id } })
       if (error) throw error
       setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
+      let huboModalAcceso = false
       if (data?.sin_email && data?.link) {
         setModalAccesoManual({ nombre: lead.nombre, link: data.link })
+        huboModalAcceso = true
       } else if (data?.email_enviado) {
         showToast(`✓ Acceso enviado a ${lead.email}`)
       } else {
         showToast(`✓ Cliente activado`)
       }
+      generarMensajeBienvenida(lead, huboModalAcceso)
     } catch (e) {
       showToast('Error al aceptar el lead')
     }
@@ -329,6 +356,23 @@ export default function Dashboard({ session }) {
               <button onClick={() => setModalAccesoManual(null)} className="flex-1 border border-black/10 text-sm font-medium py-3 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">Cerrar</button>
               <button onClick={() => { navigator.clipboard.writeText(modalAccesoManual.link); showToast('✓ Enlace copiado') }}
                 className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar enlace</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal mensaje de presentación del plan — tras aceptar un lead */}
+      {modalMensajeBienvenida && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setModalMensajeBienvenida(null)}>
+          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
+            <h2 className="font-bold text-[#0A0A0A] mb-1">💬 Mensaje de presentación del plan</h2>
+            <p className="text-xs text-[#6B6B6B] mb-3">Revísalo o edítalo antes de copiarlo a WhatsApp.</p>
+            <textarea value={modalMensajeBienvenida} onChange={e => setModalMensajeBienvenida(e.target.value)} rows={7}
+              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none mb-3" />
+            <div className="flex gap-2">
+              <button onClick={() => { navigator.clipboard.writeText(modalMensajeBienvenida); showToast('✓ Mensaje copiado') }}
+                className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar mensaje</button>
+              <button onClick={() => setModalMensajeBienvenida(null)} className="px-4 py-3 rounded-xl border border-black/10 text-sm text-[#6B6B6B] hover:bg-[#F5F5F0]">✓ Listo</button>
             </div>
           </div>
         </div>
