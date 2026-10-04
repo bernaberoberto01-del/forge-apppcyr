@@ -72,6 +72,30 @@ export default function Dashboard({ session }) {
     }) }))
   }
 
+  const [procesandoLead, setProcesandoLead] = useState(null)
+
+  async function aceptarLead(lead) {
+    setProcesandoLead(lead.id)
+    try {
+      await supabase.from('clientes').update({ estado: 'activo' }).eq('id', lead.id)
+      const { data } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: lead.id } })
+      setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
+      if (data?.email_enviado) showToast(`✓ Acceso enviado a ${lead.email}`)
+      else if (data?.link) showToast(`✓ Cliente activado — copia el enlace desde su ficha`)
+      else showToast(`✓ Cliente activado`)
+    } catch (e) {
+      showToast('Error al aceptar el lead')
+    }
+    setProcesandoLead(null)
+  }
+
+  async function rechazarLead(lead) {
+    setProcesandoLead(lead.id)
+    await supabase.from('clientes').update({ estado: 'rechazado' }).eq('id', lead.id)
+    setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
+    setProcesandoLead(null)
+  }
+
   useEffect(() => { cargar() }, [uid])
 
   // Realtime — recargar cuando llega cuestionario nuevo o alerta nueva
@@ -128,6 +152,8 @@ export default function Dashboard({ session }) {
       { data: planesCobroAll },
       { data: solicitudesCambioPlan },
       { data: cuestNutricionPendiente },
+      { data: leadsPendientesRaw },
+      { data: cuestConLead },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
@@ -148,6 +174,8 @@ export default function Dashboard({ session }) {
       supabase.from('planes_cobro').select('cliente_id,estado,importe,concepto,clientes(nombre)').eq('entrenador_id', uid),
       supabase.from('solicitudes_cambio_plan').select('cliente_id,plan_actual,plan_solicitado,clientes(nombre)').eq('entrenador_id', uid).eq('estado', 'pendiente'),
       supabase.from('cuestionarios_nutricion').select('id,cliente_id,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('procesado', false).order('created_at',{ascending:false}),
+      supabase.from('clientes').select('id,nombre,email,created_at').eq('entrenador_id', uid).eq('estado', 'pendiente').order('created_at',{ascending:false}),
+      supabase.from('cuestionarios').select('cliente_id,sugerencia_plan,sugerencia_justificacion').eq('entrenador_id', uid).not('cliente_id','is',null).order('created_at',{ascending:false}),
     ])
 
     if (alertas?.length > 0) {
@@ -208,6 +236,15 @@ export default function Dashboard({ session }) {
     ;(cuestNutricionPendiente||[]).forEach(c => { if (!cuestNutricionPorCliente[c.cliente_id]) cuestNutricionPorCliente[c.cliente_id] = c })
     const cuestionariosNutricionPendientes = Object.values(cuestNutricionPorCliente).filter(c => !estaDescartada(c.cliente_id, 'cuest_nutricion_pendiente'))
 
+    // Leads del formulario público de registro — pendientes de aceptar/rechazar
+    const sugerenciaPorCliente = {}
+    ;(cuestConLead||[]).forEach(c => { if (!sugerenciaPorCliente[c.cliente_id]) sugerenciaPorCliente[c.cliente_id] = c })
+    const PLAN_LABEL = { nutricion: 'Hábitos & Alimentación', entrenamiento: 'Entrenamiento', completo: 'Plan Completo' }
+    const leadsPendientes = (leadsPendientesRaw||[]).map(c => {
+      const sug = sugerenciaPorCliente[c.id]
+      return { ...c, planSugerido: sug ? (PLAN_LABEL[sug.sugerencia_plan] || sug.sugerencia_plan) : null, justificacion: sug?.sugerencia_justificacion || null }
+    })
+
     // Cobros online: pagos fallidos y clientes online sin ninguna suscripción configurada
     const clientesPagoFallido = (planesCobroAll||[]).filter(pc => pc.estado === 'pago_fallido').filter(pc => !estaDescartada(pc.cliente_id, 'pago_fallido'))
     const clienteIdsConPlanCobro = new Set((planesCobroAll||[]).map(pc => pc.cliente_id))
@@ -223,6 +260,7 @@ export default function Dashboard({ session }) {
       checkins: checkins||[],
       suplementacionPendiente,
       cuestionariosNutricionPendientes,
+      leadsPendientes,
       clientesPagoFallido,
       clientesOnlineSinSuscripcion,
       solicitudesCambioPlan: (solicitudesCambioPlan || []).filter(s => !estaDescartada(s.cliente_id, 'cambio_plan')),
@@ -245,7 +283,7 @@ export default function Dashboard({ session }) {
   )
 
   const d = datos
-  const totalPendiente = d.mensajesNL.length + d.clientesSinCI.length + d.rutinasIA.length + d.alertasPagos.length
+  const totalPendiente = d.mensajesNL.length + d.clientesSinCI.length + d.rutinasIA.length + d.alertasPagos.length + (d.leadsPendientes?.length || 0)
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -315,6 +353,27 @@ export default function Dashboard({ session }) {
                     </div>
                   )
                 })}
+
+                {/* Leads del formulario público de registro */}
+                {d.leadsPendientes?.map(lead => (
+                  <div key={lead.id} className="flex items-center gap-3 px-5 py-3.5 bg-[#FF5C00]/4">
+                    <div className="w-8 h-8 bg-[#FF5C00] rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">🧲</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-[#0A0A0A]">
+                        Nuevo lead: {lead.nombre}{lead.planSugerido ? ` — ${lead.planSugerido}` : ''}
+                      </p>
+                      <p className="text-xs text-[#6B6B6B] truncate">{lead.email}</p>
+                    </div>
+                    <button onClick={() => rechazarLead(lead)} disabled={procesandoLead===lead.id}
+                      className="text-xs border border-black/10 text-[#6B6B6B] font-semibold px-3 py-1.5 rounded-xl flex-shrink-0 disabled:opacity-40">
+                      ✗ Rechazar
+                    </button>
+                    <button onClick={() => aceptarLead(lead)} disabled={procesandoLead===lead.id}
+                      className="text-xs bg-[#FF5C00] text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0 disabled:opacity-40">
+                      {procesandoLead===lead.id ? '…' : '✓ Aceptar'}
+                    </button>
+                  </div>
+                ))}
 
                 {/* IA generando o con error */}
                 {clientesIAPendiente.map(c => (

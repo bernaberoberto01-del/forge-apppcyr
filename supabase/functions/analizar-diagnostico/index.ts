@@ -114,19 +114,45 @@ JSON:
 
     if (!result?.plan) throw new Error('IA no generó sugerencia válida')
 
+    // Crear (o reutilizar) la ficha de cliente para este lead — antes del fix,
+    // el cuestionario quedaba con cliente_id=null y el lead nunca aparecía en Clientes.
+    let clienteId: string | null = null
+    const { data: clienteExistente } = await sb.from('clientes')
+      .select('id').eq('entrenador_id', entrenador_id).eq('email', cuest.email).maybeSingle()
+    if (clienteExistente) {
+      clienteId = clienteExistente.id
+    } else {
+      const { data: nuevoCliente, error: errCliente } = await sb.from('clientes').insert({
+        nombre: cuest.nombre, email: cuest.email, tipo: 'online', estado: 'pendiente', entrenador_id,
+      }).select('id').single()
+      if (errCliente) console.error('analizar-diagnostico: error creando cliente', errCliente.message)
+      clienteId = nuevoCliente?.id || null
+    }
+
     await sb.from('cuestionarios').update({
       sugerencia_plan: result.plan,
       sugerencia_justificacion: result.justificacion,
       procesado: true,
+      cliente_id: clienteId,
     }).eq('id', cuest.id)
 
     const plan = PLANES[result.plan as keyof typeof PLANES]
     const ciudadInfo = cuest.ciudad ? ` (${cuest.ciudad}${esMurcia ? ' — zona Murcia ✓' : ''})` : ''
-    
+
     await sb.from('alertas').insert({
       entrenador_id,
       tipo: 'nuevo_cuestionario',
       mensaje: `📋 Nuevo diagnóstico: ${cuest.nombre}${ciudadInfo} — IA sugiere ${plan.nombre} (${plan.precio})${esMurcia ? ' · Considera también presencial' : ''}. ${result.justificacion}`,
+    })
+
+    await sb.from('notificaciones_admin').insert({
+      entrenador_id,
+      cliente_id: clienteId,
+      tipo: 'nuevo_lead',
+      titulo: `Nuevo lead: ${cuest.nombre}`,
+      descripcion: `Plan sugerido: ${result.plan}. ${result.justificacion}`,
+      leida: false,
+      url_destino: clienteId ? `/clientes?highlight=${clienteId}` : null,
     })
 
     return new Response(JSON.stringify({
@@ -134,6 +160,7 @@ JSON:
       plan: result.plan,
       es_zona_murcia: esMurcia,
       justificacion: result.justificacion,
+      cliente_id: clienteId,
     }), { headers: CORS })
 
   } catch (err: any) {
