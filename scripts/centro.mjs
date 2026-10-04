@@ -47,6 +47,7 @@ const env = {
   VITE_BRAND_ICON: m.icono || '',
   VITE_BRAND_FIXED: m.fija ? '1' : '',
   VITE_MODULOS_OCULTOS: (ficha.modulosOcultos || []).join(','),
+  VITE_SERVICIOS: (ficha.servicios || []).join(','),
 }
 
 // --- a qué base de datos se conecta: la de la ficha si trae url y anonKey; si no, la de .env ---

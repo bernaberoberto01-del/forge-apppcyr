@@ -69,5 +69,9 @@
     "nutricion",
     "mensajes",
     "tutorial"
+  ],
+  "servicios": [
+    "fisioterapia",
+    "nutricion"
   ]
 }

@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     // Cargar clientes con service_role (sin restricción RLS)
     const { data: clientes } = await sb.from('clientes')
       .select('id,nombre,tipo,nivel,lesiones,objetivo,peso_actual,peso_objetivo')
-      .in('id', ids).eq('estado', 'activo')
+      .in('id', ids).in('estado', ['activo', 'externo'])
 
     return new Response(JSON.stringify({ clientes: clientes || [] }), { headers: CORS })
   } catch (err: any) {

@@ -55,7 +55,7 @@ export default function PortalEntrenador({ session }) {
     const { data: cData } = await supabase.functions.invoke('clientes-entrenador')
     const { data: cPropios } = await supabase.from('clientes')
       .select('id,nombre,tipo,nivel,lesiones,objetivo,peso_actual,peso_objetivo,nutricion_activa')
-      .eq('entrenador_id',uid).eq('estado','activo')
+      .eq('entrenador_id',uid).in('estado',['activo','externo'])
 
     const idsYa = new Set((cData?.clientes||[]).map(c=>c.id))
     const clientes = [...(cData?.clientes||[]), ...(cPropios||[]).filter(c=>!idsYa.has(c.id))]

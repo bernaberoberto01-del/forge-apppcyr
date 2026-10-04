@@ -307,7 +307,7 @@ export default function Clientes({ session }) {
   async function cargar() {
     const hace10 = new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0]
     const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([
-      supabase.from('clientes').select('*').in('entrenador_id', equipo).order('created_at', { ascending: false }),
+      supabase.from('clientes').select('*').in('entrenador_id', equipo).neq('estado', 'externo').order('created_at', { ascending: false }),
       supabase.from('cuestionarios').select('*').in('entrenador_id', equipo).eq('procesado', false).order('created_at', { ascending: false }),
       supabase.from('checkins').select('cliente_id,fecha').in('entrenador_id', equipo).gte('fecha', hace10),
       supabase.from('pagos').select('cliente_id,valido_hasta').in('entrenador_id', equipo),

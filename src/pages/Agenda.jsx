@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
+import { SERVICIOS_EXTRA, ICONO_SERVICIO, NOMBRE_SERVICIO, esServicioExtra } from '../lib/servicios'
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -132,7 +133,7 @@ function VistaMensual({ mesVista, setMesVista, sesiones, hoy, abrirModalEnDia, s
                     <div key={si} onClick={e => { e.stopPropagation(); setSesionDetalle(s) }}
                       className="text-[10px] px-1 py-0.5 rounded truncate leading-tight"
                       style={{ background: s._esVirtual ? 'transparent' : col, color: s._esVirtual ? col : 'white', border: s._esVirtual ? `1px dashed ${col}` : 'none' }}>
-                      {s.hora?.slice(0,5)} {s.clientes?.nombre?.split(' ')[0]}
+                      {s.hora?.slice(0,5)} {ICONO_SERVICIO[s.tipo] || ''}{s.clientes?.nombre?.split(' ')[0]}
                     </div>
                   )
                 })}
@@ -177,7 +178,7 @@ export default function Agenda({ session }) {
   const [formEdit, setFormEdit] = useState({})
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState(null)
-  const [form, setForm] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'' })
+  const [form, setForm] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'', servicio:'entrenamiento', cliente_nombre:'' })
   const [formRec, setFormRec] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: formatFecha(new Date()), fecha_fin:'', notas:'', entrenador_id:'' })
   const [formExtra, setFormExtra] = useState({ fecha: formatFecha(new Date()), concepto:'', horas:'1', tipo:'desplazamiento' })
   const [loading, setLoading] = useState(false)
@@ -467,20 +468,30 @@ export default function Agenda({ session }) {
   }, [sesiones, recurrentes, grupos, gruposMap, excepcionesGrupo, excepcionesInd, diasSemana, clases])
 
   async function guardarSesion() {
-    if (!form.cliente_id) return
+    const externo = esServicioExtra(form.servicio)
+    if (externo ? !form.cliente_nombre.trim() : !form.cliente_id) return
     setLoading(true)
     const fecha = diaClick || formatFecha(diasSemana[0])
+    let clienteId = form.cliente_id
+    if (externo) {
+      const { data: cli, error: errCli } = await supabase.from('clientes').insert({
+        nombre: form.cliente_nombre.trim(), entrenador_id: form.entrenador_id || uid, centro_id: centro?.id || null,
+        estado: 'externo', tipo: 'presencial', notas: `Cliente externo de ${NOMBRE_SERVICIO[form.servicio].toLowerCase()}`
+      }).select('id').single()
+      if (errCli || !cli) { setToast({ msg: 'Error al guardar el cliente', tipo: 'error' }); setLoading(false); return }
+      clienteId = cli.id
+    }
     const { error } = await supabase.from('sesiones').insert({
-      entrenador_id: form.entrenador_id || uid, cliente_id: form.cliente_id,
+      entrenador_id: form.entrenador_id || uid, cliente_id: clienteId,
       centro_id: centro?.id || null,
-      fecha, hora: form.hora, tipo: form.tipo,
+      fecha, hora: form.hora, tipo: externo ? form.servicio : form.tipo,
       duracion_minutos: form.duracion_minutos,
       completada: false, notas: form.notas
     })
     if (error) setToast({ msg: 'Error al guardar', tipo: 'error' })
     else setToast({ msg: 'Sesión añadida' })
     setModal(false)
-    setForm({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'' })
+    setForm({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'', servicio:'entrenamiento', cliente_nombre:'' })
     await cargar(centro?.id)
     setLoading(false)
   }
@@ -823,7 +834,7 @@ export default function Agenda({ session }) {
                             <div className="flex items-center gap-2 mt-0.5">
                               <p className="text-xs text-[#6B6B6B]">{s.hora} · {s.duracion_minutos || 60}min</p>
                               {s.tipo && s.tipo !== 'presencial' && (
-                                <span className="text-xs bg-[#6366f1]/10 text-[#6366f1] px-1.5 py-0.5 rounded-md font-medium">{s.tipo}</span>
+                                <span className="text-xs bg-[#6366f1]/10 text-[#6366f1] px-1.5 py-0.5 rounded-md font-medium">{ICONO_SERVICIO[s.tipo] ? `${ICONO_SERVICIO[s.tipo]} ${NOMBRE_SERVICIO[s.tipo]}` : s.tipo}</span>
                               )}
                             </div>
                           </div>
@@ -966,7 +977,7 @@ export default function Agenda({ session }) {
                       const grupo = s.grupo_id ? gruposMap[s.grupo_id] : null
                       const nombreCliente = grupo
                         ? grupo.miembros.map(m=>m.nombre.split(' ')[0]).join(' + ')
-                        : s.clientes?.nombre?.split(' ')[0] || '—'
+                        : `${ICONO_SERVICIO[s.tipo] || ''}${s.clientes?.nombre?.split(' ')[0] || '—'}`
                       const colorSesion = grupo ? clienteColor(s.cliente_id) : col
                       
                       return (
@@ -1199,6 +1210,24 @@ export default function Agenda({ session }) {
               Nueva sesión — {diaClick ? new Date(diaClick+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'}) : ''}
             </h2>
             <div className="space-y-3">
+              {SERVICIOS_EXTRA.length > 0 && (
+                <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${SERVICIOS_EXTRA.length + 1}, minmax(0, 1fr))` }}>
+                  {['entrenamiento', ...SERVICIOS_EXTRA].map(sv => (
+                    <button key={sv} type="button" onClick={() => setForm(f => ({ ...f, servicio: sv }))}
+                      className={`py-2 rounded-xl border text-xs font-semibold transition-all ${form.servicio === sv ? 'bg-acento border-acento text-white' : 'border-black/10 text-[#0A0A0A]'}`}>
+                      {ICONO_SERVICIO[sv] ? `${ICONO_SERVICIO[sv]} ` : '💪 '}{NOMBRE_SERVICIO[sv]}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {esServicioExtra(form.servicio) ? (
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre del cliente *</label>
+                <input value={form.cliente_nombre} onChange={e => setForm(f => ({ ...f, cliente_nombre: e.target.value }))}
+                  placeholder="Escribe el nombre" autoFocus
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
+              </div>
+              ) : (
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
                 <select value={form.cliente_id} onChange={e => {
@@ -1210,6 +1239,7 @@ export default function Agenda({ session }) {
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
               </div>
+              )}
               {centro && miembros?.length > 1 && (
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Asignar a</label>
@@ -1243,7 +1273,7 @@ export default function Agenda({ session }) {
                   </select>
                 </div>
               </div>
-              <div>
+              {!esServicioExtra(form.servicio) && <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tipo</label>
                 <select value={form.tipo} onChange={e => setForm(f=>({...f,tipo:e.target.value}))}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
@@ -1251,7 +1281,7 @@ export default function Agenda({ session }) {
                   <option value="online">🌐 Online</option>
                   <option value="pareja_grupo">👥 Pareja/Grupo</option>
                 </select>
-              </div>
+              </div>}
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas</label>
                 <input value={form.notas} onChange={e => setForm(f=>({...f,notas:e.target.value}))}
@@ -1261,7 +1291,7 @@ export default function Agenda({ session }) {
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setModal(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
-              <button onClick={guardarSesion} disabled={!form.cliente_id || loading}
+              <button onClick={guardarSesion} disabled={(esServicioExtra(form.servicio) ? !form.cliente_nombre.trim() : !form.cliente_id) || loading}
                 className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading ? 'Guardando...' : 'Añadir'}
               </button>
