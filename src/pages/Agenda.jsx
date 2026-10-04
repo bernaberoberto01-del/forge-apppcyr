@@ -18,7 +18,7 @@ const TIPOS_EXTRA = [
   { id: 'formacion', label: 'Formación', icon: '📚' },
   { id: 'otro', label: 'Otro', icon: '⏱' },
 ]
-const COLORES_CLIENTE = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6']
+const COLORES_CLIENTE = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6']
 const clienteColor = (id) => COLORES_CLIENTE[(id || '').charCodeAt(0) % COLORES_CLIENTE.length]
 
 function getLunes(fecha) {
@@ -1692,7 +1692,7 @@ function ModalNuevaClase({ uid, onClose, onGuardada }) {
     ['funcional','💪 Funcional'],['otra','📋 Otra'],
   ]
   const DIAS = ['','L','M','X','J','V','S','D']
-  const COLORES = ['#10b981','#6366f1','#FF5C00','#f59e0b','#ec4899','#14b8a6']
+  const COLORES = ['#10b981','#6366f1',BRAND.color,'#f59e0b','#ec4899','#14b8a6']
 
   function toggleDia(d) {
     set('dias_semana', form.dias_semana.includes(d)

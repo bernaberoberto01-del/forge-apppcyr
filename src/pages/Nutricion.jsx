@@ -149,7 +149,7 @@ export default function Nutricion({ session }) {
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 
   const OBJETIVO_LABEL = { perdida_grasa:'Pérdida de grasa', ganancia_muscular:'Ganancia muscular', tonificacion:'Tonificación', fuerza:'Fuerza', rendimiento:'Rendimiento', salud_general:'Salud general', cambio_rapido_30dias:'Cambio 30 días' }
-  const OBJETIVO_COLOR = { perdida_grasa:'#f59e0b', ganancia_muscular:'#6366f1', tonificacion:'#10b981', fuerza:'#ef4444', rendimiento:'#0ea5e9', salud_general:'#10b981', cambio_rapido_30dias:'#FF5C00' }
+  const OBJETIVO_COLOR = { perdida_grasa:'#f59e0b', ganancia_muscular:'#6366f1', tonificacion:'#10b981', fuerza:'#ef4444', rendimiento:'#0ea5e9', salud_general:'#10b981', cambio_rapido_30dias:BRAND.color }
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">

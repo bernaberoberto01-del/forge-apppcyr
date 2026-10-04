@@ -961,7 +961,7 @@ export default function Seguimiento({ session }) {
             <div className="space-y-3">
               {analisisMensual.map(a => {
                 const ICONOS = { actualizar_rutina:'🔄', ajustar_cargas:'⚖️', mensaje_motivacional:'💬', pausa_recomendada:'⚠️' }
-                const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:'#FF5C00', pausa_recomendada:'#ef4444' }
+                const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:BRAND.color, pausa_recomendada:'#ef4444' }
                 const ETIQUETAS = { actualizar_rutina:'Nueva rutina', ajustar_cargas:'Ajustar cargas', mensaje_motivacional:'Mensaje', pausa_recomendada:'Pausa ⚠️' }
                 const color = COLORES[a.accion] || '#6B6B6B'
                 const expandido = analisisExpandido === a.id
@@ -1130,7 +1130,7 @@ export default function Seguimiento({ session }) {
                 ) : (
                   historialAnalisis.map(a => {
                     const ETIQUETAS = { actualizar_rutina:'Nueva rutina', ajustar_cargas:'Ajustar cargas', mensaje_motivacional:'Mensaje', pausa_recomendada:'Pausa ⚠️' }
-                    const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:'#FF5C00', pausa_recomendada:'#ef4444' }
+                    const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:BRAND.color, pausa_recomendada:'#ef4444' }
                     const expandido = historialExpandido === a.id
                     return (
                       <div key={a.id} className="border border-black/5 rounded-xl overflow-hidden">

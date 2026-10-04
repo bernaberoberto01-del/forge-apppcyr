@@ -147,7 +147,7 @@ const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:
   marca_press_banca:'',marca_sentadilla:'',marca_peso_muerto:'',marca_dominadas:'',marca_press_militar:'',
 }
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-const AVATAR_COLORS = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
+const AVATAR_COLORS = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
 const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
 const PER_PAGE = 20
 

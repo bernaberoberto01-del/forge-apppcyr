@@ -5,6 +5,7 @@ import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 import { useEquipo } from '../hooks/useCentro'
+import { BRAND } from '../lib/brand'
 
 const PLANTILLAS = [
   { id: 'bienvenida', icon: '👋', label: 'Bienvenida', texto: '¡Hola! Bienvenido/a al equipo. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve tendrás tu rutina lista. Cualquier duda, escríbeme aquí o por WhatsApp. ¡Vamos a por ello! 💪' },
@@ -17,7 +18,7 @@ const PLANTILLAS = [
   { id: 'renovacion', icon: '🔄', label: 'Renovación', texto: 'Tu mensualidad está próxima a vencer. Si quieres renovar, puedes hacerlo desde el portal o dime y te mando el enlace de pago. Un placer seguir trabajando contigo 💪' },
 ]
 
-const AVATARES = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6']
+const AVATARES = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6']
 const avatarColor = n => AVATARES[(n||'').charCodeAt(0) % AVATARES.length]
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 

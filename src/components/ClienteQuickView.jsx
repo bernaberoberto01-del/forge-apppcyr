@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { TIPOS_MAP } from '../utils/tiposEntrenamiento'
+import { BRAND } from '../lib/brand'
 
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-const AVATARES = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6']
+const AVATARES = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6']
 const avatarColor = n => AVATARES[(n||'').charCodeAt(0) % AVATARES.length]
 
 export default function ClienteQuickView({ clienteId, onClose }) {

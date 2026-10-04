@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useCentro } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
 
-const COLORES = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6']
+const COLORES = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6']
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 
 function Toast({ msg, tipo='ok', onClose }) {
