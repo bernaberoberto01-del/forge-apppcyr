@@ -73,6 +73,7 @@ export default function Dashboard({ session }) {
   }
 
   const [procesandoLead, setProcesandoLead] = useState(null)
+  const [leadExpandido, setLeadExpandido] = useState(null)
 
   async function aceptarLead(lead) {
     setProcesandoLead(lead.id)
@@ -175,7 +176,7 @@ export default function Dashboard({ session }) {
       supabase.from('solicitudes_cambio_plan').select('cliente_id,plan_actual,plan_solicitado,clientes(nombre)').eq('entrenador_id', uid).eq('estado', 'pendiente'),
       supabase.from('cuestionarios_nutricion').select('id,cliente_id,created_at,clientes(nombre)').eq('entrenador_id', uid).eq('procesado', false).order('created_at',{ascending:false}),
       supabase.from('clientes').select('id,nombre,email,created_at').eq('entrenador_id', uid).eq('estado', 'pendiente').order('created_at',{ascending:false}),
-      supabase.from('cuestionarios').select('cliente_id,sugerencia_plan,sugerencia_justificacion').eq('entrenador_id', uid).not('cliente_id','is',null).order('created_at',{ascending:false}),
+      supabase.from('cuestionarios').select('cliente_id,sugerencia_plan,sugerencia_justificacion,edad,objetivo,ciudad,que_no_funciono,expectativas_30dias,dias_semana,donde_entrena').eq('entrenador_id', uid).not('cliente_id','is',null).order('created_at',{ascending:false}),
     ])
 
     if (alertas?.length > 0) {
@@ -240,9 +241,26 @@ export default function Dashboard({ session }) {
     const sugerenciaPorCliente = {}
     ;(cuestConLead||[]).forEach(c => { if (!sugerenciaPorCliente[c.cliente_id]) sugerenciaPorCliente[c.cliente_id] = c })
     const PLAN_LABEL = { nutricion: 'Hábitos & Alimentación', entrenamiento: 'Entrenamiento', completo: 'Plan Completo' }
+    const OBJETIVO_LABEL = {
+      perdida_grasa: 'Pérdida de grasa', ganancia_muscular: 'Ganancia muscular',
+      rendimiento: 'Rendimiento deportivo', salud_general: 'Salud general',
+      cambio_rapido_30dias: 'Cambio rápido (30 días)',
+    }
     const leadsPendientes = (leadsPendientesRaw||[]).map(c => {
       const sug = sugerenciaPorCliente[c.id]
-      return { ...c, planSugerido: sug ? (PLAN_LABEL[sug.sugerencia_plan] || sug.sugerencia_plan) : null, justificacion: sug?.sugerencia_justificacion || null }
+      return {
+        ...c,
+        planSugeridoKey: sug?.sugerencia_plan || null,
+        planSugerido: sug ? (PLAN_LABEL[sug.sugerencia_plan] || sug.sugerencia_plan) : null,
+        justificacion: sug?.sugerencia_justificacion || null,
+        edad: sug?.edad || null,
+        objetivoLabel: sug?.objetivo ? (OBJETIVO_LABEL[sug.objetivo] || sug.objetivo) : null,
+        ciudad: sug?.ciudad || null,
+        queNoFunciono: sug?.que_no_funciono || null,
+        expectativas: sug?.expectativas_30dias || null,
+        diasSemana: sug?.dias_semana || null,
+        dondeEntrena: sug?.donde_entrena || null,
+      }
     })
 
     // Cobros online: pagos fallidos y clientes online sin ninguna suscripción configurada
@@ -355,25 +373,72 @@ export default function Dashboard({ session }) {
                 })}
 
                 {/* Leads del formulario público de registro */}
-                {d.leadsPendientes?.map(lead => (
-                  <div key={lead.id} className="flex items-center gap-3 px-5 py-3.5 bg-[#FF5C00]/4">
-                    <div className="w-8 h-8 bg-[#FF5C00] rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">🧲</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-[#0A0A0A]">
-                        Nuevo lead: {lead.nombre}{lead.planSugerido ? ` — ${lead.planSugerido}` : ''}
-                      </p>
-                      <p className="text-xs text-[#6B6B6B] truncate">{lead.email}</p>
+                {d.leadsPendientes?.map(lead => {
+                  const PLAN_BADGE = {
+                    completo: { label: '⚡ Plan Completo', cls: 'bg-[#FF5C00] text-white' },
+                    entrenamiento: { label: '💪 Entrenamiento', cls: 'bg-[#6366f1] text-white' },
+                    nutricion: { label: '🥗 Nutrición', cls: 'bg-emerald-500 text-white' },
+                  }
+                  const planBadge = lead.planSugeridoKey ? PLAN_BADGE[lead.planSugeridoKey] : null
+                  const expandido = leadExpandido === lead.id
+                  return (
+                    <div key={lead.id} className="px-5 py-3.5 bg-[#FF5C00]/4 space-y-2.5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-[#FF5C00] rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">🧲</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-[#0A0A0A]">Nuevo lead: {lead.nombre}</p>
+                          <p className="text-xs text-[#6B6B6B] truncate">{lead.email}</p>
+                        </div>
+                        {planBadge && (
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${planBadge.cls}`}>{planBadge.label}</span>
+                        )}
+                      </div>
+
+                      {/* Datos del cuestionario */}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#444] pl-11">
+                        {lead.edad && <span>🎂 {lead.edad} años</span>}
+                        {lead.objetivoLabel && <span>🎯 {lead.objetivoLabel}</span>}
+                        {lead.ciudad && <span>📍 {lead.ciudad}</span>}
+                        {lead.diasSemana && <span>📅 {lead.diasSemana} días/semana</span>}
+                        {lead.dondeEntrena && <span>🏋️ {lead.dondeEntrena}</span>}
+                      </div>
+
+                      {(lead.queNoFunciono || lead.expectativas) && (
+                        <div className="pl-11 space-y-1">
+                          {lead.queNoFunciono && (
+                            <p className="text-xs text-[#6B6B6B] leading-relaxed"><span className="font-semibold text-[#444]">Qué no funcionó:</span> {lead.queNoFunciono}</p>
+                          )}
+                          {lead.expectativas && (
+                            <p className="text-xs text-[#6B6B6B] leading-relaxed"><span className="font-semibold text-[#444]">Expectativas 30 días:</span> {lead.expectativas}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {lead.justificacion && (
+                        <div className="pl-11">
+                          <button onClick={() => setLeadExpandido(expandido ? null : lead.id)}
+                            className="text-xs font-semibold text-[#FF5C00]">
+                            {expandido ? '▾ Ocultar análisis IA' : '▸ Ver análisis IA'}
+                          </button>
+                          {expandido && (
+                            <p className="text-xs text-[#6B6B6B] leading-relaxed mt-1 bg-white rounded-lg p-2.5 border border-black/5">{lead.justificacion}</p>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end gap-2 pt-1">
+                        <button onClick={() => rechazarLead(lead)} disabled={procesandoLead===lead.id}
+                          className="text-xs border border-black/10 text-[#6B6B6B] font-semibold px-3 py-1.5 rounded-xl flex-shrink-0 disabled:opacity-40">
+                          ✗ Rechazar
+                        </button>
+                        <button onClick={() => aceptarLead(lead)} disabled={procesandoLead===lead.id}
+                          className="text-xs bg-[#FF5C00] text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0 disabled:opacity-40">
+                          {procesandoLead===lead.id ? '…' : '✓ Aceptar'}
+                        </button>
+                      </div>
                     </div>
-                    <button onClick={() => rechazarLead(lead)} disabled={procesandoLead===lead.id}
-                      className="text-xs border border-black/10 text-[#6B6B6B] font-semibold px-3 py-1.5 rounded-xl flex-shrink-0 disabled:opacity-40">
-                      ✗ Rechazar
-                    </button>
-                    <button onClick={() => aceptarLead(lead)} disabled={procesandoLead===lead.id}
-                      className="text-xs bg-[#FF5C00] text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0 disabled:opacity-40">
-                      {procesandoLead===lead.id ? '…' : '✓ Aceptar'}
-                    </button>
-                  </div>
-                ))}
+                  )
+                })}
 
                 {/* IA generando o con error */}
                 {clientesIAPendiente.map(c => (
