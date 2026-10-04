@@ -14,4 +14,10 @@ export const BRAND = {
   // Siempre #RRGGBB: hay código que le concatena un canal alfa (`${color}15`).
   color: HEX6.test(env.VITE_BRAND_COLOR || '') ? env.VITE_BRAND_COLOR : '#FF5C00',
   logo: env.VITE_BRAND_LOGO || '',
+  // Marca fija (centros): su color y nombre mandan sobre la configuración de cada
+  // entrenador. Sin ella (Forge), cada entrenador personaliza los suyos.
+  fija: ['1', 'true'].includes(String(env.VITE_BRAND_FIXED || '').toLowerCase()),
 }
+
+export const colorMarca = c => (BRAND.fija ? BRAND.color : (c || BRAND.color))
+export const nombreMarca = n => (BRAND.fija ? BRAND.nombreCompleto : (n || BRAND.nombreCompleto))

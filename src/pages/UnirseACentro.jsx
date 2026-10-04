@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { BRAND } from '../lib/brand'
+import { BRAND, colorMarca } from '../lib/brand'
 
 export default function UnirseACentro() {
   const { token } = useParams()
@@ -80,7 +80,7 @@ export default function UnirseACentro() {
     setLoading(false)
   }
 
-  const acento = centro?.color_acento || BRAND.color
+  const acento = colorMarca(centro?.color_acento)
 
   if (estado === 'cargando') return (
     <div className="min-h-screen bg-[#111] flex items-center justify-center">

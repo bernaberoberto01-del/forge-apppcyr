@@ -45,26 +45,33 @@ const env = {
   VITE_BRAND_COLOR: m.color,
   VITE_BRAND_LOGO: m.logo || '',
   VITE_BRAND_ICON: m.icono || '',
+  VITE_BRAND_FIXED: m.fija ? '1' : '',
 }
 
-// --- a qué base de datos se conecta: la de .env ---
+// --- a qué base de datos se conecta: la de la ficha si trae url y anonKey; si no, la de .env ---
 const envLocal = fs.existsSync(path.join(RAIZ, '.env')) ? fs.readFileSync(path.join(RAIZ, '.env'), 'utf8') : ''
 const refEnv = (envLocal.match(/^VITE_SUPABASE_URL=\s*["']?https:\/\/([a-z0-9]+)\.supabase\.co/m) || [])[1] || null
-const refFicha = ficha.supabase?.proyecto || null
+const sb = ficha.supabase || {}
+const propia = Boolean(sb.url && sb.anonKey)
+if (propia) { env.VITE_SUPABASE_URL = sb.url; env.VITE_SUPABASE_ANON_KEY = sb.anonKey }
+const refUsada = propia ? (sb.url.match(/https:\/\/([a-z0-9]+)\.supabase\.co/) || [])[1] : refEnv
 
 console.log(`\n  Centro:  ${m.nombreCompleto}  (centros/${id}.json)`)
 console.log(`  Color:   ${m.color}`)
 console.log(`  Logo:    ${m.logo || '(sin logo: se usa la "F")'}`)
+console.log(`  Marca:   ${m.fija ? 'fija (manda sobre la configuración de cada entrenador)' : 'cada entrenador puede personalizar su color'}`)
 console.log(`  URL:     http://localhost:${port}`)
-if (!refFicha) {
+if (propia) {
+  console.log(`  Datos:   Supabase ${refUsada} (la base de datos de este centro)`)
+} else if (!sb.proyecto) {
   console.log(`\n  ⚠  Este centro no tiene base de datos propia todavía.`)
   console.log(`     Se conecta a la de .env (${refEnv || 'ninguna'}): verás los DATOS de ese proyecto con la MARCA de este centro.`)
-} else if (refFicha !== refEnv) {
-  console.log(`\n  ⚠  La ficha dice Supabase "${refFicha}" pero .env apunta a "${refEnv}". Se usa la de .env.`)
+} else if (sb.proyecto !== refEnv) {
+  console.log(`\n  ⚠  La ficha dice Supabase "${sb.proyecto}" pero no trae url/anonKey; se usa la de .env ("${refEnv}").`)
 } else {
-  console.log(`  Datos:   Supabase ${refFicha}`)
+  console.log(`  Datos:   Supabase ${refEnv}`)
 }
-if (refEnv === 'qdpqpbkppkhzcxpfypvf') console.log(`\n  ⚠  Base de datos de PRODUCCIÓN de Forge: lo que guardes es real.`)
+if (refUsada === 'qdpqpbkppkhzcxpfypvf') console.log(`\n  ⚠  Base de datos de PRODUCCIÓN de Forge: lo que guardes es real.`)
 console.log('')
 
 const vite = spawn('npx', ['vite', '--port', port, '--strictPort'], { cwd: RAIZ, stdio: 'inherit', env: { ...process.env, ...env } })

@@ -3,7 +3,7 @@ import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
-import { BRAND } from '../lib/brand'
+import { BRAND, colorMarca, nombreMarca } from '../lib/brand'
 import { useConfig } from '../hooks/useConfig'
 import { useEquipo } from '../hooks/useCentro'
 
@@ -54,8 +54,8 @@ export default function Pagos({ session }) {
   const { completar, completado } = useOnboarding(uid)
 
   function generarRecibo(pago) {
-    const negocio = escapeHtml(config?.nombre_negocio || BRAND.nombreCompleto)
-    const colorRecibo = /^#[0-9A-Fa-f]{6}$/.test(config?.color_acento || '') ? config.color_acento : BRAND.color
+    const negocio = escapeHtml(nombreMarca(config?.nombre_negocio))
+    const colorRecibo = colorMarca(/^#[0-9A-Fa-f]{6}$/.test(config?.color_acento || '') ? config.color_acento : null)
     const html = `<!DOCTYPE html>
 <html lang="es">
 <head>

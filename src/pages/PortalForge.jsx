@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { BRAND } from '../lib/brand'
+import { BRAND, colorMarca } from '../lib/brand'
 import BrandMark from '../components/BrandMark'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ export default function PortalForge() {
   const [toast, setToast] = useState('')
   const mensajesEndRef = useRef(null)
 
-  const color = config?.color_acento || BRAND.color
+  const color = colorMarca(config?.color_acento)
 
   const ACTIVIDADES = [
     { id: 'footing', label: '🏃 Footing' }, { id: 'ciclismo', label: '🚴 Ciclismo' },

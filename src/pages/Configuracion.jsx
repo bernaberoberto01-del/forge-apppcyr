@@ -311,7 +311,13 @@ export default function Configuracion({ session, onConfigChange }) {
       )}
 
       {/* APARIENCIA */}
-      {tab === 'apariencia' && (
+      {tab === 'apariencia' && BRAND.fija && (
+        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">Color de acento</h2>
+          <p className="text-xs text-[#6B6B6B]">{`El color lo define ${BRAND.nombreCompleto} para toda la app.`}</p>
+        </div>
+      )}
+      {tab === 'apariencia' && !BRAND.fija && (
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
             <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">Color de acento</h2>

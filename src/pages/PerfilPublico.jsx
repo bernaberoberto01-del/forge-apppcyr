@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { BRAND } from '../lib/brand'
+import { BRAND, colorMarca, nombreMarca } from '../lib/brand'
 
 export default function PerfilPublico() {
   const { slug } = useParams()
@@ -60,7 +60,7 @@ export default function PerfilPublico() {
     </div>
   )
 
-  const acento = config.color_acento || BRAND.color
+  const acento = colorMarca(config.color_acento)
   const tarifas = [
     { nombre: 'Asesoría Online — Entrenamiento', precio: '35€/mes', desc: 'Rutina personalizada + seguimiento semanal + mensajería directa', icono: '💪' },
     { nombre: 'Asesoría Online — Nutrición', precio: '29€/mes', desc: 'Plan de alimentación personalizado + ajuste mensual', icono: '🥗' },
@@ -78,7 +78,7 @@ export default function PerfilPublico() {
             {config.nombre_entrenador?.charAt(0) || 'E'}
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">{config.nombre_entrenador}</h1>
-          <p className="text-white/60 text-sm mb-4">{config.nombre_negocio}</p>
+          <p className="text-white/60 text-sm mb-4">{nombreMarca(config.nombre_negocio)}</p>
           {config.anos_experiencia && (
             <p className="text-white/80 text-sm mb-6">
               {config.anos_experiencia} años de experiencia

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { BRAND } from '../lib/brand'
+import { BRAND, colorMarca } from '../lib/brand'
 
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const DIAS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
@@ -138,7 +138,7 @@ export default function PortalEntrenador({ session }) {
   )
 
   const d = datos
-  const acento = d.miembro?.centros?.color_acento || BRAND.color
+  const acento = colorMarca(d.miembro?.centros?.color_acento)
   const nombre = session.user?.user_metadata?.nombre || d.miembro?.nombre || session.user?.email?.split('@')[0] || 'Entrenador'
   const hoy    = new Date().toISOString().split('T')[0]
 

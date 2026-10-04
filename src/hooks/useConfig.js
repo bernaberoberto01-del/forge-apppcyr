@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
-import { BRAND } from '../lib/brand'
+import { BRAND, colorMarca } from '../lib/brand'
 
 const defaultConfig = {
   nombre_negocio: BRAND.nombreCompleto,
@@ -55,7 +55,7 @@ export function useConfigLoader(uid) {
         cuestionario_bloques: { ...defaultConfig.cuestionario_bloques, ...(data.cuestionario_bloques || {}) }
       }
       setConfig(merged)
-      aplicarColor(merged.color_acento)
+      aplicarColor(colorMarca(merged.color_acento))
     } else {
       setConfig(null)
     }
@@ -66,7 +66,7 @@ export function useConfigLoader(uid) {
 
   function actualizar(nuevaConfig) {
     setConfig(nuevaConfig)
-    aplicarColor(nuevaConfig.color_acento)
+    aplicarColor(colorMarca(nuevaConfig.color_acento))
   }
 
   return { config, loading, actualizar }

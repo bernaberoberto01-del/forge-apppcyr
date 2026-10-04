@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { NavLink, useLocation, Navigate, useNavigate } from 'react-router-dom'
 import TutorialBanner, { BarraProgreso } from './TutorialBanner'
 import { useOnboarding } from '../hooks/useOnboarding'
-import { BRAND } from '../lib/brand'
+import { BRAND, colorMarca, nombreMarca } from '../lib/brand'
 import BrandMark from './BrandMark'
 
 const TODOS_MODULOS = [
@@ -59,8 +59,8 @@ export default function Layout({ children, session, config }) {
 
   const modulosActivos = TODOS_MODULOS.filter(m => !config?.modulos || config.modulos[m.id] !== false)
   const nombre = config?.nombre_entrenador || session?.user?.email?.split('@')[0] || 'Entrenador'
-  const negocio = config?.nombre_negocio || BRAND.nombreCompleto
-  const acento = config?.color_acento || BRAND.color
+  const negocio = nombreMarca(config?.nombre_negocio)
+  const acento = colorMarca(config?.color_acento)
 
   // Redirigir a dashboard si aterrizamos en /
   if (location.pathname === '/') return <Navigate to="/dashboard" replace />
