@@ -1,0 +1,33 @@
+{
+  "id": "pablo-rodriguez",
+  "marca": {
+    "nombre": "Pablo Rodríguez",
+    "eslogan": "Centro de Entrenamiento",
+    "nombreCompleto": "Pablo Rodríguez Centro de Entrenamiento",
+    "descripcion": "Pablo Rodríguez — Centro de Entrenamiento en Cabezo de Torres, Murcia",
+    "color": "#AF1203",
+    "logo": "/centros/pablo-rodriguez/logo.png",
+    "logoCompleto": "/centros/pablo-rodriguez/logo-completo.png",
+    "icono": "/centros/pablo-rodriguez/icono.png"
+  },
+  "app": {
+    "url": "https://pablo-rodriguez.vercel.app"
+  },
+  "supabase": {
+    "proyecto": "focgysujvofpihjhvznl"
+  },
+  "centro": {
+    "ciudad": "Cabezo de Torres, Murcia",
+    "emailContacto": "pablorodriguezdiaz27@icloud.com",
+    "equipo": [
+      { "nombre": "Pablo Rodríguez", "rol": "admin", "especialidad": "Entrenador", "email": null },
+      { "nombre": "Roberto Bernabé", "rol": "entrenador", "especialidad": "Entrenador", "email": null },
+      { "nombre": "Paula Espín García", "rol": "entrenador", "especialidad": "Entrenadora", "email": null },
+      { "nombre": "Ricardo", "rol": "entrenador", "especialidad": "Fisioterapeuta", "email": null },
+      { "nombre": "David", "rol": "entrenador", "especialidad": "Fisioterapeuta", "email": null },
+      { "nombre": "Raquel", "rol": "entrenador", "especialidad": "Nutricionista", "email": null }
+    ],
+    "tarifas": null,
+    "datosLegales": null
+  }
+}
