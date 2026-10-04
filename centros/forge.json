@@ -1,0 +1,18 @@
+{
+  "id": "forge",
+  "marca": {
+    "nombre": "Forge",
+    "eslogan": "Studio OS",
+    "nombreCompleto": "Forge Studio OS",
+    "descripcion": "Forge — Gestión inteligente para entrenadores personales",
+    "color": "#FF5C00",
+    "logo": "",
+    "icono": "/favicon.svg"
+  },
+  "app": {
+    "url": "https://forge-studio-os.vercel.app"
+  },
+  "supabase": {
+    "proyecto": "qdpqpbkppkhzcxpfypvf"
+  }
+}
