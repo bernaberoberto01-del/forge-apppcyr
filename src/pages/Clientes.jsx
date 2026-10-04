@@ -303,7 +303,7 @@ export default function Clientes({ session }) {
   async function cargar() {
     const hace10 = new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0]
     const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([
-      supabase.from('clientes').select('*').eq('entrenador_id', uid).order('created_at', { ascending: false }),
+      supabase.from('clientes').select('*').eq('entrenador_id', uid).neq('estado', 'rechazado').order('created_at', { ascending: false }),
       supabase.from('cuestionarios').select('*').eq('entrenador_id', uid).eq('procesado', false).order('created_at', { ascending: false }),
       supabase.from('checkins').select('cliente_id,fecha').eq('entrenador_id', uid).gte('fecha', hace10),
       supabase.from('pagos').select('cliente_id,valido_hasta').eq('entrenador_id', uid),
@@ -331,9 +331,19 @@ export default function Clientes({ session }) {
     return map
   }, [clientes, checkins, pagos])
 
+  // Leads pendientes de aceptar/rechazar — sección separada, nunca mezclados con el listado general
+  const leadsPendientes = useMemo(() => {
+    let r = clientes.filter(c => c.estado === 'pendiente')
+    if (busqueda) {
+      const b = busqueda.toLowerCase()
+      r = r.filter(c => c.nombre?.toLowerCase().includes(b) || c.email?.toLowerCase().includes(b))
+    }
+    return r
+  }, [clientes, busqueda])
+
   // Filtrado y búsqueda
   const filtrados = useMemo(() => {
-    let r = [...clientes]
+    let r = clientes.filter(c => c.estado !== 'pendiente')
     if (busqueda) {
       const b = busqueda.toLowerCase()
       r = r.filter(c => c.nombre?.toLowerCase().includes(b) || c.email?.toLowerCase().includes(b) || c.telefono?.includes(b))
@@ -772,6 +782,36 @@ export default function Clientes({ session }) {
         <span>Copiar enlace de registro para nuevos clientes</span>
         <span className="ml-auto text-white/40 text-xs">{enlaceRegistro.slice(0, 40)}...</span>
       </button>
+
+      {/* Leads pendientes — separados del listado general, nunca mezclados */}
+      {leadsPendientes.length > 0 && (
+        <div className="mb-5">
+          <div className="flex items-center gap-2 mb-2 px-1">
+            <p className="text-sm font-bold text-[#0A0A0A]">🧲 Leads pendientes</p>
+            <span className="text-xs bg-[#FF5C00] text-white font-bold px-2 py-0.5 rounded-full">{leadsPendientes.length}</span>
+          </div>
+          <div className="space-y-1.5">
+            {leadsPendientes.map(c => (
+              <div key={c.id} onClick={() => abrirDetalle(c)}
+                className="bg-[#FF5C00]/5 border border-[#FF5C00]/20 rounded-xl flex items-center gap-3 p-3.5 cursor-pointer hover:border-[#FF5C00]/40 transition-all">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                  style={{ background: avatarColor(c.nombre) }}>{ini(c.nombre)}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{c.nombre}</p>
+                    <span className="text-[10px] font-bold bg-[#FF5C00] text-white px-1.5 py-0.5 rounded-full flex-shrink-0">Lead</span>
+                  </div>
+                  <p className="text-xs text-[#6B6B6B] truncate">{c.email}</p>
+                </div>
+                <p className="text-xs text-[#9B9B9B] flex-shrink-0">
+                  {c.created_at && new Date(c.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="h-px bg-black/8 mt-4" />
+        </div>
+      )}
 
       {/* Tabla */}
       {filtrados.length === 0 ? (
