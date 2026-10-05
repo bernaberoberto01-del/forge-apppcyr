@@ -126,6 +126,21 @@ export default function PortalForge() {
     cargarTodo()
   }, [sesion])
 
+  // Clasificación de "cliente nuevo" — se decide UNA vez, con el primer dato
+  // cargado, y no se recalcula aunque los datos cambien durante la sesión.
+  // Así, si completa los pasos mientras el onboarding está abierto, sigue
+  // viendo la pantalla (incluido el estado final "tu plan está listo") en
+  // vez de que desaparezca a mitad de sesión. Al volver a cargar la app de
+  // cero (nueva sesión), se reevalúa con los datos ya actualizados y, si
+  // ya no cumple las 3 condiciones, deja de mostrarse — así es como
+  // "desaparece automáticamente" para el cliente en la práctica.
+  const [modoOnboarding, setModoOnboarding] = useState(null) // null = aún sin decidir
+  useEffect(() => {
+    if (!datos || modoOnboarding !== null) return
+    const esNuevo = !datos.cuest && (datos.checkins?.length || 0) < 2 && !datos.rutina
+    setModoOnboarding(esNuevo)
+  }, [datos])
+
   async function cargarTodo() {
     setCargando(true)
     // Modo preview: el entrenador abre el portal de un cliente suyo desde Clientes.jsx
@@ -174,6 +189,21 @@ export default function PortalForge() {
     if (!previewId) {
       supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
       setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
+      // Onboarding: avisar al entrenador solo la primera vez que coinciden
+      // cuestionario de nutrición + primer check-in (se deduplica consultando
+      // si ya existe la notificación, en vez de depender de un flag en BD).
+      if (cuest && checkins.length >= 1) {
+        supabase.from('notificaciones_admin').select('id').eq('cliente_id', cid).eq('tipo', 'onboarding_completo').maybeSingle()
+          .then(({ data: yaNotificado }) => {
+            if (yaNotificado) return
+            supabase.from('notificaciones_admin').insert({
+              entrenador_id: eid, cliente_id: cid, tipo: 'onboarding_completo',
+              titulo: `${cl.nombre} ha completado su perfil`,
+              descripcion: 'Ya puedes preparar su plan personalizado. Tiene cuestionario de nutrición y primer check-in.',
+              leida: false, url_destino: `/clientes?highlight=${cid}`,
+            }).then(() => {}).catch(() => {})
+          }).catch(() => {})
+      }
     }
     setCargando(false)
   }
@@ -339,6 +369,12 @@ export default function PortalForge() {
 
   const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones } = datos
   const esOnline = cliente.tipo === 'online'
+
+  // Onboarding guiado — pasos 1 y 2 en vivo (badges), paso 3 informativo.
+  const pasoCuestionarioDone = !!cuest
+  const pasoCheckinDone = (checkins?.length || 0) >= 1
+  const pasoRutinaDone = !!rutina
+  const mostrarOnboarding = esOnline && modoOnboarding === true
   // Cuenta demo del entrenador: acceso completo siempre, sin pasar por pago ni suscripción.
   const plan = cliente.is_demo ? 'completo' : ((planCobro?.estado === 'activo' ? planCobro.plan : null) || cliente.plan_online || null)
   const acceso = {
@@ -552,7 +588,13 @@ export default function PortalForge() {
 
         {/* Contenido */}
         <div className="flex-1 px-4 md:px-8 py-5 max-w-2xl w-full mx-auto pb-28 md:pb-10">
-          {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={modoPreview ? bloqueadoPreview : setModalCI} setValorando={modoPreview ? bloqueadoPreview : setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={modoPreview ? bloqueadoPreview : setModalActividad} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} ejerciciosHist={ejerciciosHist} editarCheckin={modoPreview ? bloqueadoPreview : editarCheckin} />}
+          {tab === 'hoy' && (
+            mostrarOnboarding
+              ? <OnboardingNuevoCliente cliente={cliente} color={color} config={config}
+                  pasoCuestionarioDone={pasoCuestionarioDone} pasoCheckinDone={pasoCheckinDone} pasoRutinaDone={pasoRutinaDone}
+                  setModalCI={modoPreview ? bloqueadoPreview : setModalCI} setTab={setTab} />
+              : <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={modoPreview ? bloqueadoPreview : setModalCI} setValorando={modoPreview ? bloqueadoPreview : setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={modoPreview ? bloqueadoPreview : setModalActividad} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} ejerciciosHist={ejerciciosHist} editarCheckin={modoPreview ? bloqueadoPreview : editarCheckin} />
+          )}
           {tab === 'entrena' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoRutina) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
@@ -752,6 +794,103 @@ function LoginPortal() {
               style={{ background: '#FF5C00' }}>{loading ? '...' : recuperar ? 'Enviar enlace' : 'Entrar'}</button>
             {recuperar && <button type="button" onClick={() => setRecuperar(false)} className="w-full text-white/40 text-sm py-2">← Volver</button>}
           </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Onboarding guiado (cliente nuevo) ─────────────────────────────────────────
+function OnboardingNuevoCliente({ cliente, color, config, pasoCuestionarioDone, pasoCheckinDone, pasoRutinaDone, setModalCI, setTab }) {
+  const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
+  const obligatoriosListos = pasoCuestionarioDone && pasoCheckinDone
+  const completados = (pasoCuestionarioDone ? 1 : 0) + (pasoCheckinDone ? 1 : 0) + (pasoRutinaDone ? 1 : 0)
+  const pasoActual = Math.min(completados + 1, 3)
+  const urlCuestionario = `https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`
+
+  return (
+    <div className="rounded-3xl p-5 md:p-6" style={{ background: '#0A0A0A' }}>
+      <div className="space-y-5">
+        {/* Progreso */}
+        <div>
+          {obligatoriosListos ? (
+            <p className="text-white font-black text-lg leading-tight flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
+              ¡Todo listo! {nombreEntrenador} está preparando tu plan
+            </p>
+          ) : (
+            <>
+              <p className="text-[10px] font-bold tracking-[0.15em] uppercase mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                Paso {pasoActual} de 3
+              </p>
+              <h1 className="text-white font-black text-2xl tracking-tight leading-tight">Vamos a conocerte</h1>
+            </>
+          )}
+          <div className="h-1.5 rounded-full mt-3 overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${(completados / 3) * 100}%`, background: color }} />
+          </div>
+        </div>
+
+        {/* Paso 1 — Cuestionario */}
+        <div className="bg-white rounded-2xl p-5 border border-black/5">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <p className="font-black text-[#0A0A0A] text-base leading-tight">1. Cuéntame cómo eres</p>
+            {pasoCuestionarioDone
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
+              : <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange-50 flex-shrink-0" style={{ color }}>Pendiente</span>}
+          </div>
+          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+            Necesito conocer tu alimentación, rutinas y objetivos para preparar tu plan personalizado
+          </p>
+          {!pasoCuestionarioDone && (
+            <a href={urlCuestionario}
+              className="block text-center text-white text-sm font-black py-3 rounded-xl active:scale-95 transition-all"
+              style={{ background: color }}>
+              Rellenar cuestionario →
+            </a>
+          )}
+        </div>
+
+        {/* Paso 2 — Check-in */}
+        <div className="bg-white rounded-2xl p-5 border border-black/5">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <p className="font-black text-[#0A0A0A] text-base leading-tight">2. Tu primer check-in</p>
+            {pasoCheckinDone
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
+              : <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange-50 flex-shrink-0" style={{ color }}>Pendiente</span>}
+          </div>
+          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+            Cuéntame cómo estás hoy — energía, sueño, estrés. Es el punto de partida de todo
+          </p>
+          {!pasoCheckinDone && (
+            <button onClick={() => setModalCI(true)}
+              className="w-full text-white text-sm font-black py-3 rounded-xl active:scale-95 transition-all"
+              style={{ background: color }}>
+              Hacer mi check-in →
+            </button>
+          )}
+        </div>
+
+        {/* Paso 3 — Plan (informativo) */}
+        <div className="bg-white rounded-2xl p-5 border border-black/5">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <p className="font-black text-[#0A0A0A] text-base leading-tight">3. Tu plan {pasoRutinaDone ? 'está listo' : 'está en camino'}</p>
+            {pasoRutinaDone
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
+              : <span className="text-xl flex-shrink-0">⏳</span>}
+          </div>
+          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+            {pasoRutinaDone
+              ? 'Tu entrenador ya ha preparado tu rutina personalizada.'
+              : `En cuanto completes los pasos anteriores, ${nombreEntrenador} preparará tu plan personalizado. Te avisaremos cuando esté listo.`}
+          </p>
+          {pasoRutinaDone && (
+            <button onClick={() => setTab('entrena')}
+              className="w-full text-white text-sm font-black py-3 rounded-xl active:scale-95 transition-all"
+              style={{ background: color }}>
+              Ver mi plan →
+            </button>
+          )}
         </div>
       </div>
     </div>
