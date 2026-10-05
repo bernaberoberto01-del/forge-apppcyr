@@ -197,7 +197,7 @@ export default function Dashboard({ session }) {
       { data: leadsPendientesRaw },
       { data: cuestConLead },
     ] = await Promise.all([
-      supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio').eq('entrenador_id', uid),
+      supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio,stripe_subscription_id').eq('entrenador_id', uid),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').eq('entrenador_id', uid).gte('fecha_pago', hace6m),
       supabase.from('planes_cobro').select('cliente_id,importe,concepto,proximo_cobro').eq('entrenador_id', uid).eq('activo', true),
       supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').eq('entrenador_id', uid).gte('fecha', inicioSemana),
@@ -244,7 +244,9 @@ export default function Dashboard({ session }) {
     })
     const maxIngreso = Math.max(...ingresosPorMes.map(m => m.valor), 1)
 
-    const alertasPagos = activos.filter(c => {
+    // Solo cobros reales de Stripe — los presenciales que pagan en efectivo no deben
+    // disparar esta alerta (su "valido_hasta" es manual y no significa un cobro fallido).
+    const alertasPagos = activos.filter(c => c.stripe_subscription_id).filter(c => {
       const p = (pagos||[]).filter(p=>p.cliente_id===c.id).sort((a,b)=>b.fecha_pago?.localeCompare(a.fecha_pago))[0]
       return p?.valido_hasta && new Date(p.valido_hasta) < hoy
     }).filter(c => !estaDescartada(c.id, 'pago_vencido'))
@@ -259,7 +261,8 @@ export default function Dashboard({ session }) {
       return tieneVencimiento || tienePlanProximo
     }).filter(c => !estaDescartada(c.id, 'cobro_proximo'))
     const clientesSinCI = activos.filter(c => !ciRecientes.some(ci => ci.cliente_id===c.id && ci.fecha>=hace7d)).filter(c => !estaDescartada(c.id, 'sin_checkin'))
-    const clientesSinCI14d = activos.filter(c => {
+    // Solo online: a los presenciales los ves en persona, no hace falta alertar por check-in digital.
+    const clientesSinCI14d = activos.filter(c => c.tipo === 'online').filter(c => {
       const ultimoCI = (checkins||[]).filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha?.localeCompare(a.fecha))[0]
       return !ultimoCI || ultimoCI.fecha < hace14d
     }).filter(c => !estaDescartada(c.id, 'sin_checkin_14d'))

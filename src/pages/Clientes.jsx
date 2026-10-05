@@ -1760,8 +1760,10 @@ export default function Clientes({ session }) {
 
                   {/* Acciones */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
-                    {/* Si no tiene acceso al portal, CTA prominente */}
-                    {!detalle.auth_user_id && detalle.email && (
+                    {/* Acceso al portal — un solo botón: "Enviar" si aún no tiene cuenta,
+                        "Reenviar" si ya la tiene. Mientras el lead esté pendiente, no se
+                        muestra la variante "Enviar": "✓ Aceptar lead" ya genera el acceso. */}
+                    {detalle.email && !(detalle.estado === 'pendiente' && !detalle.auth_user_id) && (
                       <button onClick={async () => {
                         try {
                           const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
@@ -1770,12 +1772,14 @@ export default function Clientes({ session }) {
                             manejarRespuestaAcceso(data, detalle.nombre)
                             setDetalle(d => ({ ...d, ultimo_acceso_enviado: new Date().toISOString() }))
                           } else if (data?.ok) {
-                            showToast('✓ Email de acceso enviado a ' + detalle.email)
+                            showToast(`✓ Email de acceso ${detalle.auth_user_id ? 'reenviado' : 'enviado'} a ` + detalle.email)
                             setDetalle(d => ({ ...d, ultimo_acceso_enviado: new Date().toISOString() }))
                           } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
                         } catch(e) { showToast('Error de conexión') }
-                      }} className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-[#FF5C00] hover:bg-[#E54E00] active:scale-95 transition-all">
-                        📧 Enviar acceso al portal
+                      }} className={detalle.auth_user_id
+                        ? "border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]"
+                        : "col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-[#FF5C00] hover:bg-[#E54E00] active:scale-95 transition-all"}>
+                        {detalle.auth_user_id ? '📧 Reenviar acceso' : '📧 Enviar acceso'}
                       </button>
                     )}
                     {detalle.estado === 'pendiente' && (
@@ -1785,19 +1789,6 @@ export default function Clientes({ session }) {
                       </button>
                     )}
                     <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
-                    {detalle.email && detalle.auth_user_id && (
-                      <button onClick={async () => {
-                        try {
-                          const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
-                          if (error) throw error
-                          if (data?.sin_email) manejarRespuestaAcceso(data, detalle.nombre)
-                          else if (data?.ok) showToast('✓ Email de acceso reenviado a ' + detalle.email)
-                          else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
-                        } catch(e) { showToast('Error de conexión') }
-                      }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">
-                        📧 Reenviar acceso
-                      </button>
-                    )}
                     <button onClick={async () => {
                       try {
                         const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id, tipo: 'magiclink' } })
