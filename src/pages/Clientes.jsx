@@ -1808,6 +1808,8 @@ export default function Clientes({ session }) {
                         } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
                       } catch (e) { showToast('Error de conexión') }
                     }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Copiar enlace de acceso</button>
+                    <button onClick={() => window.open(`${window.location.origin}/portal-preview?cliente_id=${detalle.id}`, '_blank')}
+                      className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">👁 Ver portal</button>
                     {detalle.tipo === 'online' && dData.cuestRegistro?.sugerencia_plan && (
                       <button onClick={() => generarMensajeBienvenida(detalle, dData.cuestRegistro.sugerencia_plan, dData.cuestRegistro.sugerencia_justificacion, false, dData.cuestRegistro.donde_entrena)}
                         className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">💬 Generar mensaje de plan</button>

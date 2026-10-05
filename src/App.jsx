@@ -256,6 +256,14 @@ export default function App() {
 
           {/* ── OTRAS RUTAS PÚBLICAS ── */}
           <Route path="/portal" element={<PortalEntrada session={session} />} />
+          {/* Preview del portal de un cliente desde la ficha del entrenador (botón
+              "Ver portal" en Clientes.jsx). No pasa por PortalEntrada: el rol de la
+              sesión (entrenador) haría que esa pantalla lo bloquee como "cuenta de
+              entrenador". PortalForge verifica internamente que la sesión logueada
+              sea el entrenador_id del cliente antes de cargar nada. */}
+          <Route path="/portal-preview" element={
+            session ? <PortalCliente /> : <Navigate to="/login" replace />
+          } />
           <Route path="/registro" element={<RegistroCliente />} />
           <Route path="/nutricion-cuest" element={<NutricionCuestionario />} />
           <Route path="/progreso/:clienteId" element={<ProgresoCliente />} />
