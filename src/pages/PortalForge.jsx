@@ -18,6 +18,13 @@ const formatearFecha = (fecha, opciones = { day: 'numeric', month: 'short', year
   if (isNaN(d.getTime())) return '—'
   return d.toLocaleDateString('es-ES', opciones)
 }
+// Mismas reglas que en RegistroCliente.jsx: quita espacios/guiones y antepone
+// +34 a móviles españoles sin prefijo (empiezan por 6, 7 o 9).
+const normalizarTelefono = raw => {
+  const limpio = raw.replace(/[\s-]/g, '')
+  return /^[679]/.test(limpio) ? '+34' + limpio : limpio
+}
+const telefonoValido = raw => raw.replace(/\D/g, '').length >= 9
 const rmEpley = (peso, reps) => reps <= 1 ? peso : +(peso * (1 + reps / 30)).toFixed(1)
 const parseReps = (r) => { if (!r) return 1; const n = parseInt(String(r).split('-')[0]); return isNaN(n) ? 1 : n }
 // Convierte textos de descanso tipo "90s", "2min", "3-4 min" a segundos (usa el número mayor del rango)
@@ -87,6 +94,8 @@ export default function PortalForge() {
   const [toast, setToast] = useState('')
   const [activandoPlan, setActivandoPlan] = useState(false)
   const [modoPreview, setModoPreview] = useState(false)
+  const [telefonoInput, setTelefonoInput] = useState('')
+  const [guardandoTelefono, setGuardandoTelefono] = useState(false)
   const mensajesEndRef = useRef(null)
 
   function bloqueadoPreview() {
@@ -335,6 +344,22 @@ export default function PortalForge() {
     setDatos(d => ({ ...d, mensajes: msgs }))
     setEnviandoMsg(false)
     setTimeout(() => mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  async function guardarTelefono() {
+    if (modoPreview) return bloqueadoPreview()
+    if (!telefonoValido(telefonoInput)) return showToast('Número no válido — mínimo 9 dígitos')
+    setGuardandoTelefono(true)
+    const telefono = normalizarTelefono(telefonoInput.trim())
+    const { error } = await supabase.from('clientes').update({ telefono }).eq('id', cliente.id)
+    if (!error) {
+      setCliente(c => ({ ...c, telefono }))
+      setTelefonoInput('')
+      showToast('✓ Teléfono guardado')
+    } else {
+      showToast('Error al guardar — inténtalo de nuevo')
+    }
+    setGuardandoTelefono(false)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500) }
@@ -588,6 +613,23 @@ export default function PortalForge() {
 
         {/* Contenido */}
         <div className="flex-1 px-4 md:px-8 py-5 max-w-2xl w-full mx-auto pb-28 md:pb-10">
+          {tab === 'hoy' && !cliente.telefono && !modoPreview && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3">
+              <p className="text-sm font-semibold text-amber-800 mb-3 leading-relaxed">
+                📱 Añade tu número de WhatsApp para que {config?.nombre_entrenador || 'tu entrenador'} pueda contactarte directamente
+              </p>
+              <div className="flex gap-2">
+                <input type="tel" value={telefonoInput} onChange={e => setTelefonoInput(e.target.value)}
+                  placeholder="+34 600 000 000"
+                  className="flex-1 border border-amber-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-400" />
+                <button onClick={guardarTelefono} disabled={guardandoTelefono || !telefonoInput.trim()}
+                  className="px-4 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-40 active:scale-95 transition-all"
+                  style={{ background: color }}>
+                  {guardandoTelefono ? '...' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          )}
           {tab === 'hoy' && (
             mostrarOnboarding
               ? <OnboardingNuevoCliente cliente={cliente} color={color} config={config}
