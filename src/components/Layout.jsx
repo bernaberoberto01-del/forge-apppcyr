@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabase'
 import { NavLink, useLocation, Navigate, useNavigate } from 'react-router-dom'
 import TutorialBanner, { BarraProgreso } from './TutorialBanner'
 import { useOnboarding } from '../hooks/useOnboarding'
+import { BRAND, colorMarca, nombreMarca } from '../lib/brand'
+import BrandMark from './BrandMark'
+import { moduloVisible } from '../lib/modulos'
 
 const TODOS_MODULOS = [
   { id: 'dashboard',  path: '/dashboard',  label: 'Dashboard',  icon: '📊' },
@@ -55,10 +58,10 @@ export default function Layout({ children, session, config }) {
     return () => window.removeEventListener('alertas-leidas', actualizarBadges)
   }, [location.pathname, config, session])
 
-  const modulosActivos = TODOS_MODULOS.filter(m => !config?.modulos || config.modulos[m.id] !== false)
+  const modulosActivos = TODOS_MODULOS.filter(m => moduloVisible(m.id) && (!config?.modulos || config.modulos[m.id] !== false))
   const nombre = config?.nombre_entrenador || session?.user?.email?.split('@')[0] || 'Entrenador'
-  const negocio = config?.nombre_negocio || 'Forge Studio OS'
-  const acento = config?.color_acento || '#FF5C00'
+  const negocio = nombreMarca(config?.nombre_negocio)
+  const acento = colorMarca(config?.color_acento)
 
   // Redirigir a dashboard si aterrizamos en /
   if (location.pathname === '/') return <Navigate to="/dashboard" replace />
@@ -76,7 +79,7 @@ export default function Layout({ children, session, config }) {
         <span className="text-base w-5 text-center flex-shrink-0">{item.icon}</span>
         <span className="flex-1 truncate">{item.label}</span>
         {badge > 0 && (
-          <span className="w-5 h-5 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+          <span className="w-5 h-5 bg-acento rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
             {badge > 9 ? '9+' : badge}
           </span>
         )}
@@ -90,11 +93,7 @@ export default function Layout({ children, session, config }) {
       <div className="px-4 py-5 border-b border-white/8">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: acento }}>
-            <svg width="16" height="16" viewBox="0 0 28 28" fill="none">
-              <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-              <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-              <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-            </svg>
+            <BrandMark size={16} />
           </div>
           <div className="min-w-0">
             <p className="text-white text-sm font-bold truncate">{negocio}</p>
@@ -109,7 +108,7 @@ export default function Layout({ children, session, config }) {
       </nav>
 
       {/* Progreso onboarding — solo hasta que el usuario lo descarte */}
-      {porcentaje < 100 && <BarraProgreso porcentaje={porcentaje} onClick={() => navigate('/dashboard')} />}
+      {moduloVisible('tutorial') && porcentaje < 100 && <BarraProgreso porcentaje={porcentaje} onClick={() => navigate('/dashboard')} />}
 
       {/* Footer */}
       <div className="px-3 py-3 border-t border-white/8 space-y-1">
@@ -162,11 +161,7 @@ export default function Layout({ children, session, config }) {
             <p className="text-sm font-bold text-[#0A0A0A] truncate">{negocio}</p>
           </div>
           <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: acento }}>
-            <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
-              <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-              <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-              <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-            </svg>
+            <BrandMark size={14} />
           </div>
         </header>
 

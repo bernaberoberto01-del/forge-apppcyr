@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { moduloVisible } from '../lib/modulos'
 
 /**
  * Banner de tutorial que aparece la primera vez que el usuario
@@ -10,7 +11,12 @@ import { useState, useEffect } from 'react'
  *   onCompletar: () => void — marcar como visto
  *   onAccion: () => void — acción del botón (opcional)
  */
-export default function TutorialBanner({ tutorial, completado, onCompletar, onAccion }) {
+// Oculto en las instancias que esconden el módulo "tutorial" (ficha del centro)
+export default function TutorialBanner(props) {
+  return moduloVisible('tutorial') ? <TutorialBannerContenido {...props} /> : null
+}
+
+function TutorialBannerContenido({ tutorial, completado, onCompletar, onAccion }) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -29,10 +35,10 @@ export default function TutorialBanner({ tutorial, completado, onCompletar, onAc
   }
 
   return (
-    <div className="relative bg-gradient-to-r from-[#FF5C00]/10 to-[#6366f1]/10 border border-[#FF5C00]/20 rounded-2xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+    <div className="relative bg-gradient-to-r from-acento/10 to-[#6366f1]/10 border border-acento/20 rounded-2xl p-4 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
       {/* Indicador de tutorial */}
       <div className="flex items-start gap-3">
-        <div className="w-8 h-8 bg-[#FF5C00] rounded-xl flex items-center justify-center flex-shrink-0 text-white text-sm font-bold">
+        <div className="w-8 h-8 bg-acento rounded-xl flex items-center justify-center flex-shrink-0 text-white text-sm font-bold">
           ?
         </div>
         <div className="flex-1 min-w-0">
@@ -40,7 +46,7 @@ export default function TutorialBanner({ tutorial, completado, onCompletar, onAc
           <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">{tutorial.desc}</p>
           {tutorial.accion && (
             <button onClick={() => { onAccion?.(); cerrar() }}
-              className="mt-2 text-xs font-semibold text-[#FF5C00] hover:underline">
+              className="mt-2 text-xs font-semibold text-acento hover:underline">
               {tutorial.accion} →
             </button>
           )}
@@ -83,7 +89,7 @@ export function BarraProgreso({ porcentaje, onClick }) {
     <button onClick={onClick}
       className="w-full flex items-center gap-3 px-4 py-3 bg-[#F7F6F3] hover:bg-[#EEECEA] transition-all border-t border-black/5">
       <div className="flex-1 bg-black/10 rounded-full h-1.5 overflow-hidden">
-        <div className="h-full bg-[#FF5C00] rounded-full transition-all duration-500" style={{width:`${porcentaje}%`}}/>
+        <div className="h-full bg-acento rounded-full transition-all duration-500" style={{width:`${porcentaje}%`}}/>
       </div>
       <p className="text-xs text-[#6B6B6B] font-medium flex-shrink-0">{porcentaje}% completado</p>
     </button>

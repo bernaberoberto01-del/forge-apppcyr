@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import EquipoTab from '../components/EquipoTab'
 import { useCentro } from '../hooks/useCentro.jsx'
+import { BRAND } from '../lib/brand'
 
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊', desc: 'Métricas, alertas y resumen general', obligatorio: true },
@@ -16,7 +17,7 @@ const MODULOS = [
 ]
 
 const COLORES = [
-  { id: '#FF5C00', label: 'Naranja Forge' },
+  { id: '#FF5C00', label: 'Naranja' },
   { id: '#6366f1', label: 'Índigo' },
   { id: '#10b981', label: 'Esmeralda' },
   { id: '#f59e0b', label: 'Ámbar' },
@@ -36,7 +37,7 @@ function Toast({ msg, tipo = 'ok', onClose }) {
 }
 
 const defaultConfig = {
-  nombre_negocio: '', nombre_entrenador: '', bio: '', foto_url: '', color_acento: '#FF5C00',
+  nombre_negocio: '', nombre_entrenador: '', bio: '', foto_url: '', color_acento: BRAND.color,
   modulos: { dashboard: true, clientes: true, rutinas: true, sesiones: true, seguimiento: true, pagos: true, agenda: true },
   cuestionario_bloques: { basico: true, objetivo: true, historial: true, disponibilidad: true, material: true, salud: true, motivacion: true }
 }
@@ -126,7 +127,7 @@ export default function Configuracion({ session, onConfigChange }) {
   const setModulo = (id, val) => setConfig(c => ({ ...c, modulos: { ...c.modulos, [id]: val } }))
   const setBloque = (id, val) => setConfig(c => ({ ...c, cuestionario_bloques: { ...c.cuestionario_bloques, [id]: val } }))
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" /></div>
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" /></div>
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-lg mx-auto">
@@ -135,7 +136,7 @@ export default function Configuracion({ session, onConfigChange }) {
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Configuración</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">Personaliza Forge a tu imagen y metodología</p>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">{`Personaliza ${BRAND.nombre} a tu imagen y metodología`}</p>
         </div>
         <div className="flex gap-2">
           <a href={`/p/${config.slug_publico || 'mi-perfil'}`} target="_blank" rel="noopener noreferrer"
@@ -143,7 +144,7 @@ export default function Configuracion({ session, onConfigChange }) {
             🔗 Ver perfil público
           </a>
           <button onClick={guardar} disabled={saving}
-            className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2.5 rounded-xl disabled:opacity-40 transition-all active:scale-95">
+            className="bg-acento hover:bg-acento-hover text-white text-sm font-semibold px-4 py-2.5 rounded-xl disabled:opacity-40 transition-all active:scale-95">
             {saving ? 'Guardando...' : '💾 Guardar'}
           </button>
         </div>
@@ -169,20 +170,20 @@ export default function Configuracion({ session, onConfigChange }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre de tu negocio / centro</label>
                 <input value={config.nombre_negocio} onChange={e => setConfig(c => ({ ...c, nombre_negocio: e.target.value }))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
                   placeholder="Ej: Roberto Bernabé Personal Training" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tu nombre</label>
                 <input value={config.nombre_entrenador} onChange={e => setConfig(c => ({ ...c, nombre_entrenador: e.target.value }))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
                   placeholder="Ej: Roberto Bernabé" />
                 <p className="text-xs text-[#6B6B6B] mt-1">Aparece en el portal del cliente en lugar de "Tu entrenador"</p>
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Bio corta</label>
                 <textarea value={config.bio} onChange={e => setConfig(c => ({ ...c, bio: e.target.value }))}
-                  rows={3} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  rows={3} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                   placeholder="Ej: CAFD en Murcia especializado en transformación física y fuerza. Más de 50 clientes transformados." />
                 <p className="text-xs text-[#6B6B6B] mt-1">Visible en el portal del cliente</p>
               </div>
@@ -244,7 +245,7 @@ export default function Configuracion({ session, onConfigChange }) {
           <p className="text-xs text-[#6B6B6B] mb-4">Activa solo lo que usas — mantén el sidebar limpio</p>
           <div className="space-y-2">
             {MODULOS.map(m => (
-              <div key={m.id} className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${config.modulos[m.id] ? 'border-[#FF5C00]/20 bg-[#FF5C00]/3' : 'border-black/5 bg-[#F5F5F0]'}`}>
+              <div key={m.id} className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${config.modulos[m.id] ? 'border-acento/20 bg-acento/3' : 'border-black/5 bg-[#F5F5F0]'}`}>
                 <span className="text-xl flex-shrink-0">{m.icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#0A0A0A]">{m.label}</p>
@@ -254,7 +255,7 @@ export default function Configuracion({ session, onConfigChange }) {
                   <span className="text-xs text-[#6B6B6B] flex-shrink-0">Siempre activo</span>
                 ) : (
                   <button onClick={() => setModulo(m.id, !config.modulos[m.id])}
-                    className={`w-12 h-6 rounded-full transition-all flex-shrink-0 relative ${config.modulos[m.id] ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                    className={`w-12 h-6 rounded-full transition-all flex-shrink-0 relative ${config.modulos[m.id] ? 'bg-acento' : 'bg-black/20'}`}>
                     <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${config.modulos[m.id] ? 'left-6' : 'left-0.5'}`} />
                   </button>
                 )}
@@ -285,7 +286,7 @@ export default function Configuracion({ session, onConfigChange }) {
                 { id: 'salud', label: 'Salud y lesiones', desc: 'Lesiones previas, condiciones médicas', obligatorio: false },
                 { id: 'motivacion', label: 'Motivación', desc: 'Por qué quiere entrenar, qué le frena', obligatorio: false },
               ].map(b => (
-                <div key={b.id} className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${config.cuestionario_bloques[b.id] ? 'border-[#FF5C00]/20 bg-[#FF5C00]/3' : 'border-black/5 bg-[#F5F5F0]'}`}>
+                <div key={b.id} className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${config.cuestionario_bloques[b.id] ? 'border-acento/20 bg-acento/3' : 'border-black/5 bg-[#F5F5F0]'}`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#0A0A0A]">{b.label}</p>
                     <p className="text-xs text-[#6B6B6B]">{b.desc}</p>
@@ -294,7 +295,7 @@ export default function Configuracion({ session, onConfigChange }) {
                     <span className="text-xs text-[#6B6B6B] flex-shrink-0">Siempre activo</span>
                   ) : (
                     <button onClick={() => setBloque(b.id, !config.cuestionario_bloques[b.id])}
-                      className={`w-12 h-6 rounded-full transition-all flex-shrink-0 relative ${config.cuestionario_bloques[b.id] ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                      className={`w-12 h-6 rounded-full transition-all flex-shrink-0 relative ${config.cuestionario_bloques[b.id] ? 'bg-acento' : 'bg-black/20'}`}>
                       <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${config.cuestionario_bloques[b.id] ? 'left-6' : 'left-0.5'}`} />
                     </button>
                   )}
@@ -310,7 +311,13 @@ export default function Configuracion({ session, onConfigChange }) {
       )}
 
       {/* APARIENCIA */}
-      {tab === 'apariencia' && (
+      {tab === 'apariencia' && BRAND.fija && (
+        <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+          <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">Color de acento</h2>
+          <p className="text-xs text-[#6B6B6B]">{`El color lo define ${BRAND.nombreCompleto} para toda la app.`}</p>
+        </div>
+      )}
+      {tab === 'apariencia' && !BRAND.fija && (
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
             <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">Color de acento</h2>
@@ -355,7 +362,7 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {tab === 'equipo' && (
         centroLoading
-          ? <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+          ? <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-acento border-t-transparent rounded-full animate-spin"/></div>
           : <EquipoTab
               centro={centro}
               miembros={miembros}
@@ -428,7 +435,7 @@ function TarifasTab({ uid, showToast }) {
     { tipo: 'online', label: '🌐 Online', items: tarifas.filter(t => t.tipo === 'online') },
   ].filter(g => g.items.length > 0)
 
-  if (loading) return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+  if (loading) return <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-acento border-t-transparent rounded-full animate-spin"/></div>
 
   return (
     <div>
@@ -438,7 +445,7 @@ function TarifasTab({ uid, showToast }) {
           <p className="text-xs text-[#6B6B6B]">Define tus tarifas estándar. Al crear un cliente solo seleccionas la tarifa y el precio se rellena solo.</p>
         </div>
         <button onClick={abrirNueva}
-          className="bg-[#FF5C00] text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-[#e05200] transition-all flex-shrink-0">
+          className="bg-acento text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-acento-hover transition-all flex-shrink-0">
           + Nueva
         </button>
       </div>
@@ -456,7 +463,7 @@ function TarifasTab({ uid, showToast }) {
                     </span>
                   )}
                   <p className="text-sm font-semibold text-[#0A0A0A] flex-1 truncate">{t.nombre}</p>
-                  <p className="text-sm font-bold text-[#FF5C00] flex-shrink-0">{t.precio}€/mes</p>
+                  <p className="text-sm font-bold text-acento flex-shrink-0">{t.precio}€/mes</p>
                   <div className="flex gap-1.5 flex-shrink-0">
                     <button onClick={() => abrirEditar(t)} className="text-xs border border-black/10 text-[#6B6B6B] px-2.5 py-1.5 rounded-lg hover:bg-[#F5F5F0]">✏️</button>
                     <button onClick={() => eliminar(t.id)} className="text-xs border border-red-100 text-red-400 px-2.5 py-1.5 rounded-lg hover:bg-red-50">×</button>
@@ -489,7 +496,7 @@ function TarifasTab({ uid, showToast }) {
                   {[['presencial','📍 Presencial'],['online','🌐 Online']].map(([v,l]) => (
                     <button key={v} type="button"
                       onClick={() => setForm({...form, tipo:v, dias_semana: v==='online'?0:2})}
-                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.tipo===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.tipo===v?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
@@ -501,7 +508,7 @@ function TarifasTab({ uid, showToast }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
                 <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
                   placeholder={form.tipo==='online'?'Ej: Asesoría Completa':'Ej: Individual 3 días'}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
               </div>
 
               {/* Solo presencial: modalidad y días */}
@@ -513,7 +520,7 @@ function TarifasTab({ uid, showToast }) {
                       {[['individual','👤 Individual'],['pareja','👫 Pareja'],['grupo','👥 Grupo']].map(([v,l]) => (
                         <button key={v} type="button"
                           onClick={() => setForm({...form, modalidad:v, dias_semana: v==='grupo'?3:form.dias_semana})}
-                          className={`py-2 rounded-xl border text-xs font-semibold transition-all ${form.modalidad===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                          className={`py-2 rounded-xl border text-xs font-semibold transition-all ${form.modalidad===v?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                           {l}
                         </button>
                       ))}
@@ -525,7 +532,7 @@ function TarifasTab({ uid, showToast }) {
                       {(form.modalidad==='grupo'?[3]:[2,3,4]).map(d => (
                         <button key={d} type="button"
                           onClick={() => { const p=SUGERIDOS[form.modalidad]?.[d]||''; setForm({...form,dias_semana:d,precio:String(p)}) }}
-                          className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all ${form.dias_semana===d?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                          className={`flex-1 py-2 rounded-xl border text-xs font-bold transition-all ${form.dias_semana===d?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                           {d}
                         </button>
                       ))}
@@ -546,12 +553,12 @@ function TarifasTab({ uid, showToast }) {
                   Precio €/mes
                   {precioSugerido && Number(form.precio) !== precioSugerido && (
                     <button onClick={() => setForm({...form, precio: String(precioSugerido)})}
-                      className="ml-2 text-[#FF5C00] font-medium text-xs">std: {precioSugerido}€</button>
+                      className="ml-2 text-acento font-medium text-xs">std: {precioSugerido}€</button>
                   )}
                 </label>
                 <input type="number" value={form.precio} onChange={e=>setForm({...form,precio:e.target.value})}
                   placeholder={String(precioSugerido || form.tipo==='online'?'29':'220')}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
               </div>
 
               <div className="flex gap-2 pt-1">
@@ -560,7 +567,7 @@ function TarifasTab({ uid, showToast }) {
                   Cancelar
                 </button>
                 <button onClick={guardar} disabled={!form.nombre.trim()||!form.precio||guardando}
-                  className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-[#e05200] transition-all">
+                  className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40 hover:bg-acento-hover transition-all">
                   {guardando?'Guardando...':editando?'Guardar cambios':'Crear tarifa'}
                 </button>
               </div>

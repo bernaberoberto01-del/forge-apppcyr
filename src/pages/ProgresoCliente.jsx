@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import BrandMark from '../components/BrandMark'
+import { BRAND } from '../lib/brand'
 
 const EJERCICIOS = [
   { key: 'press_banca', label: 'Press de banca', icon: '🏋️', kg: 'press_banca_kg', reps: 'press_banca_reps' },
@@ -62,7 +64,7 @@ export default function ProgresoCliente() {
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -78,8 +80,8 @@ export default function ProgresoCliente() {
         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5 text-4xl">💪</div>
         <h2 className="text-2xl font-bold text-[#0A0A0A] mb-2">¡Gracias, {cliente.nombre.split(' ')[0]}!</h2>
         <p className="text-[#6B6B6B] text-sm leading-relaxed">Tu entrenador ya tiene tus marcas actualizadas. Las usará para preparar tu rutina del próximo mes.</p>
-        <div className="mt-5 bg-[#FF5C00]/8 border border-[#FF5C00]/20 rounded-2xl p-4">
-          <p className="text-sm font-semibold text-[#FF5C00]">¡Sigue así! 🔥</p>
+        <div className="mt-5 bg-acento/8 border border-acento/20 rounded-2xl p-4">
+          <p className="text-sm font-semibold text-acento">¡Sigue así! 🔥</p>
           <p className="text-xs text-[#6B6B6B] mt-1">Te volveremos a preguntar en 4 semanas</p>
         </div>
       </div>
@@ -92,14 +94,10 @@ export default function ProgresoCliente() {
       <div className="bg-[#111] px-4 pt-10 pb-6">
         <div className="max-w-lg mx-auto">
           <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 bg-[#FF5C00] rounded-lg flex items-center justify-center flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
-                <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-                <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-                <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-              </svg>
+            <div className="w-7 h-7 bg-acento rounded-lg flex items-center justify-center flex-shrink-0">
+              <BrandMark size={14} />
             </div>
-            <span className="text-white/60 text-xs font-medium">Forge · Control mensual</span>
+            <span className="text-white/60 text-xs font-medium">{`${BRAND.nombre} · Control mensual`}</span>
           </div>
           <h1 className="text-white font-bold text-xl">Hola {cliente.nombre.split(' ')[0]} 👋</h1>
           <p className="text-white/50 text-sm mt-1">¿Cuánto estás moviendo ahora? Tarda menos de 2 minutos.</p>
@@ -109,8 +107,8 @@ export default function ProgresoCliente() {
       <div className="max-w-lg mx-auto p-4 pb-10 space-y-3">
 
         {/* Intro */}
-        <div className="bg-[#FF5C00]/8 border border-[#FF5C00]/20 rounded-2xl p-4">
-          <p className="text-sm font-semibold text-[#FF5C00] mb-1">¿Para qué sirve esto?</p>
+        <div className="bg-acento/8 border border-acento/20 rounded-2xl p-4">
+          <p className="text-sm font-semibold text-acento mb-1">¿Para qué sirve esto?</p>
           <p className="text-xs text-[#6B6B6B] leading-relaxed">Tu entrenador usa tus marcas actuales para ver tu progresión real y preparar tu rutina del próximo mes. No hace falta que sea el máximo absoluto — pon el peso con el que haces las reps de forma limpia.</p>
         </div>
 
@@ -134,7 +132,7 @@ export default function ProgresoCliente() {
                       <div className="relative">
                         <input type="number" step="0.5" value={form[ej.kg]} onChange={e => set(ej.kg, e.target.value)}
                           placeholder="Ej: 80"
-                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] pr-10" />
+                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento pr-10" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#6B6B6B]">kg</span>
                       </div>
                     </div>
@@ -145,7 +143,7 @@ export default function ProgresoCliente() {
                       <div className="relative">
                         <input type="number" step="0.5" value={form[ej.kg]} onChange={e => set(ej.kg, e.target.value)}
                           placeholder="0"
-                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] pr-10" />
+                          className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento pr-10" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#6B6B6B]">kg</span>
                       </div>
                     </div>
@@ -155,7 +153,7 @@ export default function ProgresoCliente() {
                     <div className="relative">
                       <input type="number" value={form[ej.reps]} onChange={e => set(ej.reps, e.target.value)}
                         placeholder="Ej: 5"
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] pr-10" />
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento pr-10" />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#6B6B6B]">reps</span>
                     </div>
                   </div>
@@ -175,7 +173,7 @@ export default function ProgresoCliente() {
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
                   form.percepcion_progreso === v
                     ? v <= 2 ? 'bg-red-500 text-white' : v === 3 ? 'bg-amber-400 text-white' : 'bg-emerald-500 text-white'
-                    : 'border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'
+                    : 'border border-black/10 text-[#6B6B6B] hover:border-acento'
                 }`}>
                 {v}
               </button>
@@ -191,16 +189,16 @@ export default function ProgresoCliente() {
         <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
           <p className="text-sm font-bold text-[#0A0A0A] mb-1.5">¿Algo que contarle a tu entrenador?</p>
           <textarea value={form.comentario} onChange={e => set('comentario', e.target.value)} rows={3}
-            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
             placeholder="Lesión, cambio en la rutina, algo que haya ido especialmente bien o mal..." />
         </div>
 
         <button onClick={enviar} disabled={guardando}
-          className="w-full bg-[#FF5C00] hover:bg-[#E05200] text-white font-bold py-4 rounded-2xl text-base transition-all active:scale-98 disabled:opacity-50">
+          className="w-full bg-acento hover:bg-acento-hover text-white font-bold py-4 rounded-2xl text-base transition-all active:scale-98 disabled:opacity-50">
           {guardando ? 'Enviando...' : '💪 Enviar mis marcas'}
         </button>
 
-        <p className="text-center text-xs text-[#6B6B6B]">Forge Studio OS · Datos protegidos</p>
+        <p className="text-center text-xs text-[#6B6B6B]">{`${BRAND.nombreCompleto} · Datos protegidos`}</p>
       </div>
     </div>
   )

@@ -1,0 +1,81 @@
+{
+  "id": "pablo-rodriguez",
+  "marca": {
+    "nombre": "Pablo Rodríguez",
+    "eslogan": "Centro de Entrenamiento",
+    "nombreCompleto": "Pablo Rodríguez Centro de Entrenamiento",
+    "descripcion": "Pablo Rodríguez — Centro de Entrenamiento en Cabezo de Torres, Murcia",
+    "color": "#AF1203",
+    "logo": "/centros/pablo-rodriguez/logo.png",
+    "logoCompleto": "/centros/pablo-rodriguez/logo-completo.png",
+    "icono": "/centros/pablo-rodriguez/icono.png",
+    "fija": true
+  },
+  "app": {
+    "url": "https://pablo-rodriguez-entrenamiento.vercel.app"
+  },
+  "supabase": {
+    "proyecto": "focgysujvofpihjhvznl",
+    "url": "https://focgysujvofpihjhvznl.supabase.co",
+    "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvY2d5c3Vqdm9mcGloamh2em5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExMzE1NDQsImV4cCI6MjEwNjcwNzU0NH0.pB-FTNzTzffz4SDONVBR_BAtpfDcKvQ51TneZTnv51c"
+  },
+  "centro": {
+    "ciudad": "Cabezo de Torres, Murcia",
+    "emailContacto": "pablorodriguezdiaz27@icloud.com",
+    "equipo": [
+      {
+        "nombre": "Pablo Rodríguez",
+        "rol": "admin",
+        "especialidad": "Entrenador",
+        "email": null
+      },
+      {
+        "nombre": "Roberto Bernabé",
+        "rol": "entrenador",
+        "especialidad": "Entrenador",
+        "email": null
+      },
+      {
+        "nombre": "Paula Espín García",
+        "rol": "entrenador",
+        "especialidad": "Entrenadora",
+        "email": null
+      },
+      {
+        "nombre": "Ricardo",
+        "rol": "entrenador",
+        "especialidad": "Fisioterapeuta",
+        "email": null
+      },
+      {
+        "nombre": "David",
+        "rol": "entrenador",
+        "especialidad": "Fisioterapeuta",
+        "email": null
+      },
+      {
+        "nombre": "Raquel",
+        "rol": "entrenador",
+        "especialidad": "Nutricionista",
+        "email": null
+      }
+    ],
+    "tarifas": null,
+    "datosLegales": null
+  },
+  "modulosOcultos": [
+    "seguimiento",
+    "rutinas",
+    "nutricion",
+    "mensajes",
+    "tutorial"
+  ],
+  "servicios": [
+    "fisioterapia",
+    "nutricion"
+  ],
+  "vercel": {
+    "proyecto": "prj_3joP8L7WwZ6dJRiHbc5AQkMoHkNi",
+    "equipo": "team_ccftxY4FjAbjgPfyo5HnELjo"
+  }
+}

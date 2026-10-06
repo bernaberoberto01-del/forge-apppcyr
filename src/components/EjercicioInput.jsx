@@ -77,7 +77,7 @@ export default function EjercicioInput({ value, onChange, onSelect, placeholder 
         onChange={e => { setQuery(e.target.value); onChange?.(e.target.value); setAbierto(true) }}
         onFocus={() => setAbierto(true)}
         placeholder={placeholder}
-        className={`w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] transition-colors ${className}`}
+        className={`w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento transition-colors ${className}`}
       />
 
       {abierto && (
@@ -86,7 +86,7 @@ export default function EjercicioInput({ value, onChange, onSelect, placeholder 
           <div className="flex gap-1 p-2 overflow-x-auto border-b border-black/5">
             {GRUPOS.map(g => (
               <button key={g} type="button" onClick={() => setGrupoFiltro(g)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all ${grupoFiltro === g ? 'bg-[#FF5C00] text-white' : 'bg-[#F5F5F0] text-[#6B6B6B] hover:bg-black/10'}`}>
+                className={`px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0 transition-all ${grupoFiltro === g ? 'bg-acento text-white' : 'bg-[#F5F5F0] text-[#6B6B6B] hover:bg-black/10'}`}>
                 {g}
               </button>
             ))}
@@ -117,7 +117,7 @@ export default function EjercicioInput({ value, onChange, onSelect, placeholder 
                 {query && !sugerencias.find(e => e.nombre.toLowerCase() === query.toLowerCase()) && (
                   <button type="button" onClick={guardarNuevo}
                     className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-[#F5F5F0] border-t border-black/5 transition-all text-left">
-                    <span className="text-[#FF5C00] font-bold">+</span>
+                    <span className="text-acento font-bold">+</span>
                     <span className="text-sm text-[#6B6B6B]">Guardar "{query}" en biblioteca</span>
                   </button>
                 )}

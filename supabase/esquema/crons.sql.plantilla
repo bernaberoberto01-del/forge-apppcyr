@@ -1,0 +1,13 @@
+-- Crons de un centro. Sustituir {{REF}} (proyecto de Supabase) y {{ANON}} (clave anon,
+-- pública). La clave de administrador NO va aquí: se guarda antes en la bóveda con
+--   select vault.create_secret('<ADMIN_SECRET>', 'cron_admin_secret');
+-- ejecutado como consulta suelta (no como migración, para que no quede en el historial).
+-- Respecto a Forge, detectar-alertas y resumen-mensual ya envían x-admin-secret
+-- (en Forge no lo hacen y devuelven 401).
+select cron.schedule('analisis-mensual-domingo', '0 20 * * 0', $c$select net.http_post(url := 'https://{{REF}}.supabase.co/functions/v1/analizar-cliente-mensual', headers := jsonb_build_object('Content-Type','application/json','x-admin-secret',(select decrypted_secret from vault.decrypted_secrets where name = 'cron_admin_secret' limit 1)), body := '{}'::jsonb);$c$);
+select cron.schedule('checkin-recordatorio-miercoles', '0 10 * * 3', $c$select net.http_post(url := 'https://{{REF}}.supabase.co/functions/v1/checkin-semanal', headers := jsonb_build_object('Content-Type','application/json'), body := '{"dias_umbral": 7}'::jsonb);$c$);
+select cron.schedule('checkin-semanal-domingo', '0 9 * * 0', $c$select net.http_post(url := 'https://{{REF}}.supabase.co/functions/v1/checkin-semanal', headers := jsonb_build_object('Content-Type','application/json'), body := '{}'::jsonb);$c$);
+select cron.schedule('completar-sesiones-cada-hora', '0 * * * *', $c$select net.http_post(url := 'https://{{REF}}.supabase.co/functions/v1/completar-sesiones-auto', headers := jsonb_build_object('Content-Type','application/json'), body := '{}'::jsonb);$c$);
+select cron.schedule('detectar-alertas-diario', '0 8 * * *', $c$select net.http_post(url := 'https://{{REF}}.supabase.co/functions/v1/detectar-alertas', headers := jsonb_build_object('Content-Type','application/json','x-admin-secret',(select decrypted_secret from vault.decrypted_secrets where name = 'cron_admin_secret' limit 1),'Authorization','Bearer {{ANON}}'), body := '{}'::jsonb);$c$);
+select cron.schedule('enviar-mensajes-programados', '*/15 * * * *', $c$select net.http_post(url := 'https://{{REF}}.supabase.co/functions/v1/enviar-mensajes-programados', headers := jsonb_build_object('Content-Type','application/json'), body := '{}'::jsonb);$c$);
+select cron.schedule('resumen-mensual-dia1', '0 8 1 * *', $c$select net.http_post(url := 'https://{{REF}}.supabase.co/functions/v1/resumen-mensual', headers := jsonb_build_object('Content-Type','application/json','x-admin-secret',(select decrypted_secret from vault.decrypted_secrets where name = 'cron_admin_secret' limit 1)), body := '{"todos":true}'::jsonb);$c$);

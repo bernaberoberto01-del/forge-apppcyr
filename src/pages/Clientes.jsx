@@ -7,6 +7,9 @@ import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { TIPOS_ENTRENAMIENTO, TIPOS_MAP } from '../utils/tiposEntrenamiento'
 import GraficasCliente from '../components/GraficasCliente'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
+import { useEquipo } from '../hooks/useCentro'
+import { moduloVisible } from '../lib/modulos'
 
 
 function Toast({ msg, tipo='ok', onClose }) {
@@ -52,7 +55,7 @@ function ProtocoloIA({ protocolo: p }) {
     <div className="bg-[#F7F6F3] rounded-xl p-3 space-y-3">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold text-[#0A0A0A]">🤖 Protocolo generado por IA</p>
-        {p.fase_actual && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF5C00]/10 text-[#FF5C00] flex-shrink-0">{p.fase_actual}</span>}
+        {p.fase_actual && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-acento/10 text-acento flex-shrink-0">{p.fase_actual}</span>}
       </div>
       {p.duracion_estimada && <p className="text-xs text-[#6B6B6B]">⏱ Duración estimada: <span className="font-semibold text-[#0A0A0A]">{p.duracion_estimada}</span></p>}
       {p.resumen && <p className="text-xs text-[#0A0A0A] leading-relaxed">{p.resumen}</p>}
@@ -145,7 +148,7 @@ const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:
   marca_press_banca:'',marca_sentadilla:'',marca_peso_muerto:'',marca_dominadas:'',marca_press_militar:'',
 }
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-const AVATAR_COLORS = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
+const AVATAR_COLORS = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
 const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
 const PER_PAGE = 20
 
@@ -191,6 +194,7 @@ export default function Clientes({ session }) {
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState(null)
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const enlaceRegistro = `${window.location.origin}/registro?e=${uid}`
 
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
@@ -362,12 +366,12 @@ export default function Clientes({ session }) {
   async function cargar() {
     const hace14 = new Date(Date.now() - 14 * 864e5).toISOString().split('T')[0]
     const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([
-      supabase.from('clientes').select('*').eq('entrenador_id', uid).neq('estado', 'rechazado').order('created_at', { ascending: false }),
-      supabase.from('cuestionarios').select('*').eq('entrenador_id', uid).eq('procesado', false).order('created_at', { ascending: false }),
-      supabase.from('checkins').select('cliente_id,fecha').eq('entrenador_id', uid).gte('fecha', hace14),
-      supabase.from('pagos').select('cliente_id,valido_hasta').eq('entrenador_id', uid),
-      supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').eq('entrenador_id', uid).eq('activo', true),
-      supabase.from('tarifas').select('*').eq('entrenador_id', uid).eq('activa', true).order('modalidad').order('dias_semana'),
+      supabase.from('clientes').select('*').in('entrenador_id', equipo).not('estado', 'in', '(rechazado,externo)').order('created_at', { ascending: false }),
+      supabase.from('cuestionarios').select('*').in('entrenador_id', equipo).eq('procesado', false).order('created_at', { ascending: false }),
+      supabase.from('checkins').select('cliente_id,fecha').in('entrenador_id', equipo).gte('fecha', hace14),
+      supabase.from('pagos').select('cliente_id,valido_hasta').in('entrenador_id', equipo),
+      supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').in('entrenador_id', equipo).eq('activo', true),
+      supabase.from('tarifas').select('*').in('entrenador_id', equipo).eq('activa', true).order('modalidad').order('dias_semana'),
     ])
     setClientes(cl || [])
     setGrupos(gs || [])
@@ -665,7 +669,7 @@ export default function Clientes({ session }) {
 
   async function cancelarSuscripcionAdmin() {
     if (!dData.planCobro) return
-    if (!confirm('Esto solo marca la suscripción como cancelada en Forge. Tienes que cancelarla también manualmente en el dashboard de Stripe. ¿Continuar?')) return
+    if (!confirm(`Esto solo marca la suscripción como cancelada en ${BRAND.nombre}. Tienes que cancelarla también manualmente en el dashboard de Stripe. ¿Continuar?`)) return
     await supabase.from('planes_cobro').update({ estado: 'cancelado', activo: false }).eq('id', dData.planCobro.id)
     showToast('Suscripción marcada como cancelada — cancélala también en Stripe')
     await abrirDetalle(detalle)
@@ -744,7 +748,7 @@ export default function Clientes({ session }) {
         if (field === 'tipo') { setFiltroTipo(active ? 'todos' : value); setPagina(1) }
         else { setFiltroObj(active ? '' : value); setPagina(1) }
       }}
-        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex-shrink-0 ${active ? 'bg-[#FF5C00] text-white' : 'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex-shrink-0 ${active ? 'bg-acento text-white' : 'bg-white border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
         {label}{count !== undefined ? ` (${count})` : ''}
       </button>
     )
@@ -767,7 +771,7 @@ export default function Clientes({ session }) {
             </button>
           )}
           <button onClick={() => { setForm(initForm); setEditId(null); setModal(true) }}
-            className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95">
+            className="bg-acento hover:bg-acento-hover text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95">
             + Nuevo
           </button>
           <button onClick={() => setMostrarGrupos(g => !g)}
@@ -790,10 +794,10 @@ export default function Clientes({ session }) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          { label: 'Activos', value: stats.activos, color: '#FF5C00', filtro: 'activos' },
+          { label: 'Activos', value: stats.activos, color: BRAND.color, filtro: 'activos' },
           { label: 'Sin seguimiento (todos)', value: stats.sinCI, color: '#f59e0b', filtro: 'sinCI' },
           { label: 'Pago vencido', value: stats.vencidos, color: '#ef4444', filtro: 'vencidos' },
-        ].map(s => (
+        ].filter(s => s.filtro !== 'sinCI' || moduloVisible('seguimiento')).map(s => (
           <div key={s.label} onClick={() => s.filtro && (setFiltroTipo(filtroTipo === s.filtro ? 'todos' : s.filtro), setPagina(1))}
             className={`bg-white rounded-2xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md transition-all`}>
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
@@ -809,7 +813,7 @@ export default function Clientes({ session }) {
           value={busqueda}
           onChange={e => { setBusqueda(e.target.value); setPagina(1) }}
           placeholder="Buscar por nombre, email o teléfono..."
-          className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] transition-colors"
+          className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento transition-colors"
         />
         {busqueda && (
           <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] hover:text-[#0A0A0A]">×</button>
@@ -826,10 +830,10 @@ export default function Clientes({ session }) {
           <Chip key={k} field="obj" label={v.label} value={k} count={clientes.filter(c=>c.objetivo===k).length} />
         ))}
         <div className="w-px bg-black/10 flex-shrink-0" />
-        <button onClick={() => { setFiltroTipo('sinCI'); setPagina(1) }}
+        {moduloVisible('seguimiento') && <button onClick={() => { setFiltroTipo('sinCI'); setPagina(1) }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo==='sinCI' ? 'bg-amber-500 text-white' : 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>
           ⚠ Sin seguimiento (todos)
-        </button>
+        </button>}
         <button onClick={() => { setFiltroTipo('vencidos'); setPagina(1) }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo==='vencidos' ? 'bg-red-500 text-white' : 'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100'}`}>
           💳 Pago vencido
@@ -872,7 +876,7 @@ export default function Clientes({ session }) {
                 : null
               const estadoBadge = al.pagoVencido
                 ? { label: '💳 Vencido', cls: 'bg-red-50 text-red-700' }
-                : al.sinCI
+                : al.sinCI && moduloVisible('seguimiento')
                 ? { label: '⚠ Sin CI', cls: 'bg-amber-50 text-amber-700' }
                 : c.estado === 'activo'
                 ? { label: '✓ Activo', cls: 'bg-emerald-50 text-emerald-700' }
@@ -882,7 +886,7 @@ export default function Clientes({ session }) {
 
               return (
                 <div key={c.id} onClick={() => abrirDetalle(c)}
-                  className="bg-white rounded-xl border border-black/5 shadow-sm hover:shadow-md hover:border-[#FF5C00]/30 transition-all cursor-pointer">
+                  className="bg-white rounded-xl border border-black/5 shadow-sm hover:shadow-md hover:border-acento/30 transition-all cursor-pointer">
                   {/* Mobile */}
                   <div className="md:hidden flex items-center gap-3 p-3.5">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
@@ -892,7 +896,7 @@ export default function Clientes({ session }) {
                       <p className="text-xs text-[#6B6B6B]">{c.tipo === 'online' ? '🌐' : '📍'} {obj?.label || c.objetivo}</p>
                       {c.tipo === 'online' && c.plan_online && (
                         <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${
-                          c.plan_online === 'completo' ? 'bg-[#FF5C00]/10 text-[#FF5C00]' :
+                          c.plan_online === 'completo' ? 'bg-acento/10 text-acento' :
                           c.plan_online === 'entrenamiento' ? 'bg-[#6366f1]/10 text-[#6366f1]' :
                           'bg-emerald-50 text-emerald-700'
                         }`}>
@@ -905,7 +909,7 @@ export default function Clientes({ session }) {
                       {modalidadBadge && (
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate max-w-[100px] ${modalidadBadge.cls}`}>{modalidadBadge.label}</span>
                       )}
-                      {c.precio_mensual > 0 && <span className="text-xs font-bold text-[#FF5C00]">{c.precio_mensual}€</span>}
+                      {c.precio_mensual > 0 && <span className="text-xs font-bold text-acento">{c.precio_mensual}€</span>}
                     </div>
                   </div>
 
@@ -941,7 +945,7 @@ export default function Clientes({ session }) {
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${estadoBadge.cls}`}>{estadoBadge.label}</span>
                     </span>
                     <span className="text-right">
-                      <p className={`text-sm font-bold ${al.pagoVencido ? 'text-red-500' : 'text-[#FF5C00]'}`}>
+                      <p className={`text-sm font-bold ${al.pagoVencido ? 'text-red-500' : 'text-acento'}`}>
                         {c.precio_mensual > 0 ? `${c.precio_mensual}€` : '—'}
                       </p>
                     </span>
@@ -957,7 +961,7 @@ export default function Clientes({ session }) {
               <p className="text-sm text-[#6B6B6B]">Mostrando {(pagina-1)*PER_PAGE+1}-{Math.min(pagina*PER_PAGE, filtrados.length)} de {filtrados.length}</p>
               <div className="flex gap-1">
                 <button onClick={() => setPagina(p => Math.max(1, p-1))} disabled={pagina === 1}
-                  className="px-3 py-1.5 text-xs border border-black/10 rounded-lg disabled:opacity-40 hover:border-[#FF5C00] transition-all">
+                  className="px-3 py-1.5 text-xs border border-black/10 rounded-lg disabled:opacity-40 hover:border-acento transition-all">
                   ‹
                 </button>
                 {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
@@ -965,13 +969,13 @@ export default function Clientes({ session }) {
                   if (p < 1 || p > totalPaginas) return null
                   return (
                     <button key={p} onClick={() => setPagina(p)}
-                      className={`px-3 py-1.5 text-xs rounded-lg transition-all ${pagina === p ? 'bg-[#FF5C00] text-white' : 'border border-black/10 hover:border-[#FF5C00]'}`}>
+                      className={`px-3 py-1.5 text-xs rounded-lg transition-all ${pagina === p ? 'bg-acento text-white' : 'border border-black/10 hover:border-acento'}`}>
                       {p}
                     </button>
                   )
                 })}
                 <button onClick={() => setPagina(p => Math.min(totalPaginas, p+1))} disabled={pagina === totalPaginas}
-                  className="px-3 py-1.5 text-xs border border-black/10 rounded-lg disabled:opacity-40 hover:border-[#FF5C00] transition-all">
+                  className="px-3 py-1.5 text-xs border border-black/10 rounded-lg disabled:opacity-40 hover:border-acento transition-all">
                   ›
                 </button>
               </div>
@@ -994,7 +998,7 @@ export default function Clientes({ session }) {
             <div className="flex gap-2">
               <button onClick={() => setModalAccesoManual(null)} className="flex-1 border border-black/10 text-sm font-medium py-3 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">Cerrar</button>
               <button onClick={() => { navigator.clipboard.writeText(modalAccesoManual.link); showToast('✓ Enlace copiado') }}
-                className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar enlace</button>
+                className="flex-1 bg-acento text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar enlace</button>
             </div>
           </div>
         </div>,
@@ -1012,7 +1016,7 @@ export default function Clientes({ session }) {
               className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none mb-3" />
             <div className="flex gap-2">
               <button onClick={() => { navigator.clipboard.writeText(modalMensajeBienvenida); showToast('✓ Mensaje copiado') }}
-                className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar mensaje</button>
+                className="flex-1 bg-acento text-white font-bold py-3 rounded-xl active:scale-95 transition-all">📋 Copiar mensaje</button>
               <button onClick={() => setModalMensajeBienvenida(null)} className="px-4 py-3 rounded-xl border border-black/10 text-sm text-[#6B6B6B] hover:bg-[#F5F5F0]">✓ Listo</button>
             </div>
           </div>
@@ -1039,7 +1043,7 @@ export default function Clientes({ session }) {
                   <div className="grid grid-cols-5 gap-1.5">
                     {[1,2,3,4,5].map(v => (
                       <button key={v} type="button" onClick={() => setFormEditarCI(f => ({...f, [campo]: v}))}
-                        className={`py-2 rounded-lg text-sm font-bold ${formEditarCI[campo]===v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                        className={`py-2 rounded-lg text-sm font-bold ${formEditarCI[campo]===v ? 'bg-acento text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                         {v}
                       </button>
                     ))}
@@ -1050,14 +1054,14 @@ export default function Clientes({ session }) {
                 <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Sesiones completadas</p>
                 <input type="number" min="0" value={formEditarCI.sesiones_semana}
                   onChange={e => setFormEditarCI(f => ({...f, sesiones_semana: e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" />
               </div>
               <div>
                 <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Cargas</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {[['muy_facil','Muy fácil'],['bien','Bien'],['duro','Duro'],['muy_duro','Muy duro']].map(([v,l]) => (
                     <button key={v} type="button" onClick={() => setFormEditarCI(f => ({...f, cargas_sensacion: v}))}
-                      className={`py-2 rounded-lg text-xs font-bold ${formEditarCI.cargas_sensacion===v ? 'bg-[#FF5C00] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                      className={`py-2 rounded-lg text-xs font-bold ${formEditarCI.cargas_sensacion===v ? 'bg-acento text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
@@ -1067,20 +1071,20 @@ export default function Clientes({ session }) {
                 <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Peso (kg)</p>
                 <input type="number" step="0.1" value={formEditarCI.peso}
                   onChange={e => setFormEditarCI(f => ({...f, peso: e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" />
               </div>
               <div>
                 <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Comentario</p>
                 <textarea rows={2} value={formEditarCI.comentario}
                   onChange={e => setFormEditarCI(f => ({...f, comentario: e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento resize-none" />
               </div>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => { setModalEditarCI(null); setFormEditarCI(null) }}
                 className="flex-1 border border-black/10 text-sm font-medium py-3 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">Cancelar</button>
               <button onClick={guardarEdicionCI} disabled={guardandoCI}
-                className="flex-1 bg-[#FF5C00] text-white font-bold py-3 rounded-xl active:scale-95 transition-all disabled:opacity-50">
+                className="flex-1 bg-acento text-white font-bold py-3 rounded-xl active:scale-95 transition-all disabled:opacity-50">
                 {guardandoCI ? 'Guardando...' : 'Guardar cambios'}
               </button>
             </div>
@@ -1097,7 +1101,7 @@ export default function Clientes({ session }) {
           <img src={lightboxFoto.url} alt={lightboxFoto.tipo} onClick={e => e.stopPropagation()}
             className="max-w-full max-h-[85vh] object-contain" />
           <button onClick={e => { e.stopPropagation(); window.open(lightboxFoto.url, '_blank') }}
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-[#FF5C00] text-white font-bold text-sm px-5 py-3 rounded-2xl active:scale-95 transition-all">
+            className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-acento text-white font-bold text-sm px-5 py-3 rounded-2xl active:scale-95 transition-all">
             ⬇️ Descargar
           </button>
         </div>,
@@ -1111,7 +1115,7 @@ export default function Clientes({ session }) {
             <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">📋</div>
             <h2 className="font-bold text-[#0A0A0A] mb-2">¡Enlace copiado!</h2>
             <p className="text-sm text-[#6B6B6B] mb-4">Mándaselo al cliente por WhatsApp o email. Cuando lo rellene aparecerá en "Registros nuevos".</p>
-            <button onClick={() => setModalEnlace(false)} className="w-full bg-[#FF5C00] text-white font-semibold py-3 rounded-xl">Listo</button>
+            <button onClick={() => setModalEnlace(false)} className="w-full bg-acento text-white font-semibold py-3 rounded-xl">Listo</button>
           </div>
         </div>
       )}
@@ -1129,7 +1133,7 @@ export default function Clientes({ session }) {
                 const PLAN_INFO = {
                   nutricion:     { label: 'Hábitos & Alimentación', precio: '29€/mes', emoji: '🥗', color: '#10b981' },
                   entrenamiento: { label: 'Entrenamiento',          precio: '35€/mes', emoji: '💪', color: '#6366f1' },
-                  completo:      { label: 'Plan Completo',          precio: '49€/mes', emoji: '⚡', color: '#FF5C00' },
+                  completo:      { label: 'Plan Completo',          precio: '49€/mes', emoji: '⚡', color: BRAND.color },
                 }
                 const planInfo = PLAN_INFO[c.sugerencia_plan]
 
@@ -1162,8 +1166,8 @@ export default function Clientes({ session }) {
                     {/* Sugerencia IA */}
                     {c.sugerencia_plan ? (
                       <div className="px-4 pb-3">
-                        <div className="rounded-xl border-2 overflow-hidden" style={{borderColor: planInfo?.color || '#FF5C00'}}>
-                          <div className="px-3 py-2.5 flex items-center gap-2" style={{background: `${planInfo?.color || '#FF5C00'}10`}}>
+                        <div className="rounded-xl border-2 overflow-hidden" style={{borderColor: planInfo?.color || BRAND.color}}>
+                          <div className="px-3 py-2.5 flex items-center gap-2" style={{background: `${planInfo?.color || BRAND.color}10`}}>
                             <span className="text-lg">{planInfo?.emoji || '🤖'}</span>
                             <div className="flex-1">
                               <p className="text-xs font-bold text-[#0A0A0A]">IA sugiere: {planInfo?.label || c.sugerencia_plan}</p>
@@ -1181,7 +1185,7 @@ export default function Clientes({ session }) {
                     ) : (
                       <div className="px-4 pb-3">
                         <div className="bg-[#F7F6F3] rounded-xl px-3 py-2.5 flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin flex-shrink-0"/>
+                          <div className="w-4 h-4 border-2 border-acento border-t-transparent rounded-full animate-spin flex-shrink-0"/>
                           <p className="text-xs text-[#6B6B6B]">IA analizando diagnóstico…</p>
                         </div>
                       </div>
@@ -1198,8 +1202,8 @@ export default function Clientes({ session }) {
                         ].map(([v,l,p]) => (
                           <button key={v} type="button"
                             onClick={() => setCuestionarios(prev => prev.map(x => x.id === c.id ? {...x, necesidades: v} : x))}
-                            className={`py-2.5 px-2 rounded-xl border text-center transition-all ${(c.necesidades||c.sugerencia_plan)===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 hover:border-black/20'}`}>
-                            <p className={`text-xs font-bold ${(c.necesidades||c.sugerencia_plan)===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                            className={`py-2.5 px-2 rounded-xl border text-center transition-all ${(c.necesidades||c.sugerencia_plan)===v?'border-acento bg-acento/5':'border-black/10 hover:border-black/20'}`}>
+                            <p className={`text-xs font-bold ${(c.necesidades||c.sugerencia_plan)===v?'text-acento':'text-[#0A0A0A]'}`}>{l}</p>
                             <p className="text-xs text-[#9B9B9B]">{p}</p>
                           </button>
                         ))}
@@ -1213,7 +1217,7 @@ export default function Clientes({ session }) {
                         🗑
                       </button>
                       <button onClick={() => convertirCuestionario({...c, necesidades: c.necesidades || c.sugerencia_plan})}
-                        className="flex-1 bg-[#FF5C00] text-white text-sm font-bold py-2.5 rounded-xl hover:bg-[#e05200] transition-all">
+                        className="flex-1 bg-acento text-white text-sm font-bold py-2.5 rounded-xl hover:bg-acento-hover transition-all">
                         ✅ Aprobar y activar plan
                       </button>
                     </div>
@@ -1235,14 +1239,14 @@ export default function Clientes({ session }) {
                 <div key={k}>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
                   <input type={t} value={form[k]} onChange={e => setForm({...form,[k]:e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
               ))}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Tipo</label>
                   <select value={form.tipo} onChange={e => setForm({...form,tipo:e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                     <option value="presencial">📍 Presencial</option>
                     <option value="online">🌐 Online</option>
                   </select>
@@ -1250,7 +1254,7 @@ export default function Clientes({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Estado</label>
                   <select value={form.estado} onChange={e => setForm({...form,estado:e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                     <option value="activo">Activo</option>
                     <option value="pausado">Pausado</option>
                     <option value="baja">Baja</option>
@@ -1260,7 +1264,7 @@ export default function Clientes({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Objetivo</label>
                 <select value={form.objetivo} onChange={e => setForm({...form,objetivo:e.target.value})}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   {OBJETIVOS_LIST.map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
@@ -1268,7 +1272,7 @@ export default function Clientes({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nivel</label>
                   <select value={form.nivel} onChange={e => setForm({...form,nivel:e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                     <option value="principiante">Principiante</option>
                     <option value="intermedio">Intermedio</option>
                     <option value="avanzado">Avanzado</option>
@@ -1279,7 +1283,7 @@ export default function Clientes({ session }) {
                   <div className="flex gap-1">
                     {[2,3,4,5,6].map(n => (
                       <button key={n} type="button" onClick={() => setForm({...form, dias_semana:n})}
-                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${form.dias_semana===n?'bg-[#FF5C00] text-white border-[#FF5C00]':'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${form.dias_semana===n?'bg-acento text-white border-acento':'border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
                         {n}
                       </button>
                     ))}
@@ -1290,12 +1294,12 @@ export default function Clientes({ session }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Peso actual (kg)</label>
                   <input type="number" step="0.1" value={form.peso_actual} onChange={e => setForm({...form,peso_actual:e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Peso objetivo (kg)</label>
                   <input type="number" step="0.1" value={form.peso_objetivo} onChange={e => setForm({...form,peso_objetivo:e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                 </div>
               </div>
               <div>
@@ -1305,7 +1309,7 @@ export default function Clientes({ session }) {
                     const t = tarifas.find(t => t.id === e.target.value)
                     if (t) setForm(f => ({...f, precio_mensual: String(t.precio), dias_semana: t.dias_semana || f.dias_semana}))
                   }}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-[#FF5C00] mb-2">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-acento mb-2">
                   <option value="">— Selecciona tarifa —</option>
                   {tarifas
                     .filter(t => (form.tipo === 'online' ? t.tipo === 'online' : t.tipo !== 'online'))
@@ -1318,14 +1322,14 @@ export default function Clientes({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Precio mensual (€) <span className="text-[#9B9B9B] font-normal">— editable para excepciones</span></label>
                 <input type="number" value={form.precio_mensual} onChange={e => setForm({...form,precio_mensual:e.target.value})}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="99" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" placeholder="99" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Tipo de entrenamiento</label>
                 <div className="grid grid-cols-2 gap-1.5">
                   {TIPOS_ENTRENAMIENTO.map(t => (
                     <button key={t.id} type="button" onClick={() => setForm({...form,tipo_entrenamiento:t.id})}
-                      className={`p-2.5 rounded-xl border text-left transition-all ${form.tipo_entrenamiento===t.id?'bg-[#FF5C00] border-[#FF5C00]':'border-black/10 hover:border-[#FF5C00]/50'}`}>
+                      className={`p-2.5 rounded-xl border text-left transition-all ${form.tipo_entrenamiento===t.id?'bg-acento border-acento':'border-black/10 hover:border-acento/50'}`}>
                       <p className={`text-xs font-semibold ${form.tipo_entrenamiento===t.id?'text-white':'text-[#0A0A0A]'}`}>{t.icon} {t.label}</p>
                       <p className={`text-xs mt-0.5 leading-tight ${form.tipo_entrenamiento===t.id?'text-white/80':'text-[#6B6B6B]'} hidden md:block`}>{t.desc}</p>
                     </button>
@@ -1342,7 +1346,7 @@ export default function Clientes({ session }) {
                     ['sin_preferencia','🎯 Sin preferencia'],
                   ].map(([val,label])=>(
                     <button key={val} type="button" onClick={()=>setForm({...form,formato_entrenamiento:val})}
-                      className={`py-2 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${form.formato_entrenamiento===val?'bg-[#FF5C00] border-[#FF5C00] text-white':'border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]/50'}`}>
+                      className={`py-2 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${form.formato_entrenamiento===val?'bg-acento border-acento text-white':'border-black/10 text-[#6B6B6B] hover:border-acento/50'}`}>
                       {label}
                     </button>
                   ))}
@@ -1355,17 +1359,17 @@ export default function Clientes({ session }) {
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Edad</label>
                     <input type="number" value={form.edad||''} onChange={e => setForm({...form,edad:e.target.value})}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="30" />
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" placeholder="30" />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Altura (cm)</label>
                     <input type="number" value={form.altura||''} onChange={e => setForm({...form,altura:e.target.value})}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="175" />
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" placeholder="175" />
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Años entreno</label>
                     <input type="number" step="0.5" value={form.anos_entrenando||''} onChange={e => setForm({...form,anos_entrenando:e.target.value})}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="2" />
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" placeholder="2" />
                   </div>
                 </div>
               </div>
@@ -1384,7 +1388,7 @@ export default function Clientes({ session }) {
                     <div key={k}>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
                       <input value={form[k]||''} onChange={e => setForm({...form,[k]:e.target.value})}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder={ph} />
+                        className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" placeholder={ph} />
                     </div>
                   ))}
                 </div>
@@ -1415,7 +1419,7 @@ export default function Clientes({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Notas internas</label>
                 <textarea value={form.notas} onChange={e => setForm({...form,notas:e.target.value})} rows={2}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                   placeholder="Observaciones, preferencias..." />
               </div>
             </div>
@@ -1423,7 +1427,7 @@ export default function Clientes({ session }) {
               <button onClick={() => { setModal(false); setEditId(null); setForm(initForm) }}
                 className="flex-1 border border-black/10 text-[#0A0A0A] text-sm font-medium py-2.5 rounded-xl">Cancelar</button>
               <button onClick={guardar} disabled={!form.nombre || loading}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
+                className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading ? 'Guardando...' : editId ? 'Guardar cambios' : 'Crear cliente'}
               </button>
             </div>
@@ -1452,9 +1456,9 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],['seguimientos','Check-ins'],['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],...(moduloVisible('seguimiento')?[['seguimientos','Check-ins']]:[]),['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
-                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all relative ${dTab===id ? 'bg-[#FF5C00] text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
+                    className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all relative ${dTab===id ? 'bg-acento text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
                     {id === 'cuestionario' && dData.cuestNutricion && !dData.cuestNutricion.procesado && (
                       <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-orange-500 border border-white" />
@@ -1517,8 +1521,8 @@ export default function Clientes({ session }) {
                         </div>
                       ))}
                     </div>
-                    {detalle.telefono && <a href={`tel:${detalle.telefono}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-[#FF5C00] pt-1 border-t border-black/5 transition-colors">📞 {detalle.telefono}</a>}
-                    {detalle.email && <a href={`mailto:${detalle.email}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors">✉️ {detalle.email}</a>}
+                    {detalle.telefono && <a href={`tel:${detalle.telefono}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-acento pt-1 border-t border-black/5 transition-colors">📞 {detalle.telefono}</a>}
+                    {detalle.email && <a href={`mailto:${detalle.email}`} className="flex items-center gap-2 text-xs text-[#6B6B6B] hover:text-acento transition-colors">✉️ {detalle.email}</a>}
                     {detalle.telefono && (
                       <a href={`https://wa.me/${detalle.telefono.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer"
                         className="flex items-center justify-center gap-2 bg-emerald-50 text-emerald-700 text-xs font-bold py-2.5 rounded-xl hover:bg-emerald-100 transition-colors mt-1">
@@ -1664,7 +1668,7 @@ export default function Clientes({ session }) {
                                         <ProtocoloIA protocolo={l.protocolo_ia} />
                                       ) : (
                                         <button onClick={() => generarProtocolo(l.id)} disabled={generandoProtocolo===l.id}
-                                          className="w-full bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40">
+                                          className="w-full bg-acento text-white text-xs font-semibold py-2 rounded-xl disabled:opacity-40">
                                           {generandoProtocolo===l.id ? '⏳ Generando protocolo...' : '🩹 Generar protocolo IA'}
                                         </button>
                                       )}
@@ -1709,7 +1713,7 @@ export default function Clientes({ session }) {
                               cargar()
                               showToast(`${label} ${activo ? 'desactivado' : 'activado'}`)
                             }}
-                              className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                              className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${activo ? 'bg-acento' : 'bg-black/20'}`}>
                               <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${activo ? 'left-5' : 'left-0.5'}`}/>
                             </button>
                           </div>
@@ -1738,13 +1742,13 @@ export default function Clientes({ session }) {
                         } catch(e) { showToast('Error de conexión') }
                       }} className={detalle.auth_user_id
                         ? "border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]"
-                        : "col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-[#FF5C00] hover:bg-[#E54E00] active:scale-95 transition-all"}>
+                        : "col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-acento hover:bg-acento-hover active:scale-95 transition-all"}>
                         {detalle.auth_user_id ? '📧 Reenviar acceso' : '📧 Enviar acceso'}
                       </button>
                     )}
                     {detalle.estado === 'pendiente' && (
                       <button onClick={aceptarLeadDesdeFicha} disabled={aceptandoLead}
-                        className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-[#FF5C00] hover:bg-[#E54E00] active:scale-95 transition-all disabled:opacity-40">
+                        className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-acento hover:bg-acento-hover active:scale-95 transition-all disabled:opacity-40">
                         {aceptandoLead ? 'Activando...' : '✓ Aceptar lead'}
                       </button>
                     )}
@@ -1836,7 +1840,7 @@ export default function Clientes({ session }) {
                         <label key={tipo} className="cursor-pointer">
                           <input type="file" accept="image/*" className="hidden"
                             onChange={e => subirFoto(e.target.files[0], tipo)} />
-                          <div className="border-2 border-dashed border-black/15 rounded-xl p-3 text-center hover:border-[#FF5C00] transition-all">
+                          <div className="border-2 border-dashed border-black/15 rounded-xl p-3 text-center hover:border-acento transition-all">
                             <p className="text-2xl mb-1">📷</p>
                             <p className="text-xs font-medium text-[#0A0A0A] capitalize">{tipo}</p>
                             <p className="text-xs text-[#6B6B6B]">+ añadir</p>
@@ -1863,7 +1867,7 @@ export default function Clientes({ session }) {
                             <p className="text-xs font-semibold text-[#0A0A0A]">
                               {new Date(fecha).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
                             </p>
-                            {fotosDia[0]?.peso && <p className="text-xs text-[#FF5C00] font-bold">{fotosDia[0].peso}kg</p>}
+                            {fotosDia[0]?.peso && <p className="text-xs text-acento font-bold">{fotosDia[0].peso}kg</p>}
                           </div>
                           <div className="grid grid-cols-3 gap-2">
                             {fotosDia.map(f => (
@@ -1909,7 +1913,7 @@ export default function Clientes({ session }) {
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-xs font-semibold text-[#0A0A0A]">{new Date(ci.fecha).toLocaleDateString('es-ES', { weekday:'short', day:'numeric', month:'short' })}</p>
                         <div className="flex items-center gap-2">
-                          {ci.peso && <span className="text-xs font-bold text-[#FF5C00]">⚖️ {ci.peso}kg</span>}
+                          {ci.peso && <span className="text-xs font-bold text-acento">⚖️ {ci.peso}kg</span>}
                           <button onClick={() => abrirEditarCI(ci)} className="text-[10px] font-bold text-[#9B9B9B] hover:text-[#0A0A0A]">✏️ Editar</button>
                         </div>
                       </div>
@@ -2033,7 +2037,7 @@ export default function Clientes({ session }) {
                         </div>
                         {!cr.procesado && (
                           <button onClick={marcarCuestionarioRegistroProcesado}
-                            className="w-full bg-[#FF5C00] text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
+                            className="w-full bg-acento text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
                             ✓ Marcar como procesado
                           </button>
                         )}
@@ -2073,7 +2077,7 @@ export default function Clientes({ session }) {
 
                         {!cn.procesado && (
                           <button onClick={marcarCuestionarioProcesado}
-                            className="w-full bg-[#FF5C00] text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
+                            className="w-full bg-acento text-white text-sm font-bold py-3 rounded-xl active:scale-95 transition-all">
                             ✓ Marcar como procesado
                           </button>
                         )}
@@ -2089,12 +2093,12 @@ export default function Clientes({ session }) {
                     <div className="flex gap-2">
                       <input value={nuevaTarea.texto} onChange={e=>setNuevaTarea(t=>({...t,texto:e.target.value}))}
                         placeholder="Ej: Caminar 30 min"
-                        className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white" />
+                        className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white" />
                       <input value={nuevaTarea.frecuencia} onChange={e=>setNuevaTarea(t=>({...t,frecuencia:e.target.value}))}
                         placeholder="Frecuencia (ej: 3x/sem)"
-                        className="w-32 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white" />
+                        className="w-32 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white" />
                       <button onClick={anadirTarea} disabled={!nuevaTarea.texto.trim()}
-                        className="bg-[#FF5C00] text-white text-sm font-semibold px-4 rounded-xl disabled:opacity-40">+</button>
+                        className="bg-acento text-white text-sm font-semibold px-4 rounded-xl disabled:opacity-40">+</button>
                     </div>
                   </div>
                   {tareasExtra.length === 0 ? (
@@ -2104,7 +2108,7 @@ export default function Clientes({ session }) {
                       {tareasExtra.map(t => (
                         <div key={t.id} className={`flex items-center gap-3 border rounded-xl p-3 ${t.activa?'border-black/6 bg-white':'border-black/5 bg-[#F5F5F0] opacity-60'}`}>
                           <button onClick={()=>toggleTarea(t)}
-                            className={`w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center ${t.activa?'border-[#FF5C00] bg-[#FF5C00]':'border-black/20'}`}>
+                            className={`w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center ${t.activa?'border-acento bg-acento':'border-black/20'}`}>
                             {t.activa && <span className="text-white text-xs">✓</span>}
                           </button>
                           <div className="flex-1 min-w-0">
@@ -2158,14 +2162,14 @@ export default function Clientes({ session }) {
                           <div className="grid grid-cols-3 gap-2">
                             {PLANES_COBRO.map(([id, label, precio]) => (
                               <button key={id} onClick={() => setPlanSeleccionado(id)}
-                                className={`rounded-xl border p-3 text-center transition-all ${planSeleccionado===id ? 'bg-[#FF5C00] border-[#FF5C00] text-white' : 'border-black/10 text-[#0A0A0A] hover:border-[#FF5C00]'}`}>
+                                className={`rounded-xl border p-3 text-center transition-all ${planSeleccionado===id ? 'bg-acento border-acento text-white' : 'border-black/10 text-[#0A0A0A] hover:border-acento'}`}>
                                 <p className="text-sm font-bold">{label}</p>
                                 <p className={`text-xs mt-0.5 ${planSeleccionado===id ? 'text-white/80' : 'text-[#6B6B6B]'}`}>{precio}€/mes</p>
                               </button>
                             ))}
                           </div>
                           <button onClick={crearSuscripcion} disabled={creandoSuscripcion}
-                            className="w-full bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
+                            className="w-full bg-acento text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
                             {creandoSuscripcion ? '⏳ Creando...' : 'Crear suscripción'}
                           </button>
                           {pc?.estado === 'cancelado' && (
@@ -2338,7 +2342,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
           <p className="font-bold text-[#0A0A0A]">Grupos de entrenamiento</p>
         </div>
         <button onClick={()=>{setForm(initFormG);setEditando(false);setModal(true)}}
-          className="text-sm font-semibold text-[#FF5C00] hover:text-[#e05200] transition-colors">
+          className="text-sm font-semibold text-acento hover:text-acento-hover transition-colors">
           + Nuevo
         </button>
       </div>
@@ -2351,14 +2355,14 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
           {grupos.length === 0 ? (
             <div className="p-5 text-center">
               <p className="text-xs text-[#C0C0C0] mb-2">Sin grupos</p>
-              <button onClick={()=>{setForm(initFormG);setModal(true)}} className="text-xs text-[#FF5C00] font-semibold">+ Crear primero</button>
+              <button onClick={()=>{setForm(initFormG);setModal(true)}} className="text-xs text-acento font-semibold">+ Crear primero</button>
             </div>
           ) : grupos.map(g => {
             const ms = g.grupo_clientes?.filter(m=>m.activo)||[]
             const mx = g.tipo==='pareja'?2:6
             return (
               <button key={g.id} onClick={()=>seleccionar(g)}
-                className={`w-full flex items-center gap-2.5 px-4 py-3.5 border-b border-black/5 text-left transition-all ${sel?.id===g.id?'bg-[#FF5C00]/5':'hover:bg-[#F7F6F3]'}`}>
+                className={`w-full flex items-center gap-2.5 px-4 py-3.5 border-b border-black/5 text-left transition-all ${sel?.id===g.id?'bg-acento/5':'hover:bg-[#F7F6F3]'}`}>
                 <span className="text-lg flex-shrink-0">{g.tipo==='pareja'?'👫':'👥'}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#0A0A0A] truncate">{g.nombre}</p>
@@ -2366,7 +2370,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
                     {ms.length}/{mx} · {g.hora?.slice(0,5)}
                   </p>
                 </div>
-                <span className={`text-xs flex-shrink-0 ${sel?.id===g.id?'text-[#FF5C00]':'text-[#C0C0C0]'}`}>›</span>
+                <span className={`text-xs flex-shrink-0 ${sel?.id===g.id?'text-acento':'text-[#C0C0C0]'}`}>›</span>
               </button>
             )
           })}
@@ -2407,14 +2411,14 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
                     <input type="number" value={precioPP}
                       onChange={e=>setPrecioPP(e.target.value)}
                       onBlur={guardarPrecio}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm font-bold text-[#0A0A0A] focus:outline-none focus:border-[#FF5C00] bg-white pr-8"/>
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm font-bold text-[#0A0A0A] focus:outline-none focus:border-acento bg-white pr-8"/>
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[#9B9B9B]">€</span>
                   </div>
                   <p className="text-xs text-[#9B9B9B] flex-shrink-0">por persona</p>
                 </div>
                 {tarifaSel && Number(precioPP) !== tarifaSel.pp && (
                   <button onClick={()=>setPrecioPP(String(tarifaSel.pp))}
-                    className="text-xs text-[#FF5C00] font-medium whitespace-nowrap">
+                    className="text-xs text-acento font-medium whitespace-nowrap">
                     Tarifa std: {tarifaSel.pp}€
                   </button>
                 )}
@@ -2441,7 +2445,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
                       {m.clientes?.nombre?.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
                     </div>
                     <p className="text-sm font-medium text-[#0A0A0A] flex-1 truncate">{m.clientes?.nombre}</p>
-                    <span className="text-xs font-bold text-[#FF5C00] flex-shrink-0">{ppActual}€/mes</span>
+                    <span className="text-xs font-bold text-acento flex-shrink-0">{ppActual}€/mes</span>
                     <button onClick={()=>quitar(m)} className="text-xs text-red-400 hover:text-red-600 flex-shrink-0 ml-1">✕</button>
                   </div>
                 ))}
@@ -2449,7 +2453,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
               {miembros.length < max && (
                 <div className="flex gap-2">
                   <select value={cliAdd} onChange={e=>setCliAdd(e.target.value)}
-                    className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#FF5C00]">
+                    className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-acento">
                     <option value="">— Añadir cliente —</option>
                     {disponibles.map(c=><option key={c.id} value={c.id}>{c.nombre}</option>)}
                   </select>
@@ -2485,16 +2489,16 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nombre</label>
                 <input value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})}
                   placeholder="Ej: Pareja Lunes/Miércoles · Ana y Carlos"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Modalidad</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[['pareja','👫','Pareja','2 personas · 2-4 días'],['grupo','👥','Grupo','3-6 personas · 3 días']].map(([v,ic,l,sub])=>(
                     <button key={v} type="button" onClick={()=>setForm({...form,tipo:v,dias_semana:[]})}
-                      className={`py-3 px-3 rounded-xl border text-left transition-all ${form.tipo===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 hover:border-black/20'}`}>
+                      className={`py-3 px-3 rounded-xl border text-left transition-all ${form.tipo===v?'border-acento bg-acento/5':'border-black/10 hover:border-black/20'}`}>
                       <p className="text-xl mb-0.5">{ic}</p>
-                      <p className={`text-sm font-bold ${form.tipo===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                      <p className={`text-sm font-bold ${form.tipo===v?'text-acento':'text-[#0A0A0A]'}`}>{l}</p>
                       <p className="text-xs text-[#9B9B9B]">{sub}</p>
                     </button>
                   ))}
@@ -2528,19 +2532,19 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Hora</label>
                   <input type="time" value={form.hora} onChange={e=>setForm({...form,hora:e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Duración (min)</label>
                   <input type="number" value={form.duracion_minutos} onChange={e=>setForm({...form,duracion_minutos:e.target.value})}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
                 </div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Notas (opcional)</label>
                 <textarea value={form.notas} onChange={e=>setForm({...form,notas:e.target.value})}
                   rows={2} placeholder="Amigos del trabajo, nivel intermedio…"
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"/>
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"/>
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={()=>{setModal(false);setEditando(false)}}
@@ -2595,7 +2599,7 @@ function NuevoGrupoInline({ modalidad, diasSemana, hora, uid, onCreado }) {
 
   if (!expandido) return (
     <button type="button" onClick={() => setExpandido(true)}
-      className="w-full border border-dashed border-black/20 rounded-xl px-3 py-3 text-sm text-[#6B6B6B] hover:border-[#FF5C00] hover:text-[#FF5C00] transition-all text-left flex items-center gap-2">
+      className="w-full border border-dashed border-black/20 rounded-xl px-3 py-3 text-sm text-[#6B6B6B] hover:border-acento hover:text-acento transition-all text-left flex items-center gap-2">
       <span className="text-base">{modalidad === 'pareja' ? '👫' : '👥'}</span>
       <span>Crear nueva {modalidad === 'pareja' ? 'pareja' : 'grupo'}</span>
       <span className="ml-auto font-bold text-lg leading-none">+</span>
@@ -2603,16 +2607,16 @@ function NuevoGrupoInline({ modalidad, diasSemana, hora, uid, onCreado }) {
   )
 
   return (
-    <div className="border border-[#FF5C00]/30 bg-[#FF5C00]/3 rounded-xl p-3 space-y-2">
-      <p className="text-xs font-semibold text-[#FF5C00]">Nueva {modalidad === 'pareja' ? 'pareja' : 'grupo'}</p>
+    <div className="border border-acento/30 bg-acento/3 rounded-xl p-3 space-y-2">
+      <p className="text-xs font-semibold text-acento">Nueva {modalidad === 'pareja' ? 'pareja' : 'grupo'}</p>
       <input value={nombre} onChange={e => setNombre(e.target.value)}
         placeholder={modalidad === 'pareja' ? 'Ej: Ana y Carlos — L/X' : 'Ej: Grupo mañanas jueves'}
-        className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white"/>
+        className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white"/>
       <div className="flex items-center gap-2">
         <div className="flex-1">
           <label className="text-xs text-[#9B9B9B] mb-1 block">Hora de entrenamiento</label>
           <input type="time" value={horaGrupo} onChange={e => setHoraGrupo(e.target.value)}
-            className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] bg-white"/>
+            className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white"/>
         </div>
         {tarifa && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-center flex-shrink-0">
@@ -2687,7 +2691,7 @@ function ActividadCliente({ clienteId }) {
 
   if (cargando) return (
     <div className="flex items-center justify-center h-32">
-      <div className="w-6 h-6 border-3 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+      <div className="w-6 h-6 border-3 border-acento border-t-transparent rounded-full animate-spin"/>
     </div>
   )
 
@@ -2837,7 +2841,7 @@ function HabitosCliente({ clienteId, entrenadorId }) {
                 </div>
                 <div className="flex gap-1.5">
                   <button onClick={() => toggleActivo(h)}
-                    className={`w-8 h-4 rounded-full transition-all relative ${h.activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                    className={`w-8 h-4 rounded-full transition-all relative ${h.activo ? 'bg-acento' : 'bg-black/20'}`}>
                     <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${h.activo ? 'left-4' : 'left-0.5'}`}/>
                   </button>
                   <button onClick={() => eliminar(h.id)} className="text-red-400 hover:text-red-600 text-xs p-1">🗑</button>
@@ -2853,7 +2857,7 @@ function HabitosCliente({ clienteId, entrenadorId }) {
         <div className="flex gap-2 flex-wrap mb-3">
           {EMOJIS.map(e => (
             <button key={e} onClick={() => setNuevoEmoji(e)}
-              className={`text-xl p-1.5 rounded-lg transition-all ${nuevoEmoji===e ? 'bg-[#FF5C00]/10 ring-2 ring-[#FF5C00]' : 'hover:bg-[#F7F6F3]'}`}>
+              className={`text-xl p-1.5 rounded-lg transition-all ${nuevoEmoji===e ? 'bg-acento/10 ring-2 ring-acento' : 'hover:bg-[#F7F6F3]'}`}>
               {e}
             </button>
           ))}
@@ -2862,9 +2866,9 @@ function HabitosCliente({ clienteId, entrenadorId }) {
           <input value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && crear()}
             placeholder="Ej: Beber 2L de agua, Dormir 8h..."
-            className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            className="flex-1 border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
           <button onClick={crear} disabled={!nuevoNombre.trim() || guardando}
-            className="bg-[#FF5C00] text-white text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-40">
+            className="bg-acento text-white text-sm font-bold px-4 py-2.5 rounded-xl disabled:opacity-40">
             + Añadir
           </button>
         </div>
@@ -2928,7 +2932,7 @@ function GestionHabitos({ clienteId, entrenadorId }) {
       .then(({data}) => setRegistrosSemana(data || []))
   }, [clienteId, habitos.length])
 
-  if (cargando) return <div className="h-24 flex items-center justify-center"><div className="w-5 h-5 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+  if (cargando) return <div className="h-24 flex items-center justify-center"><div className="w-5 h-5 border-2 border-acento border-t-transparent rounded-full animate-spin"/></div>
 
   return (
     <div className="space-y-3">
@@ -2951,7 +2955,7 @@ function GestionHabitos({ clienteId, entrenadorId }) {
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <button onClick={() => toggleActivo(h.id, !h.activo)}
-                className={`w-9 h-5 rounded-full transition-all relative ${h.activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                className={`w-9 h-5 rounded-full transition-all relative ${h.activo ? 'bg-acento' : 'bg-black/20'}`}>
                 <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${h.activo ? 'left-4' : 'left-0.5'}`}/>
               </button>
               <button onClick={() => eliminar(h.id)} className="text-[#C0C0C0] hover:text-red-400 text-sm p-1 transition-all">🗑</button>
@@ -2967,7 +2971,7 @@ function GestionHabitos({ clienteId, entrenadorId }) {
             <div className="flex flex-wrap gap-2 mb-2">
               {ICONOS_RAPIDOS.map(ic => (
                 <button key={ic} type="button" onClick={() => setForm(f=>({...f,icono:ic}))}
-                  className={`text-lg w-9 h-9 rounded-xl transition-all ${form.icono===ic ? 'bg-[#FF5C00]/20 ring-1 ring-[#FF5C00]' : 'bg-white hover:bg-[#F0EEE8]'}`}>
+                  className={`text-lg w-9 h-9 rounded-xl transition-all ${form.icono===ic ? 'bg-acento/20 ring-1 ring-acento' : 'bg-white hover:bg-[#F0EEE8]'}`}>
                   {ic}
                 </button>
               ))}
@@ -2975,22 +2979,22 @@ function GestionHabitos({ clienteId, entrenadorId }) {
           </div>
           <input value={form.nombre} onChange={e=>setForm(f=>({...f,nombre:e.target.value}))}
             placeholder="Nombre del hábito (ej: Beber 2L de agua)"
-            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
           <input value={form.descripcion} onChange={e=>setForm(f=>({...f,descripcion:e.target.value}))}
             placeholder="Descripción opcional"
-            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]"/>
+            className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
           <div className="flex gap-2">
             <button onClick={() => setMostrarForm(false)}
               className="flex-1 border border-black/10 text-[#6B6B6B] text-sm py-2 rounded-xl">Cancelar</button>
             <button onClick={crear} disabled={!form.nombre.trim() || guardando}
-              className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-2 rounded-xl disabled:opacity-40">
+              className="flex-1 bg-acento text-white text-sm font-semibold py-2 rounded-xl disabled:opacity-40">
               {guardando ? '...' : 'Añadir hábito'}
             </button>
           </div>
         </div>
       ) : (
         <button onClick={() => setMostrarForm(true)}
-          className="w-full border-2 border-dashed border-black/10 rounded-2xl py-3 text-sm text-[#9B9B9B] hover:border-[#FF5C00]/30 hover:text-[#FF5C00] transition-all">
+          className="w-full border-2 border-dashed border-black/10 rounded-2xl py-3 text-sm text-[#9B9B9B] hover:border-acento/30 hover:text-acento transition-all">
           + Añadir hábito
         </button>
       )}
@@ -3048,7 +3052,7 @@ function ProgresoCargas({ clienteId }) {
     setCargando(false)
   }
 
-  if (cargando) return <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/></div>
+  if (cargando) return <div className="flex items-center justify-center h-32"><div className="w-5 h-5 border-2 border-acento border-t-transparent rounded-full animate-spin"/></div>
 
   if (datos.length === 0) return (
     <div className="text-center py-10">
@@ -3072,7 +3076,7 @@ function ProgresoCargas({ clienteId }) {
           return (
             <button key={d.ejercicio} onClick={() => setEjercicioSel(d.ejercicio)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${ejercicioSel === d.ejercicio ? 'text-white' : 'border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}
-              style={ejercicioSel === d.ejercicio ? {background:'#FF5C00'} : {}}>
+              style={ejercicioSel === d.ejercicio ? {background:BRAND.color} : {}}>
               {d.ejercicio}
               {prog > 0 && <span className={`text-[10px] font-bold ${ejercicioSel === d.ejercicio ? 'text-white/80' : 'text-emerald-600'}`}>+{prog}kg</span>}
             </button>

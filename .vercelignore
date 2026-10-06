@@ -1,0 +1,14 @@
+# Nunca subir a Vercel: datos personales, claves y material de pruebas
+datos-privados/
+.env
+.env.*
+.secrets.local
+.sec-audit-tmp/
+.claude/
+supabase/
+tests/
+test-results/
+playwright-report/
+node_modules/
+dist/
+*.md

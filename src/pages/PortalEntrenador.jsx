@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND, colorMarca } from '../lib/brand'
+import { moduloVisible } from '../lib/modulos'
 
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 const DIAS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
@@ -53,7 +55,7 @@ export default function PortalEntrenador({ session }) {
     const { data: cData } = await supabase.functions.invoke('clientes-entrenador')
     const { data: cPropios } = await supabase.from('clientes')
       .select('id,nombre,tipo,nivel,lesiones,objetivo,peso_actual,peso_objetivo,nutricion_activa')
-      .eq('entrenador_id',uid).eq('estado','activo')
+      .eq('entrenador_id',uid).in('estado',['activo','externo'])
 
     const idsYa = new Set((cData?.clientes||[]).map(c=>c.id))
     const clientes = [...(cData?.clientes||[]), ...(cPropios||[]).filter(c=>!idsYa.has(c.id))]
@@ -132,12 +134,12 @@ export default function PortalEntrenador({ session }) {
   // ─── Loading ───────────────────────────────────────────────────────────────
   if (loading) return (
     <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin"/>
     </div>
   )
 
   const d = datos
-  const acento = d.miembro?.centros?.color_acento || '#FF5C00'
+  const acento = colorMarca(d.miembro?.centros?.color_acento)
   const nombre = session.user?.user_metadata?.nombre || d.miembro?.nombre || session.user?.email?.split('@')[0] || 'Entrenador'
   const hoy    = new Date().toISOString().split('T')[0]
 
@@ -210,7 +212,7 @@ export default function PortalEntrenador({ session }) {
           ['semana',   'Semana'],
           ['clientes', `Clientes (${d.clientes.length})`],
           ['mensajes', 'Mensajes'],
-        ].map(([id,label])=>(
+        ].filter(([id]) => id !== 'mensajes' || moduloVisible('mensajes')).map(([id,label])=>(
           <button key={id} onClick={()=>setTab(id)}
             className={`px-5 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-all relative ${tab===id?'text-white':'text-white/40 border-transparent hover:text-white/70'}`}
             style={tab===id?{borderColor:acento}:{borderColor:'transparent'}}>

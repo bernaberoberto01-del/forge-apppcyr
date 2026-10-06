@@ -4,6 +4,8 @@ import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
+import { BRAND } from '../lib/brand'
+import { useEquipo } from '../hooks/useCentro'
 
 const ESCALAS = [
   { label: 'Energía', field: 'energia', min: 1, max: 5, suffix: '/5', color: 'blue' },
@@ -60,6 +62,7 @@ export default function Seguimiento({ session }) {
   const [loading, setLoading] = useState(false)
   const [filtroCliente, setFiltroCliente] = useState('todos')
   const uid = session.user.id
+  const equipo = useEquipo(uid)
   const navigate = useNavigate()
   const [analisisExpandido, setAnalisisExpandido] = useState(null)
   const { completar, completado } = useOnboarding(uid)
@@ -105,11 +108,11 @@ export default function Seguimiento({ session }) {
 
   async function cargar() {
     const [{ data: ci }, { data: cl }, { data: se }, { data: bors }, { data: an }] = await Promise.all([
-      supabase.from('checkins').select('*, clientes(nombre, tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(200),
-      supabase.from('clientes').select('id,nombre,tipo').eq('entrenador_id', uid).eq('estado', 'activo'),
-      supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('entrenador_id', uid).order('fecha', { ascending: false }).limit(300),
-      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').eq('entrenador_id', uid).eq('estado', 'por revisar').order('created_at', { ascending: false }),
-      supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('enviado_cliente', false).order('created_at', { ascending: false }).limit(20),
+      supabase.from('checkins').select('*, clientes(nombre, tipo)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(200),
+      supabase.from('clientes').select('id,nombre,tipo').in('entrenador_id', equipo).eq('estado', 'activo'),
+      supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(300),
+      supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').in('entrenador_id', equipo).eq('estado', 'por revisar').order('created_at', { ascending: false }),
+      supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', false).order('created_at', { ascending: false }).limit(20),
     ])
     setCheckins(ci || [])
     setClientes(cl || [])
@@ -120,7 +123,7 @@ export default function Seguimiento({ session }) {
 
   async function cargarHistorialAnalisis() {
     setCargandoHistorial(true)
-    const { data } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').eq('entrenador_id', uid).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(50)
+    const { data } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(50)
     setHistorialAnalisis(data || [])
     setHistorialCargado(true)
     setCargandoHistorial(false)
@@ -220,7 +223,7 @@ export default function Seguimiento({ session }) {
     return (
       <button type="button" onClick={() => setForm(f => ({ ...f, [field]: val }))}
         className={`w-9 h-9 rounded-xl text-xs font-semibold transition-all ${active
-          ? isRed ? 'bg-red-500 text-white' : 'bg-[#FF5C00] text-white'
+          ? isRed ? 'bg-red-500 text-white' : 'bg-acento text-white'
           : 'border border-black/10 text-[#6B6B6B] hover:border-orange-300'}`}>
         {val}
       </button>
@@ -262,7 +265,7 @@ export default function Seguimiento({ session }) {
             {enviando ? '⏳' : '📨'} {enviando ? 'Enviando...' : 'Enviar check-in'}
           </button>
           <button onClick={() => setModal(true)}
-            className="bg-[#FF5C00] hover:bg-[#E05200] text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95">
+            className="bg-acento hover:bg-acento-hover text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all active:scale-95">
             + Registrar
           </button>
         </div>
@@ -271,7 +274,7 @@ export default function Seguimiento({ session }) {
       {/* Stats */}
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
         {[
-          ['Total CI', checkins.length, '#FF5C00'],
+          ['Total CI', checkins.length, BRAND.color],
           ['Con fatiga alta', checkins.filter(x=>x.fatiga>=4||x.estres>=4).length, '#ef4444'],
           ['Energía baja', checkins.filter(x=>x.energia<=3).length, '#f59e0b'],
         ].map(([l,v,c])=>(
@@ -299,7 +302,7 @@ export default function Seguimiento({ session }) {
         <button onClick={() => setTabPrincipal('mensual')}
           className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all relative ${tabPrincipal==='mensual'?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
           🔄 IA
-          {borradores.length > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-[#FF5C00] text-white rounded-full text-[9px] font-bold flex items-center justify-center">{borradores.length}</span>}
+          {borradores.length > 0 && <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-acento text-white rounded-full text-[9px] font-bold flex items-center justify-center">{borradores.length}</span>}
         </button>
       </div>
 
@@ -356,14 +359,14 @@ export default function Seguimiento({ session }) {
       <div className="relative mb-3">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
         <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente..."
-          className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+          className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
         {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]">×</button>}
       </div>
 
       {/* Filtros */}
       <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
         <button onClick={() => setFiltroAlerta('todos')}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroAlerta==='todos'?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+          className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroAlerta==='todos'?'bg-acento text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
           Todos ({checkins.length})
         </button>
         <button onClick={() => setFiltroAlerta('fatiga')}
@@ -382,7 +385,7 @@ export default function Seguimiento({ session }) {
           <div className="w-px bg-black/10 flex-shrink-0" />
           {clientes.map(c => (
             <button key={c.id} onClick={() => setFiltroCliente(filtroCliente===c.id?'todos':c.id)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroCliente===c.id?'bg-[#111] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+              className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroCliente===c.id?'bg-[#111] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
               {c.nombre.split(' ')[0]}
             </button>
           ))}
@@ -396,23 +399,23 @@ export default function Seguimiento({ session }) {
             <p className="text-[#6B6B6B] text-sm">Sin seguimientos registrados</p>
           </div>
         ) : checkinsFiltrados.map(ci => (
-          <div key={ci.id} onClick={() => setDetalleCI(ci)} className="bg-white rounded-xl border border-black/5 p-3.5 cursor-pointer hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
+          <div key={ci.id} onClick={() => setDetalleCI(ci)} className="bg-white rounded-xl border border-black/5 p-3.5 cursor-pointer hover:shadow-md hover:border-acento/20 transition-all">
             <div className="flex items-center justify-between mb-2.5">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">
+                <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-acento font-bold text-xs flex-shrink-0">
                   {ini(ci.clientes?.nombre)}
                 </div>
                 <div>
-                  <button onClick={e=>{e.stopPropagation();setQuickView(ci.cliente_id)}} className="text-sm font-medium text-[#0A0A0A] hover:text-[#FF5C00] transition-colors">{ci.clientes?.nombre}</button>
+                  <button onClick={e=>{e.stopPropagation();setQuickView(ci.cliente_id)}} className="text-sm font-medium text-[#0A0A0A] hover:text-acento transition-colors">{ci.clientes?.nombre}</button>
                   <p className="text-xs text-[#6B6B6B]">{new Date(ci.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                 </div>
               </div>
               <div className="text-right">
-                {ci.peso && <p className="text-base font-bold text-[#FF5C00]">{ci.peso}kg</p>}
+                {ci.peso && <p className="text-base font-bold text-acento">{ci.peso}kg</p>}
                 {ci.pasos_diarios && <p className="text-xs text-[#6B6B6B]">👟 {ci.pasos_diarios.toLocaleString()}</p>}
                 <div className="flex gap-1 justify-end mt-1">
                   <button onClick={e => { e.stopPropagation(); copiarEnlaceCheckin(ci.cliente_id) }}
-                    className="text-xs text-[#6B6B6B] hover:text-[#FF5C00] transition-colors px-1.5 py-1">
+                    className="text-xs text-[#6B6B6B] hover:text-acento transition-colors px-1.5 py-1">
                     🔗
                   </button>
                   <button onClick={async e => {
@@ -522,8 +525,8 @@ export default function Seguimiento({ session }) {
               {(detalleCI.peso || detalleCI.pasos_diarios) && (
                 <div className="grid grid-cols-2 gap-2">
                   {detalleCI.peso && (
-                    <div className="bg-[#FF5C00]/8 rounded-xl p-3 text-center">
-                      <p className="text-2xl font-bold text-[#FF5C00]">{detalleCI.peso}kg</p>
+                    <div className="bg-acento/8 rounded-xl p-3 text-center">
+                      <p className="text-2xl font-bold text-acento">{detalleCI.peso}kg</p>
                       <p className="text-xs text-[#6B6B6B] mt-0.5">Peso corporal</p>
                     </div>
                   )}
@@ -555,7 +558,7 @@ export default function Seguimiento({ session }) {
                   const etiqueta = getEtiqueta(campo, val)
                   const esAlerta = invertido ? val >= 4 : val <= 3
                   const esBien = invertido ? val <= 2 : val >= Math.ceil(max * 0.7)
-                  const colorBar = esAlerta ? '#ef4444' : esBien ? '#10b981' : '#FF5C00'
+                  const colorBar = esAlerta ? '#ef4444' : esBien ? '#10b981' : BRAND.color
                   return (
                     <div key={campo} className="bg-[#F5F5F0] rounded-xl p-3">
                       <div className="flex items-center justify-between mb-1.5">
@@ -688,7 +691,7 @@ export default function Seguimiento({ session }) {
                 <div key={cl.id} onClick={() => ultimo && setDetalleCI(ultimo)}
                   className={`flex items-center gap-2.5 py-2.5 px-2 border-b border-black/5 last:border-0 rounded-xl transition-all ${ultimo ? 'cursor-pointer hover:bg-[#F7F6F3]' : ''}`}>
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                    style={{background: alertaFatiga ? '#ef4444' : diasSinCI === null ? '#C0C0C0' : '#FF5C00'}}>
+                    style={{background: alertaFatiga ? '#ef4444' : diasSinCI === null ? '#C0C0C0' : BRAND.color}}>
                     {ini(cl.nombre)}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -726,7 +729,7 @@ export default function Seguimiento({ session }) {
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
             <input value={busquedaSes} onChange={e => setBusquedaSes(e.target.value)}
               placeholder="Buscar por cliente..."
-              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
           </div>
           <div className="space-y-2">
             {sesiones
@@ -739,14 +742,14 @@ export default function Seguimiento({ session }) {
                         .select('*').eq('sesion_id', s.id).order('orden')
                       setDetalleSesion({ ...s, ejercicios: ejes || [] })
                     }}
-                    className="bg-white rounded-xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-[#FF5C00]/20 transition-all">
+                    className="bg-white rounded-xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-acento/20 transition-all">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-sm flex-shrink-0">
+                      <div className="w-10 h-10 bg-acento/10 rounded-xl flex items-center justify-center text-acento font-bold text-sm flex-shrink-0">
                         {ini(s.clientes?.nombre)}
                       </div>
                       <div className="flex-1 min-w-0">
                         <button onClick={e => { e.stopPropagation(); setQuickView(s.cliente_id) }}
-                          className="text-sm font-semibold text-[#0A0A0A] hover:text-[#FF5C00] truncate block text-left">
+                          className="text-sm font-semibold text-[#0A0A0A] hover:text-acento truncate block text-left">
                           {s.clientes?.nombre}
                         </button>
                         <p className="text-xs text-[#6B6B6B]">
@@ -787,7 +790,7 @@ export default function Seguimiento({ session }) {
             <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
               <div>
                 <button onClick={() => { setQuickView(detalleSesion.cliente_id); setDetalleSesion(null) }}
-                  className="font-bold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors">
+                  className="font-bold text-[#0A0A0A] hover:text-acento transition-colors">
                   {detalleSesion.clientes?.nombre}
                 </button>
                 <p className="text-xs text-[#6B6B6B]">
@@ -799,7 +802,7 @@ export default function Seguimiento({ session }) {
             <div className="p-4 space-y-3">
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  ['RPE', detalleSesion.rpe ? `${detalleSesion.rpe}/10` : '—', '#FF5C00'],
+                  ['RPE', detalleSesion.rpe ? `${detalleSesion.rpe}/10` : '—', BRAND.color],
                   ['Fatiga', detalleSesion.fatiga_post ? `${detalleSesion.fatiga_post}/5` : '—', detalleSesion.fatiga_post >= 4 ? '#ef4444' : '#10b981'],
                   ['Duración', detalleSesion.duracion_minutos ? `${detalleSesion.duracion_minutos}min` : '—', '#6B6B6B'],
                 ].map(([l,v,col]) => (
@@ -848,7 +851,7 @@ export default function Seguimiento({ session }) {
               <div>
                 <label className="text-xs font-medium text-[#6B6B6B] mb-1 block">Cliente</label>
                 <select value={form.cliente_id} onChange={e => setForm(f => ({ ...f, cliente_id: e.target.value }))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]">
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento">
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
@@ -856,23 +859,23 @@ export default function Seguimiento({ session }) {
               <div>
                 <label className="text-xs font-medium text-[#6B6B6B] mb-1 block">Fecha</label>
                 <input type="date" value={form.fecha} onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-medium text-[#6B6B6B] mb-1 block">Peso (kg)</label>
                   <input type="number" step="0.1" value={form.peso} onChange={e => setForm(f => ({ ...f, peso: e.target.value }))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="70.5" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" placeholder="70.5" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-[#6B6B6B] mb-1 block">Pasos diarios</label>
                   <input type="number" value={form.pasos_diarios} onChange={e => setForm(f => ({ ...f, pasos_diarios: e.target.value }))}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="8000" />
+                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento" placeholder="8000" />
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-medium text-[#6B6B6B] mb-2 block">Sesiones esta semana: <span className="text-[#FF5C00] font-bold">{form.sesiones_semana}</span></label>
+                <label className="text-xs font-medium text-[#6B6B6B] mb-2 block">Sesiones esta semana: <span className="text-acento font-bold">{form.sesiones_semana}</span></label>
                 <div className="flex gap-1.5 flex-wrap">
                   {[0,1,2,3,4,5,6,7].map(v => <Btn key={v} field="sesiones_semana" val={v} />)}
                 </div>
@@ -880,7 +883,7 @@ export default function Seguimiento({ session }) {
 
               {ESCALAS.map(({ label, field, min, max, suffix }) => (
                 <div key={field}>
-                  <label className="text-xs font-medium text-[#6B6B6B] mb-2 block">{label}: <span className="text-[#FF5C00] font-bold">{form[field]}{suffix}</span></label>
+                  <label className="text-xs font-medium text-[#6B6B6B] mb-2 block">{label}: <span className="text-acento font-bold">{form[field]}{suffix}</span></label>
                   <div className="flex gap-1.5 flex-wrap">
                     {Array.from({ length: max - min + 1 }, (_, i) => i + min).map(v => <Btn key={v} field={field} val={v} />)}
                   </div>
@@ -890,14 +893,14 @@ export default function Seguimiento({ session }) {
               <div>
                 <label className="text-xs font-medium text-[#6B6B6B] mb-1 block">Comentario</label>
                 <textarea value={form.comentario} onChange={e => setForm(f => ({ ...f, comentario: e.target.value }))}
-                  rows={2} className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  rows={2} className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento resize-none"
                   placeholder="Observaciones de la sesión..." />
               </div>
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => { setModal(false); setForm(initForm) }} className="flex-1 border border-black/10 text-[#6B6B6B] text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={guardar} disabled={!form.cliente_id || loading}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-50">
+                className="flex-1 bg-acento text-white text-sm font-medium py-2.5 rounded-xl disabled:opacity-50">
                 {loading ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
@@ -935,7 +938,7 @@ export default function Seguimiento({ session }) {
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-3">
                 {analisisMensual.length > 0 && (
-                  <span className="text-xs font-semibold text-[#FF5C00]">{analisisMensual.length} análisis pendiente{analisisMensual.length > 1 ? 's' : ''}</span>
+                  <span className="text-xs font-semibold text-acento">{analisisMensual.length} análisis pendiente{analisisMensual.length > 1 ? 's' : ''}</span>
                 )}
                 {borradores.length > 0 && (
                   <span className="text-xs font-semibold text-[#6366f1]">{borradores.length} rutina{borradores.length > 1 ? 's' : ''} por revisar</span>
@@ -958,7 +961,7 @@ export default function Seguimiento({ session }) {
             <div className="space-y-3">
               {analisisMensual.map(a => {
                 const ICONOS = { actualizar_rutina:'🔄', ajustar_cargas:'⚖️', mensaje_motivacional:'💬', pausa_recomendada:'⚠️' }
-                const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:'#FF5C00', pausa_recomendada:'#ef4444' }
+                const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:BRAND.color, pausa_recomendada:'#ef4444' }
                 const ETIQUETAS = { actualizar_rutina:'Nueva rutina', ajustar_cargas:'Ajustar cargas', mensaje_motivacional:'Mensaje', pausa_recomendada:'Pausa ⚠️' }
                 const color = COLORES[a.accion] || '#6B6B6B'
                 const expandido = analisisExpandido === a.id
@@ -1011,19 +1014,19 @@ export default function Seguimiento({ session }) {
 
                         {/* Mensaje listo para enviar */}
                         {a.mensaje_cliente && editandoMensajeAnalisis !== a.id && (
-                          <div className="border border-[#FF5C00]/20 rounded-xl p-3">
-                            <p className="text-xs font-bold text-[#FF5C00] mb-2">💬 Mensaje listo para enviar</p>
+                          <div className="border border-acento/20 rounded-xl p-3">
+                            <p className="text-xs font-bold text-acento mb-2">💬 Mensaje listo para enviar</p>
                             <p className="text-sm text-[#0A0A0A] leading-relaxed whitespace-pre-line">{a.mensaje_cliente}</p>
                           </div>
                         )}
 
                         {/* Editor de mensaje — cuando no hay mensaje_cliente o se está redactando */}
                         {editandoMensajeAnalisis === a.id && (
-                          <div className="border border-[#FF5C00]/20 rounded-xl p-3">
-                            <p className="text-xs font-bold text-[#FF5C00] mb-2">💬 Escribe el mensaje para el cliente</p>
+                          <div className="border border-acento/20 rounded-xl p-3">
+                            <p className="text-xs font-bold text-acento mb-2">💬 Escribe el mensaje para el cliente</p>
                             <textarea rows={4} value={borradorMensajeAnalisis} onChange={e => setBorradorMensajeAnalisis(e.target.value)}
                               placeholder="Escribe aquí el mensaje que recibirá el cliente..."
-                              className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#FF5C00] resize-none" />
+                              className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento resize-none" />
                           </div>
                         )}
 
@@ -1088,7 +1091,7 @@ export default function Seguimiento({ session }) {
                               setEnviandoAnalisisId(null)
                             }
                           }}
-                            className="flex-1 bg-[#FF5C00] text-white text-xs font-bold py-2.5 rounded-xl disabled:opacity-50">
+                            className="flex-1 bg-acento text-white text-xs font-bold py-2.5 rounded-xl disabled:opacity-50">
                             {enviandoAnalisisId === a.id ? '⏳ Enviando...' : editandoMensajeAnalisis === a.id ? '✓ Confirmar envío' : '💬 Enviar mensaje'}
                           </button>
                           {/* Marcar como revisado — no oculta la tarjeta hasta que también se envíe el mensaje */}
@@ -1120,14 +1123,14 @@ export default function Seguimiento({ session }) {
               <div className="border-t border-black/5 p-4 space-y-2">
                 {cargandoHistorial ? (
                   <div className="flex items-center justify-center py-6">
-                    <div className="w-5 h-5 border-2 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+                    <div className="w-5 h-5 border-2 border-acento border-t-transparent rounded-full animate-spin"/>
                   </div>
                 ) : historialAnalisis.length === 0 ? (
                   <p className="text-sm text-[#9B9B9B] text-center py-4">Sin análisis revisados todavía</p>
                 ) : (
                   historialAnalisis.map(a => {
                     const ETIQUETAS = { actualizar_rutina:'Nueva rutina', ajustar_cargas:'Ajustar cargas', mensaje_motivacional:'Mensaje', pausa_recomendada:'Pausa ⚠️' }
-                    const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:'#FF5C00', pausa_recomendada:'#ef4444' }
+                    const COLORES = { actualizar_rutina:'#6366f1', ajustar_cargas:'#f59e0b', mensaje_motivacional:BRAND.color, pausa_recomendada:'#ef4444' }
                     const expandido = historialExpandido === a.id
                     return (
                       <div key={a.id} className="border border-black/5 rounded-xl overflow-hidden">
@@ -1221,7 +1224,7 @@ export default function Seguimiento({ session }) {
                                       <p className="text-xs font-medium text-[#0A0A0A]">{ej.nombre}</p>
                                       {ej.notas && <p className="text-xs text-[#9B9B9B]">{ej.notas}</p>}
                                     </div>
-                                    <p className="text-xs font-bold text-[#FF5C00] flex-shrink-0 ml-2">{ej.series}×{ej.reps}</p>
+                                    <p className="text-xs font-bold text-acento flex-shrink-0 ml-2">{ej.series}×{ej.reps}</p>
                                   </div>
                                 ))}
                               </div>
@@ -1248,7 +1251,7 @@ export default function Seguimiento({ session }) {
                       setPublicandoBorrador(null)
                     }} disabled={publicandoBorrador === b.id}
                       className="flex-1 text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50"
-                      style={{background:'#FF5C00'}}>
+                      style={{background:BRAND.color}}>
                       {publicandoBorrador === b.id ? 'Publicando...' : '▶ Publicar rutina'}
                     </button>
                     <button onClick={async () => {

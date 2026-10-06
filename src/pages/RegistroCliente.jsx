@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import BrandMark from '../components/BrandMark'
+import { BRAND } from '../lib/brand'
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 const BLOQUES = [
@@ -39,9 +41,9 @@ const MATERIALES = [
 // ─── Componentes base ──────────────────────────────────────────────────────────
 const Input = ({ label, value, onChange, type='text', placeholder='', required=false, small=false }) => (
   <div>
-    {label && <label className="block text-sm font-semibold text-[#0A0A0A] mb-1.5">{label}{required && <span className="text-[#FF5C00] ml-1">*</span>}</label>}
+    {label && <label className="block text-sm font-semibold text-[#0A0A0A] mb-1.5">{label}{required && <span className="text-acento ml-1">*</span>}</label>}
     <input type={type} value={value} onChange={onChange} placeholder={placeholder}
-      className={`w-full border border-black/10 rounded-xl px-4 ${small?'py-2':'py-3'} text-sm focus:outline-none focus:border-[#FF5C00] bg-white`}/>
+      className={`w-full border border-black/10 rounded-xl px-4 ${small?'py-2':'py-3'} text-sm focus:outline-none focus:border-acento bg-white`}/>
   </div>
 )
 
@@ -49,7 +51,7 @@ const Textarea = ({ label, value, onChange, placeholder='', rows=3 }) => (
   <div>
     {label && <label className="block text-sm font-semibold text-[#0A0A0A] mb-1.5">{label}</label>}
     <textarea value={value} onChange={onChange} placeholder={placeholder} rows={rows}
-      className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] resize-none bg-white"/>
+      className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-acento resize-none bg-white"/>
   </div>
 )
 
@@ -203,12 +205,8 @@ export default function RegistroCliente() {
         <div className="max-w-lg mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-[#FF5C00] rounded-xl flex items-center justify-center flex-shrink-0">
-                <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
-                  <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-                  <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-                  <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-                </svg>
+              <div className="w-7 h-7 bg-acento rounded-xl flex items-center justify-center flex-shrink-0">
+                <BrandMark size={14} />
               </div>
               <div>
                 <p className="text-white font-semibold text-sm">Diagnóstico inicial</p>
@@ -218,7 +216,7 @@ export default function RegistroCliente() {
             <p className="text-white/40 text-xs">{paso + 1} / {BLOQUES.length}</p>
           </div>
           <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full bg-[#FF5C00] rounded-full transition-all duration-500" style={{width:`${progreso}%`}}/>
+            <div className="h-full bg-acento rounded-full transition-all duration-500" style={{width:`${progreso}%`}}/>
           </div>
         </div>
       </div>
@@ -242,11 +240,11 @@ export default function RegistroCliente() {
                 <Input label="Ciudad" value={form.ciudad} onChange={e=>set('ciudad',e.target.value)} placeholder="Murcia"/>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Sexo biológico <span className="text-[#FF5C00]">*</span></label>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Sexo biológico <span className="text-acento">*</span></label>
                 <div className="grid grid-cols-2 gap-2">
                   {[['hombre','Hombre'],['mujer','Mujer']].map(([v,l]) => (
                     <button key={v} type="button" onClick={() => set('sexo', v)}
-                      className={`py-3 rounded-xl border text-sm font-semibold transition-all ${form.sexo===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      className={`py-3 rounded-xl border text-sm font-semibold transition-all ${form.sexo===v?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
@@ -268,13 +266,13 @@ export default function RegistroCliente() {
             <div className="space-y-2">
               {OBJETIVOS.map(({ v, l, emoji }) => (
                 <button key={v} type="button" onClick={() => set('objetivo', v)}
-                  className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all ${form.objetivo===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 bg-white hover:border-black/20'}`}>
+                  className={`w-full flex items-center gap-4 p-4 rounded-2xl border text-left transition-all ${form.objetivo===v?'border-acento bg-acento/5':'border-black/10 bg-white hover:border-black/20'}`}>
                   <span className="text-2xl flex-shrink-0">{emoji}</span>
                   <div className="flex-1">
-                    <p className={`text-sm font-semibold ${form.objetivo===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                    <p className={`text-sm font-semibold ${form.objetivo===v?'text-acento':'text-[#0A0A0A]'}`}>{l}</p>
                   </div>
-                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${form.objetivo===v?'border-[#FF5C00]':'border-black/20'}`}>
-                    {form.objetivo===v && <div className="w-2.5 h-2.5 rounded-full bg-[#FF5C00]"/>}
+                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${form.objetivo===v?'border-acento':'border-black/20'}`}>
+                    {form.objetivo===v && <div className="w-2.5 h-2.5 rounded-full bg-acento"/>}
                   </div>
                 </button>
               ))}
@@ -292,11 +290,11 @@ export default function RegistroCliente() {
 
             <div className="bg-white rounded-2xl border border-black/5 p-5 space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">¿Entrenas ahora mismo? <span className="text-[#FF5C00]">*</span></label>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">¿Entrenas ahora mismo? <span className="text-acento">*</span></label>
                 <div className="grid grid-cols-3 gap-2">
                   {[['si','Sí'],['aveces','A veces'],['no','No']].map(([v,l]) => (
                     <button key={v} type="button" onClick={() => set('entrenas_ahora', v)}
-                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.entrenas_ahora===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${form.entrenas_ahora===v?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
@@ -310,7 +308,7 @@ export default function RegistroCliente() {
                     <div className="flex gap-2">
                       {[1,2,3,4,5,6,7].map(n => (
                         <button key={n} type="button" onClick={() => set('dias_semana', n)}
-                          className={`flex-1 py-2.5 rounded-xl border text-sm font-bold transition-all ${form.dias_semana===n?'bg-[#FF5C00] text-white border-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                          className={`flex-1 py-2.5 rounded-xl border text-sm font-bold transition-all ${form.dias_semana===n?'bg-acento text-white border-acento':'border-black/10 text-[#6B6B6B]'}`}>
                           {n}
                         </button>
                       ))}
@@ -328,7 +326,7 @@ export default function RegistroCliente() {
                 <div className="grid grid-cols-2 gap-2">
                   {[['menos_mes','Menos de 1 mes'],['1_3_meses','1-3 meses'],['3_12_meses','3-12 meses'],['mas_1_año','Más de un año']].map(([v,l]) => (
                     <button key={v} type="button" onClick={() => set('anos_intentando', v)}
-                      className={`py-2.5 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${form.anos_intentando===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-semibold text-left transition-all ${form.anos_intentando===v?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
@@ -373,11 +371,11 @@ export default function RegistroCliente() {
 
             <div className="bg-white rounded-2xl border border-black/5 p-5 space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Días disponibles para entrenar <span className="text-[#FF5C00]">*</span></label>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Días disponibles para entrenar <span className="text-acento">*</span></label>
                 <div className="flex gap-1.5">
                   {[2,3,4,'5+'].map(n => (
                     <button key={n} type="button" onClick={() => set('disponibilidad_dias', n)}
-                      className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all ${form.disponibilidad_dias===n?'bg-[#FF5C00] text-white border-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all ${form.disponibilidad_dias===n?'bg-acento text-white border-acento':'border-black/10 text-[#6B6B6B]'}`}>
                       {n}
                     </button>
                   ))}
@@ -385,16 +383,16 @@ export default function RegistroCliente() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Material disponible <span className="text-[#FF5C00]">*</span></label>
+                <label className="block text-sm font-semibold text-[#0A0A0A] mb-2">Material disponible <span className="text-acento">*</span></label>
                 <div className="space-y-2">
                   {MATERIALES.map(({ v, l, sub }) => (
                     <button key={v} type="button" onClick={() => set('material', v)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${form.material===v?'border-[#FF5C00] bg-[#FF5C00]/5':'border-black/10 hover:border-black/20'}`}>
-                      <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${form.material===v?'border-[#FF5C00]':'border-black/20'}`}>
-                        {form.material===v && <div className="w-2.5 h-2.5 rounded-full bg-[#FF5C00]"/>}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all ${form.material===v?'border-acento bg-acento/5':'border-black/10 hover:border-black/20'}`}>
+                      <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${form.material===v?'border-acento':'border-black/20'}`}>
+                        {form.material===v && <div className="w-2.5 h-2.5 rounded-full bg-acento"/>}
                       </div>
                       <div>
-                        <p className={`text-sm font-semibold ${form.material===v?'text-[#FF5C00]':'text-[#0A0A0A]'}`}>{l}</p>
+                        <p className={`text-sm font-semibold ${form.material===v?'text-acento':'text-[#0A0A0A]'}`}>{l}</p>
                         <p className="text-xs text-[#9B9B9B]">{sub}</p>
                       </div>
                     </button>
@@ -407,7 +405,7 @@ export default function RegistroCliente() {
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   {[['false','No'],['true','Sí']].map(([v,l]) => (
                     <button key={v} type="button" onClick={() => set('tiene_lesion', v==='true')}
-                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${String(form.tiene_lesion)===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      className={`py-2.5 rounded-xl border text-sm font-semibold transition-all ${String(form.tiene_lesion)===v?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
@@ -442,7 +440,7 @@ export default function RegistroCliente() {
                 <div className="grid grid-cols-2 gap-2">
                   {[['menos_3h','Menos de 3h'],['3_5h','3-5 horas'],['5_8h','5-8 horas'],['mas_8h','Más de 8h']].map(([v,l]) => (
                     <button key={v} type="button" onClick={() => set('tiempo_semanal', v)}
-                      className={`py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all ${form.tiempo_semanal===v?'border-[#FF5C00] bg-[#FF5C00]/5 text-[#FF5C00]':'border-black/10 text-[#6B6B6B]'}`}>
+                      className={`py-2.5 px-3 rounded-xl border text-xs font-semibold transition-all ${form.tiempo_semanal===v?'border-acento bg-acento/5 text-acento':'border-black/10 text-[#6B6B6B]'}`}>
                       {l}
                     </button>
                   ))}
@@ -452,12 +450,12 @@ export default function RegistroCliente() {
               {/* RGPD */}
               <button type="button" onClick={() => set('acepta_rgpd', !form.acepta_rgpd)}
                 className="w-full flex items-start gap-3 text-left">
-                <div className={`w-5 h-5 rounded border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all ${form.acepta_rgpd?'bg-[#FF5C00] border-[#FF5C00]':'border-black/20'}`}>
+                <div className={`w-5 h-5 rounded border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all ${form.acepta_rgpd?'bg-acento border-acento':'border-black/20'}`}>
                   {form.acepta_rgpd && <span className="text-white text-xs font-bold">✓</span>}
                 </div>
                 <p className="text-xs text-[#6B6B6B] leading-relaxed">
                   Acepto que mis datos sean tratados para recibir un plan personalizado. 
-                  No compartimos tu información con terceros. <span className="text-[#FF5C00]">*</span>
+                  No compartimos tu información con terceros. <span className="text-acento">*</span>
                 </p>
               </button>
             </div>
@@ -481,18 +479,18 @@ export default function RegistroCliente() {
           )}
           {paso < BLOQUES.length - 1 ? (
             <button onClick={siguiente}
-              className="flex-1 bg-[#FF5C00] text-white font-bold py-4 rounded-2xl text-sm hover:bg-[#e05200] transition-all active:scale-98">
+              className="flex-1 bg-acento text-white font-bold py-4 rounded-2xl text-sm hover:bg-acento-hover transition-all active:scale-98">
               Siguiente →
             </button>
           ) : (
             <button onClick={enviar} disabled={enviando}
-              className="flex-1 bg-[#FF5C00] text-white font-bold py-4 rounded-2xl text-sm disabled:opacity-50 transition-all">
+              className="flex-1 bg-acento text-white font-bold py-4 rounded-2xl text-sm disabled:opacity-50 transition-all">
               {enviando ? 'Enviando…' : 'Enviar diagnóstico 📋'}
             </button>
           )}
         </div>
 
-        <p className="text-center text-xs text-[#9B9B9B]">Forge Studio · Tus datos están protegidos</p>
+        <p className="text-center text-xs text-[#9B9B9B]">{`${BRAND.nombreCompleto} · Tus datos están protegidos`}</p>
       </div>
     </div>
   )

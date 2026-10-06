@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
+import { useEquipo } from '../hooks/useCentro'
 
 const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
 
@@ -44,14 +46,15 @@ export default function Nutricion({ session }) {
   const [suplementacion, setSuplementacion] = useState(null)
   const [generandoSup, setGenerandoSup] = useState(false)
   const uid = session.user.id
+  const equipo = useEquipo(uid)
 
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
     const [{ data: cl }, { data: pl }, { data: cu }] = await Promise.all([
-      supabase.from('clientes').select('id,nombre,tipo,nivel,peso_actual,peso_objetivo,objetivo,nutricion_activa,plan_online').eq('entrenador_id', uid).eq('estado','activo').order('nombre'),
-      supabase.from('planes_nutricion').select('*, clientes(nombre)').eq('entrenador_id', uid).order('created_at', { ascending: false }),
-      supabase.from('cuestionarios_nutricion').select('cliente_id, created_at').eq('entrenador_id', uid)
+      supabase.from('clientes').select('id,nombre,tipo,nivel,peso_actual,peso_objetivo,objetivo,nutricion_activa,plan_online').in('entrenador_id', equipo).eq('estado','activo').order('nombre'),
+      supabase.from('planes_nutricion').select('*, clientes(nombre)').in('entrenador_id', equipo).order('created_at', { ascending: false }),
+      supabase.from('cuestionarios_nutricion').select('cliente_id, created_at').in('entrenador_id', equipo)
     ])
     setClientes(cl || [])
     setPlanes(pl || [])
@@ -146,7 +149,7 @@ export default function Nutricion({ session }) {
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 
   const OBJETIVO_LABEL = { perdida_grasa:'Pérdida de grasa', ganancia_muscular:'Ganancia muscular', tonificacion:'Tonificación', fuerza:'Fuerza', rendimiento:'Rendimiento', salud_general:'Salud general', cambio_rapido_30dias:'Cambio 30 días' }
-  const OBJETIVO_COLOR = { perdida_grasa:'#f59e0b', ganancia_muscular:'#6366f1', tonificacion:'#10b981', fuerza:'#ef4444', rendimiento:'#0ea5e9', salud_general:'#10b981', cambio_rapido_30dias:'#FF5C00' }
+  const OBJETIVO_COLOR = { perdida_grasa:'#f59e0b', ganancia_muscular:'#6366f1', tonificacion:'#10b981', fuerza:'#ef4444', rendimiento:'#0ea5e9', salud_general:'#10b981', cambio_rapido_30dias:BRAND.color }
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
@@ -164,7 +167,7 @@ export default function Nutricion({ session }) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
-          ['Con nutrición', clientesConNutricion.length, '#FF5C00'],
+          ['Con nutrición', clientesConNutricion.length, BRAND.color],
           ['Pendientes', clientesSinPlan.length, '#f59e0b'],
           ['Publicados', planes.filter(p=>p.estado==='publicado').length, '#10b981'],
         ].map(([l,v,col])=>(
@@ -190,7 +193,7 @@ export default function Nutricion({ session }) {
               const tieneCuest = cuests.some(cu => cu.cliente_id === c.id)
               return (
                 <div key={c.id} className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-[#FF5C00] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{ini(c.nombre)}</div>
+                  <div className="w-8 h-8 bg-acento rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{ini(c.nombre)}</div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[#0A0A0A] truncate">{c.nombre}</p>
                     <p className="text-xs text-[#6B6B6B]">{tieneCuest ? '✓ Cuestionario completado' : '⚠ Sin cuestionario'}</p>
@@ -210,7 +213,7 @@ export default function Nutricion({ session }) {
                       </button>
                     )}
                     <button onClick={() => generarPlan(c.id)} disabled={generando === c.id}
-                      className="bg-[#FF5C00] text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
+                      className="bg-acento text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
                       {generando === c.id ? <span className='flex items-center gap-1.5'><span className='w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin'/> Generando...</span> : '✨ Generar con IA'}
                     </button>
                   </div>
@@ -227,13 +230,13 @@ export default function Nutricion({ session }) {
           <div className="relative mb-3">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar por cliente..."
-              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+              className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
             {busqueda && <button onClick={() => setBusqueda('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#6B6B6B]">×</button>}
           </div>
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
             {[['todos','Todos'],['borrador','Por revisar'],['publicado','Publicado']].map(([v,l])=>(
               <button key={v} onClick={() => setFiltro(v)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtro===v?'bg-[#FF5C00] text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-[#FF5C00]'}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtro===v?'bg-acento text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
                 {l}
               </button>
             ))}
@@ -251,14 +254,14 @@ export default function Nutricion({ session }) {
           </div>
         ) : planFiltrado.map(p => {
           const obj = p.objetivo || 'perdida_grasa'
-          const objColor = OBJETIVO_COLOR[obj] || '#FF5C00'
+          const objColor = OBJETIVO_COLOR[obj] || BRAND.color
           const objLabel = OBJETIVO_LABEL[obj] || obj
           const menu = p.borrador?.menu || p.contenido?.menu || []
           const hoy = new Date().toLocaleDateString('es-ES',{weekday:'long'}).replace(/^\w/,c=>c.toUpperCase())
           const diaHoy = menu.find(d => d.dia === hoy) || menu[0]
           return (
           <div key={p.id} onClick={() => abrirDetalle(p)}
-            className="bg-white rounded-2xl border border-black/5 shadow-sm hover:shadow-md hover:border-[#FF5C00]/20 transition-all cursor-pointer">
+            className="bg-white rounded-2xl border border-black/5 shadow-sm hover:shadow-md hover:border-acento/20 transition-all cursor-pointer">
             {/* Header con objetivo */}
             <div className="px-4 pt-4 pb-3 border-b border-black/5">
               <div className="flex items-center justify-between mb-2">
@@ -269,7 +272,7 @@ export default function Nutricion({ session }) {
                   </div>
                   <div>
                     <button onClick={e=>{e.stopPropagation();setQuickView(p.cliente_id)}}
-                      className="text-sm font-bold text-[#0A0A0A] hover:text-[#FF5C00] transition-colors block text-left">
+                      className="text-sm font-bold text-[#0A0A0A] hover:text-acento transition-colors block text-left">
                       {p.clientes?.nombre}
                     </button>
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
@@ -286,7 +289,7 @@ export default function Nutricion({ session }) {
               {/* Macros prominentes */}
               <div className="grid grid-cols-4 gap-2 mt-3">
                 {[
-                  [p.calorias_dia, 'kcal', '#FF5C00'],
+                  [p.calorias_dia, 'kcal', BRAND.color],
                   [p.proteinas_g + 'g', 'Proteína', '#6366f1'],
                   [p.carbohidratos_g + 'g', 'Carbos', '#f59e0b'],
                   [p.grasas_g + 'g', 'Grasas', '#10b981'],
@@ -320,7 +323,7 @@ export default function Nutricion({ session }) {
             <div className="px-4 pb-3 flex gap-2" onClick={e=>e.stopPropagation()}>
               {p.estado==='borrador' && (
                 <button onClick={() => abrirDetalle(p)}
-                  className="flex-1 bg-[#FF5C00] text-white text-xs font-semibold py-2 rounded-xl">
+                  className="flex-1 bg-acento text-white text-xs font-semibold py-2 rounded-xl">
                   Revisar y publicar →
                 </button>
               )}
@@ -357,15 +360,15 @@ export default function Nutricion({ session }) {
                 return (
                 <div key={c.id} className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                    style={{background: activo ? '#FF5C00' : '#C0C0C0'}}>{ini(c.nombre)}</div>
+                    style={{background: activo ? BRAND.color : '#C0C0C0'}}>{ini(c.nombre)}</div>
                   <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre.split(' ')[0]}</p>
                   {esOnline
                     ? <button onClick={() => { navigate('/clientes', { state: { abrirId: c.id, tab: 'resumen' } }) }}
-                        className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all hover:opacity-75 ${activo ? 'bg-[#FF5C00]/10 text-[#FF5C00]' : 'bg-black/5 text-[#9B9B9B]'}`}>
+                        className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all hover:opacity-75 ${activo ? 'bg-acento/10 text-acento' : 'bg-black/5 text-[#9B9B9B]'}`}>
                         {activo ? (c.plan_online === 'completo' ? '⚡ Completo' : '🥗 Online') : 'Sin plan →'}
                       </button>
                     : <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
-                        className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                        className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
                         <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
                       </button>
                   }
@@ -378,7 +381,7 @@ export default function Nutricion({ session }) {
             <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Resumen</p>
             <div className="space-y-2">
               {[
-                ['Activos', clientesConNutricion.length, '#FF5C00'],
+                ['Activos', clientesConNutricion.length, BRAND.color],
                 ['Borradores', planes.filter(p=>p.estado==='borrador').length, '#6366f1'],
                 ['Publicados', planes.filter(p=>p.estado==='publicado').length, '#10b981'],
                 ['Sin plan', clientesSinPlan.length, '#f59e0b'],
@@ -406,14 +409,14 @@ export default function Nutricion({ session }) {
               return (
               <div key={c.id} className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                  style={{background: activo ? '#FF5C00' : '#C0C0C0'}}>{ini(c.nombre)}</div>
+                  style={{background: activo ? BRAND.color : '#C0C0C0'}}>{ini(c.nombre)}</div>
                 <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre}</p>
                 {esOnline
-                  ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${activo ? 'bg-[#FF5C00]/10 text-[#FF5C00]' : 'bg-black/5 text-[#9B9B9B]'}`}>
+                  ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${activo ? 'bg-acento/10 text-acento' : 'bg-black/5 text-[#9B9B9B]'}`}>
                       {activo ? '🟠 Online' : 'Sin plan'}
                     </span>
                   : <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
-                      className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-[#FF5C00]' : 'bg-black/20'}`}>
+                      className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
                       <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
                     </button>
                 }
@@ -438,7 +441,7 @@ export default function Nutricion({ session }) {
             <div className="p-4 space-y-4">
               {/* Macros resumen */}
               <div className="grid grid-cols-4 gap-2">
-                <MacroBadge label="Calorías" valor={detalle.calorias_dia} unit="kcal" color="#FF5C00" />
+                <MacroBadge label="Calorías" valor={detalle.calorias_dia} unit="kcal" color={BRAND.color} />
                 <MacroBadge label="Proteínas" valor={detalle.proteinas_g} unit="g" color="#6366f1" />
                 <MacroBadge label="Carbos" valor={detalle.carbohidratos_g} unit="g" color="#f59e0b" />
                 <MacroBadge label="Grasas" valor={detalle.grasas_g} unit="g" color="#10b981" />
@@ -458,7 +461,7 @@ export default function Nutricion({ session }) {
                 <div className="flex gap-1.5 overflow-x-auto pb-1">
                   {DIAS_SEMANA.map((d,i) => (
                     <button key={d} onClick={() => setDiaActivo(i)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${diaActivo===i?'bg-[#FF5C00] text-white':'bg-[#F5F5F0] text-[#6B6B6B] hover:bg-black/10'}`}>
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${diaActivo===i?'bg-acento text-white':'bg-[#F5F5F0] text-[#6B6B6B] hover:bg-black/10'}`}>
                       {d.slice(0,3)}
                     </button>
                   ))}
@@ -504,12 +507,12 @@ export default function Nutricion({ session }) {
                                   const copy = JSON.parse(JSON.stringify(editComidaData))
                                   copy.alimentos[j].nombre = e.target.value
                                   setEditComidaData(copy)
-                                }} className="flex-1 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="Alimento"/>
+                                }} className="flex-1 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="Alimento"/>
                                 <input value={al.cantidad} onChange={e => {
                                   const copy = JSON.parse(JSON.stringify(editComidaData))
                                   copy.alimentos[j].cantidad = e.target.value
                                   setEditComidaData(copy)
-                                }} className="w-24 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="150g"/>
+                                }} className="w-24 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="150g"/>
                                 <button onClick={() => {
                                   const copy = JSON.parse(JSON.stringify(editComidaData))
                                   copy.alimentos.splice(j, 1)
@@ -521,11 +524,11 @@ export default function Nutricion({ session }) {
                               const copy = JSON.parse(JSON.stringify(editComidaData))
                               copy.alimentos.push({ nombre: '', cantidad: '' })
                               setEditComidaData(copy)
-                            }} className="text-xs text-[#FF5C00] font-semibold">+ Añadir alimento</button>
+                            }} className="text-xs text-acento font-semibold">+ Añadir alimento</button>
                             <div>
                               <label className="text-xs text-amber-700 font-medium block mb-1">Preparación</label>
                               <input value={editComidaData.prep||''} onChange={e => setEditComidaData({...editComidaData, prep: e.target.value})}
-                                className="w-full border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-[#FF5C00]" placeholder="Breve descripción..."/>
+                                className="w-full border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="Breve descripción..."/>
                             </div>
                             <div className="flex gap-2 pt-1">
                               <button onClick={async () => {
@@ -540,7 +543,7 @@ export default function Nutricion({ session }) {
                                   setTimeout(() => setToast(''), 2500)
                                   cargar()
                                 }
-                              }} className="flex-1 bg-[#FF5C00] text-white text-xs font-bold py-2 rounded-lg">Guardar cambios</button>
+                              }} className="flex-1 bg-acento text-white text-xs font-bold py-2 rounded-lg">Guardar cambios</button>
                               <button onClick={() => { setEditandoComida(null); setEditComidaData(null) }}
                                 className="border border-black/10 text-[#6B6B6B] text-xs px-3 py-2 rounded-lg">Cancelar</button>
                             </div>
@@ -602,7 +605,7 @@ export default function Nutricion({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Instrucciones para la IA (al regenerar)</label>
                 <textarea value={instruccionesIA} onChange={e => setInstruccionesIA(e.target.value)} rows={2}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                   placeholder="Ej: desayunos rápidos tipo tostadas o bocadillos, nada de avena ni huevo por las mañanas..." />
                 <p className="text-xs text-[#6B6B6B] mt-1">Se aplica solo al pulsar 🔄 Regenerar, con prioridad máxima sobre el resto de preferencias.</p>
               </div>
@@ -611,14 +614,14 @@ export default function Nutricion({ session }) {
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas para el cliente</label>
                 <textarea value={notasEdit} onChange={e => setNotasEdit(e.target.value)} rows={3}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] resize-none"
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                   placeholder="Indicaciones especiales, ajustes, contexto..." />
               </div>
 
               {/* Acciones */}
               <div className="flex gap-2">
                 {detalle.estado==='borrador' && (
-                  <button onClick={() => publicar(detalle)} className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">
+                  <button onClick={() => publicar(detalle)} className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl">
                     ✅ Publicar para el cliente
                   </button>
                 )}
@@ -690,7 +693,7 @@ export default function Nutricion({ session }) {
                   {cuestDetalle.interes_suplementacion && (
                     suplementacion?.recomendaciones?.length > 0 ? (
                       <button onClick={() => generarSuplementacionAdmin(detalle.cliente_id)} disabled={generandoSup}
-                        className="text-xs font-semibold text-[#FF5C00] disabled:opacity-40">
+                        className="text-xs font-semibold text-acento disabled:opacity-40">
                         {generandoSup ? '⏳ Regenerando...' : '🔄 Regenerar'}
                       </button>
                     ) : (
@@ -727,13 +730,13 @@ export default function Nutricion({ session }) {
                     <div key={k}>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
                       <input type={t} value={cuest[k]||''} onChange={e=>setCuest(c=>({...c,[k]:e.target.value}))}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                     </div>
                   ))}
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Sexo</label>
                     <select value={cuest.sexo||''} onChange={e=>setCuest(c=>({...c,sexo:e.target.value}))}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                       <option value="">Selecciona</option>
                       <option value="hombre">Hombre</option>
                       <option value="mujer">Mujer</option>
@@ -749,7 +752,7 @@ export default function Nutricion({ session }) {
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Nivel de actividad</label>
                     <select value={cuest.nivel_actividad||''} onChange={e=>setCuest(c=>({...c,nivel_actividad:e.target.value}))}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                       <option value="">Selecciona</option>
                       <option value="sedentario">Sedentario (sin ejercicio)</option>
                       <option value="ligero">Ligero (1-2 días/sem)</option>
@@ -761,7 +764,7 @@ export default function Nutricion({ session }) {
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Objetivo nutricional</label>
                     <select value={cuest.objetivo||''} onChange={e=>setCuest(c=>({...c,objetivo:e.target.value}))}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                       <option value="">Selecciona</option>
                       <option value="perdida_grasa">Pérdida de grasa</option>
                       <option value="ganancia_muscular">Ganancia muscular</option>
@@ -773,7 +776,7 @@ export default function Nutricion({ session }) {
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Velocidad de progreso</label>
                     <select value={cuest.velocidad_progreso||''} onChange={e=>setCuest(c=>({...c,velocidad_progreso:e.target.value}))}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                       <option value="">Selecciona</option>
                       <option value="lento">Lento y sostenible (0.25kg/sem)</option>
                       <option value="moderado">Moderado (0.5kg/sem)</option>
@@ -791,7 +794,7 @@ export default function Nutricion({ session }) {
                     <div>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Comidas al día</label>
                       <select value={cuest.comidas_dia||''} onChange={e=>setCuest(c=>({...c,comidas_dia:Number(e.target.value)}))}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                         <option value="">—</option>
                         {[2,3,4,5,6].map(n=><option key={n} value={n}>{n} comidas</option>)}
                       </select>
@@ -799,7 +802,7 @@ export default function Nutricion({ session }) {
                     <div>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Tiempo cocinar</label>
                       <select value={cuest.tiempo_cocina||''} onChange={e=>setCuest(c=>({...c,tiempo_cocina:e.target.value}))}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                         <option value="">—</option>
                         <option value="10-15 minutos">Muy poco (10-15 min)</option>
                         <option value="30 minutos">Normal (30 min)</option>
@@ -810,7 +813,7 @@ export default function Nutricion({ session }) {
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Tipo de dieta</label>
                     <select value={cuest.tipo_dieta||''} onChange={e=>setCuest(c=>({...c,tipo_dieta:e.target.value}))}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                       <option value="">Selecciona</option>
                       {['Omnívora','Vegetariana','Vegana','Pescetariana','Sin gluten','Sin lactosa','Cetogénica','Paleo'].map(d=><option key={d} value={d.toLowerCase()}>{d}</option>)}
                     </select>
@@ -818,7 +821,7 @@ export default function Nutricion({ session }) {
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Entrena cuándo</label>
                     <select value={cuest.entrena_cuando||''} onChange={e=>setCuest(c=>({...c,entrena_cuando:e.target.value}))}
-                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white">
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                       <option value="">—</option>
                       <option value="mañana en ayunas">Mañana en ayunas</option>
                       <option value="mañana">Mañana (con desayuno)</option>
@@ -838,7 +841,7 @@ export default function Nutricion({ session }) {
                     <div key={k}>
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
                       <input value={cuest[k]||''} onChange={e=>setCuest(c=>({...c,[k]:e.target.value}))} placeholder={ph}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                     </div>
                   ))}
                 </div>
@@ -847,7 +850,7 @@ export default function Nutricion({ session }) {
             <div className="p-4 border-t border-black/5 sticky bottom-0 bg-white flex gap-2">
               <button onClick={() => setModalCuest(null)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-3 rounded-xl">Cancelar</button>
               <button onClick={() => guardarCuest(modalCuest.id)}
-                className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl">
+                className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl">
                 💾 Guardar y generar plan
               </button>
             </div>
@@ -867,7 +870,7 @@ export default function Nutricion({ session }) {
               📋 Copiar enlace para el cliente
             </button>
             <button onClick={() => { const c = clientes.find(x=>x.id===modalActivar); setModalCuest(c); setCuest({ peso: c?.peso_actual, objetivo: c?.objetivo }); setModalActivar(null) }}
-              className="w-full bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl">
+              className="w-full bg-acento text-white text-sm font-semibold py-2.5 rounded-xl">
               ✍️ Rellenar yo ahora
             </button>
             <button onClick={() => setModalActivar(null)} className="mt-2 text-xs text-[#6B6B6B]">Cerrar</button>

@@ -236,7 +236,7 @@ export default function HealthCheck({ session }) {
 
       {ejecutando && (
         <div className="bg-black/5 rounded-full h-1.5 mb-4 overflow-hidden">
-          <div className="h-full bg-[#FF5C00] rounded-full transition-all duration-300" style={{ width: `${progreso}%` }} />
+          <div className="h-full bg-acento rounded-full transition-all duration-300" style={{ width: `${progreso}%` }} />
         </div>
       )}
 

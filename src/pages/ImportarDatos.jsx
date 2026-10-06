@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND } from '../lib/brand'
 
 const CAMPOS_CSV = [
   { key: 'nombre', label: 'Nombre', requerido: true },
@@ -140,7 +141,7 @@ export default function ImportarDatos({ session }) {
       <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
         {[['1','Subir CSV'],['2','Mapear campos'],['3','Previsualizar'],['4','Resultado']].map(([n,l],i) => (
           <div key={n} className="flex items-center gap-2 flex-shrink-0">
-            <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${paso > i+1 ? 'bg-emerald-500 text-white' : paso === i+1 ? 'bg-[#FF5C00] text-white' : 'bg-black/10 text-[#6B6B6B]'}`}>
+            <div className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${paso > i+1 ? 'bg-emerald-500 text-white' : paso === i+1 ? 'bg-acento text-white' : 'bg-black/10 text-[#6B6B6B]'}`}>
               {paso > i+1 ? '✓' : n}
             </div>
             <span className={`text-xs font-medium ${paso === i+1 ? 'text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>{l}</span>
@@ -163,7 +164,7 @@ export default function ImportarDatos({ session }) {
             onChange={e => handleFile(e.target.files[0])} />
 
           <div onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-black/15 rounded-2xl p-10 text-center cursor-pointer hover:border-[#FF5C00] hover:bg-[#FF5C00]/3 transition-all">
+            className="border-2 border-dashed border-black/15 rounded-2xl p-10 text-center cursor-pointer hover:border-acento hover:bg-acento/3 transition-all">
             <p className="text-4xl mb-3">📂</p>
             <p className="font-semibold text-[#0A0A0A] mb-1">Arrastra tu CSV aquí o pulsa para seleccionar</p>
             <p className="text-sm text-[#6B6B6B]">Archivos .csv o .txt</p>
@@ -193,7 +194,7 @@ export default function ImportarDatos({ session }) {
             <p className="text-xs text-[#6B6B6B] mt-1">Columnas detectadas: {csvData.headers.join(', ')}</p>
           </div>
 
-          <p className="text-sm font-semibold text-[#0A0A0A]">Relaciona las columnas de tu archivo con los campos de Forge:</p>
+          <p className="text-sm font-semibold text-[#0A0A0A]">{`Relaciona las columnas de tu archivo con los campos de ${BRAND.nombre}:`}</p>
 
           <div className="space-y-2">
             {CAMPOS_CSV.map(campo => (
@@ -201,12 +202,12 @@ export default function ImportarDatos({ session }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#0A0A0A]">
                     {campo.label}
-                    {campo.requerido && <span className="text-[#FF5C00] ml-1">*</span>}
+                    {campo.requerido && <span className="text-acento ml-1">*</span>}
                   </p>
                 </div>
                 <select value={mapeo[campo.key] || ''}
                   onChange={e => setMapeo(m => ({ ...m, [campo.key]: e.target.value }))}
-                  className="border border-black/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#FF5C00] bg-white flex-shrink-0">
+                  className="border border-black/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-acento bg-white flex-shrink-0">
                   <option value="">— No importar —</option>
                   {csvData.headers.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
@@ -217,7 +218,7 @@ export default function ImportarDatos({ session }) {
           <div className="flex gap-2">
             <button onClick={resetear} className="flex-1 border border-black/10 text-[#6B6B6B] text-sm py-3 rounded-xl">← Volver</button>
             <button onClick={generarPreview} disabled={!mapeo.nombre}
-              className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
+              className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
               Previsualizar →
             </button>
           </div>
@@ -238,7 +239,7 @@ export default function ImportarDatos({ session }) {
             {preview.map((c, i) => (
               <div key={i} className="bg-white border border-black/5 rounded-xl p-3.5">
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-[#FF5C00]/10 rounded-xl flex items-center justify-center text-[#FF5C00] font-bold text-xs flex-shrink-0">
+                  <div className="w-9 h-9 bg-acento/10 rounded-xl flex items-center justify-center text-acento font-bold text-xs flex-shrink-0">
                     {(c.nombre||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -263,7 +264,7 @@ export default function ImportarDatos({ session }) {
           <div className="flex gap-2">
             <button onClick={() => setPaso(2)} className="flex-1 border border-black/10 text-[#6B6B6B] text-sm py-3 rounded-xl">← Revisar mapeo</button>
             <button onClick={importar} disabled={importando}
-              className="flex-1 bg-[#FF5C00] text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
+              className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl disabled:opacity-40">
               {importando ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -300,7 +301,7 @@ export default function ImportarDatos({ session }) {
             <button onClick={resetear} className="border border-black/10 text-sm font-medium px-5 py-2.5 rounded-xl">
               Importar más
             </button>
-            <a href="/clientes" className="bg-[#FF5C00] text-white text-sm font-semibold px-5 py-2.5 rounded-xl">
+            <a href="/clientes" className="bg-acento text-white text-sm font-semibold px-5 py-2.5 rounded-xl">
               Ver clientes →
             </a>
           </div>

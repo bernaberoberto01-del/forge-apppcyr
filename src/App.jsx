@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { ConfigContext, useConfigLoader } from './hooks/useConfig'
 import { CentroProvider } from './hooks/useCentro.jsx'
+import { moduloVisible } from './lib/modulos'
 
 import Layout from './components/Layout'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -48,6 +49,7 @@ import SesionCliente from './pages/SesionCliente'
 import ProgresoCliente from './pages/ProgresoCliente'
 import UnirseACentro from './pages/UnirseACentro'
 import HealthCheck from './pages/HealthCheck'
+import { BRAND } from './lib/brand'
 
 // Rutas privadas con layout
 function AppPrivada({ session }) {
@@ -73,14 +75,14 @@ function AppPrivada({ session }) {
         <Layout session={session} config={config}>
           <Routes>
             <Route path="/dashboard" element={<Dashboard session={session} />} />
-            <Route path="/clientes" element={<Clientes session={session} />} />
-            <Route path="/grupos" element={<Grupos session={session} />} />
-            <Route path="/rutinas" element={<Rutinas session={session} />} />
-            <Route path="/seguimiento" element={<Seguimiento session={session} />} />
-            <Route path="/pagos" element={<Pagos session={session} />} />
-            <Route path="/agenda" element={<Agenda session={session} />} />
-            <Route path="/nutricion" element={<Nutricion session={session} />} />
-            <Route path="/mensajes" element={<Mensajes session={session} />} />
+            <Route path="/clientes" element={moduloVisible('clientes') ? <Clientes session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/grupos" element={moduloVisible('clientes') ? <Grupos session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/rutinas" element={moduloVisible('rutinas') ? <Rutinas session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/seguimiento" element={moduloVisible('seguimiento') ? <Seguimiento session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/pagos" element={moduloVisible('pagos') ? <Pagos session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/agenda" element={moduloVisible('agenda') ? <Agenda session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/nutricion" element={moduloVisible('nutricion') ? <Nutricion session={session} /> : <Navigate to="/dashboard" replace />} />
+            <Route path="/mensajes" element={moduloVisible('mensajes') ? <Mensajes session={session} /> : <Navigate to="/dashboard" replace />} />
             <Route path="/biblioteca" element={<Biblioteca session={session} />} />
             <Route path="/centro" element={<AdminCentro session={session} />} />
             <Route path="/importar" element={<ImportarDatos session={session} />} />
@@ -153,7 +155,7 @@ function PortalEntrada({ session }) {
 
   if (estado === undefined) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -173,7 +175,7 @@ function PortalEntrada({ session }) {
         <p className="font-bold text-xl mb-2 text-[#0A0A0A]">{msg.titulo}</p>
         <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">{msg.texto}</p>
         <button onClick={() => supabase.auth.signOut().then(() => { window.location.href = '/portal' })}
-          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: '#FF5C00' }}>Cerrar sesión y volver</button>
+          className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: BRAND.color }}>Cerrar sesión y volver</button>
       </div>
     </div>
   )
@@ -209,7 +211,7 @@ function AreaPrivada({ session }) {
 
   if (esCliente === undefined) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
@@ -239,7 +241,7 @@ export default function App() {
   // Cargando sesión
   if (session === undefined) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F0]">
-      <div className="w-8 h-8 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-4 border-acento border-t-transparent rounded-full animate-spin" />
     </div>
   )
 

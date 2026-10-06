@@ -1,12 +1,13 @@
 import { useState, useEffect, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND, colorMarca } from '../lib/brand'
 
 const defaultConfig = {
-  nombre_negocio: 'Forge Studio OS',
+  nombre_negocio: BRAND.nombreCompleto,
   nombre_entrenador: '',
   bio: '',
   foto_url: '',
-  color_acento: '#FF5C00',
+  color_acento: BRAND.color,
   modulos: { dashboard:true, clientes:true, rutinas:true, sesiones:true, seguimiento:true, pagos:true, agenda:true, mensajes:true },
   cuestionario_bloques: { basico:true, objetivo:true, historial:true, disponibilidad:true, material:true, salud:true, motivacion:true }
 }
@@ -25,11 +26,12 @@ function hexToRgb(hex) {
   return { hover, light: `rgba(${r},${g},${b},0.08)`, border: `rgba(${r},${g},${b},0.2)` }
 }
 
-function aplicarColor(acento) {
+export function aplicarColor(acento) {
   if (!acento) return
   const { hover, light, border } = hexToRgb(acento)
   const root = document.documentElement
   root.style.setProperty('--acento', acento)
+  root.style.setProperty('--acento-rgb', `${parseInt(acento.slice(1,3),16)} ${parseInt(acento.slice(3,5),16)} ${parseInt(acento.slice(5,7),16)}`)
   root.style.setProperty('--acento-hover', hover)
   root.style.setProperty('--acento-light', light)
   root.style.setProperty('--acento-border', border)
@@ -53,7 +55,7 @@ export function useConfigLoader(uid) {
         cuestionario_bloques: { ...defaultConfig.cuestionario_bloques, ...(data.cuestionario_bloques || {}) }
       }
       setConfig(merged)
-      aplicarColor(merged.color_acento)
+      aplicarColor(colorMarca(merged.color_acento))
     } else {
       setConfig(null)
     }
@@ -64,7 +66,7 @@ export function useConfigLoader(uid) {
 
   function actualizar(nuevaConfig) {
     setConfig(nuevaConfig)
-    aplicarColor(nuevaConfig.color_acento)
+    aplicarColor(colorMarca(nuevaConfig.color_acento))
   }
 
   return { config, loading, actualizar }

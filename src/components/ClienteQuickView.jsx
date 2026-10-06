@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useNavigate } from 'react-router-dom'
 import { TIPOS_MAP } from '../utils/tiposEntrenamiento'
+import { BRAND } from '../lib/brand'
 
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-const AVATARES = ['#FF5C00','#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6']
+const AVATARES = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6']
 const avatarColor = n => AVATARES[(n||'').charCodeAt(0) % AVATARES.length]
 
 export default function ClienteQuickView({ clienteId, onClose }) {
@@ -45,7 +46,7 @@ export default function ClienteQuickView({ clienteId, onClose }) {
       <div className="bg-white rounded-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {loading ? (
           <div className="flex items-center justify-center h-40">
-            <div className="w-6 h-6 border-4 border-[#FF5C00] border-t-transparent rounded-full animate-spin"/>
+            <div className="w-6 h-6 border-4 border-acento border-t-transparent rounded-full animate-spin"/>
           </div>
         ) : !cliente ? (
           <div className="p-6 text-center"><p className="text-[#6B6B6B]">Cliente no encontrado</p></div>
@@ -142,7 +143,7 @@ export default function ClienteQuickView({ clienteId, onClose }) {
               {/* Acciones rápidas */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button onClick={() => { navigate('/clientes'); onClose(); setTimeout(() => window.dispatchEvent(new CustomEvent('abrir-cliente', { detail: clienteId })), 300) }}
-                  className="col-span-2 bg-[#FF5C00] text-white text-sm font-semibold py-2.5 rounded-xl">
+                  className="col-span-2 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl">
                   Ver perfil completo →
                 </button>
                 <button onClick={() => { navigate('/seguimiento'); onClose() }}

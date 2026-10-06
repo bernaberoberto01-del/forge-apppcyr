@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { BRAND, colorMarca } from '../lib/brand'
+import BrandMark from '../components/BrandMark'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const qa = p => p.then(r => r.data || []).catch(() => [])
@@ -102,7 +104,7 @@ export default function PortalForge() {
     showToast('👁 Modo vista previa — solo lectura')
   }
 
-  const color = config?.color_acento || '#FF5C00'
+  const color = colorMarca(config?.color_acento)
 
   const ACTIVIDADES = [
     { id: 'footing', label: '🏃 Footing' }, { id: 'ciclismo', label: '🚴 Ciclismo' },
@@ -368,10 +370,10 @@ export default function PortalForge() {
   if (sesion === undefined || cargando) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: '#0A0A0A' }}>
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#FF5C00' }}>
-          <svg width="24" height="24" viewBox="0 0 28 28" fill="none"><rect x="5" y="5" width="4" height="18" rx="1" fill="white"/><rect x="5" y="5" width="13" height="4" rx="1" fill="white"/><rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/></svg>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: BRAND.color }}>
+          <BrandMark size={24} />
         </div>
-        <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#FF5C00', borderTopColor: 'transparent' }} />
+        <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: BRAND.color, borderTopColor: 'transparent' }} />
       </div>
     </div>
   )
@@ -540,9 +542,9 @@ export default function PortalForge() {
         <div className="px-5 py-6 border-b border-black/5">
           <div className="flex items-center gap-3 mb-5">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: color }}>
-              <svg width="18" height="18" viewBox="0 0 28 28" fill="none"><rect x="5" y="5" width="4" height="18" rx="1" fill="white"/><rect x="5" y="5" width="13" height="4" rx="1" fill="white"/><rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/></svg>
+              <BrandMark size={18} />
             </div>
-            <div><p className="text-xs font-bold text-[#0A0A0A]">Forge</p><p className="text-[10px] text-[#9B9B9B]">Tu portal</p></div>
+            <div><p className="text-xs font-bold text-[#0A0A0A]">{BRAND.nombre}</p><p className="text-[10px] text-[#9B9B9B]">Tu portal</p></div>
           </div>
           <div className="flex items-center gap-3">
             {config?.foto_url
@@ -590,11 +592,7 @@ export default function PortalForge() {
           style={{ background: '#0A0A0A', height: 52, top: pagoVencido ? 32 : 0 }}>
           <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
             style={{ background: color }}>
-            <svg width="14" height="14" viewBox="0 0 28 28" fill="none">
-              <rect x="5" y="5" width="4" height="18" rx="1" fill="white"/>
-              <rect x="5" y="5" width="13" height="4" rx="1" fill="white"/>
-              <rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/>
-            </svg>
+            <BrandMark size={14} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black text-white truncate tracking-tight leading-none">{nombre}</p>
@@ -796,7 +794,7 @@ function LoginPortal() {
         <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">✓</div>
         <p className="text-white font-bold text-xl mb-2">Revisa tu email</p>
         <p className="text-white/50 text-sm mb-6">Te enviamos un enlace para entrar directamente.</p>
-        <button onClick={() => { setEnviado(false); setRecuperar(false) }} className="text-[#FF5C00] text-sm font-semibold">← Volver</button>
+        <button onClick={() => { setEnviado(false); setRecuperar(false) }} className="text-acento text-sm font-semibold">← Volver</button>
       </div>
     </div>
   )
@@ -805,10 +803,10 @@ function LoginPortal() {
     <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: '#FF5C00' }}>
-            <svg width="32" height="32" viewBox="0 0 28 28" fill="none"><rect x="5" y="5" width="4" height="18" rx="1" fill="white"/><rect x="5" y="5" width="13" height="4" rx="1" fill="white"/><rect x="5" y="13" width="9" height="3.5" rx="1" fill="white"/></svg>
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: BRAND.color }}>
+            <BrandMark size={32} />
           </div>
-          <h1 className="text-white text-2xl font-bold tracking-tight">Forge</h1>
+          <h1 className="text-white text-2xl font-bold tracking-tight">{BRAND.nombre}</h1>
           <p className="text-white/40 text-sm mt-1">Tu portal de entrenamiento</p>
         </div>
         <div className="rounded-2xl p-6 border border-white/8" style={{ background: 'rgba(255,255,255,0.05)' }}>
@@ -823,7 +821,7 @@ function LoginPortal() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-white/50 text-xs font-medium">Contraseña</label>
-                  <button type="button" onClick={() => setRecuperar(true)} className="text-[#FF5C00] text-xs font-medium">¿La olvidaste?</button>
+                  <button type="button" onClick={() => setRecuperar(true)} className="text-acento text-xs font-medium">¿La olvidaste?</button>
                 </div>
                 <input type="password" value={pass} onChange={e => setPass(e.target.value)} required placeholder="••••••••"
                   className="w-full rounded-xl px-4 py-3 text-white text-sm placeholder:text-white/20 focus:outline-none border border-white/10"
@@ -833,7 +831,7 @@ function LoginPortal() {
             {error && <p className="text-red-400 text-xs rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.1)' }}>{error}</p>}
             <button type="submit" disabled={loading || !email || (!recuperar && !pass)}
               className="w-full font-bold py-3.5 rounded-xl text-white disabled:opacity-40 active:scale-95 transition-all"
-              style={{ background: '#FF5C00' }}>{loading ? '...' : recuperar ? 'Enviar enlace' : 'Entrar'}</button>
+              style={{ background: BRAND.color }}>{loading ? '...' : recuperar ? 'Enviar enlace' : 'Entrar'}</button>
             {recuperar && <button type="button" onClick={() => setRecuperar(false)} className="w-full text-white/40 text-sm py-2">← Volver</button>}
           </form>
         </div>
@@ -848,7 +846,7 @@ function OnboardingNuevoCliente({ cliente, color, config, pasoCuestionarioDone, 
   const obligatoriosListos = pasoCuestionarioDone && pasoCheckinDone
   const completados = (pasoCuestionarioDone ? 1 : 0) + (pasoCheckinDone ? 1 : 0) + (pasoRutinaDone ? 1 : 0)
   const pasoActual = Math.min(completados + 1, 3)
-  const urlCuestionario = `https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`
+  const urlCuestionario = `${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`
 
   return (
     <div className="rounded-3xl p-5 md:p-6" style={{ background: '#0A0A0A' }}>
@@ -1039,11 +1037,11 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
       {esNuevo && (
         <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
           <div className="px-5 py-6">
-            <p className="text-white/60 text-xs font-semibold mb-1.5">Bienvenido a Forge</p>
+            <p className="text-white/60 text-xs font-semibold mb-1.5">{`Bienvenido a ${BRAND.nombre}`}</p>
             <p className="text-white font-bold text-xl leading-snug">{config?.nombre_entrenador||'Tu entrenador'} está preparando tu plan</p>
             <p className="text-white/60 text-sm mt-2">En breve tendrás tu rutina, plan de nutrición y progreso.</p>
             {verNutricion && !cuest && (
-              <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+              <a href={`${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
                 className="mt-4 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white font-black text-sm active:scale-95 transition-all"
                 style={{ color }}>
                 🥗 Rellenar cuestionario de nutrición →
@@ -1059,7 +1057,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
 
       {/* Cuestionario nutrición */}
       {verNutricion && !nutricion && !cuest && !esNuevo && (
-        <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
+        <a href={`${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
           className="flex items-center gap-4 rounded-2xl p-4 active:scale-95 transition-all"
           style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><span className="text-xl">🥗</span></div>
@@ -1487,7 +1485,7 @@ function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensa
         <input value={textoMsg} onChange={e => setTextoMsg(e.target.value)}
           placeholder={modoPreview ? 'Solo lectura en vista previa' : 'Escribe un mensaje...'}
           disabled={modoPreview}
-          className="flex-1 border border-black/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00] bg-white disabled:opacity-50" />
+          className="flex-1 border border-black/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-acento bg-white disabled:opacity-50" />
         <button type="submit" disabled={!textoMsg.trim() || enviandoMsg || modoPreview}
           className="px-4 py-3 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
           style={{ background: color }}>
@@ -1922,7 +1920,7 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
         {!cuest
           ? <div className="mt-5">
               <p className="text-sm text-[#6B6B6B] mb-4 leading-relaxed max-w-xs mx-auto">Tu entrenador necesita tu cuestionario para crear tu plan.</p>
-              <a href={`https://forge-studio-os.vercel.app/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
+              <a href={`${window.location.origin}/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
                 className="inline-block text-white text-sm font-black px-6 py-3 rounded-xl"
                 style={{ background: color }}>Rellenar cuestionario →</a>
             </div>
@@ -2945,7 +2943,7 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
             <div className="flex items-center gap-2">
               <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso}
                 onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
-                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FF5C00]" />
+                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-acento" />
               <span className="text-sm text-[#9B9B9B] font-medium">kg</span>
             </div>
           </div>

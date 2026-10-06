@@ -7,3 +7,5 @@ supabase/.temp/
 .sec-audit-tmp/
 test-results/
 playwright-report/
+datos-privados/
+.vercel

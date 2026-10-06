@@ -5,6 +5,7 @@
 
 :root {
   --acento: #FF5C00;
+  --acento-rgb: 255 92 0;
   --acento-hover: #E05200;
   --acento-light: rgba(255,92,0,0.08);
   --acento-border: rgba(255,92,0,0.2);
@@ -13,12 +14,9 @@
 * { box-sizing: border-box; }
 body { font-family: 'Inter', sans-serif; background: #F5F5F0; color: #0A0A0A; }
 
-/* Clases dinámicas que usan la variable CSS */
-.bg-acento { background-color: var(--acento) !important; }
-.text-acento { color: var(--acento) !important; }
-.border-acento { border-color: var(--acento) !important; }
+/* bg-/text-/border-/ring-acento las genera Tailwind (tailwind.config.js) a partir
+   de --acento-rgb, con soporte de opacidad (bg-acento/10). Aquí solo las que no. */
 .hover-acento:hover { background-color: var(--acento) !important; color: white !important; }
-.ring-acento { --tw-ring-color: var(--acento) !important; }
 .bg-acento-light { background-color: var(--acento-light) !important; }
 .border-acento-light { border-color: var(--acento-border) !important; }
 

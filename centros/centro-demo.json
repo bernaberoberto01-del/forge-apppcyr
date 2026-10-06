@@ -1,0 +1,18 @@
+{
+  "id": "centro-demo",
+  "marca": {
+    "nombre": "Centro Demo",
+    "eslogan": "Entrena con nosotros",
+    "nombreCompleto": "Centro Demo Fitness",
+    "descripcion": "Centro Demo Fitness — Tu portal de entrenamiento",
+    "color": "#2563EB",
+    "logo": "/centros/centro-demo/logo.svg",
+    "icono": "/centros/centro-demo/logo.svg"
+  },
+  "app": {
+    "url": "http://localhost:5174"
+  },
+  "supabase": {
+    "proyecto": null
+  }
+}
