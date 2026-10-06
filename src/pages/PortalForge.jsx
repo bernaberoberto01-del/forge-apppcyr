@@ -20,6 +20,13 @@ const formatearFecha = (fecha, opciones = { day: 'numeric', month: 'short', year
   if (isNaN(d.getTime())) return '—'
   return d.toLocaleDateString('es-ES', opciones)
 }
+// Mismas reglas que en RegistroCliente.jsx: quita espacios/guiones y antepone
+// +34 a móviles españoles sin prefijo (empiezan por 6, 7 o 9).
+const normalizarTelefono = raw => {
+  const limpio = raw.replace(/[\s-]/g, '')
+  return /^[679]/.test(limpio) ? '+34' + limpio : limpio
+}
+const telefonoValido = raw => raw.replace(/\D/g, '').length >= 9
 const rmEpley = (peso, reps) => reps <= 1 ? peso : +(peso * (1 + reps / 30)).toFixed(1)
 const parseReps = (r) => { if (!r) return 1; const n = parseInt(String(r).split('-')[0]); return isNaN(n) ? 1 : n }
 // Convierte textos de descanso tipo "90s", "2min", "3-4 min" a segundos (usa el número mayor del rango)
@@ -88,7 +95,14 @@ export default function PortalForge() {
   const [enviandoMsg, setEnviandoMsg] = useState(false)
   const [toast, setToast] = useState('')
   const [activandoPlan, setActivandoPlan] = useState(false)
+  const [modoPreview, setModoPreview] = useState(false)
+  const [telefonoInput, setTelefonoInput] = useState('')
+  const [guardandoTelefono, setGuardandoTelefono] = useState(false)
   const mensajesEndRef = useRef(null)
+
+  function bloqueadoPreview() {
+    showToast('👁 Modo vista previa — solo lectura')
+  }
 
   const color = colorMarca(config?.color_acento)
 
@@ -123,11 +137,38 @@ export default function PortalForge() {
     cargarTodo()
   }, [sesion])
 
+  // Clasificación de "cliente nuevo" — se decide UNA vez, con el primer dato
+  // cargado, y no se recalcula aunque los datos cambien durante la sesión.
+  // Así, si completa los pasos mientras el onboarding está abierto, sigue
+  // viendo la pantalla (incluido el estado final "tu plan está listo") en
+  // vez de que desaparezca a mitad de sesión. Al volver a cargar la app de
+  // cero (nueva sesión), se reevalúa con los datos ya actualizados y, si
+  // ya no cumple las 3 condiciones, deja de mostrarse — así es como
+  // "desaparece automáticamente" para el cliente en la práctica.
+  const [modoOnboarding, setModoOnboarding] = useState(null) // null = aún sin decidir
+  useEffect(() => {
+    if (!datos || modoOnboarding !== null) return
+    const esNuevo = !datos.cuest && (datos.checkins?.length || 0) < 2 && !datos.rutina
+    setModoOnboarding(esNuevo)
+  }, [datos])
+
   async function cargarTodo() {
     setCargando(true)
-    const { data: cl, error } = await supabase.from('clientes').select('*').eq('auth_user_id', sesion.id).maybeSingle()
+    // Modo preview: el entrenador abre el portal de un cliente suyo desde Clientes.jsx
+    // (?cliente_id=...). Solo se activa si la sesión logueada es realmente su
+    // entrenador — nunca por un token en la URL (reusable, filtrable en logs/historial).
+    const previewId = new URLSearchParams(window.location.search).get('cliente_id')
+    let cl, error
+    if (previewId) {
+      const r = await supabase.from('clientes').select('*').eq('id', previewId).eq('entrenador_id', sesion.id).maybeSingle()
+      cl = r.data; error = r.error
+    } else {
+      const r = await supabase.from('clientes').select('*').eq('auth_user_id', sesion.id).maybeSingle()
+      cl = r.data; error = r.error
+    }
     if (error || !cl) { setSinCuenta(true); setCargando(false); return }
     setCliente(cl)
+    setModoPreview(!!previewId)
     const cid = cl.id, eid = cl.entrenador_id, hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
@@ -156,12 +197,30 @@ export default function PortalForge() {
 
     setConfig(cfg)
     setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones })
-    supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
-    setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
+    if (!previewId) {
+      supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
+      setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
+      // Onboarding: avisar al entrenador solo la primera vez que coinciden
+      // cuestionario de nutrición + primer check-in (se deduplica consultando
+      // si ya existe la notificación, en vez de depender de un flag en BD).
+      if (cuest && checkins.length >= 1) {
+        supabase.from('notificaciones_admin').select('id').eq('cliente_id', cid).eq('tipo', 'onboarding_completo').maybeSingle()
+          .then(({ data: yaNotificado }) => {
+            if (yaNotificado) return
+            supabase.from('notificaciones_admin').insert({
+              entrenador_id: eid, cliente_id: cid, tipo: 'onboarding_completo',
+              titulo: `${cl.nombre} ha completado su perfil`,
+              descripcion: 'Ya puedes preparar su plan personalizado. Tiene cuestionario de nutrición y primer check-in.',
+              leida: false, url_destino: `/clientes?highlight=${cid}`,
+            }).then(() => {}).catch(() => {})
+          }).catch(() => {})
+      }
+    }
     setCargando(false)
   }
 
   async function enviarCheckin() {
+    if (modoPreview) return bloqueadoPreview()
     if (!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres) return
     setEnviandoCI(true)
     try {
@@ -221,6 +280,7 @@ export default function PortalForge() {
   }
 
   async function guardarValoracion() {
+    if (modoPreview) return bloqueadoPreview()
     if (!rpe || !fatigaVal || !valorando) return
     setGuardandoVal(true)
     await supabase.from('sesiones').update({ rpe, fatiga_post: fatigaVal, notas_cliente: notaValoracion || null, valoracion_pendiente: false }).eq('id', valorando.id)
@@ -231,6 +291,7 @@ export default function PortalForge() {
   }
 
   async function guardarActividad() {
+    if (modoPreview) return bloqueadoPreview()
     if (!actForm.tipo || !actForm.duracion) return
     setGuardandoAct(true)
     const nombreAct = ACTIVIDADES.find(a => a.id === actForm.tipo)?.label?.split(' ').slice(1).join(' ') || actForm.tipo
@@ -246,6 +307,7 @@ export default function PortalForge() {
   }
 
   async function guardarRegistroSesion() {
+    if (modoPreview) return bloqueadoPreview()
     if (!modalRegistro) return
     setGuardandoRegistro(true)
     const { data: sesNueva, error } = await supabase.from('sesiones').insert({
@@ -275,6 +337,7 @@ export default function PortalForge() {
 
   async function enviarMensaje(e) {
     e.preventDefault()
+    if (modoPreview) return bloqueadoPreview()
     if (!textoMsg.trim() || enviandoMsg) return
     setEnviandoMsg(true)
     const texto = textoMsg.trim(); setTextoMsg('')
@@ -283,6 +346,22 @@ export default function PortalForge() {
     setDatos(d => ({ ...d, mensajes: msgs }))
     setEnviandoMsg(false)
     setTimeout(() => mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  async function guardarTelefono() {
+    if (modoPreview) return bloqueadoPreview()
+    if (!telefonoValido(telefonoInput)) return showToast('Número no válido — mínimo 9 dígitos')
+    setGuardandoTelefono(true)
+    const telefono = normalizarTelefono(telefonoInput.trim())
+    const { error } = await supabase.from('clientes').update({ telefono }).eq('id', cliente.id)
+    if (!error) {
+      setCliente(c => ({ ...c, telefono }))
+      setTelefonoInput('')
+      showToast('✓ Teléfono guardado')
+    } else {
+      showToast('Error al guardar — inténtalo de nuevo')
+    }
+    setGuardandoTelefono(false)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 2500) }
@@ -317,6 +396,12 @@ export default function PortalForge() {
 
   const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones } = datos
   const esOnline = cliente.tipo === 'online'
+
+  // Onboarding guiado — pasos 1 y 2 en vivo (badges), paso 3 informativo.
+  const pasoCuestionarioDone = !!cuest
+  const pasoCheckinDone = (checkins?.length || 0) >= 1
+  const pasoRutinaDone = !!rutina
+  const mostrarOnboarding = esOnline && modoOnboarding === true
   // Cuenta demo del entrenador: acceso completo siempre, sin pasar por pago ni suscripción.
   const plan = cliente.is_demo ? 'completo' : ((planCobro?.estado === 'activo' ? planCobro.plan : null) || cliente.plan_online || null)
   const acceso = {
@@ -352,6 +437,12 @@ export default function PortalForge() {
     const planInfo = PLANES_INFO.find(p => p.id === cliente.plan_online)
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
+        {modoPreview && (
+          <div className="fixed top-0 inset-x-0 z-50 w-full px-4 py-2 text-center text-xs md:text-sm font-bold text-white"
+            style={{ background: '#F59E0B', paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}>
+            👁 Modo vista previa — estás viendo el portal de {cliente.nombre}
+          </div>
+        )}
         <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
           <p className="text-5xl mb-4">💳</p>
           <p className="font-bold text-xl mb-2 text-[#0A0A0A]">Activa tu plan para acceder</p>
@@ -363,6 +454,7 @@ export default function PortalForge() {
             Activa tu suscripción para empezar a usar tu rutina, tu plan de nutrición y todo tu seguimiento.
           </p>
           <button onClick={async () => {
+            if (modoPreview) return bloqueadoPreview()
             setActivandoPlan(true)
             try {
               const { data, error } = await supabase.functions.invoke('crear-checkout-suscripcion', { body: { cliente_id: cliente.id, plan: cliente.plan_online } })
@@ -373,7 +465,7 @@ export default function PortalForge() {
               showToast('Error al generar el pago — contacta con tu entrenador')
             }
             setActivandoPlan(false)
-          }} disabled={activandoPlan}
+          }} disabled={activandoPlan || modoPreview}
             className="w-full font-bold py-3.5 rounded-2xl text-white text-sm disabled:opacity-50" style={{ background: color }}>
             {activandoPlan ? 'Abriendo pago...' : '💳 Activar plan'}
           </button>
@@ -386,6 +478,7 @@ export default function PortalForge() {
   function irAPagos() { setSeccionMasInicial('pagos'); setTab('mas') }
 
   async function solicitarCambioPlan(planSolicitado) {
+    if (modoPreview) return bloqueadoPreview()
     await supabase.from('solicitudes_cambio_plan').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
       plan_actual: plan, plan_solicitado: planSolicitado, estado: 'pendiente',
@@ -435,6 +528,13 @@ export default function PortalForge() {
   ]
 
   return (
+    <>
+    {modoPreview && (
+      <div className="sticky top-0 z-50 w-full px-4 py-2 text-center text-xs md:text-sm font-bold text-white"
+        style={{ background: '#F59E0B', paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}>
+        👁 Modo vista previa — estás viendo el portal de {cliente.nombre}
+      </div>
+    )}
     <div className="min-h-screen flex" style={{ background: '#F4F3F0', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica Neue,sans-serif' }}>
 
       {/* Sidebar desktop */}
@@ -511,11 +611,34 @@ export default function PortalForge() {
 
         {/* Contenido */}
         <div className="flex-1 px-4 md:px-8 py-5 max-w-2xl w-full mx-auto pb-28 md:pb-10">
-          {tab === 'hoy' && <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={setModalCI} setValorando={setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={setModalActividad} setModalRegistro={setModalRegistro} ejerciciosHist={ejerciciosHist} editarCheckin={editarCheckin} />}
+          {tab === 'hoy' && !cliente.telefono && !modoPreview && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-3">
+              <p className="text-sm font-semibold text-amber-800 mb-3 leading-relaxed">
+                📱 Añade tu número de WhatsApp para que {config?.nombre_entrenador || 'tu entrenador'} pueda contactarte directamente
+              </p>
+              <div className="flex gap-2">
+                <input type="tel" value={telefonoInput} onChange={e => setTelefonoInput(e.target.value)}
+                  placeholder="+34 600 000 000"
+                  className="flex-1 border border-amber-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-400" />
+                <button onClick={guardarTelefono} disabled={guardandoTelefono || !telefonoInput.trim()}
+                  className="px-4 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-40 active:scale-95 transition-all"
+                  style={{ background: color }}>
+                  {guardandoTelefono ? '...' : 'Guardar'}
+                </button>
+              </div>
+            </div>
+          )}
+          {tab === 'hoy' && (
+            mostrarOnboarding
+              ? <OnboardingNuevoCliente cliente={cliente} color={color} config={config}
+                  pasoCuestionarioDone={pasoCuestionarioDone} pasoCheckinDone={pasoCheckinDone} pasoRutinaDone={pasoRutinaDone}
+                  setModalCI={modoPreview ? bloqueadoPreview : setModalCI} setTab={setTab} />
+              : <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={modoPreview ? bloqueadoPreview : setModalCI} setValorando={modoPreview ? bloqueadoPreview : setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={modoPreview ? bloqueadoPreview : setModalActividad} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} ejerciciosHist={ejerciciosHist} editarCheckin={modoPreview ? bloqueadoPreview : editarCheckin} />
+          )}
           {tab === 'entrena' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoRutina) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
-                <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={setModalRegistro} esOnline={esOnline} />
+                <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} esOnline={esOnline} />
               </div>
               {pagoVencido ? (
                 <BloqueoOverlay mensaje="Tu plan está pausado. Renueva para seguir." boton="Renovar ahora" onClick={irAPagos} color={color} />
@@ -527,7 +650,7 @@ export default function PortalForge() {
           {tab === 'nutricion' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoNutricion) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
-                <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} suplementacion={suplementacion} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} />
+                <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} suplementacion={suplementacion} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />
               </div>
               {pagoVencido ? (
                 <BloqueoOverlay mensaje="Tu plan está pausado. Renueva para seguir." boton="Renovar ahora" onClick={irAPagos} color={color} />
@@ -536,9 +659,9 @@ export default function PortalForge() {
               ) : null}
             </div>
           )}
-          {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} />}
-          {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} />}
-          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} />}
+          {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
+          {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} />}
+          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
         </div>
 
         {/* Bottom bar — negro total, 5 slots fijos */}
@@ -634,10 +757,11 @@ export default function PortalForge() {
         {modalActividad && <ModalActividad color={color} actForm={actForm} setActForm={setActForm} guardandoAct={guardandoAct} guardarActividad={guardarActividad} onClose={() => setModalActividad(false)} ACTIVIDADES={ACTIVIDADES} />}
 
         {/* Modal registro sesión */}
-        {modalRegistro && <ModalRegistroSesion dia={modalRegistro} color={color} registroSets={registroSets} setRegistroSets={setRegistroSets} ejerciciosHist={ejerciciosHist} guardandoRegistro={guardandoRegistro} guardarRegistroSesion={guardarRegistroSesion} onClose={() => { setModalRegistro(null); setRegistroSets({}); setSesionGuardadaId(null) }} sesionGuardadaId={sesionGuardadaId} cliente={cliente} onFinalizar={cerrarModalRegistro} acceso={acceso} solicitarCambioPlan={solicitarCambioPlan} />}
+        {modalRegistro && <ModalRegistroSesion dia={modalRegistro} color={color} registroSets={registroSets} setRegistroSets={setRegistroSets} ejerciciosHist={ejerciciosHist} guardandoRegistro={guardandoRegistro} guardarRegistroSesion={guardarRegistroSesion} onClose={() => { setModalRegistro(null); setRegistroSets({}); setSesionGuardadaId(null) }} sesionGuardadaId={sesionGuardadaId} cliente={cliente} onFinalizar={cerrarModalRegistro} acceso={acceso} solicitarCambioPlan={solicitarCambioPlan} modoPreview={modoPreview} />}
 
       </main>
     </div>
+    </>
   )
 }
 
@@ -710,6 +834,103 @@ function LoginPortal() {
               style={{ background: BRAND.color }}>{loading ? '...' : recuperar ? 'Enviar enlace' : 'Entrar'}</button>
             {recuperar && <button type="button" onClick={() => setRecuperar(false)} className="w-full text-white/40 text-sm py-2">← Volver</button>}
           </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Onboarding guiado (cliente nuevo) ─────────────────────────────────────────
+function OnboardingNuevoCliente({ cliente, color, config, pasoCuestionarioDone, pasoCheckinDone, pasoRutinaDone, setModalCI, setTab }) {
+  const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
+  const obligatoriosListos = pasoCuestionarioDone && pasoCheckinDone
+  const completados = (pasoCuestionarioDone ? 1 : 0) + (pasoCheckinDone ? 1 : 0) + (pasoRutinaDone ? 1 : 0)
+  const pasoActual = Math.min(completados + 1, 3)
+  const urlCuestionario = `${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`
+
+  return (
+    <div className="rounded-3xl p-5 md:p-6" style={{ background: '#0A0A0A' }}>
+      <div className="space-y-5">
+        {/* Progreso */}
+        <div>
+          {obligatoriosListos ? (
+            <p className="text-white font-black text-lg leading-tight flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full animate-pulse" style={{ background: color }} />
+              ¡Todo listo! {nombreEntrenador} está preparando tu plan
+            </p>
+          ) : (
+            <>
+              <p className="text-[10px] font-bold tracking-[0.15em] uppercase mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                Paso {pasoActual} de 3
+              </p>
+              <h1 className="text-white font-black text-2xl tracking-tight leading-tight">Vamos a conocerte</h1>
+            </>
+          )}
+          <div className="h-1.5 rounded-full mt-3 overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${(completados / 3) * 100}%`, background: color }} />
+          </div>
+        </div>
+
+        {/* Paso 1 — Cuestionario */}
+        <div className="bg-white rounded-2xl p-5 border border-black/5">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <p className="font-black text-[#0A0A0A] text-base leading-tight">1. Cuéntame cómo eres</p>
+            {pasoCuestionarioDone
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
+              : <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange-50 flex-shrink-0" style={{ color }}>Pendiente</span>}
+          </div>
+          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+            Necesito conocer tu alimentación, rutinas y objetivos para preparar tu plan personalizado
+          </p>
+          {!pasoCuestionarioDone && (
+            <a href={urlCuestionario}
+              className="block text-center text-white text-sm font-black py-3 rounded-xl active:scale-95 transition-all"
+              style={{ background: color }}>
+              Rellenar cuestionario →
+            </a>
+          )}
+        </div>
+
+        {/* Paso 2 — Check-in */}
+        <div className="bg-white rounded-2xl p-5 border border-black/5">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <p className="font-black text-[#0A0A0A] text-base leading-tight">2. Tu primer check-in</p>
+            {pasoCheckinDone
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
+              : <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange-50 flex-shrink-0" style={{ color }}>Pendiente</span>}
+          </div>
+          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+            Cuéntame cómo estás hoy — energía, sueño, estrés. Es el punto de partida de todo
+          </p>
+          {!pasoCheckinDone && (
+            <button onClick={() => setModalCI(true)}
+              className="w-full text-white text-sm font-black py-3 rounded-xl active:scale-95 transition-all"
+              style={{ background: color }}>
+              Hacer mi check-in →
+            </button>
+          )}
+        </div>
+
+        {/* Paso 3 — Plan (informativo) */}
+        <div className="bg-white rounded-2xl p-5 border border-black/5">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <p className="font-black text-[#0A0A0A] text-base leading-tight">3. Tu plan {pasoRutinaDone ? 'está listo' : 'está en camino'}</p>
+            {pasoRutinaDone
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
+              : <span className="text-xl flex-shrink-0">⏳</span>}
+          </div>
+          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+            {pasoRutinaDone
+              ? 'Tu entrenador ya ha preparado tu rutina personalizada.'
+              : `En cuanto completes los pasos anteriores, ${nombreEntrenador} preparará tu plan personalizado. Te avisaremos cuando esté listo.`}
+          </p>
+          {pasoRutinaDone && (
+            <button onClick={() => setTab('entrena')}
+              className="w-full text-white text-sm font-black py-3 rounded-xl active:scale-95 transition-all"
+              style={{ background: color }}>
+              Ver mi plan →
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1235,7 +1456,7 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline 
 }
 
 // ─── Tab Mensajes ─────────────────────────────────────────────────────────────
-function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensaje, color, endRef }) {
+function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensaje, color, endRef, modoPreview }) {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes?.length])
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
@@ -1262,9 +1483,10 @@ function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensa
       </div>
       <form onSubmit={enviarMensaje} className="flex gap-2 pt-3 border-t border-black/5">
         <input value={textoMsg} onChange={e => setTextoMsg(e.target.value)}
-          placeholder="Escribe un mensaje..."
-          className="flex-1 border border-black/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-acento bg-white" />
-        <button type="submit" disabled={!textoMsg.trim() || enviandoMsg}
+          placeholder={modoPreview ? 'Solo lectura en vista previa' : 'Escribe un mensaje...'}
+          disabled={modoPreview}
+          className="flex-1 border border-black/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-acento bg-white disabled:opacity-50" />
+        <button type="submit" disabled={!textoMsg.trim() || enviandoMsg || modoPreview}
           className="px-4 py-3 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
           style={{ background: color }}>
           {enviandoMsg ? '…' : '→'}
@@ -1302,7 +1524,7 @@ function TabPagos({ pagos, color }) {
 }
 
 // ─── Tab Más ──────────────────────────────────────────────────────────────────
-function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0, seccionInicial, onConsumirSeccionInicial, solicitarCambioPlan, lesiones, cargarTodo }) {
+function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0, seccionInicial, onConsumirSeccionInicial, solicitarCambioPlan, lesiones, cargarTodo, modoPreview }) {
   const [seccion, setSeccion] = useState(seccionInicial || 'menu')
   const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
   const [guardando, setGuardando] = useState(false)
@@ -1320,7 +1542,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
   const lesionesActivas = lesiones?.filter(l => l.estado === 'activa').length || 0
 
   async function guardarLesion() {
-    if (!lesionForm.zona) return
+    if (modoPreview || !lesionForm.zona) return
     setGuardandoLesion(true)
     await supabase.from('lesiones_cliente').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
@@ -1370,7 +1592,9 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
   ]
 
   async function guardar(e) {
-    e.preventDefault(); setGuardando(true); setOk(false)
+    e.preventDefault()
+    if (modoPreview) return
+    setGuardando(true); setOk(false)
     await supabase.from('clientes').update({
       peso_actual: form.peso_actual ? parseFloat(form.peso_actual) : null,
       peso_objetivo: form.peso_objetivo ? parseFloat(form.peso_objetivo) : null,
@@ -1412,7 +1636,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
               ))}
             </div>
           </div>
-          <button type="submit" disabled={guardando}
+          <button type="submit" disabled={guardando || modoPreview}
             className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40"
             style={{background:ok?'#10b981':color}}>
             {guardando?'Guardando...':ok?'✓ Guardado':'Guardar'}
@@ -1472,7 +1696,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
                       {p.incluye.map((inc, idx) => <li key={idx}>{inc}</li>)}
                     </ul>
                     <button onClick={async () => { setEnviandoSolicitud(p.id); await solicitarCambioPlan(p.id); setEnviandoSolicitud(null); setSolicitudEnviada(true) }}
-                      disabled={enviandoSolicitud === p.id}
+                      disabled={enviandoSolicitud === p.id || modoPreview}
                       className="w-full text-white text-xs font-bold py-2.5 rounded-xl disabled:opacity-40 active:scale-95 transition-all" style={{ background: color }}>
                       {enviandoSolicitud === p.id ? 'Enviando...' : 'Solicitar este plan'}
                     </button>
@@ -1550,7 +1774,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
               placeholder="Qué ha pasado..."
               className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none" />
           </div>
-          <button onClick={guardarLesion} disabled={!lesionForm.zona || guardandoLesion}
+          <button onClick={guardarLesion} disabled={!lesionForm.zona || guardandoLesion || modoPreview}
             className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all"
             style={{ background: lesionEnviada ? '#10b981' : color }}>
             {guardandoLesion ? 'Enviando...' : lesionEnviada ? '✓ Reportada' : 'Reportar lesión'}
@@ -1683,7 +1907,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
 }
 
 // ─── Tab Nutrición ────────────────────────────────────────────────────────────
-function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [], suplementacion, cargarTodo, acceso, irAPagos }) {
+function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [], suplementacion, cargarTodo, acceso, irAPagos, modoPreview }) {
   const [diaAbierto, setDiaAbierto] = useState(null)
   const [guardandoDia, setGuardandoDia] = useState(null)
   const [registrosLocales, setRegistrosLocales] = useState(nutricionRegistros)
@@ -1703,7 +1927,7 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
           : <p className="text-sm text-[#9B9B9B] mt-3">Cuestionario enviado · Pendiente</p>
         }
       </div>
-      {cuest && <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} />}
+      {cuest && <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />}
     </div>
   )
 
@@ -1726,6 +1950,7 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
   const hoy = hoyStr()
 
   async function registrarDia(dia, diaNombre) {
+    if (modoPreview) return
     setGuardandoDia(diaNombre)
     const { error } = await supabase.from('nutricion_registros').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
@@ -1923,7 +2148,7 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                       {registradoEste
                         ? <p className="text-xs font-black text-emerald-600 text-center">✓ Este día está registrado</p>
                         : (
-                          <button onClick={() => registrarDia(dia, dia.dia)} disabled={!!guardandoDia}
+                          <button onClick={() => registrarDia(dia, dia.dia)} disabled={!!guardandoDia || modoPreview}
                             className="w-full py-3 rounded-xl text-sm font-black text-white active:scale-95 transition-all disabled:opacity-40"
                             style={{ background: color }}>
                             {guardandoDia === dia.dia ? '⏳ Registrando...' : `✓ He seguido el plan de ${dia.dia}`}
@@ -2012,17 +2237,17 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
         </div>
       )}
 
-      <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} />
+      <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />
     </div>
   )
 }
 
 // ─── Sección Suplementación (dentro de Nutrición) ────────────────────────────
-function SuplementacionSection({ cuest, suplementacion, color, cliente, cargarTodo, acceso, irAPagos }) {
+function SuplementacionSection({ cuest, suplementacion, color, cliente, cargarTodo, acceso, irAPagos, modoPreview }) {
   const [activando, setActivando] = useState(false)
 
   async function activarSuplementacion() {
-    if (!cuest?.id) return
+    if (modoPreview || !cuest?.id) return
     setActivando(true)
     await supabase.from('cuestionarios_nutricion').update({ interes_suplementacion: true }).eq('id', cuest.id)
     await cargarTodo()
@@ -2046,7 +2271,7 @@ function SuplementacionSection({ cuest, suplementacion, color, cliente, cargarTo
             <p className="text-2xl mb-2">💊</p>
             <p className="text-sm font-black text-[#0A0A0A] mb-1">¿Quieres llevar tu nutrición un paso más allá?</p>
             <p className="text-xs text-[#6B6B6B] mb-3 leading-relaxed max-w-xs mx-auto">Tu entrenador puede prepararte recomendaciones de suplementación personalizadas.</p>
-            <button onClick={activarSuplementacion} disabled={activando}
+            <button onClick={activarSuplementacion} disabled={activando || modoPreview}
               className="text-white text-sm font-black px-5 py-2.5 rounded-xl disabled:opacity-40 active:scale-95 transition-all" style={{ background: color }}>
               {activando ? 'Activando...' : 'Activar suplementación'}
             </button>
@@ -2088,7 +2313,7 @@ function SuplementacionSection({ cuest, suplementacion, color, cliente, cargarTo
 
 // ─── Tab Progreso ─────────────────────────────────────────────────────────────
 // ─── TAB PROGRESO ─────────────────────────────────────────────────────────────
-function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, subTab, setSubTab, cliente, cargarTodo }) {
+function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, subTab, setSubTab, cliente, cargarTodo, modoPreview }) {
   const SUBTABS = [
     { id: 'peso',    label: 'Peso' },
     { id: 'fuerza',  label: 'Fuerza' },
@@ -2111,8 +2336,8 @@ function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, 
       </div>
       {subTab === 'peso'    && <SubPeso checkins={checkins} color={color} />}
       {subTab === 'fuerza'  && <SubFuerza ejerciciosHist={ejerciciosHist} color={color} />}
-      {subTab === 'medidas' && <SubMedidas medidas={medidas} color={color} cliente={cliente} cargarTodo={cargarTodo} />}
-      {subTab === 'fotos'   && <SubFotos fotos={fotos} color={color} cliente={cliente} cargarTodo={cargarTodo} />}
+      {subTab === 'medidas' && <SubMedidas medidas={medidas} color={color} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
+      {subTab === 'fotos'   && <SubFotos fotos={fotos} color={color} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
     </div>
   )
 }
@@ -2264,7 +2489,7 @@ function SubPeso({ checkins, color }) {
 
 
 // ─── SubMedidas ───────────────────────────────────────────────────────────────
-function SubMedidas({ medidas, color, cliente, cargarTodo }) {
+function SubMedidas({ medidas, color, cliente, cargarTodo, modoPreview }) {
   const [mostrando, setMostrando] = useState('lista')
   const [form, setForm] = useState({ cintura:'', pecho:'', cadera:'', bicep:'', muslo:'', gemelo:'', cuello:'' })
   const [guardando, setGuardando] = useState(false)
@@ -2281,6 +2506,7 @@ function SubMedidas({ medidas, color, cliente, cargarTodo }) {
   ]
 
   async function guardar() {
+    if (modoPreview) return
     const rellenos = CAMPOS.filter(c => form[c.key] && !isNaN(+form[c.key]))
     if (!rellenos.length) return
     setGuardando(true)
@@ -2340,8 +2566,8 @@ function SubMedidas({ medidas, color, cliente, cargarTodo }) {
         <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">
           {hayMedidas ? `${medidas.length} medición${medidas.length>1?'es':''}` : 'Sin medidas'}
         </p>
-        <button onClick={() => setMostrando('form')}
-          className="text-xs font-black px-4 py-2 rounded-xl text-white active:scale-95"
+        <button onClick={() => setMostrando('form')} disabled={modoPreview}
+          className="text-xs font-black px-4 py-2 rounded-xl text-white active:scale-95 disabled:opacity-40"
           style={{ background: color }}>+ Añadir</button>
       </div>
 
@@ -2350,8 +2576,8 @@ function SubMedidas({ medidas, color, cliente, cargarTodo }) {
           <p className="text-4xl mb-4">📏</p>
           <p className="text-base font-black text-white">Sin medidas aún</p>
           <p className="text-xs mt-2 mb-5" style={{ color: 'rgba(255,255,255,0.35)' }}>Registra tu primera medición para ver tu evolución</p>
-          <button onClick={() => setMostrando('form')}
-            className="px-6 py-3 rounded-xl text-sm font-black text-white active:scale-95"
+          <button onClick={() => setMostrando('form')} disabled={modoPreview}
+            className="px-6 py-3 rounded-xl text-sm font-black text-white active:scale-95 disabled:opacity-40"
             style={{ background: color }}>Añadir medidas →</button>
         </div>
       ) : (
@@ -2415,7 +2641,7 @@ function SubMedidas({ medidas, color, cliente, cargarTodo }) {
 
 
 // ─── SubFotos ─────────────────────────────────────────────────────────────────
-function SubFotos({ fotos, color, cliente, cargarTodo }) {
+function SubFotos({ fotos, color, cliente, cargarTodo, modoPreview }) {
   const [subiendo, setSubiendo] = useState(false)
   const [tipo, setTipo] = useState('frente')
   const [errorMsg, setErrorMsg] = useState('')
@@ -2428,6 +2654,7 @@ function SubFotos({ fotos, color, cliente, cargarTodo }) {
   ]
 
   async function subirFoto(e) {
+    if (modoPreview) return
     const file = e.target.files?.[0]
     if (!file) return
     setSubiendo(true); setErrorMsg('')
@@ -2473,10 +2700,10 @@ function SubFotos({ fotos, color, cliente, cargarTodo }) {
               </button>
             ))}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment"
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" disabled={modoPreview}
             onChange={subirFoto} className="hidden" id="foto-up" />
-          <label htmlFor="foto-up"
-            className="w-full py-3.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+          <label htmlFor={modoPreview ? undefined : 'foto-up'}
+            className={`w-full py-3.5 rounded-xl text-sm font-black text-white flex items-center justify-center gap-2 transition-all ${modoPreview ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
             style={{ background: subiendo ? 'rgba(255,255,255,0.1)' : color }}>
             {subiendo
               ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Subiendo...</>
@@ -2803,7 +3030,7 @@ function ModalActividad({ color, actForm, setActForm, guardandoAct, guardarActiv
 }
 
 // ─── Modal registrar sesión ───────────────────────────────────────────────────
-function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerciciosHist, guardandoRegistro, guardarRegistroSesion, onClose, sesionGuardadaId, cliente, onFinalizar, acceso, solicitarCambioPlan }) {
+function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerciciosHist, guardandoRegistro, guardarRegistroSesion, onClose, sesionGuardadaId, cliente, onFinalizar, acceso, solicitarCambioPlan, modoPreview }) {
   const ejercicios = dia?.ejercicios || []
   const [tieneMolestia, setTieneMolestia] = useState(null)
   const [molestiaForm, setMolestiaForm] = useState({ zona: '', severidad: 'leve', descripcion: '' })
@@ -2813,7 +3040,7 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
   const [cambioSolicitado, setCambioSolicitado] = useState(false)
 
   async function guardarMolestia() {
-    if (!molestiaForm.zona) return
+    if (modoPreview || !molestiaForm.zona) return
     setGuardandoMolestia(true)
     await supabase.from('lesiones_cliente').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, sesion_id: sesionGuardadaId,

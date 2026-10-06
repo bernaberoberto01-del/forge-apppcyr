@@ -364,11 +364,11 @@ export default function Clientes({ session }) {
   }, [uid])
 
   async function cargar() {
-    const hace10 = new Date(Date.now() - 10 * 864e5).toISOString().split('T')[0]
+    const hace14 = new Date(Date.now() - 14 * 864e5).toISOString().split('T')[0]
     const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([
       supabase.from('clientes').select('*').in('entrenador_id', equipo).not('estado', 'in', '(rechazado,externo)').order('created_at', { ascending: false }),
       supabase.from('cuestionarios').select('*').in('entrenador_id', equipo).eq('procesado', false).order('created_at', { ascending: false }),
-      supabase.from('checkins').select('cliente_id,fecha').in('entrenador_id', equipo).gte('fecha', hace10),
+      supabase.from('checkins').select('cliente_id,fecha').in('entrenador_id', equipo).gte('fecha', hace14),
       supabase.from('pagos').select('cliente_id,valido_hasta').in('entrenador_id', equipo),
       supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').in('entrenador_id', equipo).eq('activo', true),
       supabase.from('tarifas').select('*').in('entrenador_id', equipo).eq('activa', true).order('modalidad').order('dias_semana'),
@@ -393,16 +393,6 @@ export default function Clientes({ session }) {
     })
     return map
   }, [clientes, checkins, pagos])
-
-  // Leads pendientes de aceptar/rechazar — sección separada, nunca mezclados con el listado general
-  const leadsPendientes = useMemo(() => {
-    let r = clientes.filter(c => c.estado === 'pendiente')
-    if (busqueda) {
-      const b = busqueda.toLowerCase()
-      r = r.filter(c => c.nombre?.toLowerCase().includes(b) || c.email?.toLowerCase().includes(b))
-    }
-    return r
-  }, [clientes, busqueda])
 
   // Filtrado y búsqueda
   const filtrados = useMemo(() => {
@@ -805,7 +795,7 @@ export default function Clientes({ session }) {
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: 'Activos', value: stats.activos, color: BRAND.color, filtro: 'activos' },
-          { label: 'Sin seguimiento', value: stats.sinCI, color: '#f59e0b', filtro: 'sinCI' },
+          { label: 'Sin seguimiento (todos)', value: stats.sinCI, color: '#f59e0b', filtro: 'sinCI' },
           { label: 'Pago vencido', value: stats.vencidos, color: '#ef4444', filtro: 'vencidos' },
         ].filter(s => s.filtro !== 'sinCI' || moduloVisible('seguimiento')).map(s => (
           <div key={s.label} onClick={() => s.filtro && (setFiltroTipo(filtroTipo === s.filtro ? 'todos' : s.filtro), setPagina(1))}
@@ -842,7 +832,7 @@ export default function Clientes({ session }) {
         <div className="w-px bg-black/10 flex-shrink-0" />
         {moduloVisible('seguimiento') && <button onClick={() => { setFiltroTipo('sinCI'); setPagina(1) }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo==='sinCI' ? 'bg-amber-500 text-white' : 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>
-          ⚠ Sin seguimiento
+          ⚠ Sin seguimiento (todos)
         </button>}
         <button onClick={() => { setFiltroTipo('vencidos'); setPagina(1) }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo==='vencidos' ? 'bg-red-500 text-white' : 'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100'}`}>
@@ -857,36 +847,6 @@ export default function Clientes({ session }) {
         <span>Copiar enlace de registro para nuevos clientes</span>
         <span className="ml-auto text-white/40 text-xs">{enlaceRegistro.slice(0, 40)}...</span>
       </button>
-
-      {/* Leads pendientes — separados del listado general, nunca mezclados */}
-      {leadsPendientes.length > 0 && (
-        <div className="mb-5">
-          <div className="flex items-center gap-2 mb-2 px-1">
-            <p className="text-sm font-bold text-[#0A0A0A]">🧲 Leads pendientes</p>
-            <span className="text-xs bg-acento text-white font-bold px-2 py-0.5 rounded-full">{leadsPendientes.length}</span>
-          </div>
-          <div className="space-y-1.5">
-            {leadsPendientes.map(c => (
-              <div key={c.id} onClick={() => abrirDetalle(c)}
-                className="bg-acento/5 border border-acento/20 rounded-xl flex items-center gap-3 p-3.5 cursor-pointer hover:border-acento/40 transition-all">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                  style={{ background: avatarColor(c.nombre) }}>{ini(c.nombre)}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-[#0A0A0A] truncate">{c.nombre}</p>
-                    <span className="text-[10px] font-bold bg-acento text-white px-1.5 py-0.5 rounded-full flex-shrink-0">Lead</span>
-                  </div>
-                  <p className="text-xs text-[#6B6B6B] truncate">{c.email}</p>
-                </div>
-                <p className="text-xs text-[#9B9B9B] flex-shrink-0">
-                  {c.created_at && new Date(c.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                </p>
-              </div>
-            ))}
-          </div>
-          <div className="h-px bg-black/8 mt-4" />
-        </div>
-      )}
 
       {/* Tabla */}
       {filtrados.length === 0 ? (
@@ -1764,8 +1724,10 @@ export default function Clientes({ session }) {
 
                   {/* Acciones */}
                   <div className="grid grid-cols-2 gap-2 pt-1">
-                    {/* Si no tiene acceso al portal, CTA prominente */}
-                    {!detalle.auth_user_id && detalle.email && (
+                    {/* Acceso al portal — un solo botón: "Enviar" si aún no tiene cuenta,
+                        "Reenviar" si ya la tiene. Mientras el lead esté pendiente, no se
+                        muestra la variante "Enviar": "✓ Aceptar lead" ya genera el acceso. */}
+                    {detalle.email && !(detalle.estado === 'pendiente' && !detalle.auth_user_id) && (
                       <button onClick={async () => {
                         try {
                           const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
@@ -1774,34 +1736,23 @@ export default function Clientes({ session }) {
                             manejarRespuestaAcceso(data, detalle.nombre)
                             setDetalle(d => ({ ...d, ultimo_acceso_enviado: new Date().toISOString() }))
                           } else if (data?.ok) {
-                            showToast('✓ Email de acceso enviado a ' + detalle.email)
+                            showToast(`✓ Email de acceso ${detalle.auth_user_id ? 'reenviado' : 'enviado'} a ` + detalle.email)
                             setDetalle(d => ({ ...d, ultimo_acceso_enviado: new Date().toISOString() }))
                           } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
                         } catch(e) { showToast('Error de conexión') }
-                      }} className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-acento hover:bg-[#E54E00] active:scale-95 transition-all">
-                        📧 Enviar acceso al portal
+                      }} className={detalle.auth_user_id
+                        ? "border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]"
+                        : "col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-acento hover:bg-acento-hover active:scale-95 transition-all"}>
+                        {detalle.auth_user_id ? '📧 Reenviar acceso' : '📧 Enviar acceso'}
                       </button>
                     )}
                     {detalle.estado === 'pendiente' && (
                       <button onClick={aceptarLeadDesdeFicha} disabled={aceptandoLead}
-                        className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-acento hover:bg-[#E54E00] active:scale-95 transition-all disabled:opacity-40">
+                        className="col-span-2 py-3 rounded-xl text-white text-sm font-bold bg-acento hover:bg-acento-hover active:scale-95 transition-all disabled:opacity-40">
                         {aceptandoLead ? 'Activando...' : '✓ Aceptar lead'}
                       </button>
                     )}
                     <button onClick={() => abrirEditar(detalle)} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#0A0A0A] hover:bg-[#F5F5F0]">✏️ Editar</button>
-                    {detalle.email && detalle.auth_user_id && (
-                      <button onClick={async () => {
-                        try {
-                          const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id } })
-                          if (error) throw error
-                          if (data?.sin_email) manejarRespuestaAcceso(data, detalle.nombre)
-                          else if (data?.ok) showToast('✓ Email de acceso reenviado a ' + detalle.email)
-                          else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
-                        } catch(e) { showToast('Error de conexión') }
-                      }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">
-                        📧 Reenviar acceso
-                      </button>
-                    )}
                     <button onClick={async () => {
                       try {
                         const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: detalle.id, tipo: 'magiclink' } })
@@ -1812,6 +1763,8 @@ export default function Clientes({ session }) {
                         } else showToast('Error: ' + (data?.error || 'inténtalo de nuevo'))
                       } catch (e) { showToast('Error de conexión') }
                     }} className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">📋 Copiar enlace de acceso</button>
+                    <button onClick={() => window.open(`${window.location.origin}/portal-preview?cliente_id=${detalle.id}`, '_blank')}
+                      className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">👁 Ver portal</button>
                     {detalle.tipo === 'online' && dData.cuestRegistro?.sugerencia_plan && (
                       <button onClick={() => generarMensajeBienvenida(detalle, dData.cuestRegistro.sugerencia_plan, dData.cuestRegistro.sugerencia_justificacion, false, dData.cuestRegistro.donde_entrena)}
                         className="border border-black/10 text-sm font-medium py-2.5 rounded-xl text-[#6B6B6B] hover:bg-[#F5F5F0]">💬 Generar mensaje de plan</button>
