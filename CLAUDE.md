@@ -2,7 +2,8 @@
 
 ## Estado del proyecto (actualizar al inicio de cada sesión)
 - **Producción**: https://forge-studio-os.vercel.app (Vercel, plan Hobby)
-- **Repo**: github.com/bernaberoberto01-del/forge-apppcyr (rama `main` → autodeploy)
+- **Repo**: github.com/bernaberoberto01-del/forge-apppcyr (rama `main` → autodeploy de Forge + Action "Desplegar centros" para el resto)
+- **Multi-centro**: el MISMO código sirve a varios centros (Forge y Pablo Rodríguez). Leer la sección "Multi-centro" antes de tocar nada.
 - **Supabase**: qdpqpbkppkhzcxpfypvf
 - **Portal cliente activo**: `src/pages/PortalForge.jsx` (importado en App.jsx como PortalCliente)
 - **Archivos obsoletos (no borrar, son backups)**: PortalCliente.jsx, PortalCliente.backup.jsx, PortalClienteNuevo.jsx
@@ -205,6 +206,40 @@ PortalForge()
 4. **Nunca push --force** — Rompió la integración automática Vercel↔GitHub. Los deploys se crean en READY pero no se promueven a producción.
 
 5. **PortalForge.jsx es EL portal** — App.jsx lo importa como PortalCliente. No renombrar el archivo.
+
+---
+
+## Multi-centro — reglas obligatorias
+
+Un solo código en `main`, una instalación por centro (su Vercel, su Supabase, su ficha).
+Cada centro se describe en `centros/<id>.json` (marca, módulos ocultos, servicios, Supabase, Vercel).
+Un cambio en `main` llega a TODOS los centros: no puede romper ni cambiar el aspecto de ninguno.
+
+### Al escribir código
+| En vez de… | Usar… |
+|---|---|
+| `#FF5C00` / `#E54E00` escritos a mano | clases Tailwind `acento` (`bg-acento`, `text-acento`, `border-acento/20`, `hover:bg-acento-hover`…) o `colorMarca(config?.color_acento)` cuando haga falta el valor |
+| "Forge" / "Forge Studio" en textos | `BRAND.nombre`, `BRAND.nombreCompleto` o `nombreMarca(config?.nombre_negocio)` (`src/lib/brand.js`) |
+| `https://forge-studio-os.vercel.app` escrito a mano | `window.location.origin` en el frontend; `Deno.env.get('APP_URL')` en edge functions |
+| `noreply@forge-studio.es` escrito a mano | `Deno.env.get('MAIL_FROM')` |
+| `.eq('entrenador_id', uid)` al leer clientes/sesiones/pagos… | `.in('entrenador_id', equipo)` con `const equipo = useEquipo(uid)` (`src/hooks/useCentro.jsx`). EXCEPCIÓN: `configuracion` y `checkin_config` siguen con `.eq('entrenador_id', uid)` |
+| En edge functions: `cliente.entrenador_id !== user.id` | `!(await puedeGestionar(db, user.id, cliente.entrenador_id))` |
+| Sección nueva en el menú o en el dashboard | darle un id y envolverla en `moduloVisible('<id>')` (`src/lib/modulos.js`) para poder ocultarla por centro. Ids actuales: dashboard, clientes, rutinas, seguimiento, pagos, agenda, nutricion, mensajes, tutorial |
+
+- Ocultar algo para un centro = añadir su id a `modulosOcultos` en SU ficha. Nunca borrar código ni ocultarlo para todos.
+- Variable nueva `VITE_*`: añadirla en `scripts/centro.mjs` y en las fichas que la necesiten.
+- Probar un centro en local: `npm run centro <id>` (p. ej. `npm run centro pablo-rodriguez -- --port 5174`).
+
+### Base de datos y edge functions (NO se despliegan solas)
+- **Migración nueva** (`supabase/migrations/NNNN_*.sql`): hay que aplicarla en el Supabase de Forge **y** en el de cada centro (Pablo: `focgysujvofpihjhvznl`). Indicarlo en el PR.
+- **Edge function nueva o modificada**: desplegarla en el Supabase de Forge y en el de cada centro. Indicarlo en el PR.
+- Mantener `supabase/esquema/esquema-base.sql` coherente con las migraciones (es lo que se usa para montar un centro nuevo).
+
+### Cómo subir cambios
+1. `git checkout main && git pull` antes de empezar (si no, se puede deshacer el trabajo multi-centro).
+2. Trabajar en una rama (`feat/...`, `fix/...`), `npm run build`, push de la rama.
+3. Abrir PR y pedir revisión a @JuananGarcia. Indicar si hay migraciones o edge functions que desplegar en los centros.
+4. Al mergear: Vercel despliega Forge y la Action "Desplegar centros" despliega el resto (necesita el secreto `VERCEL_TOKEN`). Comprobar que la Action sale en verde.
 
 ---
 
