@@ -9,8 +9,13 @@ import GraficasCliente from '../components/GraficasCliente'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
-import { moduloVisible } from '../lib/modulos'
+import { moduloVisible, funcionActiva } from '../lib/modulos'
+import { AREAS, NOMBRE_SERVICIO, ICONO_SERVICIO, hayAreas, areasDe } from '../lib/servicios'
+import HistorialClinico from '../components/cliente/HistorialClinico'
+import CobroAreas from '../components/cliente/CobroAreas'
 
+// En la lista de Clientes el área de entrenamiento se llama "Gimnasio"
+const NOMBRE_AREA = { ...NOMBRE_SERVICIO, entrenamiento: 'Gimnasio' }
 
 function Toast({ msg, tipo='ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
@@ -166,6 +171,8 @@ export default function Clientes({ session }) {
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [filtroObj, setFiltroObj] = useState('')
   const [filtroEstado, setFiltroEstado] = useState('')
+  // Centros con fisio/nutrición: la lista se separa por área (por defecto, gimnasio)
+  const [filtroArea, setFiltroArea] = useState(hayAreas ? 'entrenamiento' : 'todos')
   const [pagina, setPagina] = useState(1)
   const [modal, setModal] = useState(false)
   const [modalRegistros, setModalRegistros] = useState(false)
@@ -397,6 +404,7 @@ export default function Clientes({ session }) {
   // Filtrado y búsqueda
   const filtrados = useMemo(() => {
     let r = clientes.filter(c => c.estado !== 'pendiente')
+    if (filtroArea !== 'todos') r = r.filter(c => areasDe(c).includes(filtroArea))
     if (busqueda) {
       const b = busqueda.toLowerCase()
       r = r.filter(c => c.nombre?.toLowerCase().includes(b) || c.email?.toLowerCase().includes(b) || c.telefono?.includes(b))
@@ -408,24 +416,25 @@ export default function Clientes({ session }) {
     if (filtroTipo === 'vencidos') r = r.filter(c => alertas[c.id]?.pagoVencido)
     if (filtroObj) r = r.filter(c => c.objetivo === filtroObj)
     return r
-  }, [clientes, busqueda, filtroTipo, filtroObj, alertas])
+  }, [clientes, busqueda, filtroTipo, filtroObj, alertas, filtroArea])
 
   const totalPaginas = Math.ceil(filtrados.length / PER_PAGE)
   const paginados = filtrados.slice((pagina - 1) * PER_PAGE, pagina * PER_PAGE)
 
   const stats = useMemo(() => ({
-    activos: clientes.filter(c => c.estado === 'activo').length,
+    activos: clientes.filter(c => c.estado === 'activo' && (filtroArea === 'todos' || areasDe(c).includes(filtroArea))).length,
     ingresos: pagos.filter(p => {
       const d = new Date(); const inicio = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0]
       return p.fecha_pago >= inicio
     }).reduce((s, p) => s + Number(p.importe || 0), 0),
     sinCI: Object.values(alertas).filter(a => a.sinCI).length,
     vencidos: Object.values(alertas).filter(a => a.pagoVencido).length,
-  }), [clientes, pagos, alertas])
+  }), [clientes, pagos, alertas, filtroArea])
 
   async function guardar() {
     setLoading(true)
     const camposCliente = { nombre:form.nombre, email:form.email, telefono:form.telefono, objetivo:form.objetivo, tipo:form.tipo, estado:form.estado, nivel:form.nivel, dias_semana:Number(form.dias_semana)||3, material:form.material, lesiones:form.lesiones||null, enfermedades:form.enfermedades||null, medicacion:form.medicacion||null, notas:form.notas||null, precio_mensual:Number(form.precio_mensual)||0, tipo_entrenamiento:form.tipo_entrenamiento||null, formato_entrenamiento:form.formato_entrenamiento||null, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null }
+    if (hayAreas) camposCliente.areas = form.areas?.length ? form.areas : ['entrenamiento']
     let clienteId = editId
     if (editId) {
       await supabase.from('clientes').update(camposCliente).eq('id', editId)
@@ -718,7 +727,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'' })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', areas:areasDe(c) })
     setEditId(c.id); setModal(true); setDetalle(null)
     // Cargar datos del cuestionario más reciente para este cliente
     supabase.from('cuestionarios').select('*').eq('cliente_id', c.id).order('created_at', {ascending:false}).limit(1).maybeSingle()
@@ -770,7 +779,7 @@ export default function Clientes({ session }) {
               📋 {cuestionarios.length} nuevo{cuestionarios.length > 1 ? 's' : ''}
             </button>
           )}
-          <button onClick={() => { setForm(initForm); setEditId(null); setModal(true) }}
+          <button onClick={() => { setForm({ ...initForm, areas: [filtroArea === 'todos' ? 'entrenamiento' : filtroArea] }); setEditId(null); setModal(true) }}
             className="bg-acento hover:bg-acento-hover text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95">
             + Nuevo
           </button>
@@ -789,6 +798,21 @@ export default function Clientes({ session }) {
           uid={uid}
           onActualizar={cargar}
         />
+      )}
+
+      {/* Áreas (centros con fisio/nutrición) */}
+      {hayAreas && (
+        <div className="flex gap-1.5 mb-3 overflow-x-auto">
+          {[...AREAS, 'todos'].map(a => {
+            const n = clientes.filter(c => c.estado !== 'pendiente' && (a === 'todos' || areasDe(c).includes(a))).length
+            return (
+              <button key={a} onClick={() => { setFiltroArea(a); setPagina(1) }}
+                className={`px-3.5 py-2 rounded-xl text-sm font-semibold flex-shrink-0 transition-all ${filtroArea === a ? 'bg-acento text-white' : 'bg-white border border-black/5 text-[#0A0A0A] hover:bg-[#F5F5F0]'}`}>
+                {a === 'todos' ? 'Todos' : `${ICONO_SERVICIO[a]} ${NOMBRE_AREA[a]}`} <span className="opacity-60 font-medium">{n}</span>
+              </button>
+            )
+          })}
+        </div>
       )}
 
       {/* Stats */}
@@ -1235,6 +1259,26 @@ export default function Clientes({ session }) {
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-4">{editId ? 'Editar cliente' : 'Nuevo cliente'}</h2>
             <div className="space-y-3">
+              {hayAreas && (
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Áreas *</label>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {AREAS.map(a => {
+                      const sel = (form.areas || ['entrenamiento']).includes(a)
+                      return (
+                        <button key={a} type="button" onClick={() => setForm(f => {
+                            const actuales = f.areas || ['entrenamiento']
+                            const nuevas = sel ? actuales.filter(x => x !== a) : [...actuales, a]
+                            return nuevas.length ? { ...f, areas: nuevas } : f
+                          })}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${sel ? 'bg-acento border-acento text-white' : 'border-black/10 text-[#0A0A0A]'}`}>
+                          {ICONO_SERVICIO[a]} {NOMBRE_AREA[a]}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
               {[['nombre','Nombre completo *','text'],['email','Email','email'],['telefono','Teléfono','tel']].map(([k,l,t]) => (
                 <div key={k}>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
@@ -1456,7 +1500,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],...(moduloVisible('seguimiento')?[['seguimientos','Check-ins']]:[]),['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],...(moduloVisible('seguimiento')?[['seguimientos','Check-ins']]:[]),['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],...(funcionActiva('historial')?[['historial','🩺 Historial']]:[]),...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all relative ${dTab===id ? 'bg-acento text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -2122,6 +2166,10 @@ export default function Clientes({ session }) {
                   )}
                 </div>
               )}
+              {dTab==='historial' && funcionActiva('historial') && (
+                <HistorialClinico cliente={detalle} uid={uid} onToast={showToast} />
+              )}
+
               {dTab==='pagos' && (() => {
                 const PLANES_COBRO = [
                   ['nutricion', 'Nutrición', 29],
@@ -2133,6 +2181,14 @@ export default function Clientes({ session }) {
                 const pagoFallido = pc && pc.estado === 'pago_fallido'
                 return (
                   <div className="space-y-4">
+                    {/* Cobro por área: tarifa, bono o sesión suelta (solo centros con la función "bonos") */}
+                    {funcionActiva('bonos') && (
+                      <CobroAreas cliente={detalle} onToast={showToast}
+                        onCambio={cambios => {
+                          setDetalle(d => ({ ...d, ...cambios }))
+                          setClientes(cs => cs.map(c => c.id === detalle.id ? { ...c, ...cambios } : c))
+                        }} />
+                    )}
                     {/* Acceso libre — exime de cobro (cuentas de prueba, cortesías) */}
                     {detalle.tipo === 'online' && (
                       <div className="bg-white border border-black/5 rounded-2xl p-4 flex items-center justify-between gap-3">

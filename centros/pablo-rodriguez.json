@@ -74,6 +74,10 @@
     "fisioterapia",
     "nutricion"
   ],
+  "funciones": [
+    "bonos",
+    "historial"
+  ],
   "vercel": {
     "proyecto": "prj_3joP8L7WwZ6dJRiHbc5AQkMoHkNi",
     "equipo": "team_ccftxY4FjAbjgPfyo5HnELjo"

@@ -35,6 +35,8 @@ if (m.color && !/^#[0-9A-Fa-f]{6}$/.test(m.color)) errores.push(`marca.color deb
 for (const k of ['logo', 'icono']) {
   if (m[k] && m[k].startsWith('/') && !fs.existsSync(path.join(RAIZ, 'public', m[k]))) errores.push(`marca.${k}: no existe public${m[k]}`)
 }
+const FUNCIONES = ['bonos', 'historial']
+for (const f of ficha.funciones || []) if (!FUNCIONES.includes(f)) errores.push(`funciones: "${f}" no existe (válidas: ${FUNCIONES.join(', ')})`)
 if (errores.length) salir(`Ficha centros/${id}.json incorrecta:\n  - ${errores.join('\n  - ')}`)
 
 const env = {
@@ -48,6 +50,7 @@ const env = {
   VITE_BRAND_FIXED: m.fija ? '1' : '',
   VITE_MODULOS_OCULTOS: (ficha.modulosOcultos || []).join(','),
   VITE_SERVICIOS: (ficha.servicios || []).join(','),
+  VITE_FUNCIONES: (ficha.funciones || []).join(','),
 }
 
 // --- a qué base de datos se conecta: la de la ficha si trae url y anonKey; si no, la de .env ---
