@@ -2133,9 +2133,30 @@ export default function Clientes({ session }) {
                 const pagoFallido = pc && pc.estado === 'pago_fallido'
                 return (
                   <div className="space-y-4">
-                    {/* Sección 1 — Suscripción (solo clientes online) */}
+                    {/* Acceso libre — exime de cobro (cuentas de prueba, cortesías) */}
                     {detalle.tipo === 'online' && (
-                      hayActiva ? (
+                      <div className="bg-white border border-black/5 rounded-2xl p-4 flex items-center justify-between gap-3">
+                        <p className="text-sm font-semibold text-[#0A0A0A] flex-1">✓ Acceso libre (sin cobro)</p>
+                        <button onClick={async () => {
+                          const nuevo = !detalle.acceso_libre
+                          await supabase.from('clientes').update({ acceso_libre: nuevo }).eq('id', detalle.id)
+                          setDetalle(d => ({ ...d, acceso_libre: nuevo }))
+                          setClientes(cs => cs.map(c => c.id === detalle.id ? { ...c, acceso_libre: nuevo } : c))
+                          showToast(nuevo ? '✓ Acceso libre activado' : 'Acceso libre desactivado')
+                        }} className={`w-11 h-6 rounded-full transition-all relative flex-shrink-0 ${detalle.acceso_libre ? 'bg-emerald-500' : 'bg-black/20'}`}>
+                          <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow-sm ${detalle.acceso_libre ? 'left-5' : 'left-0.5'}`}/>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Sección 1 — Suscripción (solo clientes online, oculta si tiene acceso libre) */}
+                    {detalle.tipo === 'online' && (
+                      detalle.acceso_libre ? (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-2">
+                          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500 text-white flex-shrink-0">Acceso libre</span>
+                          <p className="text-sm text-emerald-700">Tiene acceso completo sin pasar por Stripe</p>
+                        </div>
+                      ) : hayActiva ? (
                         <div className="bg-white border border-emerald-100 rounded-2xl p-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">✓ Activa</span>

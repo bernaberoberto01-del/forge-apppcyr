@@ -402,8 +402,10 @@ export default function PortalForge() {
   const pasoCheckinDone = (checkins?.length || 0) >= 1
   const pasoRutinaDone = !!rutina
   const mostrarOnboarding = esOnline && modoOnboarding === true
-  // Cuenta demo del entrenador: acceso completo siempre, sin pasar por pago ni suscripción.
-  const plan = cliente.is_demo ? 'completo' : ((planCobro?.estado === 'activo' ? planCobro.plan : null) || cliente.plan_online || null)
+  // Cuenta demo del entrenador o cliente marcado como acceso_libre: acceso
+  // completo siempre, sin pasar por pago ni suscripción.
+  const tieneAccesoLibre = cliente.is_demo || cliente.acceso_libre
+  const plan = tieneAccesoLibre ? 'completo' : ((planCobro?.estado === 'activo' ? planCobro.plan : null) || cliente.plan_online || null)
   const acceso = {
     rutinas: ['entrenamiento', 'completo'].includes(plan),
     nutricion: ['nutricion', 'completo'].includes(plan),
@@ -423,15 +425,15 @@ export default function PortalForge() {
   const ultimoPago = pagos?.[0] || null
   const diasDesdeUltimoPago = ultimoPago?.fecha_pago ? Math.floor((Date.now() - new Date(ultimoPago.fecha_pago + 'T00:00').getTime()) / 864e5) : null
   const tieneSuscripcionStripeActiva = planCobro?.estado === 'activo'
-  const pagoVencido = esOnline && !cliente.is_demo && !tieneSuscripcionStripeActiva && diasDesdeUltimoPago !== null && diasDesdeUltimoPago > 35
+  const pagoVencido = esOnline && !tieneAccesoLibre && !tieneSuscripcionStripeActiva && diasDesdeUltimoPago !== null && diasDesdeUltimoPago > 35
   const diasVencido = pagoVencido ? diasDesdeUltimoPago - 30 : 0
 
   // Lead aceptado con un plan sugerido pero aún sin pagar — plan_online está puesto
   // pero plan_activo sigue en false hasta que llegue checkout.session.completed.
   // No se mezcla con el blur de pagoVencido: aquí no hay nada que mostrar todavía,
   // así que se sustituye toda la pantalla por la activación.
-  // is_demo (cuenta de prueba del entrenador) nunca pasa por esta pantalla.
-  const faltaActivarPlan = esOnline && !cliente.is_demo && !!cliente.plan_online && !cliente.plan_activo && !tieneSuscripcionStripeActiva
+  // is_demo o acceso_libre nunca pasan por esta pantalla.
+  const faltaActivarPlan = esOnline && !tieneAccesoLibre && !!cliente.plan_online && !cliente.plan_activo && !tieneSuscripcionStripeActiva
 
   if (faltaActivarPlan) {
     const planInfo = PLANES_INFO.find(p => p.id === cliente.plan_online)
