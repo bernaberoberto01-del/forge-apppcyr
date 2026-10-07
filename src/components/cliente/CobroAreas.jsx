@@ -43,7 +43,7 @@ function TarjetaBono({ bono, onUsar, onDesactivar }) {
   )
 }
 
-export default function CobroAreas({ cliente, onToast, onCambio }) {
+export default function CobroAreas({ cliente, onToast, onCambio, onPagos }) {
   const areas = AREAS.filter(a => areasDe(cliente).includes(a))
   const [mods, setMods] = useState({})
   const [bonos, setBonos] = useState([])
@@ -92,6 +92,7 @@ export default function CobroAreas({ cliente, onToast, onCambio }) {
         entrenador_id: cliente.entrenador_id, cliente_id: cliente.id, importe: precio,
         concepto: `Bono ${total} sesiones · ${NOMBRE_SERVICIO[area]}`, estado: 'pagado', area,
       })
+      onPagos?.()
     }
     setNuevoBono(null); setFormBono(bonoVacio()); onToast?.('Bono creado'); cargar()
   }
@@ -112,7 +113,7 @@ export default function CobroAreas({ cliente, onToast, onCambio }) {
   async function marcarPagado(pago) {
     const { error } = await supabase.from('pagos').update({ estado: 'pagado', fecha_pago: hoy() }).eq('id', pago.id)
     if (error) { onToast?.('No se pudo marcar como pagado', 'error'); return }
-    onToast?.('Pago registrado'); cargar()
+    onToast?.('Pago registrado'); cargar(); onPagos?.()
   }
 
   return (

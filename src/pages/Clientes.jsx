@@ -2187,6 +2187,10 @@ export default function Clientes({ session }) {
                         onCambio={cambios => {
                           setDetalle(d => ({ ...d, ...cambios }))
                           setClientes(cs => cs.map(c => c.id === detalle.id ? { ...c, ...cambios } : c))
+                        }}
+                        onPagos={async () => {
+                          const { data } = await supabase.from('pagos').select('*').eq('cliente_id', detalle.id).order('fecha_pago', { ascending: false })
+                          setDData(d => ({ ...d, pagos: data || [] }))
                         }} />
                     )}
                     {/* Acceso libre — exime de cobro (cuentas de prueba, cortesías) */}
