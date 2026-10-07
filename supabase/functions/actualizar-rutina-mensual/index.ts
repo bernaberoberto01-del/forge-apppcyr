@@ -48,15 +48,17 @@ async function procesarCliente(cliente: any, contextoExtra: string = '') {
   const mesActual = new Date().toLocaleString('es-ES', { month: 'long' });
   const añoActual = new Date().getFullYear();
 
-  // El contexto del entrenador (si llega) va SIEMPRE al final del prompt, con prioridad
-  // explícita sobre las reglas generales de variación. Sin contexto, esas reglas actúan
-  // como guía por defecto para evitar que los días salgan con los mismos ejercicios.
+  // El contexto del entrenador (si llega) va SIEMPRE al final del prompt. Sin contexto,
+  // las reglas de distribución actúan como guía por defecto para evitar que los días
+  // salgan con los mismos ejercicios. Con contexto, esas reglas siguen presentes pero
+  // quedan rebajadas a orientación — no obligatorias — y la instrucción del entrenador
+  // tiene prioridad explícita por encima de todo lo anterior en el prompt.
   const reglasVariacion = `IMPORTANTE: Cada día debe tener ejercicios COMPLETAMENTE DISTINTOS entre sí. Nunca repitas el mismo ejercicio en días diferentes. Distribuye los patrones de movimiento así:
 - Si son 3 días: Día 1 = empuje + pierna dominante rodilla, Día 2 = tirón + pierna dominante cadera, Día 3 = full body con variaciones y core
 - Si son 4 días: Upper/Lower/Upper/Lower
 - Si son 5 días: Push/Pull/Legs/Upper/Lower`;
   const bloqueFinal = contextoExtra?.trim()
-    ? `CONTEXTO DEL ENTRENADOR (PRIORIDAD MÁXIMA — sigue esto por encima de las reglas generales anteriores): ${contextoExtra.trim()}`
+    ? `${reglasVariacion}\n(Esta distribución de días es solo una ORIENTACIÓN por defecto, no obligatoria, si hay una instrucción del entrenador a continuación.)\n\nINSTRUCCIÓN PRIORITARIA DEL ENTRENADOR (tiene prioridad sobre todo lo anterior): ${contextoExtra.trim()}`
     : reglasVariacion;
 
   const prompt = `Eres entrenador personal experto. Genera rutina mes siguiente con datos reales del cliente.

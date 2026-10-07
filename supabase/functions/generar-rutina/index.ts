@@ -143,10 +143,11 @@ function buildPrompt(i: number, nombre: string, cliente: any, perfil: any, cuest
   const nombreLow = nombre.toLowerCase()
   const esCardio = nombreLow.includes('cardio') || nombreLow.includes('z2') || nombreLow.includes('fartlek')
   // El contexto del entrenador (boton "Regenerar con mas contexto") va SIEMPRE al final,
-  // justo antes del JSON, con prioridad explicita sobre las reglas generales de variacion.
+  // justo antes del JSON, con prioridad explicita e inequivoca sobre todo lo anterior
+  // (incluido el nombre/patron de dia ya fijado mas arriba, que pasa a ser orientativo).
   // Si no hay contexto, se recuerda la regla de variacion por dia como guia por defecto.
   const trailer = contexto
-    ? ` CONTEXTO DEL ENTRENADOR (PRIORIDAD MAXIMA, sigue esto por encima de las reglas generales anteriores):${contexto}`
+    ? ` El patron "${nombre}" indicado arriba es solo una orientacion por defecto, no obligatoria. INSTRUCCION PRIORITARIA DEL ENTRENADOR (tiene prioridad sobre todo lo anterior):${contexto}`
     : ` Sin contexto adicional: usa ejercicios especificos del patron "${nombre}", nunca genericos de otro dia del bloque.`
   if (esCardio) return `Cardio dia${i}:${nombre}|${base}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Cardio","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"Cardio 30min","patron":"cardio","series":1,"reps":"30 min","descanso":"-","notas":""},{"orden":3,"nombre":"Core","patron":"core","series":3,"reps":"3x30s","descanso":"15s","notas":""}]}`
   if (tipo === 'crossfit') return `WOD dia${i}:${nombre}|${base}${biblioPrompt}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"CrossFit","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"10 min","descanso":"-","notas":""},{"orden":2,"nombre":"Fuerza","patron":"fuerza","series":4,"reps":"3-5","descanso":"3 min","notas":""},{"orden":3,"nombre":"MetCon","patron":"metabolico","series":1,"reps":"AMRAP 10min","descanso":"-","notas":""}]}`
@@ -187,7 +188,13 @@ Deno.serve(async (req) => {
     const formato = cliente.formato_entrenamiento || cuestionario?.formato_entrenamiento || ''
     const biblioPrompt = (biblioteca||[]).length ? ` Usa:${(biblioteca||[]).slice(0,12).map((e:any)=>e.nombre).join(',')}.` : ''
     const contextoPrompt = contexto_extra?.trim() ? ` ${contexto_extra.trim()}` : ''
-    const nombres = nombresDias(tipoEnt, perfil.fase, objetivo, formato, dias)
+    // Con contexto del entrenador, el split fijo (Circuito Sup/Inf, Push/Pull/Legs...)
+    // no se pre-asigna por dia — si no, el nombre ya fijado compite contra la
+    // instruccion del entrenador (y ademas queda literal en la plantilla JSON de
+    // buildPrompt). Sin contexto, se mantiene el split por defecto de siempre.
+    const nombres = contextoPrompt
+      ? Array.from({ length: dias }, (_, idx) => `Dia ${idx + 1}`)
+      : nombresDias(tipoEnt, perfil.fase, objetivo, formato, dias)
 
     // Todos los dias en paralelo con reintento automatico
     const promesas = Array.from({ length: dias }, (_, idx) => {
