@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
-import { SERVICIOS_EXTRA, ICONO_SERVICIO, NOMBRE_SERVICIO, esServicioExtra } from '../lib/servicios'
+import { SERVICIOS_EXTRA, ICONO_SERVICIO, NOMBRE_SERVICIO, esServicioExtra, hayAreas, areasDe } from '../lib/servicios'
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -147,6 +147,11 @@ function VistaMensual({ mesVista, setMesVista, sesiones, hoy, abrirModalEnDia, s
   )
 }
 
+// Valor del desplegable de cliente para crear uno nuevo desde la sesión (fisio/nutrición)
+const NUEVO = '__nuevo__'
+// La columna areas solo existe/importa en centros con servicios extra
+const COLS_CLIENTE = `id,nombre,tipo,horas_semana,entrenador_id${hayAreas ? ',areas' : ''}`
+
 export default function Agenda({ session }) {
   const [semanaBase, setSemanaBase] = useState(() => getLunes(new Date()))
   const [sesiones, setSesiones] = useState([])
@@ -179,6 +184,9 @@ export default function Agenda({ session }) {
   const [quickView, setQuickView] = useState(null)
   const [toast, setToast] = useState(null)
   const [form, setForm] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', notas:'', entrenador_id:'', servicio:'entrenamiento', cliente_nombre:'' })
+  // En el formulario "+ Sesión", solo los clientes del área elegida
+  const clientesDelServicio = useMemo(() => !hayAreas ? clientes
+    : clientes.filter(c => areasDe(c).includes(form.servicio)), [clientes, form.servicio])
   const [formRec, setFormRec] = useState({ cliente_id:'', hora:'09:00', duracion_minutos:60, tipo:'presencial', dias_semana:[], fecha_inicio: formatFecha(new Date()), fecha_fin:'', notas:'', entrenador_id:'' })
   const [formExtra, setFormExtra] = useState({ fecha: formatFecha(new Date()), concepto:'', horas:'1', tipo:'desplazamiento' })
   const [loading, setLoading] = useState(false)
@@ -262,8 +270,8 @@ export default function Agenda({ session }) {
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centroId).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').or(`entrenador_id.eq.${uid},grupo_id.not.is.null`).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
       centroId
-        ? supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').eq('centro_id', centroId).eq('estado','activo')
-        : supabase.from('clientes').select('id,nombre,tipo,horas_semana,entrenador_id').in('entrenador_id', equipo).eq('estado','activo'),
+        ? supabase.from('clientes').select(COLS_CLIENTE).eq('centro_id', centroId).eq('estado','activo')
+        : supabase.from('clientes').select(COLS_CLIENTE).in('entrenador_id', equipo).eq('estado','activo'),
       supabase.from('horas_extra').select('*').in('entrenador_id', equipo).gte('fecha', hace60).order('fecha', { ascending: false }),
       centroId
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centroId).eq('activa', true)
@@ -468,15 +476,17 @@ export default function Agenda({ session }) {
   }, [sesiones, recurrentes, grupos, gruposMap, excepcionesGrupo, excepcionesInd, diasSemana, clases])
 
   async function guardarSesion() {
-    const externo = esServicioExtra(form.servicio)
-    if (externo ? !form.cliente_nombre.trim() : !form.cliente_id) return
+    const extra = esServicioExtra(form.servicio)
+    const nuevo = extra && form.cliente_id === NUEVO
+    if (nuevo ? !form.cliente_nombre.trim() : !form.cliente_id) return
     setLoading(true)
     const fecha = diaClick || formatFecha(diasSemana[0])
     let clienteId = form.cliente_id
-    if (externo) {
+    if (nuevo) {
+      // Cliente nuevo del área (fisio/nutrición): ficha completa en Clientes, pestaña de su área
       const { data: cli, error: errCli } = await supabase.from('clientes').insert({
         nombre: form.cliente_nombre.trim(), entrenador_id: form.entrenador_id || uid, centro_id: centro?.id || null,
-        estado: 'externo', tipo: 'presencial', notas: `Cliente externo de ${NOMBRE_SERVICIO[form.servicio].toLowerCase()}`
+        estado: 'activo', tipo: 'presencial', areas: [form.servicio]
       }).select('id').single()
       if (errCli || !cli) { setToast({ msg: 'Error al guardar el cliente', tipo: 'error' }); setLoading(false); return }
       clienteId = cli.id
@@ -484,7 +494,7 @@ export default function Agenda({ session }) {
     const { error } = await supabase.from('sesiones').insert({
       entrenador_id: form.entrenador_id || uid, cliente_id: clienteId,
       centro_id: centro?.id || null,
-      fecha, hora: form.hora, tipo: externo ? form.servicio : form.tipo,
+      fecha, hora: form.hora, tipo: extra ? form.servicio : form.tipo,
       duracion_minutos: form.duracion_minutos,
       completada: false, notas: form.notas
     })
@@ -1213,21 +1223,13 @@ export default function Agenda({ session }) {
               {SERVICIOS_EXTRA.length > 0 && (
                 <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${SERVICIOS_EXTRA.length + 1}, minmax(0, 1fr))` }}>
                   {['entrenamiento', ...SERVICIOS_EXTRA].map(sv => (
-                    <button key={sv} type="button" onClick={() => setForm(f => ({ ...f, servicio: sv }))}
+                    <button key={sv} type="button" onClick={() => setForm(f => ({ ...f, servicio: sv, cliente_id: '', cliente_nombre: '' }))}
                       className={`py-2 rounded-xl border text-xs font-semibold transition-all ${form.servicio === sv ? 'bg-acento border-acento text-white' : 'border-black/10 text-[#0A0A0A]'}`}>
                       {ICONO_SERVICIO[sv] ? `${ICONO_SERVICIO[sv]} ` : '💪 '}{NOMBRE_SERVICIO[sv]}
                     </button>
                   ))}
                 </div>
               )}
-              {esServicioExtra(form.servicio) ? (
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre del cliente *</label>
-                <input value={form.cliente_nombre} onChange={e => setForm(f => ({ ...f, cliente_nombre: e.target.value }))}
-                  placeholder="Escribe el nombre" autoFocus
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
-              </div>
-              ) : (
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
                 <select value={form.cliente_id} onChange={e => {
@@ -1236,8 +1238,16 @@ export default function Agenda({ session }) {
                   }}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                   <option value="">Selecciona cliente</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  {esServicioExtra(form.servicio) && <option value={NUEVO}>＋ Cliente nuevo de {NOMBRE_SERVICIO[form.servicio].toLowerCase()}</option>}
+                  {clientesDelServicio.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
+              </div>
+              {form.cliente_id === NUEVO && (
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre del cliente nuevo *</label>
+                <input value={form.cliente_nombre} onChange={e => setForm(f => ({ ...f, cliente_nombre: e.target.value }))}
+                  placeholder="Escribe el nombre" autoFocus
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
               </div>
               )}
               {centro && miembros?.length > 1 && (
@@ -1291,7 +1301,7 @@ export default function Agenda({ session }) {
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setModal(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
-              <button onClick={guardarSesion} disabled={(esServicioExtra(form.servicio) ? !form.cliente_nombre.trim() : !form.cliente_id) || loading}
+              <button onClick={guardarSesion} disabled={(form.cliente_id === NUEVO ? !form.cliente_nombre.trim() : !form.cliente_id) || loading}
                 className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading ? 'Guardando...' : 'Añadir'}
               </button>

@@ -7,3 +7,12 @@ const ocultos = new Set(
 )
 
 export const moduloVisible = id => !ocultos.has(id)
+
+// Funciones opcionales que el centro activa (VITE_FUNCIONES, de "funciones" en la ficha).
+// Al revés que los módulos: apagadas salvo que la ficha las pida.
+// Ids: bonos (modalidad de cobro por área y bonos de sesiones), historial (historial clínico)
+const activas = new Set(
+  String(import.meta.env.VITE_FUNCIONES || '').split(',').map(s => s.trim()).filter(Boolean)
+)
+
+export const funcionActiva = id => activas.has(id)

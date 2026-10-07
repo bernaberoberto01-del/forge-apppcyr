@@ -227,6 +227,7 @@ Un cambio en `main` llega a TODOS los centros: no puede romper ni cambiar el asp
 | Sección nueva en el menú o en el dashboard | darle un id y envolverla en `moduloVisible('<id>')` (`src/lib/modulos.js`) para poder ocultarla por centro. Ids actuales: dashboard, clientes, rutinas, seguimiento, pagos, agenda, nutricion, mensajes, tutorial |
 
 - Ocultar algo para un centro = añadir su id a `modulosOcultos` en SU ficha. Nunca borrar código ni ocultarlo para todos.
+- Funciones opcionales (apagadas salvo que la ficha las active): `funciones` en la ficha → `funcionActiva('<id>')` (`src/lib/modulos.js`). Ids: `bonos` (modalidad de cobro por área: tarifa/bono/sesión suelta), `historial` (historial clínico). Con `servicios` (fisioterapia, nutricion) en la ficha, cada cliente tiene `areas` y la lista de Clientes se separa por área (`hayAreas`, `src/lib/servicios.js`). Código nuevo de estas funciones: nunca leer ni escribir `areas`/tablas nuevas fuera de esas condiciones (en un centro sin ellas puede que la migración aún no esté aplicada).
 - Variable nueva `VITE_*`: añadirla en `scripts/centro.mjs` y en las fichas que la necesiten.
 - Probar un centro en local: `npm run centro <id>` (p. ej. `npm run centro pablo-rodriguez -- --port 5174`).
 
