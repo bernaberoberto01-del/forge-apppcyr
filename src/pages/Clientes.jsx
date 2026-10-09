@@ -167,6 +167,7 @@ export default function Clientes({ session }) {
   const [cuestionarios, setCuestionarios] = useState([])
   const [checkins, setCheckins] = useState([])
   const [pagos, setPagos] = useState([])
+  const [clienteIdsConPlanCobro, setClienteIdsConPlanCobro] = useState(new Set())
   const [busqueda, setBusqueda] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [filtroObj, setFiltroObj] = useState('')
@@ -354,6 +355,15 @@ export default function Clientes({ session }) {
     setSearchParams({}, { replace: true })
   }, [clientes])
 
+  // Deep-link desde Dashboard: /clientes?filter=sin_suscripcion — aplica el
+  // filtro de la lista directamente, sin esperar a que carguen los clientes.
+  useEffect(() => {
+    const filtro = searchParams.get('filter')
+    if (!filtro) return
+    setFiltroTipo(filtro)
+    setSearchParams({}, { replace: true })
+  }, [])
+
   // Realtime — nuevo cuestionario llega sin recargar página
   useEffect(() => {
     if (!uid) return
@@ -372,13 +382,14 @@ export default function Clientes({ session }) {
 
   async function cargar() {
     const hace14 = new Date(Date.now() - 14 * 864e5).toISOString().split('T')[0]
-    const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }] = await Promise.all([
+    const [{ data: cl }, { data: cu }, { data: ci }, { data: pg }, { data: gs }, { data: tf }, { data: pc }] = await Promise.all([
       supabase.from('clientes').select('*').in('entrenador_id', equipo).not('estado', 'in', '(rechazado,externo)').order('created_at', { ascending: false }),
       supabase.from('cuestionarios').select('*').in('entrenador_id', equipo).eq('procesado', false).order('created_at', { ascending: false }),
       supabase.from('checkins').select('cliente_id,fecha').in('entrenador_id', equipo).gte('fecha', hace14),
       supabase.from('pagos').select('cliente_id,valido_hasta').in('entrenador_id', equipo),
       supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').in('entrenador_id', equipo).eq('activo', true),
       supabase.from('tarifas').select('*').in('entrenador_id', equipo).eq('activa', true).order('modalidad').order('dias_semana'),
+      supabase.from('planes_cobro').select('cliente_id').in('entrenador_id', equipo),
     ])
     setClientes(cl || [])
     setGrupos(gs || [])
@@ -386,6 +397,7 @@ export default function Clientes({ session }) {
     setCuestionarios(cu || [])
     setCheckins(ci || [])
     setPagos(pg || [])
+    setClienteIdsConPlanCobro(new Set((pc || []).map(p => p.cliente_id)))
   }
 
   // Calcular alertas por cliente
@@ -414,9 +426,10 @@ export default function Clientes({ session }) {
     if (filtroTipo === 'activos') r = r.filter(c => c.estado === 'activo')
     if (filtroTipo === 'sinCI') r = r.filter(c => alertas[c.id]?.sinCI)
     if (filtroTipo === 'vencidos') r = r.filter(c => alertas[c.id]?.pagoVencido)
+    if (filtroTipo === 'sin_suscripcion') r = r.filter(c => c.tipo === 'online' && !clienteIdsConPlanCobro.has(c.id))
     if (filtroObj) r = r.filter(c => c.objetivo === filtroObj)
     return r
-  }, [clientes, busqueda, filtroTipo, filtroObj, alertas, filtroArea])
+  }, [clientes, busqueda, filtroTipo, filtroObj, alertas, filtroArea, clienteIdsConPlanCobro])
 
   const totalPaginas = Math.ceil(filtrados.length / PER_PAGE)
   const paginados = filtrados.slice((pagina - 1) * PER_PAGE, pagina * PER_PAGE)

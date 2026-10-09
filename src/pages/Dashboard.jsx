@@ -654,7 +654,7 @@ export default function Dashboard({ session }) {
                         {d.clientesOnlineSinSuscripcion.slice(0,3).map(c=>c.nombre.split(' ')[0]).join(', ')}
                       </p>
                     </div>
-                    <button onClick={() => navigate('/clientes')}
+                    <button onClick={() => navigate('/clientes?filter=sin_suscripcion')}
                       className="text-xs bg-amber-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
                       Configurar →
                     </button>
