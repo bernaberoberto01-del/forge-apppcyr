@@ -6,6 +6,7 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
 import { SERVICIOS_EXTRA, ICONO_SERVICIO, NOMBRE_SERVICIO, esServicioExtra, hayAreas, areasDe } from '../lib/servicios'
+import { funcionActiva } from '../lib/modulos'
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -228,14 +229,20 @@ export default function Agenda({ session }) {
 
   useEffect(() => { if (uid) cargar(centro?.id) }, [uid, semanaBase, centro?.id])
 
+  // sesiones cambia con cada cargar() pero el efecto de abajo solo se monta una
+  // vez (deps []) — sin este ref, autoCompletar se queda con el array vacío del
+  // primer render para siempre, porque cargar() aún no habría devuelto nada.
+  const sesionesRef = useRef(sesiones)
+  useEffect(() => { sesionesRef.current = sesiones }, [sesiones])
+
   // Auto-completar sesiones reales cuando pasa la hora de finalización
   useEffect(() => {
     async function autoCompletar() {
       const ahora = new Date()
-      const hoy = ahora.toISOString().split('T')[0]
+      const hoy = formatFecha(ahora)
       const horaActual = ahora.getHours() * 60 + ahora.getMinutes()
       // Buscar sesiones de hoy no completadas cuya hora de fin ya pasó
-      const sesionesHoy = sesiones.filter(s =>
+      const sesionesHoy = sesionesRef.current.filter(s =>
         s.fecha === hoy && !s.completada && !s.cancelada && s.hora &&
         s.tipo !== 'online' // solo presenciales — las online las registra el cliente
       )
@@ -265,7 +272,12 @@ export default function Agenda({ session }) {
 
   async function cargar(centroId) {
     const hace60 = formatFecha(new Date(Date.now() - 60*864e5))
-    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: excGrupo }, { data: excInd }, { data: miem }] = await Promise.all([
+    // Nombres alineados con su query real — antes estaban desalineados desde
+    // la posición 6 (miembros_centro se guardaba como "excGrupo", sesiones_excepcion
+    // como "excInd" y sesiones_excepcion_individual como "miem"), un bug
+    // preexistente a esta sesión que rompía el color/nombre por entrenador en
+    // la agenda compartida y cruzaba las excepciones de grupo/individuales.
+    const [{ data: se }, { data: cl }, { data: he }, { data: rc }, { data: gs }, { data: miem }, { data: excGrupo }, { data: excInd }] = await Promise.all([
       centroId
         ? supabase.from('sesiones').select('*, clientes(nombre,tipo)').eq('centro_id', centroId).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora')
         : supabase.from('sesiones').select('*, clientes(nombre,tipo)').or(`entrenador_id.eq.${uid},grupo_id.not.is.null`).neq('tipo','online').gte('fecha', hace60).order('fecha').order('hora'),
@@ -275,11 +287,13 @@ export default function Agenda({ session }) {
       supabase.from('horas_extra').select('*').in('entrenador_id', equipo).gte('fecha', hace60).order('fecha', { ascending: false }),
       centroId
         ? supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('centro_id', centroId).eq('activa', true)
-        : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').eq('activa', true),
+        : supabase.from('sesiones_recurrentes').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('activa', true),
       // Grupos: buscar SIEMPRE por entrenador_id (funciona sin centro)
       // Y también por centro_id si hay centro — combinar para no perder ninguno
       supabase.from('grupos').select('id,nombre,tipo,hora,duracion_minutos,dias_semana,grupo_clientes(cliente_id,activo,clientes(id,nombre))').in('entrenador_id', equipo).eq('activo', true),
-      supabase.from('miembros_centro').select('user_id,nombre,rol,color,email').eq('activo', true),
+      centroId
+        ? supabase.from('miembros_centro').select('user_id,nombre,rol,color,email').eq('centro_id', centroId).eq('activo', true)
+        : Promise.resolve({ data: [], error: null }),
       supabase.from('sesiones_excepcion').select('*').in('entrenador_id', equipo),
       supabase.from('sesiones_excepcion_individual').select('*').in('entrenador_id', equipo),
     ])
@@ -290,13 +304,18 @@ export default function Agenda({ session }) {
     setExcepcionesGrupo(excGrupo || [])
     setExcepcionesInd(excInd || [])
     setMiembrosAgenda(miem || [])
-    // Cargar clases — en try propio para no abortar el resto si falla
-    try {
-      const { data: cls } = await supabase.from('clases_con_plazas')
-        .select('*').in('entrenador_id', equipo).eq('cancelada', false)
-        .gte('fecha', hace60).order('fecha').order('hora')
-      setClases(cls || [])
-    } catch { setClases([]) }
+    // Cargar clases — solo si el centro activa la función "clases" (igual que
+    // bonos/historial). En try propio para no abortar el resto si falla.
+    if (funcionActiva('clases')) {
+      try {
+        const { data: cls } = await supabase.from('clases_con_plazas')
+          .select('*').in('entrenador_id', equipo).eq('cancelada', false)
+          .gte('fecha', hace60).order('fecha').order('hora')
+        setClases(cls || [])
+      } catch { setClases([]) }
+    } else {
+      setClases([])
+    }
 
     // Construir mapa grupo_id → info completa
     const gm = {}
@@ -764,10 +783,12 @@ export default function Agenda({ session }) {
           </button>
           <button onClick={() => { setEditandoRecId(null); setModalRecurrente(true) }}
             className="border border-acento/30 text-acento text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-acento/5">↻ Nueva regla</button>
-          <button onClick={() => setModalClase(true)}
-            className="border border-emerald-300 text-emerald-700 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-emerald-50">
-            👥 Nueva clase
-          </button>
+          {centro && funcionActiva('clases') && (
+            <button onClick={() => setModalClase(true)}
+              className="border border-emerald-300 text-emerald-700 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-emerald-50">
+              👥 Nueva clase
+            </button>
+          )}
 
         </div>
         <button onClick={() => { setDiaClick(hoy); setModal(true) }}
@@ -1130,7 +1151,7 @@ export default function Agenda({ session }) {
                       <div>
                         <label className="text-xs text-[#6B6B6B] mb-1 block">Día</label>
                         <input type="date" value={moverForm.fecha}
-                          min={new Date().toISOString().split('T')[0]}
+                          min={formatFecha(new Date())}
                           onChange={e => setMoverForm(f => ({...f, fecha: e.target.value}))}
                           className="w-full border border-black/10 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-acento"/>
                       </div>
@@ -1592,6 +1613,8 @@ export default function Agenda({ session }) {
       {modalClase && (
         <ModalNuevaClase
           uid={uid}
+          centro={centro}
+          onToast={setToast}
           onClose={() => setModalClase(false)}
           onGuardada={() => { setModalClase(false); cargar(centro?.id) }}
         />
@@ -1715,10 +1738,10 @@ function EditarGrupoModal({ grupo, onClose, onGuardado }) {
 }
 
 // ─── Modal crear clase ────────────────────────────────────────────────────────
-function ModalNuevaClase({ uid, onClose, onGuardada }) {
+function ModalNuevaClase({ uid, centro, onToast, onClose, onGuardada }) {
   const [form, setForm] = useState({
     nombre: '', tipo: 'grupo', descripcion: '',
-    fecha: new Date().toISOString().split('T')[0],
+    fecha: formatFecha(new Date()),
     hora: '09:00', duracion_minutos: 60,
     plazas_max: 10, es_recurrente: false,
     dias_semana: [], color: '#10b981',
@@ -1745,6 +1768,7 @@ function ModalNuevaClase({ uid, onClose, onGuardada }) {
     setGuardando(true)
     const payload = {
       entrenador_id: uid,
+      centro_id: centro?.id || null,
       nombre: form.nombre.trim(),
       tipo: form.tipo,
       descripcion: form.descripcion || null,
@@ -1756,8 +1780,10 @@ function ModalNuevaClase({ uid, onClose, onGuardada }) {
       dias_semana: form.es_recurrente ? form.dias_semana : null,
       color: form.color,
     }
-    await supabase.from('clases').insert(payload)
+    const { error } = await supabase.from('clases').insert(payload)
     setGuardando(false)
+    if (error) { onToast?.({ msg: 'Error al crear la clase', tipo: 'error' }); return }
+    onToast?.({ msg: 'Clase creada', tipo: 'ok' })
     onGuardada()
   }
 
@@ -1790,6 +1816,7 @@ function ModalNuevaClase({ uid, onClose, onGuardada }) {
             <div>
               <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Fecha</label>
               <input type="date" value={form.fecha} onChange={e => set('fecha', e.target.value)}
+                min={formatFecha(new Date())}
                 className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
             </div>
             <div>
