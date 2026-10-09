@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
-
-const COLORES = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6']
-const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+import { ini, AVATAR_COLORS as COLORES } from '../lib/avatar'
+import { diaLocal } from '../lib/dateUtils'
 
 export default function EquipoTab({ centro, miembros, esAdmin, recargar, session, uid, showToast }) {
-  if (!uid) return null
   const [statsEntrenadores, setStatsEntrenadores] = useState({})
   const [pendientes, setPendientes] = useState([])
   const [reenviando, setReenviando] = useState(null)
@@ -21,6 +19,8 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
   useEffect(() => { if (centro && miembros?.length) cargarStats() }, [centro, miembros])
   useEffect(() => { if (centro) cargarPendientes() }, [centro])
 
+  if (!uid) return null
+
   async function cargarPendientes() {
     if (!centro?.id) return
     const { data } = await supabase.from('invitaciones_centro').select('*')
@@ -30,8 +30,8 @@ export default function EquipoTab({ centro, miembros, esAdmin, recargar, session
 
   async function cargarStats() {
     if (!centro?.id) return
-    const hace30 = new Date(Date.now()-30*864e5).toISOString().split('T')[0]
-    const inicioSemana = (() => { const d=new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)); return d.toISOString().split('T')[0] })()
+    const hace30 = diaLocal(new Date(Date.now()-30*864e5))
+    const inicioSemana = (() => { const d=new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)); return diaLocal(d) })()
     
     const [sesMesR, sesSemR, clientesR, extrasR] = await Promise.all([
       supabase.from('sesiones').select('entrenador_id,completada,duracion_minutos').eq('centro_id', centro.id).gte('fecha', hace30).then(r=>r.data||[]).catch(()=>[]),
