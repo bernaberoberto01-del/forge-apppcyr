@@ -13,6 +13,7 @@ import { moduloVisible, funcionActiva } from '../lib/modulos'
 import { AREAS, NOMBRE_SERVICIO, ICONO_SERVICIO, hayAreas, areasDe } from '../lib/servicios'
 import HistorialClinico from '../components/cliente/HistorialClinico'
 import CobroAreas from '../components/cliente/CobroAreas'
+import { ini, avatarColor } from '../lib/avatar'
 
 // En la lista de Clientes el área de entrenamiento se llama "Gimnasio"
 const NOMBRE_AREA = { ...NOMBRE_SERVICIO, entrenamiento: 'Gimnasio' }
@@ -152,9 +153,6 @@ const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:
   edad:'',altura:'',anos_entrenando:'',
   marca_press_banca:'',marca_sentadilla:'',marca_peso_muerto:'',marca_dominadas:'',marca_press_militar:'',
 }
-const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-const AVATAR_COLORS = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6','#14b8a6','#f97316','#06b6d4']
-const avatarColor = (nombre) => AVATAR_COLORS[(nombre||'').charCodeAt(0) % AVATAR_COLORS.length]
 const PER_PAGE = 20
 
 export default function Clientes({ session }) {
