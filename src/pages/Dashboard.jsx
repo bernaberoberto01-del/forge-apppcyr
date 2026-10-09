@@ -28,6 +28,13 @@ function descartarAlertas(clienteIds, tipo) {
   try { localStorage.setItem(DESCARTE_KEY, JSON.stringify(d)) } catch {}
 }
 
+// Fecha en zona horaria LOCAL, no UTC. d.toISOString().split('T')[0] convierte
+// a UTC antes de cortar — entre medianoche y la 1-2 de la madrugada en horario
+// de España, eso devuelve el día anterior y "sesiones de hoy" sale vacío.
+function diaLocal(d) {
+  return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-')
+}
+
 function BarChart({ datos, max }) {
   return (
     <div className="flex items-end gap-1 h-20">
@@ -170,13 +177,13 @@ export default function Dashboard({ session }) {
   async function cargar() {
     try {
     const hoy = new Date()
-    const hoyStr = hoy.toISOString().split('T')[0]
-    const hace6m = new Date(hoy.getFullYear(), hoy.getMonth()-5, 1).toISOString().split('T')[0]
-    const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split('T')[0]
-    const inicioSemana = (() => { const d=new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)); return d.toISOString().split('T')[0] })()
-    const hace7d = new Date(Date.now()-7*864e5).toISOString().split('T')[0]
-    const hace14d = new Date(Date.now()-14*864e5).toISOString().split('T')[0]
-    const en7d   = new Date(Date.now()+7*864e5).toISOString().split('T')[0]
+    const hoyStr = diaLocal(hoy)
+    const hace6m = diaLocal(new Date(hoy.getFullYear(), hoy.getMonth()-5, 1))
+    const inicioMes = diaLocal(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
+    const inicioSemana = (() => { const d=new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)); return diaLocal(d) })()
+    const hace7d = diaLocal(new Date(Date.now()-7*864e5))
+    const hace14d = diaLocal(new Date(Date.now()-14*864e5))
+    const en7d   = diaLocal(new Date(Date.now()+7*864e5))
 
     const [
       { data: clientes },
@@ -210,7 +217,7 @@ export default function Dashboard({ session }) {
       supabase.from('mensajes_cliente').select('id,cliente_id,contenido,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('leido_entrenador', false).eq('tipo','cliente').order('created_at',{ascending:false}).limit(10),
       supabase.from('rutinas').select('id,cliente_id,estado,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('estado','borrador').order('created_at',{ascending:false}).limit(10),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
-      supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).eq('fecha', new Date(Date.now()+864e5).toISOString().split('T')[0]).eq('cancelada', false).order('hora'),
+      supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).eq('fecha', diaLocal(new Date(Date.now()+864e5))).eq('cancelada', false).order('hora'),
       supabase.from('cuestionarios').select('id,nombre,email,necesidades,objetivo,created_at').in('entrenador_id', equipo).eq('procesado', false).order('created_at', {ascending:false}),
       supabase.from('clientes').select('id,nombre,plan_online,ia_estado').in('entrenador_id', equipo).eq('tipo','online').in('ia_estado',['generando','error','pendiente_datos']).eq('estado','activo'),
       supabase.from('configuracion').select('nombre_entrenador').eq('entrenador_id', uid).maybeSingle(),
@@ -235,7 +242,7 @@ export default function Dashboard({ session }) {
     setClientesIAPendiente(clientesIAPendiente || [])
     const activos = (clientes||[]).filter(c => c.estado === 'activo' && !c.nombre?.toLowerCase().includes('prueba') && !c.email?.includes('@forge-app.test'))
     const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
-    const hace4s = new Date(Date.now()-28*864e5).toISOString().split('T')[0]
+    const hace4s = diaLocal(new Date(Date.now()-28*864e5))
     const ciRecientes = (checkins||[]).filter(c => c.fecha >= hace4s)
     const adherenciaMedia = ciRecientes.length > 0
       ? Math.round(ciRecientes.reduce((s,c) => s+(c.adherencia_entreno||0),0)/ciRecientes.length*10) : null
@@ -730,7 +737,7 @@ export default function Dashboard({ session }) {
                 {moduloVisible('seguimiento') && d.clientesSinCI.length > 0 && (() => {
                   // clientesSinCI ya filtra los que llevan +7 días — todos son al menos warning
                   // Los críticos son los que no tienen NINGÚN check-in o llevan +14 días
-                  const hace14d = new Date(Date.now() - 14*864e5).toISOString().split('T')[0]
+                  const hace14d = diaLocal(new Date(Date.now() - 14*864e5))
                   const criticos = d.clientesSinCI.filter(c => {
                     const ultimoCI = (d.checkins||[]).filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha?.localeCompare(a.fecha))[0]
                     return !ultimoCI || ultimoCI.fecha < hace14d
