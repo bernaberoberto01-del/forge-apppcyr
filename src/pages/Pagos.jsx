@@ -6,6 +6,7 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import { BRAND, colorMarca, nombreMarca } from '../lib/brand'
 import { useConfig } from '../hooks/useConfig'
 import { useEquipo } from '../hooks/useCentro'
+import { diaLocal, mesLocal } from '../lib/dateUtils'
 
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
 
@@ -45,7 +46,7 @@ export default function Pagos({ session }) {
   const [planExpandido, setPlanExpandido] = useState(null)
   const [mostrarPendientes, setMostrarPendientes] = useState(true)
   const [toast, setToast] = useState('')
-  const [form, setForm] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: new Date().toISOString().split('T')[0], periodo:'' })
+  const [form, setForm] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()), periodo:'' })
   const [formPlan, setFormPlan] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', frecuencia:'mensual', dia_cobro:1 })
   const [loading, setLoading] = useState(false)
   const [generandoStripe, setGenerandoStripe] = useState(null)
@@ -134,14 +135,49 @@ export default function Pagos({ session }) {
   async function registrarPago() {
     if (!form.cliente_id || !form.importe) return
     setLoading(true)
+    // Un mes después de fecha_pago, con el día recortado al último día del mes
+    // destino si no existe (p.ej. 31 enero -> 28/29 febrero, no marzo).
+    const valido_hasta = (() => {
+      const d = new Date(form.fecha_pago + 'T12:00')
+      const y = d.getFullYear(), m = d.getMonth()
+      const targetY = y + (m === 11 ? 1 : 0)
+      const targetM = (m + 1) % 12
+      const lastDay = new Date(targetY, targetM + 1, 0).getDate()
+      const dia = Math.min(d.getDate(), lastDay)
+      return `${targetY}-${String(targetM + 1).padStart(2,'0')}-${String(dia).padStart(2,'0')}`
+    })()
     const { error } = await supabase.from('pagos').insert({
       entrenador_id: uid, cliente_id: form.cliente_id,
       importe: Number(form.importe), concepto: form.concepto,
       fecha_pago: form.fecha_pago, periodo: form.periodo,
-      valido_hasta: new Date(new Date(form.fecha_pago).setMonth(new Date(form.fecha_pago).getMonth()+1)).toISOString().split('T')[0]
+      valido_hasta
     })
+    // Si el cliente tiene un plan de cobro activo, un pago manual también lo
+    // adelanta — igual que marcarCobrado(), para que no se duplique el aviso
+    // de "próximo cobro" cuando ya se ha registrado el pago a mano.
+    const { data: plan } = await supabase
+      .from('planes_cobro')
+      .select('id, frecuencia, dia_cobro')
+      .eq('cliente_id', form.cliente_id)
+      .eq('activo', true)
+      .maybeSingle()
+    if (plan) {
+      const fechaPago = new Date(form.fecha_pago + 'T12:00')
+      let siguiente
+      if (plan.frecuencia === 'mensual') {
+        siguiente = new Date(fechaPago.getFullYear(), fechaPago.getMonth()+1, plan.dia_cobro)
+      } else if (plan.frecuencia === 'quincenal') {
+        siguiente = new Date(fechaPago.getTime() + 14*864e5)
+      } else {
+        siguiente = new Date(fechaPago.getTime() + 7*864e5)
+      }
+      await supabase.from('planes_cobro').update({
+        ultimo_cobro: form.fecha_pago,
+        proximo_cobro: diaLocal(siguiente)
+      }).eq('id', plan.id)
+    }
     if (error) setToast('Error al registrar')
-    else { setToast('Pago registrado'); setModal(false); setForm({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: new Date().toISOString().split('T')[0], periodo:'' }) }
+    else { setToast('Pago registrado'); setModal(false); setForm({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()), periodo:'' }) }
     await cargar()
     setLoading(false)
   }
@@ -155,7 +191,7 @@ export default function Pagos({ session }) {
       entrenador_id: uid, cliente_id: formPlan.cliente_id,
       importe: Number(formPlan.importe), concepto: formPlan.concepto,
       frecuencia: formPlan.frecuencia, dia_cobro: Number(formPlan.dia_cobro),
-      proximo_cobro: proximo.toISOString().split('T')[0], activo: true
+      proximo_cobro: `${proximo.getFullYear()}-${String(proximo.getMonth()+1).padStart(2,'0')}-${String(proximo.getDate()).padStart(2,'0')}`, activo: true
     }
     if (editandoPlan) {
       await supabase.from('planes_cobro').update(data).eq('id', editandoPlan.id)
@@ -178,12 +214,12 @@ export default function Pagos({ session }) {
     else if (plan.frecuencia === 'quincenal') siguiente = new Date(hoy.getTime() + 14*864e5)
     else siguiente = new Date(hoy.getTime() + 7*864e5)
 
-    await supabase.from('planes_cobro').update({ ultimo_cobro: hoy.toISOString().split('T')[0], proximo_cobro: siguiente.toISOString().split('T')[0] }).eq('id', plan.id)
+    await supabase.from('planes_cobro').update({ ultimo_cobro: diaLocal(hoy), proximo_cobro: `${siguiente.getFullYear()}-${String(siguiente.getMonth()+1).padStart(2,'0')}-${String(siguiente.getDate()).padStart(2,'0')}` }).eq('id', plan.id)
     await supabase.from('pagos').insert({
       entrenador_id: uid, cliente_id: plan.cliente_id,
       importe: plan.importe, concepto: plan.concepto,
-      fecha_pago: hoy.toISOString().split('T')[0],
-      valido_hasta: siguiente.toISOString().split('T')[0]
+      fecha_pago: diaLocal(hoy),
+      valido_hasta: `${siguiente.getFullYear()}-${String(siguiente.getMonth()+1).padStart(2,'0')}-${String(siguiente.getDate()).padStart(2,'0')}`
     })
     setToast(`✓ Cobro registrado — próximo ${siguiente.toLocaleDateString('es-ES',{day:'numeric',month:'short'})}`)
     await cargar()
@@ -242,7 +278,7 @@ export default function Pagos({ session }) {
   }
 
   const ingresosMes = useMemo(() => {
-    const mes = new Date().toISOString().slice(0,7)
+    const mes = mesLocal(new Date())
     return pagos.filter(p => p.fecha_pago?.startsWith(mes)).reduce((s,p) => s+Number(p.importe||0), 0)
   }, [pagos])
 
