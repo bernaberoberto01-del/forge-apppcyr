@@ -27,8 +27,10 @@ const COLORES = [
   { id: '#111111', label: 'Negro' },
 ]
 
+// Toast duplica el componente de src/pages/Sesiones.jsx (mismo patrón {msg,tipo,onClose}) — no se consolida
+// aquí porque no existe todavía un <Toast> compartido en src/components/
 function Toast({ msg, tipo = 'ok', onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t) }, [])
+  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t) }, [onClose])
   return (
     <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 ${tipo === 'error' ? 'bg-red-600' : 'bg-[#111]'}`}>
       <span>{tipo === 'error' ? '⚠' : '✓'}</span> {msg}
@@ -38,7 +40,7 @@ function Toast({ msg, tipo = 'ok', onClose }) {
 
 const defaultConfig = {
   nombre_negocio: '', nombre_entrenador: '', bio: '', foto_url: '', color_acento: BRAND.color,
-  modulos: { dashboard: true, clientes: true, rutinas: true, sesiones: true, seguimiento: true, pagos: true, agenda: true },
+  modulos: { dashboard: true, clientes: true, rutinas: true, sesiones: true, seguimiento: true, pagos: true, agenda: true, nutricion: true, mensajes: true },
   cuestionario_bloques: { basico: true, objetivo: true, historial: true, disponibilidad: true, material: true, salud: true, motivacion: true }
 }
 
@@ -62,22 +64,34 @@ export default function Configuracion({ session, onConfigChange }) {
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
-    const { data } = await supabase.from('configuracion').select('*').eq('entrenador_id', uid).single()
-    if (data) {
-      setConfig({
-        ...defaultConfig,
-        ...data,
-        modulos: { ...defaultConfig.modulos, ...(data.modulos || {}) },
-        cuestionario_bloques: { ...defaultConfig.cuestionario_bloques, ...(data.cuestionario_bloques || {}) }
-      })
+    try {
+      const { data } = await supabase.from('configuracion').select('*').eq('entrenador_id', uid).maybeSingle()
+      if (data) {
+        setConfig({
+          ...defaultConfig,
+          ...data,
+          modulos: { ...defaultConfig.modulos, ...(data.modulos || {}) },
+          cuestionario_bloques: { ...defaultConfig.cuestionario_bloques, ...(data.cuestionario_bloques || {}) }
+        })
+      }
+    } catch (err) {
+      setToast({ msg: 'Error al cargar configuración: ' + err.message, tipo: 'error' })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
+
+  const EXTENSIONES_PERMITIDAS = ['jpg', 'jpeg', 'png', 'webp', 'gif']
 
   async function subirFoto(file) {
     if (!file) return
+    const parts = file.name.split('.')
+    const ext = parts.length > 1 ? parts.pop().toLowerCase() : ''
+    if (!EXTENSIONES_PERMITIDAS.includes(ext)) {
+      setToast({ msg: 'Formato no permitido. Usa JPG, PNG, WEBP o GIF', tipo: 'error' })
+      return
+    }
     setSubiendoFoto(true)
-    const ext = file.name.split('.').pop()
     const path = `${uid}/avatar.${ext}`
     const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
     if (error) { setToast({ msg: 'Error al subir foto', tipo: 'error' }); setSubiendoFoto(false); return }
@@ -85,28 +99,6 @@ export default function Configuracion({ session, onConfigChange }) {
     setConfig(c => ({ ...c, foto_url: publicUrl + '?t=' + Date.now() }))
     setSubiendoFoto(false)
     setToast({ msg: 'Foto subida correctamente' })
-  }
-
-  async function guardarCheckin() {
-    await supabase.from('checkin_config').upsert({ entrenador_id: uid, campos: camposCheckin, updated_at: new Date().toISOString() }, { onConflict: 'entrenador_id' })
-    showToast('Cuestionario guardado')
-  }
-
-  function toggleCampo(id) {
-    setCamposCheckin(prev => prev.map(c => c.id === id ? { ...c, activo: !c.activo } : c))
-  }
-
-  function updateCampoLabel(id, label) {
-    setCamposCheckin(prev => prev.map(c => c.id === id ? { ...c, label } : c))
-  }
-
-  function addCampoPersonalizado() {
-    const nuevo = { id: `custom_${Date.now()}`, label: 'Nuevo campo', tipo: 'escala', min:1, max:10, activo:true, orden: camposCheckin.length+1, custom:true }
-    setCamposCheckin(prev => [...prev, nuevo])
-  }
-
-  function eliminarCampo(id) {
-    setCamposCheckin(prev => prev.filter(c => c.id !== id))
   }
 
   async function guardar() {
@@ -393,29 +385,40 @@ function TarifasTab({ uid, showToast }) {
   const [form, setForm] = useState({ nombre: '', modalidad: 'individual', dias_semana: 2, precio: '', tipo: 'presencial' })
   const [guardando, setGuardando] = useState(false)
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
     setLoading(true)
-    const { data } = await supabase.from('tarifas').select('*').eq('entrenador_id', uid).eq('activa', true).order('modalidad').order('dias_semana')
-    setTarifas(data || [])
-    setLoading(false)
+    try {
+      const { data } = await supabase.from('tarifas').select('*').eq('entrenador_id', uid).eq('activa', true).order('modalidad').order('dias_semana')
+      setTarifas(data || [])
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function guardar() {
     if (!form.nombre.trim() || !form.precio) return
+    const eraEdicion = !!editando
     setGuardando(true)
-    const payload = { entrenador_id: uid, nombre: form.nombre.trim(), modalidad: form.modalidad, dias_semana: Number(form.dias_semana), precio: Number(form.precio), tipo: form.tipo }
-    if (editando) await supabase.from('tarifas').update(payload).eq('id', editando.id)
-    else await supabase.from('tarifas').insert(payload)
-    setModal(false); setEditando(null)
-    await cargar(); setGuardando(false)
-    showToast(editando ? 'Tarifa actualizada' : 'Tarifa creada')
+    try {
+      const payload = { entrenador_id: uid, nombre: form.nombre.trim(), modalidad: form.modalidad, dias_semana: Number(form.dias_semana), precio: Number(form.precio), tipo: form.tipo }
+      const { error } = editando
+        ? await supabase.from('tarifas').update(payload).eq('id', editando.id)
+        : await supabase.from('tarifas').insert(payload)
+      if (error) { showToast('Error al guardar la tarifa: ' + error.message, 'error'); return }
+      setModal(false); setEditando(null)
+      await cargar()
+      showToast(eraEdicion ? 'Tarifa actualizada' : 'Tarifa creada')
+    } finally {
+      setGuardando(false)
+    }
   }
 
   async function eliminar(id) {
     if (!confirm('¿Eliminar esta tarifa?')) return
-    await supabase.from('tarifas').update({ activa: false }).eq('id', id)
+    const { error } = await supabase.from('tarifas').update({ activa: false }).eq('id', id)
+    if (error) { showToast('Error al eliminar la tarifa: ' + error.message, 'error'); return }
     await cargar(); showToast('Tarifa eliminada')
   }
 
@@ -484,7 +487,7 @@ function TarifasTab({ uid, showToast }) {
 
       {/* Modal crear/editar */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>{setModal(false);setEditando(false)}}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={()=>{setModal(false);setEditando(null)}}>
           <div className="bg-white rounded-2xl w-full max-w-sm p-5 max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
             <h3 className="font-bold text-[#0A0A0A] mb-4">{editando?`Editar — ${editando.nombre}`:'Nueva tarifa'}</h3>
             <div className="space-y-4">
@@ -557,7 +560,7 @@ function TarifasTab({ uid, showToast }) {
                   )}
                 </label>
                 <input type="number" value={form.precio} onChange={e=>setForm({...form,precio:e.target.value})}
-                  placeholder={String(precioSugerido || form.tipo==='online'?'29':'220')}
+                  placeholder={String(precioSugerido || (form.tipo === 'online' ? '29' : '220'))}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"/>
               </div>
 
