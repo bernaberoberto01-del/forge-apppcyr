@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useEquipo } from '../hooks/useCentro'
 
@@ -31,25 +31,36 @@ export default function Grupos({ session }) {
   const uid = session?.user?.id
   const equipo = useEquipo(uid)
 
-  useEffect(() => { cargar() }, [])
+  const loadingRef = useRef(false)
+
+  useEffect(() => { cargar() }, [equipo])
 
   async function cargar() {
+    if (loadingRef.current) return
+    loadingRef.current = true
     setLoading(true)
-    const [{ data: gs }, { data: cs }] = await Promise.all([
-      supabase.from('grupos')
-        .select('*, grupo_clientes(id, cliente_id, activo, clientes(id, nombre, email, tipo, dias_semana, precio_mensual))')
-        .in('entrenador_id', equipo).eq('activo', true).order('created_at'),
-      supabase.from('clientes')
-        .select('id, nombre, email, tipo, dias_semana, precio_mensual, modalidad, grupo_id')
-        .in('entrenador_id', equipo).eq('estado', 'activo').order('nombre'),
-    ])
-    setGrupos(gs || [])
-    setClientes(cs || [])
-    if (sel) {
-      const updated = (gs || []).find(g => g.id === sel.id)
-      if (updated) setSel(updated)
+    try {
+      const [{ data: gs, error: errG }, { data: cs, error: errC }] = await Promise.all([
+        supabase.from('grupos')
+          .select('*, grupo_clientes(id, cliente_id, activo, clientes(id, nombre, email, tipo, dias_semana, precio_mensual))')
+          .in('entrenador_id', equipo).eq('activo', true).order('created_at'),
+        supabase.from('clientes')
+          .select('id, nombre, email, tipo, dias_semana, precio_mensual, modalidad, grupo_id')
+          .in('entrenador_id', equipo).eq('estado', 'activo').order('nombre'),
+      ])
+      if (errG || errC) { alert('Error al cargar: ' + (errG?.message || errC?.message)); return }
+      setGrupos(gs || [])
+      setClientes(cs || [])
+      if (sel) {
+        const updated = (gs || []).find(g => g.id === sel.id)
+        if (updated) setSel(updated)
+      }
+    } catch (err) {
+      alert('Error al cargar: ' + err.message)
+    } finally {
+      setLoading(false)
+      loadingRef.current = false
     }
-    setLoading(false)
   }
 
   function abrirNuevo() {
@@ -66,34 +77,38 @@ export default function Grupos({ session }) {
       notas: g.notas || '',
     })
     setEditando(true)
+    setModal(true)
   }
 
   async function guardar() {
     setGuardando(true)
-    const tarifa = getTarifa(form.tipo, form.dias_semana.length)
-    const payload = {
-      entrenador_id: uid,
-      nombre: form.nombre.trim(),
-      tipo: form.tipo,
-      dias_semana: form.dias_semana,
-      hora: form.hora,
-      duracion_minutos: Number(form.duracion_minutos) || 60,
-      precio_por_persona: tarifa?.pp || 0,
-      precio_total: tarifa?.total || 0,
-      notas: form.notas.trim() || null,
+    try {
+      const tarifa = getTarifa(form.tipo, form.dias_semana.length)
+      const datosGrupo = {
+        nombre: form.nombre.trim(),
+        tipo: form.tipo,
+        dias_semana: form.dias_semana,
+        hora: form.hora,
+        duracion_minutos: Number(form.duracion_minutos) || 60,
+        precio_por_persona: tarifa?.pp || 0,
+        precio_total: tarifa?.total || 0,
+        notas: form.notas.trim() || null,
+      }
+      const { error } = editando && sel
+        ? await supabase.from('grupos').update(datosGrupo).eq('id', sel.id)
+        : await supabase.from('grupos').insert({ ...datosGrupo, entrenador_id: uid })
+      if (error) { alert('Error al guardar: ' + error.message); return }
+      setModal(false); setEditando(false)
+      await cargar()
+    } finally {
+      setGuardando(false)
     }
-    if (editando && sel) {
-      await supabase.from('grupos').update(payload).eq('id', sel.id)
-    } else {
-      await supabase.from('grupos').insert(payload)
-    }
-    setModal(false); setEditando(false)
-    await cargar(); setGuardando(false)
   }
 
   async function eliminarGrupo() {
     if (!confirm('¿Eliminar este grupo? Los clientes no se borran.')) return
-    await supabase.from('grupos').update({ activo: false }).eq('id', sel.id)
+    const { error } = await supabase.from('grupos').update({ activo: false }).eq('id', sel.id)
+    if (error) { alert('Error al eliminar: ' + error.message); return }
     setSel(null); await cargar()
   }
 
@@ -103,24 +118,32 @@ export default function Grupos({ session }) {
     const max = sel.tipo === 'pareja' ? 2 : 6
     if (miembros.length >= max) { alert(`Máximo ${max} personas`); return }
     setAñadiendo(true)
-    const tarifa = getTarifa(sel.tipo, sel.dias_semana?.length || 0)
-    await supabase.from('grupo_clientes').upsert(
-      { grupo_id: sel.id, cliente_id: clienteAdd, activo: true },
-      { onConflict: 'grupo_id,cliente_id' }
-    )
-    // Actualizar el cliente con modalidad, grupo_id y precio calculado
-    await supabase.from('clientes').update({
-      modalidad: sel.tipo === 'pareja' ? 'pareja' : 'grupo',
-      grupo_id: sel.id,
-      precio_mensual: tarifa?.pp || 0,
-    }).eq('id', clienteAdd)
-    setClienteAdd(''); await cargar(); setAñadiendo(false)
+    try {
+      const tarifa = getTarifa(sel.tipo, sel.dias_semana?.length || 0)
+      const { error: errUp } = await supabase.from('grupo_clientes').upsert(
+        { grupo_id: sel.id, cliente_id: clienteAdd, activo: true },
+        { onConflict: 'grupo_id,cliente_id' }
+      )
+      if (errUp) { alert('Error al añadir cliente: ' + errUp.message); return }
+      // Actualizar el cliente con modalidad, grupo_id y precio calculado
+      const { error: errCl } = await supabase.from('clientes').update({
+        modalidad: sel.tipo === 'pareja' ? 'pareja' : 'grupo',
+        grupo_id: sel.id,
+        precio_mensual: tarifa?.pp || 0,
+      }).eq('id', clienteAdd)
+      if (errCl) { alert('Error al actualizar el cliente: ' + errCl.message); return }
+      setClienteAdd(''); await cargar()
+    } finally {
+      setAñadiendo(false)
+    }
   }
 
   async function quitarCliente(gc) {
-    await supabase.from('grupo_clientes').update({ activo: false }).eq('id', gc.id)
+    const { error: errGc } = await supabase.from('grupo_clientes').update({ activo: false }).eq('id', gc.id)
+    if (errGc) { alert('Error al quitar cliente: ' + errGc.message); return }
     // Resetear modalidad del cliente
-    await supabase.from('clientes').update({ modalidad: 'individual', grupo_id: null }).eq('id', gc.cliente_id)
+    const { error: errCl } = await supabase.from('clientes').update({ modalidad: 'individual', grupo_id: null }).eq('id', gc.cliente_id)
+    if (errCl) { alert('Error al resetear modalidad: ' + errCl.message); return }
     await cargar()
   }
 
@@ -134,7 +157,8 @@ export default function Grupos({ session }) {
       dias_semana: sel.dias_semana, tipo: 'presencial',
       activa: true, grupo_id: sel.id,
     }))
-    await supabase.from('sesiones_recurrentes').insert(rows)
+    const { error } = await supabase.from('sesiones_recurrentes').insert(rows)
+    if (error) { alert('Error al crear sesiones: ' + error.message); return }
     alert('✓ Sesiones creadas en la Agenda')
   }
 
@@ -268,7 +292,7 @@ export default function Grupos({ session }) {
                     <p className="text-xl font-bold text-[#0A0A0A]">{tarifaSel.pp}€</p>
                     <p className="text-xs text-[#9B9B9B] mt-0.5">por persona</p>
                   </div>
-                  {tarifaSel.total && (
+                  {tarifaSel.total != null && (
                     <div className="bg-acento/8 rounded-xl p-3 text-center">
                       <p className="text-xl font-bold text-acento">{tarifaSel.total}€</p>
                       <p className="text-xs text-[#9B9B9B] mt-0.5">total grupo</p>
@@ -297,6 +321,12 @@ export default function Grupos({ session }) {
                   <span className="text-xs bg-emerald-100 text-emerald-700 font-semibold px-2 py-0.5 rounded-full">Completo</span>
                 )}
               </div>
+
+              {sel.tipo === 'grupo' && miembrosSel.length > 0 && miembrosSel.length < 3 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+                  <p className="text-xs text-amber-700">Los grupos funcionan mejor con 3-6 personas — este grupo tiene {miembrosSel.length}</p>
+                </div>
+              )}
 
               {/* Lista miembros */}
               <div className="space-y-2 mb-4">
@@ -436,7 +466,7 @@ export default function Grupos({ session }) {
                   <div className="mt-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 flex items-center justify-between">
                     <p className="text-xs text-emerald-700">{form.dias_semana.length} días/sem · {form.tipo}</p>
                     <p className="text-sm font-bold text-emerald-700">
-                      {tarifa.pp}€/p{tarifa.total ? ` · ${tarifa.total}€ total` : ''}
+                      {tarifa.pp}€/p{tarifa.total != null ? ` · ${tarifa.total}€ total` : ''}
                     </p>
                   </div>
                 )}
