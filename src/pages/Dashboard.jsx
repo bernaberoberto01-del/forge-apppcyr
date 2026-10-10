@@ -115,7 +115,8 @@ export default function Dashboard({ session }) {
       // al portal hasta que pague; stripe-webhook lo pone a true cuando llega
       // checkout.session.completed.
       if (lead.planSugeridoKey) { camposAceptar.plan_online = lead.planSugeridoKey; camposAceptar.plan_activo = false }
-      await supabase.from('clientes').update(camposAceptar).eq('id', lead.id)
+      const { error: errUpdate } = await supabase.from('clientes').update(camposAceptar).eq('id', lead.id)
+      if (errUpdate) throw errUpdate
       const { data, error } = await supabase.functions.invoke('bienvenida-cliente', { body: { cliente_id: lead.id } })
       if (error) throw error
       setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
@@ -131,15 +132,22 @@ export default function Dashboard({ session }) {
       generarMensajeBienvenida(lead, huboModalAcceso)
     } catch (e) {
       showToast('Error al aceptar el lead')
+    } finally {
+      setProcesandoLead(null)
     }
-    setProcesandoLead(null)
   }
 
   async function rechazarLead(lead) {
     setProcesandoLead(lead.id)
-    await supabase.from('clientes').update({ estado: 'rechazado' }).eq('id', lead.id)
-    setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
-    setProcesandoLead(null)
+    try {
+      const { error } = await supabase.from('clientes').update({ estado: 'rechazado' }).eq('id', lead.id)
+      if (error) throw error
+      setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
+    } catch (e) {
+      showToast('Error al rechazar el lead')
+    } finally {
+      setProcesandoLead(null)
+    }
   }
 
   useEffect(() => { cargar() }, [uid])
