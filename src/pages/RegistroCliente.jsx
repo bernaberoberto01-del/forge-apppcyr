@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import BrandMark from '../components/BrandMark'
 import { BRAND } from '../lib/brand'
@@ -26,10 +26,22 @@ const OBJETIVOS = [
 function normalizarTelefono(raw) {
   const limpio = raw.replace(/[\s-]/g, '')
   if (/^[679]/.test(limpio)) return '+34' + limpio
+  if (/^34[679]\d{8}$/.test(limpio)) return '+' + limpio
   return limpio
 }
 function telefonoValido(raw) {
   return raw.replace(/\D/g, '').length >= 9
+}
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+// Aproximación numérica para el campo anos_entrenando (numeric) a partir
+// de la respuesta categórica del Bloque 3 — BUG-094
+const ANOS_INTENTANDO_MAP = {
+  menos_mes: 0,
+  '1_3_meses': 0.2,
+  '3_12_meses': 0.6,
+  'mas_1_año': 1.5,
 }
 
 const MATERIALES = [
@@ -88,10 +100,11 @@ export default function RegistroCliente() {
   })
 
   const set = (k, v) => { setError(''); setForm(f => ({ ...f, [k]: v })) }
+  const enviandoRef = useRef(false)
 
   useEffect(() => {
     const uid = new URLSearchParams(window.location.search).get('e')
-    if (uid) setEntrenadorId(uid)
+    if (uid && UUID_REGEX.test(uid)) setEntrenadorId(uid)
   }, [])
 
   function validar() {
@@ -129,44 +142,53 @@ export default function RegistroCliente() {
     const err = validar()
     if (err) { setError(err); return }
     if (!entrenadorId) { setError('Enlace de registro no válido'); return }
+    if (enviandoRef.current) return
+    enviandoRef.current = true
     setEnviando(true)
 
-    const payload = {
-      entrenador_id: entrenadorId,
-      nombre: form.nombre.trim(),
-      email: form.email.trim().toLowerCase(),
-      telefono: normalizarTelefono(form.telefono.trim()),
-      edad: Number(form.edad) || null,
-      sexo: form.sexo || null,
-      ciudad: form.ciudad.trim() || null,
-      objetivo: form.objetivo,
-      entrenas_ahora: form.entrenas_ahora,
-      dias_semana: Number(form.disponibilidad_dias) || 3,
-      donde_entrena: form.donde_entrena.trim() || null,
-      alimentacion_actual: form.alimentacion_actual.trim() || null,
-      anos_entrenando: form.anos_intentando ? Number(form.anos_intentando) : null,
-      que_no_funciono: form.que_no_funciono.trim() || null,
-      material: form.material,
-      tiene_lesion: form.tiene_lesion,
-      lesiones: form.lesiones.trim() || null,
-      expectativas_30dias: form.expectativas_30dias.trim(),
-      tiempo_semanal: form.tiempo_semanal.trim() || null,
-      tipo: 'online',
-      procesado: false,
-      acepta_rgpd: form.acepta_rgpd,
-      fecha_consentimiento: new Date().toISOString(),
+    try {
+      const diasDisponibles = form.disponibilidad_dias === '5+' ? 5 : Number(form.disponibilidad_dias) || 3
+
+      const payload = {
+        entrenador_id: entrenadorId,
+        nombre: form.nombre.trim(),
+        email: form.email.trim().toLowerCase(),
+        telefono: normalizarTelefono(form.telefono.trim()),
+        edad: Number(form.edad) || null,
+        sexo: form.sexo || null,
+        ciudad: form.ciudad.trim() || null,
+        objetivo: form.objetivo,
+        entrenas_ahora: form.entrenas_ahora,
+        dias_semana: Number(form.dias_semana) || 3,
+        disponibilidad_dias: diasDisponibles,
+        donde_entrena: form.donde_entrena.trim() || null,
+        alimentacion_actual: form.alimentacion_actual.trim() || null,
+        anos_entrenando: form.anos_intentando ? (ANOS_INTENTANDO_MAP[form.anos_intentando] ?? null) : null,
+        que_no_funciono: form.que_no_funciono.trim() || null,
+        material: form.material,
+        tiene_lesion: form.tiene_lesion,
+        lesiones: form.lesiones.trim() || null,
+        expectativas_30dias: form.expectativas_30dias.trim(),
+        tiempo_semanal: form.tiempo_semanal.trim() || null,
+        tipo: 'online',
+        procesado: false,
+        acepta_rgpd: form.acepta_rgpd,
+        fecha_consentimiento: new Date().toISOString(),
+      }
+
+      const { data: inserted, error: err2 } = await supabase.from('cuestionarios').insert(payload).select('id').single()
+      if (err2) { setError('Error al enviar. Inténtalo de nuevo.'); return }
+
+      // Lanzar análisis IA en background (no bloqueante)
+      supabase.functions.invoke('analizar-diagnostico', {
+        body: { entrenador_id: entrenadorId, email: form.email.trim().toLowerCase(), cuestionario_id: inserted?.id }
+      }).catch(() => {})
+
+      setEnviado(true)
+    } finally {
+      enviandoRef.current = false
+      setEnviando(false)
     }
-
-    const { error: err2 } = await supabase.from('cuestionarios').insert(payload)
-    if (err2) { setError('Error al enviar. Inténtalo de nuevo.'); setEnviando(false); return }
-
-    // Lanzar análisis IA en background (no bloqueante)
-    supabase.functions.invoke('analizar-diagnostico', {
-      body: { entrenador_id: entrenadorId, email: form.email.trim().toLowerCase() }
-    }).catch(() => {})
-
-    setEnviado(true)
-    setEnviando(false)
   }
 
   // ── Pantalla de éxito ──────────────────────────────────────────────────────
@@ -196,7 +218,7 @@ export default function RegistroCliente() {
     </div>
   )
 
-  const progreso = ((paso) / BLOQUES.length) * 100
+  const progreso = ((paso + 1) / BLOQUES.length) * 100
 
   return (
     <div className="min-h-screen bg-[#F7F6F3]">
