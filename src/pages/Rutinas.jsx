@@ -787,9 +787,11 @@ export default function Rutinas({ session }) {
                         placeholder="Ej: Sustituir sentadilla por prensa porque tiene dolor de rodilla. Añadir más trabajo de espalda. Quitar ejercicios de impacto." />
                       <button onClick={async () => {
                         if (!confirm('¿Regenerar con este contexto adicional?')) return
-                        await supabase.from('rutinas').delete().eq('id', detalle.id)
+                        const clienteId = detalle.cliente_id
+                        const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
+                        if (error) { alert('No se pudo eliminar la rutina actual: ' + error.message); return }
                         setDetalle(null); setMostrarContextoIA(false)
-                        await generarRutina(detalle.cliente_id, contextoIA)
+                        await generarRutina(clienteId, contextoIA)
                         setContextoIA('')
                       }} disabled={generando===detalle.cliente_id}
                         className="w-full bg-[#6366f1] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
@@ -819,14 +821,21 @@ export default function Rutinas({ session }) {
                 <button onClick={() => guardarComoPlantilla(detalle)} className="border border-[#6366f1]/30 text-[#6366f1] text-sm py-3 px-3 rounded-xl hover:bg-[#6366f1]/5">📋</button>
                 <button onClick={async () => {
                   if (!confirm('¿Regenerar con IA? Se eliminará la actual.')) return
-                  await supabase.from('rutinas').delete().eq('id', detalle.id); setDetalle(null)
-                  await generarRutina(detalle.cliente_id)
+                  const clienteId = detalle.cliente_id
+                  const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
+                  if (error) { alert('No se pudo eliminar: ' + error.message); return }
+                  setDetalle(null)
+                  await generarRutina(clienteId)
                 }} disabled={generando===detalle.cliente_id}
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
                   {generando===detalle.cliente_id?'⏳':'🔄'}
                 </button>
-                <button onClick={async () => { if(!confirm('¿Eliminar?')) return; await supabase.from('rutinas').delete().eq('id',detalle.id); setDetalle(null); await cargar() }}
-                  className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">🗑</button>
+                <button onClick={async () => {
+                  if (!confirm('¿Eliminar?')) return
+                  const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
+                  if (error) { alert('No se pudo eliminar: ' + error.message); return }
+                  setDetalle(null); await cargar()
+                }} className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">🗑</button>
               </div>
             </div>
             </div>
