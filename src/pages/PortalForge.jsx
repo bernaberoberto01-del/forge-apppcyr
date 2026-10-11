@@ -152,6 +152,14 @@ export default function PortalForge() {
     setModoOnboarding(esNuevo)
   }, [datos])
 
+  // Si el tab activo queda fuera de los tabs visibles (p.ej. plan cambiado en BD),
+  // volver a Inicio para no mostrar una pantalla vacía.
+  useEffect(() => {
+    if (!cliente) return
+    if (tab === 'entrena' && !verRutina) setTab('hoy')
+    if (tab === 'nutricion' && !verNutricion) setTab('hoy')
+  }, [tab, verRutina, verNutricion, cliente])
+
   async function cargarTodo() {
     setCargando(true)
     // Modo preview: el entrenador abre el portal de un cliente suyo desde Clientes.jsx
@@ -515,12 +523,14 @@ export default function PortalForge() {
     return streak
   })()
 
+  // Visibilidad de tabs según plan — un cliente de solo Nutrición no ve Entrena y viceversa.
+  // verRutina / verNutricion ya incluyen la lógica de acceso y la excepción "tiene datos en BD".
   const TABS = [
-    { id: 'hoy',      label: 'Inicio',    icon: '⊞' },
-    { id: 'entrena',  label: 'Entrena',   icon: '💪' },
-    { id: 'nutricion',label: 'Nutrición', icon: '🥗' },
-    { id: 'progreso', label: 'Progreso',  icon: '📈' },
-    { id: 'mas',      label: 'Más',       icon: '···', badge: msgNoLeidos },
+    { id: 'hoy',       label: 'Inicio',    icon: '⊞' },
+    { id: 'entrena',   label: 'Entrena',   icon: '💪',  oculto: !verRutina },
+    { id: 'nutricion', label: 'Nutrición', icon: '🥗',  oculto: !verNutricion },
+    { id: 'progreso',  label: 'Progreso',  icon: '📈' },
+    { id: 'mas',       label: 'Más',       icon: '···', badge: msgNoLeidos },
   ].filter(t => !t.oculto)
 
   // Bottom bar: siempre los tabs disponibles (máx 4) + Más
