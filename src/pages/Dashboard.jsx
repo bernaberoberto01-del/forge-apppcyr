@@ -200,6 +200,7 @@ export default function Dashboard({ session }) {
       { data: cuestNutricionPendiente },
       { data: leadsPendientesRaw },
       { data: cuestConLead },
+      { data: clientesContactoRaw },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio,stripe_subscription_id').in('entrenador_id', equipo),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').in('entrenador_id', equipo).gte('fecha_pago', hace6m),
@@ -220,8 +221,9 @@ export default function Dashboard({ session }) {
       supabase.from('planes_cobro').select('cliente_id,estado,importe,concepto,clientes(nombre)').in('entrenador_id', equipo),
       supabase.from('solicitudes_cambio_plan').select('cliente_id,plan_actual,plan_solicitado,clientes(nombre)').in('entrenador_id', equipo).eq('estado', 'pendiente'),
       supabase.from('cuestionarios_nutricion').select('id,cliente_id,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('procesado', false).order('created_at',{ascending:false}),
-      supabase.from('clientes').select('id,nombre,email,created_at').in('entrenador_id', equipo).eq('estado', 'pendiente').order('created_at',{ascending:false}),
+      supabase.from('clientes').select('id,nombre,email,created_at,plan_online').in('entrenador_id', equipo).eq('estado', 'pendiente').order('created_at',{ascending:false}),
       supabase.from('cuestionarios').select('cliente_id,sugerencia_plan,sugerencia_justificacion,edad,objetivo,ciudad,que_no_funciono,expectativas_30dias,dias_semana,donde_entrena').in('entrenador_id', equipo).not('cliente_id','is',null).order('created_at',{ascending:false}),
+      supabase.from('clientes').select('id,nombre,email,plan_online,created_at').in('entrenador_id', equipo).eq('estado', 'contacto').order('created_at',{ascending:false}),
     ])
 
     if (alertas?.length > 0) {
@@ -316,11 +318,17 @@ export default function Dashboard({ session }) {
     const clienteIdsConPlanCobro = new Set((planesCobroAll||[]).map(pc => pc.cliente_id))
     const clientesOnlineSinSuscripcion = activos.filter(c => c.tipo === 'online' && !clienteIdsConPlanCobro.has(c.id)).filter(c => !estaDescartada(c.id, 'sin_suscripcion'))
 
+    const PLAN_LABEL_CONTACTO = { nutricion: 'Nutrición', entrenamiento: 'Entrenamiento', completo: 'Plan Completo' }
+    const clientesContacto = (clientesContactoRaw || []).map(c => ({
+      ...c,
+      planLabel: c.plan_online ? (PLAN_LABEL_CONTACTO[c.plan_online] || c.plan_online) : null,
+    }))
+
     setDatos({
       activos, ingresosMes, adherenciaMedia, ingresosPorMes, maxIngreso,
       alertasPagos, cobrosProximos, clientesSinCI, clientesSinCI14d, checkinsNuevos,
       mensajesNL: mensajesNL||[], rutinasIA: rutinasIA||[],
-      alertasExtra: (alertas||[]).filter(a => !estaDescartada(a.cliente_id, `extra_${a.tipo}`)), tasaRetencion, totalClientes,
+      alertasExtra: (alertas||[]).filter(a => a.tipo !== 'resumen_listo' && !estaDescartada(a.cliente_id, `extra_${a.tipo}`)), tasaRetencion, totalClientes,
       nombreEntrenador: cfg?.nombre_entrenador?.split(' ')[0] || null,
       analisisPendientes: analisisPendientes||[],
       checkins: checkins||[],
@@ -330,6 +338,7 @@ export default function Dashboard({ session }) {
       clientesPagoFallido,
       clientesOnlineSinSuscripcion,
       solicitudesCambioPlan: (solicitudesCambioPlan || []).filter(s => !estaDescartada(s.cliente_id, 'cambio_plan')),
+      clientesContacto,
     })
     setLoading(false)
     } catch (e) {
@@ -349,7 +358,7 @@ export default function Dashboard({ session }) {
   )
 
   const d = datos
-  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length + (d.leadsPendientes?.length || 0)
+  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length + (d.leadsPendientes?.length || 0) + (d.clientesContacto?.length || 0)
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -522,6 +531,29 @@ export default function Dashboard({ session }) {
                     </div>
                   )
                 })}
+
+                {/* Clientes en contacto — esperando completar el pago */}
+                {d.clientesContacto?.length > 0 && (
+                  <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-50">
+                    <div className="w-8 h-8 bg-amber-400 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">⏳</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-amber-800">
+                        {d.clientesContacto.length === 1
+                          ? `${d.clientesContacto[0].nombre.split(' ')[0]} — esperando pago`
+                          : `${d.clientesContacto.length} clientes esperando pago`}
+                      </p>
+                      <p className="text-xs text-amber-600 truncate">
+                        {d.clientesContacto.length === 1
+                          ? (d.clientesContacto[0].planLabel ? `Plan: ${d.clientesContacto[0].planLabel}` : 'Acceso enviado, pendiente de pago')
+                          : d.clientesContacto.slice(0, 3).map(c => c.nombre.split(' ')[0]).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/clientes')}
+                      className="text-xs bg-amber-500 text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0">
+                      Ver →
+                    </button>
+                  </div>
+                )}
 
                 {/* IA generando o con error */}
                 {clientesIAPendiente.map(c => (
