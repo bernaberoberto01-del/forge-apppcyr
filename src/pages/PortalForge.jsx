@@ -75,7 +75,7 @@ export default function PortalForge() {
 
   // Modales
   const [modalCI, setModalCI] = useState(false)
-  const [ciForm, setCiForm] = useState({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, peso: '', nota: '' })
+  const [ciForm, setCiForm] = useState({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, motivacion: null, pasos: '', logro: '', peso: '', nota: '' })
   const [enviandoCI, setEnviandoCI] = useState(false)
   const [ciEditandoId, setCiEditandoId] = useState(null)
   const [valorando, setValorando] = useState(null)
@@ -232,15 +232,17 @@ export default function PortalForge() {
         const { error } = await supabase.from('checkins').update({
           peso, energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
           sesiones_semana: ciForm.sesiones, cargas_sensacion: ciForm.cargas,
+          motivacion: ciForm.motivacion, logro_semana: ciForm.logro || null,
+          pasos_diarios: ciForm.pasos ? parseInt(ciForm.pasos) : null,
           comentario: ciForm.nota || null, adherencia_entreno: adherencia,
         }).eq('id', ciEditandoId).eq('cliente_id', cliente.id)
         if (!error) {
           setDatos(d => ({ ...d, checkins: d.checkins.map(c => c.id === ciEditandoId
-            ? { ...c, peso, energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres, sesiones_semana: ciForm.sesiones, cargas_sensacion: ciForm.cargas, comentario: ciForm.nota || null, adherencia_entreno: adherencia }
+            ? { ...c, peso, energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres, sesiones_semana: ciForm.sesiones, cargas_sensacion: ciForm.cargas, motivacion: ciForm.motivacion, logro_semana: ciForm.logro || null, pasos_diarios: ciForm.pasos ? parseInt(ciForm.pasos) : null, comentario: ciForm.nota || null, adherencia_entreno: adherencia }
             : c) }))
           setModalCI(false)
           setCiEditandoId(null)
-          setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, peso: '', nota: '' })
+          setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, motivacion: null, pasos: '', logro: '', peso: '', nota: '' })
           showToast('✓ Check-in actualizado')
         } else {
           showToast('⚠️ Error al guardar — inténtalo de nuevo')
@@ -250,13 +252,15 @@ export default function PortalForge() {
           cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, fecha: hoyStr(),
           energia: ciForm.energia, sueno: ciForm.sueno, fatiga: ciForm.fatiga, estres: ciForm.estres,
           sesiones_semana: ciForm.sesiones, sesiones_planificadas: diasPlan,
-          cargas_sensacion: ciForm.cargas,
+          cargas_sensacion: ciForm.cargas, motivacion: ciForm.motivacion,
+          logro_semana: ciForm.logro || null,
+          pasos_diarios: ciForm.pasos ? parseInt(ciForm.pasos) : null,
           peso, comentario: ciForm.nota || null, adherencia_entreno: adherencia,
         })
         if (!error) {
           setDatos(d => ({ ...d, checkins: [{ id: Date.now()+'', fecha: hoyStr(), ...ciForm, peso, adherencia_entreno: adherencia }, ...d.checkins] }))
           setModalCI(false)
-          setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, peso: '', nota: '' })
+          setCiForm({ energia: null, sueno: null, fatiga: null, estres: null, sesiones: null, cargas: null, motivacion: null, pasos: '', logro: '', peso: '', nota: '' })
           showToast('✓ Check-in enviado')
         } else {
           showToast('⚠️ Error al enviar — inténtalo de nuevo')
@@ -273,6 +277,9 @@ export default function PortalForge() {
     setCiForm({
       energia: c.energia, sueno: c.sueno, fatiga: c.fatiga, estres: c.estres,
       sesiones: c.sesiones_semana ?? null, cargas: c.cargas_sensacion ?? null,
+      motivacion: c.motivacion ?? null,
+      pasos: c.pasos_diarios != null ? String(c.pasos_diarios) : '',
+      logro: c.logro_semana || '',
       peso: c.peso != null ? String(c.peso) : '', nota: c.comentario || '',
     })
     setCiEditandoId(c.id)
@@ -2881,11 +2888,13 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F7F6F3] text-[#6B6B6B] text-xl font-light">×</button>
         </div>
         <div className="px-6 py-5 space-y-6">
+
+          {/* — Escalas obligatorias — */}
           {[
-            { k: 'energia', icon: '⚡', label: 'Energía', opciones: ['Agotado','Bajo','Normal','Bien','Excelente'], tipo: 'positiva' },
-            { k: 'sueno', icon: '😴', label: 'Sueño', opciones: ['Muy mal','Mal','Regular','Bien','Muy bien'], tipo: 'positiva' },
-            { k: 'fatiga', icon: '🏋️', label: 'Fatiga', opciones: ['Ninguna','Leve','Moderada','Alta','Al límite'], tipo: 'negativa' },
-            { k: 'estres', icon: '🧠', label: 'Estrés', opciones: ['Tranquilo','Leve','Moderado','Alto','Al límite'], tipo: 'negativa' },
+            { k: 'energia', icon: '⚡', label: 'Energía general', opciones: ['Agotado','Bajo','Normal','Bien','Excelente'], tipo: 'positiva' },
+            { k: 'sueno', icon: '😴', label: 'Calidad del sueño', opciones: ['Muy mal','Mal','Regular','Bien','Perfecta'], tipo: 'positiva' },
+            { k: 'estres', icon: '🧠', label: 'Nivel de estrés', opciones: ['Relajado','Leve','Moderado','Alto','Al límite'], tipo: 'negativa' },
+            { k: 'fatiga', icon: '🏋️', label: 'Fatiga muscular', opciones: ['Sin fatiga','Leve','Moderada','Alta','Al límite'], tipo: 'negativa' },
           ].map(({ k, icon, label, opciones, tipo }) => (
             <div key={k}>
               <div className="flex items-center gap-2 mb-3">
@@ -2910,8 +2919,33 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
               </div>
             </div>
           ))}
+
+          {/* — Motivación — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">🏃 Sesiones completadas esta semana <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <div className="flex items-center gap-2 mb-3">
+              <span>🔥</span>
+              <p className="text-sm font-bold text-[#0A0A0A]">Motivación</p>
+            </div>
+            <div className="grid grid-cols-5 gap-1.5">
+              {[1,2,3,4,5].map(v => {
+                const sel = ciForm.motivacion === v
+                const motivLabels = ['Por los suelos','Tirando','Normal','Con ganas','Imparable']
+                const bg = v <= 2 ? '#ef4444' : v === 3 ? '#f59e0b' : color
+                return (
+                  <button key={v} onClick={() => setCiForm(f => ({ ...f, motivacion: v }))}
+                    className={`flex flex-col items-center gap-1 py-4 rounded-xl transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
+                    style={sel ? { background: bg } : {}}>
+                    <span className="text-base font-bold">{v}</span>
+                    <span className={`text-[9px] leading-tight text-center ${sel ? 'text-white/90' : 'text-[#9B9B9B]'}`}>{motivLabels[v - 1]}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* — Sesiones completadas — */}
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">🏃 Sesiones completadas <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
             <div className="grid grid-cols-6 gap-1.5">
               {[0,1,2,3,4,5].map(v => {
                 const sel = ciForm.sesiones === v
@@ -2925,10 +2959,12 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
               })}
             </div>
           </div>
+
+          {/* — Sensación de cargas — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">💪 ¿Cómo has sentido las cargas? <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">💪 Sensación con las cargas <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
             <div className="grid grid-cols-2 gap-2">
-              {[['muy_facil','😴 Muy fácil'],['bien','💪 Bien'],['duro','😤 Duro'],['muy_duro','🔥 Muy duro']].map(([v,l]) => {
+              {[['muy_facil','😴 Muy fácil'],['bien','💪 En mi punto'],['duro','😤 Exigente'],['muy_duro','🔥 Al límite']].map(([v,l]) => {
                 const sel = ciForm.cargas === v
                 return (
                   <button key={v} onClick={() => setCiForm(f => ({ ...f, cargas: v }))}
@@ -2940,21 +2976,45 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
               })}
             </div>
           </div>
+
+          {/* — Pasos diarios (media) — */}
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">👟 Pasos diarios (media) <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <div className="flex items-center gap-2">
+              <input type="number" step="100" min="0" placeholder="8000" value={ciForm.pasos}
+                onChange={e => setCiForm(f => ({ ...f, pasos: e.target.value }))}
+                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black/20" />
+              <span className="text-sm text-[#9B9B9B] font-medium">pasos/día</span>
+            </div>
+          </div>
+
+          {/* — Peso — */}
           <div>
             <p className="text-sm font-bold text-[#0A0A0A] mb-2">⚖️ Peso <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
             <div className="flex items-center gap-2">
               <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso}
                 onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
-                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-acento" />
+                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black/20" />
               <span className="text-sm text-[#9B9B9B] font-medium">kg</span>
             </div>
           </div>
+
+          {/* — Logro de la semana — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">💬 Nota <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
-            <textarea rows={2} placeholder="¿Algo que contarle a tu entrenador?" value={ciForm.nota}
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">🏆 Tu mayor logro esta semana <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <input type="text" maxLength={120} placeholder="Ej: completé las 4 sesiones, subí peso en press banca…" value={ciForm.logro}
+              onChange={e => setCiForm(f => ({ ...f, logro: e.target.value }))}
+              className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black/20" />
+          </div>
+
+          {/* — Nota libre — */}
+          <div>
+            <p className="text-sm font-bold text-[#0A0A0A] mb-2">💬 ¿Algo más que contarle a tu entrenador? <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <textarea rows={2} placeholder="Lesión, viaje, cambio en la dieta, lo que sea..." value={ciForm.nota}
               onChange={e => setCiForm(f => ({ ...f, nota: e.target.value }))}
               className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
           </div>
+
           <button onClick={enviarCheckin}
             disabled={!ciForm.energia || !ciForm.sueno || !ciForm.fatiga || !ciForm.estres || enviandoCI}
             className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
