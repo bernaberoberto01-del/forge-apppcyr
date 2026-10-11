@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useEquipo } from '../hooks/useCentro'
+import { ini, avatarColor } from '../lib/avatar'
 
 const DIAS = ['', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
 
@@ -305,8 +306,9 @@ export default function Grupos({ session }) {
                 )}
                 {miembrosSel.map(m => (
                   <div key={m.id} className="flex items-center gap-3 bg-[#F7F6F3] rounded-xl px-4 py-3">
-                    <div className="w-8 h-8 rounded-full bg-[#0A0A0A] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                      {m.clientes?.nombre?.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                      style={{ background: avatarColor(m.clientes?.nombre) }}>
+                      {ini(m.clientes?.nombre)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#0A0A0A] truncate">{m.clientes?.nombre}</p>
