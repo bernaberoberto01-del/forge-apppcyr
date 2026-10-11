@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
@@ -104,16 +103,21 @@ export default function Seguimiento({ session }) {
     return r
   }, [checkins, filtroCliente, busqueda, filtroAlerta])
 
-  useEffect(() => { cargar() }, [uid])
+  useEffect(() => { cargar() }, [uid, equipo])
 
   async function cargar() {
-    const [{ data: ci }, { data: cl }, { data: se }, { data: bors }, { data: an }] = await Promise.all([
+    const resultados = await Promise.all([
       supabase.from('checkins').select('*, clientes(nombre, tipo)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(200),
       supabase.from('clientes').select('id,nombre,tipo').in('entrenador_id', equipo).eq('estado', 'activo'),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(300),
       supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').in('entrenador_id', equipo).eq('estado', 'por revisar').order('created_at', { ascending: false }),
       supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', false).order('created_at', { ascending: false }).limit(20),
     ])
+    if (resultados.some(r => r.error)) {
+      setToast('Error al cargar datos')
+      setTimeout(() => setToast(''), 3000)
+    }
+    const [{ data: ci }, { data: cl }, { data: se }, { data: bors }, { data: an }] = resultados
     setCheckins(ci || [])
     setClientes(cl || [])
     setSesiones(se || [])
@@ -123,10 +127,15 @@ export default function Seguimiento({ session }) {
 
   async function cargarHistorialAnalisis() {
     setCargandoHistorial(true)
-    const { data } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(50)
+    const { data, error } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(50)
+    setCargandoHistorial(false)
+    if (error) {
+      setToast('Error al cargar datos')
+      setTimeout(() => setToast(''), 3000)
+      return
+    }
     setHistorialAnalisis(data || [])
     setHistorialCargado(true)
-    setCargandoHistorial(false)
   }
 
   function toggleHistorialAnalisis() {
@@ -205,16 +214,21 @@ export default function Seguimiento({ session }) {
 
   async function guardar() {
     setLoading(true)
-    await supabase.from('checkins').insert({
+    const { error } = await supabase.from('checkins').insert({
       ...form,
       entrenador_id: uid,
       peso: form.peso ? Number(form.peso) : null,
       pasos_diarios: form.pasos_diarios ? Number(form.pasos_diarios) : null
     })
+    setLoading(false)
+    if (error) {
+      setToast('Error al guardar check-in')
+      setTimeout(() => setToast(''), 3000)
+      return
+    }
     setModal(false)
     setForm(initForm)
     await cargar()
-    setLoading(false)
   }
 
   const Btn = ({ field, val }) => {
@@ -310,7 +324,7 @@ export default function Seguimiento({ session }) {
         // Estado de cada cliente — solo check-in
         const estadoClientes = clientes.map(c => {
           const ciUltimo = checkins.filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha.localeCompare(a.fecha))[0]
-          const diasSinCI = ciUltimo ? Math.floor((Date.now() - new Date(ciUltimo.fecha).getTime()) / 864e5) : 999
+          const diasSinCI = ciUltimo ? Math.floor((Date.now() - new Date(ciUltimo.fecha + 'T12:00').getTime()) / 864e5) : 999
 
           let alerta = 'ok' // ok | warning | critical
           if (diasSinCI >= 14) alerta = 'critical'
@@ -735,7 +749,6 @@ export default function Seguimiento({ session }) {
             {sesiones
               .filter(s => !busquedaSes || s.clientes?.nombre?.toLowerCase().includes(busquedaSes.toLowerCase()))
               .map(s => {
-                const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                 return (
                   <div key={s.id} onClick={async () => {
                       const { data: ejes } = await supabase.from('sesion_ejercicios')
@@ -965,12 +978,11 @@ export default function Seguimiento({ session }) {
                 const ETIQUETAS = { actualizar_rutina:'Nueva rutina', ajustar_cargas:'Ajustar cargas', mensaje_motivacional:'Mensaje', pausa_recomendada:'Pausa ⚠️' }
                 const color = COLORES[a.accion] || '#6B6B6B'
                 const expandido = analisisExpandido === a.id
-                const setExpandido = (v) => setAnalisisExpandido(v ? a.id : null)
 
                 return (
                   <div key={a.id} className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
                     {/* Cabecera compacta */}
-                    <button onClick={() => setExpandido(v => !v)}
+                    <button onClick={() => setAnalisisExpandido(prev => prev === a.id ? null : a.id)}
                       className="w-full flex items-center gap-3 p-4 text-left hover:bg-[#FAFAFA] transition-all">
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-base flex-shrink-0"
                         style={{background: color}}>
