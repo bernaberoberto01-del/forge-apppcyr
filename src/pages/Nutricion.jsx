@@ -48,7 +48,7 @@ export default function Nutricion({ session }) {
   const uid = session.user.id
   const equipo = useEquipo(uid)
 
-  useEffect(() => { cargar() }, [uid])
+  useEffect(() => { cargar() }, [uid, equipo])
 
   async function cargar() {
     const [{ data: cl }, { data: pl }, { data: cu }] = await Promise.all([
@@ -62,7 +62,11 @@ export default function Nutricion({ session }) {
   }
 
   async function activarNutricion(clienteId, valor) {
-    await supabase.from('clientes').update({ nutricion_activa: valor }).eq('id', clienteId)
+    const { error } = await supabase.from('clientes').update({ nutricion_activa: valor }).eq('id', clienteId)
+    if (error) {
+      setToast({ msg: 'Error al activar/desactivar nutrición', tipo: 'error' })
+      return
+    }
     if (valor) {
       // Enviar enlace cuestionario (se muestra en UI)
       setModalActivar(clienteId)
@@ -84,7 +88,11 @@ export default function Nutricion({ session }) {
   }
 
   async function publicar(plan) {
-    await supabase.from('planes_nutricion').update({ estado: 'publicado', contenido: plan.borrador, notas_entrenador: notasEdit }).eq('id', plan.id)
+    const { error } = await supabase.from('planes_nutricion').update({ estado: 'publicado', contenido: plan.borrador, notas_entrenador: notasEdit }).eq('id', plan.id)
+    if (error) {
+      setToast({ msg: 'Error al publicar el plan', tipo: 'error' })
+      return
+    }
     setDetalle(null)
     setToast({ msg: `Plan publicado para ${plan.clientes?.nombre}` })
     await cargar()
@@ -119,7 +127,12 @@ export default function Nutricion({ session }) {
   }
 
   async function guardarCuest(clienteId) {
-    await supabase.from('cuestionarios_nutricion').insert({ ...cuest, cliente_id: clienteId, entrenador_id: uid })
+    const { error } = await supabase.from('cuestionarios_nutricion')
+      .upsert({ ...cuest, cliente_id: clienteId, entrenador_id: uid }, { onConflict: 'cliente_id' })
+    if (error) {
+      setToast({ msg: 'Error al guardar el cuestionario', tipo: 'error' })
+      return
+    }
     setModalCuest(null)
     setCuest({})
     setToast({ msg: 'Cuestionario guardado — ya puedes generar el plan' })
@@ -154,7 +167,6 @@ export default function Nutricion({ session }) {
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
-      {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
 
       {/* Cabecera */}
       <div className="flex items-start justify-between mb-4">
@@ -334,7 +346,8 @@ export default function Nutricion({ session }) {
               {p.estado==='borrador' && (
                 <button onClick={async () => {
                   if (!confirm(`¿Eliminar el borrador de ${p.clientes?.nombre?.split(' ')[0] || 'este cliente'}?`)) return
-                  await supabase.from('planes_nutricion').delete().eq('id', p.id)
+                  const { error } = await supabase.from('planes_nutricion').delete().eq('id', p.id)
+                  if (error) { setToast({ msg: 'Error al eliminar el borrador', tipo: 'error' }); return }
                   cargar()
                 }}
                   className="border border-red-100 text-red-400 text-xs py-2 px-3 rounded-xl hover:bg-red-50">
@@ -361,7 +374,7 @@ export default function Nutricion({ session }) {
                 <div key={c.id} className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                     style={{background: activo ? BRAND.color : '#C0C0C0'}}>{ini(c.nombre)}</div>
-                  <p className="flex-1 text-sm text-[#0A0A0A] truncate">{c.nombre.split(' ')[0]}</p>
+                  <p className="flex-1 text-sm text-[#0A0A0A] truncate">{(c.nombre ?? '').split(' ')[0]}</p>
                   {esOnline
                     ? <button onClick={() => { navigate('/clientes', { state: { abrirId: c.id, tab: 'resumen' } }) }}
                         className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all hover:opacity-75 ${activo ? 'bg-acento/10 text-acento' : 'bg-black/5 text-[#9B9B9B]'}`}>
@@ -522,7 +535,7 @@ export default function Nutricion({ session }) {
                             ))}
                             <button onClick={() => {
                               const copy = JSON.parse(JSON.stringify(editComidaData))
-                              copy.alimentos.push({ nombre: '', cantidad: '' })
+                              copy.alimentos = [...(copy.alimentos ?? []), { nombre: '', cantidad: '' }]
                               setEditComidaData(copy)
                             }} className="text-xs text-acento font-semibold">+ Añadir alimento</button>
                             <div>
@@ -532,16 +545,25 @@ export default function Nutricion({ session }) {
                             </div>
                             <div className="flex gap-2 pt-1">
                               <button onClick={async () => {
-                                // Guardar cambios en el borrador
+                                // Guardar cambios en el borrador — y en contenido también si el
+                                // plan ya está publicado, porque eso es lo que ve el cliente
+                                // (contenido). Si no, los cambios quedarían invisibles hasta
+                                // volver a pulsar "Publicar".
                                 const planActual = JSON.parse(JSON.stringify(detalle.borrador || detalle.contenido))
                                 planActual.menu[diaActivo].comidas[i] = editComidaData
-                                const { error } = await supabase.from('planes_nutricion').update({ borrador: planActual }).eq('id', detalle.id)
+                                const update = detalle.estado === 'publicado'
+                                  ? { borrador: planActual, contenido: planActual }
+                                  : { borrador: planActual }
+                                const { error } = await supabase.from('planes_nutricion').update(update).eq('id', detalle.id)
                                 if (!error) {
-                                  setDetalle({ ...detalle, borrador: planActual })
+                                  setDetalle({ ...detalle, ...update })
                                   setEditandoComida(null); setEditComidaData(null)
-                                  setToast('✓ Comida actualizada')
-                                  setTimeout(() => setToast(''), 2500)
+                                  setToast({ msg: detalle.estado === 'publicado' ? '✓ Comida actualizada — el cliente ya ve el cambio' : '✓ Comida actualizada' })
+                                  setTimeout(() => setToast(null), 2500)
                                   cargar()
+                                } else {
+                                  setToast({ msg: 'Error al guardar la comida', tipo: 'error' })
+                                  setTimeout(() => setToast(null), 3000)
                                 }
                               }} className="flex-1 bg-acento text-white text-xs font-bold py-2 rounded-lg">Guardar cambios</button>
                               <button onClick={() => { setEditandoComida(null); setEditComidaData(null) }}
@@ -644,10 +666,12 @@ export default function Nutricion({ session }) {
                 {/* Botón pausar / despublicar plan */}
                 {detalle.estado === 'publicado' && (
                   <button onClick={async () => {
-                    await supabase.from('planes_nutricion')
+                    const { error } = await supabase.from('planes_nutricion')
                       .update({ estado: 'borrador' })
+                      .eq('id', detalle.id)
                       .eq('cliente_id', detalle.cliente_id)
                       .eq('estado', 'publicado')
+                    if (error) { setToast({ msg: 'Error al pausar el plan', tipo: 'error' }); setTimeout(() => setToast(null), 3000); return }
                     setToast({ msg: '⏸ Plan pausado — el cliente ya no lo ve' })
                     setTimeout(() => setToast(null), 3000)
                     cargar()
@@ -657,10 +681,12 @@ export default function Nutricion({ session }) {
                 )}
                 {detalle.estado === 'borrador' && (
                   <button onClick={async () => {
-                    await supabase.from('planes_nutricion')
+                    const { error } = await supabase.from('planes_nutricion')
                       .update({ estado: 'publicado' })
+                      .eq('id', detalle.id)
                       .eq('cliente_id', detalle.cliente_id)
                       .eq('estado', 'borrador')
+                    if (error) { setToast({ msg: 'Error al publicar el plan', tipo: 'error' }); setTimeout(() => setToast(null), 3000); return }
                     setToast({ msg: '✓ Plan publicado — el cliente ya puede verlo' })
                     setTimeout(() => setToast(null), 3000)
                     cargar()
