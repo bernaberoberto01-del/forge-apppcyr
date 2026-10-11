@@ -307,7 +307,7 @@ export default function PortalForge() {
 
   async function guardarActividad() {
     if (modoPreview) return bloqueadoPreview()
-    if (!actForm.tipo || !actForm.duracion) return
+    if (!actForm.tipo || !actForm.duracion || guardandoAct) return
     setGuardandoAct(true)
     const nombreAct = ACTIVIDADES.find(a => a.id === actForm.tipo)?.label?.split(' ').slice(1).join(' ') || actForm.tipo
     await supabase.from('sesiones').insert({
@@ -323,7 +323,7 @@ export default function PortalForge() {
 
   async function guardarRegistroSesion() {
     if (modoPreview) return bloqueadoPreview()
-    if (!modalRegistro) return
+    if (!modalRegistro || guardandoRegistro) return
     setGuardandoRegistro(true)
     const { data: sesNueva, error } = await supabase.from('sesiones').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
