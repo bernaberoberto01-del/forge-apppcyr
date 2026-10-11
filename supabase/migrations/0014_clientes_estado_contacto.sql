@@ -6,7 +6,8 @@
 -- filtros .eq('estado','activo') del resto de la app. Ahora pasan a 'contacto'
 -- y stripe-webhook los sube a 'activo' solo cuando checkout.session.completed
 -- confirma el pago.
+-- Mantiene 'externo' (0008). Idempotente.
 
-ALTER TABLE "public"."clientes" DROP CONSTRAINT "clientes_estado_check";
+ALTER TABLE "public"."clientes" DROP CONSTRAINT IF EXISTS "clientes_estado_check";
 ALTER TABLE "public"."clientes" ADD CONSTRAINT "clientes_estado_check"
-  CHECK (("estado" = ANY (ARRAY['activo'::"text", 'pausado'::"text", 'baja'::"text", 'pendiente'::"text", 'rechazado'::"text", 'contacto'::"text"])));
+  CHECK (("estado" = ANY (ARRAY['activo'::"text", 'pausado'::"text", 'baja'::"text", 'pendiente'::"text", 'rechazado'::"text", 'externo'::"text", 'contacto'::"text"])));
