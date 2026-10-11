@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
-import TutorialBanner from '../components/TutorialBanner'
-import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
+import { useOnboarding } from '../hooks/useOnboarding'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 import { useEquipo } from '../hooks/useCentro'
@@ -43,8 +42,11 @@ export default function Mensajes({ session }) {
     if (!uid) return
     supabase.from('tarifas').select('id,nombre,tipo,precio,stripe_price_id,modalidad,dias_semana')
       .in('entrenador_id', equipo).eq('activa', true).not('stripe_price_id', 'is', null)
-      .then(({ data }) => setTarifas(data || []))
-  }, [uid])
+      .then(({ data, error }) => {
+        if (error) { setToast('Error al cargar tarifas: ' + error.message); return }
+        setTarifas(data || [])
+      })
+  }, [uid, equipo])
 
   async function generarLinkPago(tarifaId, tarifaNombre) {
     if (!seleccionado) return
@@ -70,7 +72,7 @@ export default function Mensajes({ session }) {
   const [loading, setLoading] = useState(true)
   const endRef = useRef()
 
-  useEffect(() => { cargarClientes() }, [uid])
+  useEffect(() => { cargarClientes() }, [uid, equipo])
   useEffect(() => {
     if (location.state?.clienteId && clientes.length) {
       const c = clientes.find(cl => cl.id === location.state.clienteId)
@@ -80,16 +82,22 @@ export default function Mensajes({ session }) {
       }
     }
   }, [location.state, clientes])
-  useEffect(() => { if (seleccionado) cargarMensajes(seleccionado.id) }, [seleccionado])
+  useEffect(() => { if (seleccionado) cargarMensajes(seleccionado.id) }, [seleccionado, equipo])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes])
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(''), 3000)
+    return () => clearTimeout(t)
+  }, [toast])
 
   async function cargarClientes() {
     setLoading(true)
-    const [{ data: cl }, { data: ms }] = await Promise.all([
+    const [{ data: cl, error: errCl }, { data: ms, error: errMs }] = await Promise.all([
       supabase.from('clientes').select('id,nombre,tipo,estado,plan_online,suscripcion_activa,email').in('entrenador_id', equipo).eq('estado','activo').order('nombre'),
       supabase.from('mensajes_cliente').select('cliente_id,leido_entrenador,tipo,created_at')
         .in('entrenador_id', equipo).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema')
     ])
+    if (errCl || errMs) setToast('Error al cargar clientes: ' + (errCl?.message || errMs?.message))
     setClientes(cl || [])
     const nl = {}
     ;(ms || []).forEach(m => { nl[m.cliente_id] = (nl[m.cliente_id] || 0) + 1 })
@@ -98,15 +106,17 @@ export default function Mensajes({ session }) {
   }
 
   async function cargarMensajes(clienteId) {
-    const { data } = await supabase.from('mensajes_cliente')
+    const { data, error } = await supabase.from('mensajes_cliente')
       .select('*').eq('cliente_id', clienteId).order('created_at', { ascending: true })
+    if (error) setToast('Error al cargar mensajes: ' + error.message)
     setMensajes(data || [])
     // Marcar como leídos por el entrenador en la BD
-    await supabase.from('mensajes_cliente')
+    const { error: errUpd } = await supabase.from('mensajes_cliente')
       .update({ leido_entrenador: true })
       .eq('cliente_id', clienteId)
       .in('entrenador_id', equipo)
       .neq('tipo', 'entrenador')
+    if (errUpd) setToast('Error al marcar como leído: ' + errUpd.message)
     setNoLeidos(prev => { const n = {...prev}; delete n[clienteId]; return n })
   }
 
@@ -114,15 +124,16 @@ export default function Mensajes({ session }) {
     const msg = textoMsg || texto.trim()
     if (!msg || !seleccionado) return
     setEnviando(true)
-    const { error } = await supabase.from('mensajes_cliente').insert({
-      entrenador_id: uid,
-      cliente_id: seleccionado.id,
-      contenido: msg,
-      tipo: 'entrenador',
-      leido: false,
-      leido_entrenador: true
-    })
-    if (!error) {
+    try {
+      const { error } = await supabase.from('mensajes_cliente').insert({
+        entrenador_id: uid,
+        cliente_id: seleccionado.id,
+        contenido: msg,
+        tipo: 'entrenador',
+        leido: false,
+        leido_entrenador: true
+      })
+      if (error) { setToast('Error al enviar mensaje: ' + error.message); return }
       setTexto('')
       setShowPlantillas(false)
       await cargarMensajes(seleccionado.id)
@@ -130,8 +141,9 @@ export default function Mensajes({ session }) {
       supabase.functions.invoke('notificar-mensaje', {
         body: { cliente_id: seleccionado.id, tipo: 'mensaje_entrenador', preview: msg.slice(0, 200) }
       }).catch(() => {})
+    } finally {
+      setEnviando(false)
     }
-    setEnviando(false)
   }
 
   const clientesFiltrados = clientes.filter(c =>
@@ -142,6 +154,11 @@ export default function Mensajes({ session }) {
 
   return (
     <div className="flex h-[calc(100vh-64px)] md:h-screen overflow-hidden">
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-[60] bg-[#111] text-white text-sm px-4 py-2.5 rounded-xl shadow-lg max-w-xs">
+          {toast}
+        </div>
+      )}
 
       {/* Sidebar clientes */}
       <div className={`${seleccionado ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-72 bg-white border-r border-black/5 flex-shrink-0`}>
@@ -228,8 +245,8 @@ export default function Mensajes({ session }) {
                 <p className="text-xs text-[#6B6B6B] mt-1 mb-4">Usa una plantilla para empezar</p>
                 <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
                   {PLANTILLAS.slice(0,4).map(p => (
-                    <button key={p.id} onClick={() => enviar(p.texto)}
-                      className="bg-white border border-black/10 rounded-xl p-3 text-left hover:border-acento transition-all">
+                    <button key={p.id} onClick={() => enviar(p.texto)} disabled={enviando}
+                      className="bg-white border border-black/10 rounded-xl p-3 text-left hover:border-acento transition-all disabled:opacity-40">
                       <p className="text-base mb-1">{p.icon}</p>
                       <p className="text-xs font-semibold text-[#0A0A0A]">{p.label}</p>
                     </button>
@@ -305,7 +322,7 @@ export default function Mensajes({ session }) {
               <button
                 onClick={() => {
                   const link = `${window.location.origin}/nutricion-cuest?e=${uid}&c=${seleccionado.id}`
-                  const msg = `Hola ${seleccionado.nombre.split(' ')[0]} 👋\n\nPara preparar tu plan de alimentación personalizado necesito que rellenes este breve cuestionario nutricional:\n\n${link}\n\nSolo te llevará 2-3 minutos. Con esa información podré crear un plan adaptado exactamente a ti. ¡Gracias!`
+                  const msg = `Hola ${seleccionado?.nombre?.split(' ')[0]} 👋\n\nPara preparar tu plan de alimentación personalizado necesito que rellenes este breve cuestionario nutricional:\n\n${link}\n\nSolo te llevará 2-3 minutos. Con esa información podré crear un plan adaptado exactamente a ti. ¡Gracias!`
                   setTexto(msg)
                 }}
                 className="w-9 h-9 flex items-center justify-center rounded-xl border border-black/10 text-emerald-600 hover:bg-emerald-50 transition-all flex-shrink-0"
@@ -343,7 +360,7 @@ export default function Mensajes({ session }) {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="font-bold text-[#0A0A0A]">💳 Generar link de pago</h3>
-                <p className="text-xs text-[#6B6B6B] mt-0.5">Para {seleccionado.nombre.split(' ')[0]}</p>
+                <p className="text-xs text-[#6B6B6B] mt-0.5">Para {seleccionado?.nombre?.split(' ')[0]}</p>
               </div>
               <button onClick={() => setModalPago(false)} className="text-[#9B9B9B] text-xl leading-none">×</button>
             </div>
