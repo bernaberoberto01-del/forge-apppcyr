@@ -2920,27 +2920,28 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
             </div>
           ))}
 
-          {/* — Motivación — */}
+          {/* — Motivación (1-7) — */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span>🔥</span>
               <p className="text-sm font-bold text-[#0A0A0A]">Motivación</p>
             </div>
-            <div className="grid grid-cols-5 gap-1.5">
-              {[1,2,3,4,5].map(v => {
+            <div className="grid grid-cols-7 gap-1">
+              {[1,2,3,4,5,6,7].map(v => {
                 const sel = ciForm.motivacion === v
-                const motivLabels = ['Por los suelos','Tirando','Normal','Con ganas','Imparable']
-                const bg = v <= 2 ? '#ef4444' : v === 3 ? '#f59e0b' : color
+                const motivLabels = ['💀','😞','😐','🙂','😊','💪','🚀']
+                const bg = v <= 2 ? '#ef4444' : v <= 4 ? '#f59e0b' : color
                 return (
                   <button key={v} onClick={() => setCiForm(f => ({ ...f, motivacion: v }))}
-                    className={`flex flex-col items-center gap-1 py-4 rounded-xl transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
+                    className={`flex flex-col items-center gap-1 py-3 rounded-xl transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
                     style={sel ? { background: bg } : {}}>
-                    <span className="text-base font-bold">{v}</span>
-                    <span className={`text-[9px] leading-tight text-center ${sel ? 'text-white/90' : 'text-[#9B9B9B]'}`}>{motivLabels[v - 1]}</span>
+                    <span className="text-sm">{motivLabels[v - 1]}</span>
+                    <span className="text-xs font-bold">{v}</span>
                   </button>
                 )
               })}
             </div>
+            <p className="text-[10px] text-[#C0C0C0] mt-1.5 text-center">1 = sin ganas · 7 = imparable</p>
           </div>
 
           {/* — Sesiones completadas — */}
