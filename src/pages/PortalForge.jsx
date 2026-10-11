@@ -292,7 +292,7 @@ export default function PortalForge() {
 
   async function guardarActividad() {
     if (modoPreview) return bloqueadoPreview()
-    if (!actForm.tipo || !actForm.duracion) return
+    if (!actForm.tipo || !actForm.duracion || guardandoAct) return
     setGuardandoAct(true)
     const nombreAct = ACTIVIDADES.find(a => a.id === actForm.tipo)?.label?.split(' ').slice(1).join(' ') || actForm.tipo
     await supabase.from('sesiones').insert({
@@ -308,7 +308,7 @@ export default function PortalForge() {
 
   async function guardarRegistroSesion() {
     if (modoPreview) return bloqueadoPreview()
-    if (!modalRegistro) return
+    if (!modalRegistro || guardandoRegistro) return
     setGuardandoRegistro(true)
     const { data: sesNueva, error } = await supabase.from('sesiones').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
@@ -421,6 +421,14 @@ export default function PortalForge() {
   const bloqueadoRutina = esOnline && !verRutina
   const bloqueadoNutricion = esOnline && !verNutricion
 
+  // Si el tab activo queda fuera de los tabs visibles (p.ej. plan cambiado en BD),
+  // volver a Inicio para no mostrar una pantalla vacía. Ajuste de estado durante el
+  // render (patrón soportado por React) en vez de useEffect: verRutina/verNutricion
+  // se calculan después del "if (!datos) return" de arriba, así que un useEffect aquí
+  // violaría las Rules of Hooks (hooks llamados condicionalmente entre renders).
+  if (tab === 'entrena' && !verRutina) setTab('hoy')
+  if (tab === 'nutricion' && !verNutricion) setTab('hoy')
+
   // Pago vencido: plan manual (sin suscripción activa en Stripe) con más de 35 días desde el último pago
   const ultimoPago = pagos?.[0] || null
   const diasDesdeUltimoPago = ultimoPago?.fecha_pago ? Math.floor((Date.now() - new Date(ultimoPago.fecha_pago + 'T00:00').getTime()) / 864e5) : null
@@ -508,12 +516,14 @@ export default function PortalForge() {
     return streak
   })()
 
+  // Visibilidad de tabs según plan — un cliente de solo Nutrición no ve Entrena y viceversa.
+  // verRutina / verNutricion ya incluyen la lógica de acceso y la excepción "tiene datos en BD".
   const TABS = [
-    { id: 'hoy',      label: 'Inicio',    icon: '⊞' },
-    { id: 'entrena',  label: 'Entrena',   icon: '💪' },
-    { id: 'nutricion',label: 'Nutrición', icon: '🥗' },
-    { id: 'progreso', label: 'Progreso',  icon: '📈' },
-    { id: 'mas',      label: 'Más',       icon: '···', badge: msgNoLeidos },
+    { id: 'hoy',       label: 'Inicio',    icon: '⊞' },
+    { id: 'entrena',   label: 'Entrena',   icon: '💪',  oculto: !verRutina },
+    { id: 'nutricion', label: 'Nutrición', icon: '🥗',  oculto: !verNutricion },
+    { id: 'progreso',  label: 'Progreso',  icon: '📈' },
+    { id: 'mas',       label: 'Más',       icon: '···', badge: msgNoLeidos },
   ].filter(t => !t.oculto)
 
   // Bottom bar: siempre los tabs disponibles (máx 4) + Más
