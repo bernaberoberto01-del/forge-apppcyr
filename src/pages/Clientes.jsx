@@ -238,7 +238,10 @@ export default function Clientes({ session }) {
       // determina qué módulos ve el cliente en el portal (ver acceso.rutinas/
       // acceso.nutricion en PortalForge.jsx), así que fijarlo activa el módulo.
       const planSugerido = dData.cuestRegistro?.sugerencia_plan || null
-      const camposAceptar = { estado: 'activo' }
+      // estado queda en 'contacto' (no 'activo') hasta que pague — así no se
+      // mezcla con clientes reales activos en el resto de la app; stripe-webhook
+      // lo pone a 'activo' cuando llega checkout.session.completed.
+      const camposAceptar = { estado: 'contacto' }
       // plan_activo queda en false aquí a propósito — el cliente no tiene acceso
       // al portal hasta que pague; stripe-webhook lo pone a true cuando llega
       // checkout.session.completed.
@@ -917,6 +920,8 @@ export default function Clientes({ session }) {
                 ? { label: '✓ Activo', cls: 'bg-emerald-50 text-emerald-700' }
                 : c.estado === 'pausado'
                 ? { label: '⏸ Pausado', cls: 'bg-gray-100 text-gray-600' }
+                : c.estado === 'contacto'
+                ? { label: '⏳ Contacto', cls: 'bg-amber-50 text-amber-700' }
                 : { label: 'Baja', cls: 'bg-red-50 text-red-600' }
 
               return (
@@ -1311,6 +1316,7 @@ export default function Clientes({ session }) {
                   <select value={form.estado} onChange={e => setForm({...form,estado:e.target.value})}
                     className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                     <option value="activo">Activo</option>
+                    <option value="contacto">Contacto (pendiente de pago)</option>
                     <option value="pausado">Pausado</option>
                     <option value="baja">Baja</option>
                   </select>

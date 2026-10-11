@@ -435,6 +435,32 @@ export default function PortalForge() {
   // is_demo o acceso_libre nunca pasan por esta pantalla.
   const faltaActivarPlan = esOnline && !tieneAccesoLibre && !!cliente.plan_online && !cliente.plan_activo && !tieneSuscripcionStripeActiva
 
+  // Lead aceptado (estado='contacto') pero sin plan todavía asignado — la IA no
+  // sugirió uno o el entrenador aún no ha elegido tarifa. Sin esto el cliente
+  // vería un portal vacío sin ningún mensaje. El entrenador manda el enlace de
+  // pago manualmente desde Mensajes.jsx; aquí solo se informa de que está en curso.
+  const faltaAsignarPlan = esOnline && !tieneAccesoLibre && cliente.estado === 'contacto' && !cliente.plan_online
+
+  if (faltaAsignarPlan) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
+        {modoPreview && (
+          <div className="fixed top-0 inset-x-0 z-50 w-full px-4 py-2 text-center text-xs md:text-sm font-bold text-white"
+            style={{ background: '#F59E0B', paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}>
+            👁 Modo vista previa — estás viendo el portal de {cliente.nombre}
+          </div>
+        )}
+        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
+          <p className="text-5xl mb-4">📋</p>
+          <p className="font-bold text-xl mb-2 text-[#0A0A0A]">¡Ya casi está!</p>
+          <p className="text-sm text-[#6B6B6B] leading-relaxed">
+            Tu entrenador está preparando tu plan personalizado. En breve recibirás el enlace para activarlo.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   if (faltaActivarPlan) {
     const planInfo = PLANES_INFO.find(p => p.id === cliente.plan_online)
     return (
