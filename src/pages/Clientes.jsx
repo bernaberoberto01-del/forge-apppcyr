@@ -239,7 +239,10 @@ export default function Clientes({ session }) {
       // determina qué módulos ve el cliente en el portal (ver acceso.rutinas/
       // acceso.nutricion en PortalForge.jsx), así que fijarlo activa el módulo.
       const planSugerido = dData.cuestRegistro?.sugerencia_plan || null
-      const camposAceptar = { estado: 'activo' }
+      // estado queda en 'contacto' (no 'activo') hasta que pague — así no se
+      // mezcla con clientes reales activos en el resto de la app; stripe-webhook
+      // lo pone a 'activo' cuando llega checkout.session.completed.
+      const camposAceptar = { estado: 'contacto' }
       // plan_activo queda en false aquí a propósito — el cliente no tiene acceso
       // al portal hasta que pague; stripe-webhook lo pone a true cuando llega
       // checkout.session.completed.

@@ -43,7 +43,7 @@ serve(async (req) => {
           const { error: insError } = await supabase.from('planes_cobro').insert(payload)
           console.log('checkout.session.completed — insert planes_cobro', insError ? 'ERROR: ' + insError.message : 'OK')
         }
-        const { error: cliError } = await supabase.from('clientes').update({ stripe_subscription_id: subId, stripe_customer_id: session.customer, plan_online: plan, plan_activo: true }).eq('id', cliente_id)
+        const { error: cliError } = await supabase.from('clientes').update({ stripe_subscription_id: subId, stripe_customer_id: session.customer, plan_online: plan, plan_activo: true, estado: 'activo' }).eq('id', cliente_id)
         console.log('checkout.session.completed — update clientes', cliError ? 'ERROR: ' + cliError.message : 'OK')
         break
       }
