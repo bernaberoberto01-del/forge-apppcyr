@@ -7,7 +7,7 @@ import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
 
 function Toast({ msg, tipo = 'ok', onClose }) {
-  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [onClose])
   return (
     <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo === 'error' ? 'bg-red-600' : 'bg-[#111]'}`}>
       <span>{tipo === 'error' ? '⚠' : '✓'}</span> {msg}
@@ -15,12 +15,17 @@ function Toast({ msg, tipo = 'ok', onClose }) {
   )
 }
 
+const fechaLocal = (d = new Date()) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 const initForm = {
-  cliente_id: '', fecha: new Date().toISOString().split('T')[0],
-  tipo: 'presencial', duracion_minutos: 60, notas: '',
+  cliente_id: '', fecha: fechaLocal(),
+  tipo: 'presencial', duracion_minutos: 60, notas: '', hora: '',
   rpe: 7, fatiga_post: 2, sensaciones: '', dia_rutina: 1
 }
 
+// ini() duplica src/components/ClienteQuickView.jsx, EquipoTab.jsx y otros 13+ archivos — no se consolida aquí porque
+// no existe todavía un módulo compartido en main (src/lib/avatar.js solo existe en rama sin mergear, ver PR #7)
 const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
 export default function Sesiones({ session }) {
@@ -38,25 +43,27 @@ export default function Sesiones({ session }) {
   const [busqueda, setBusqueda] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [quickView, setQuickView] = useState(null)
+  const [cargandoRutina, setCargandoRutina] = useState(false)
   const uid = session.user.id
   const equipo = useEquipo(uid)
 
-  useEffect(() => { cargar() }, [uid])
+  useEffect(() => { cargar() }, [uid, equipo])
 
   const sesionesFiltradas = useMemo(() => {
     let r = [...sesiones]
     if (busqueda) { const b = busqueda.toLowerCase(); r = r.filter(s => s.clientes?.nombre?.toLowerCase().includes(b)) }
     if (filtroTipo === 'presencial') r = r.filter(s => s.tipo === 'presencial')
     if (filtroTipo === 'online') r = r.filter(s => s.tipo === 'online')
-    if (filtroTipo === 'hoy') r = r.filter(s => s.fecha === new Date().toISOString().split('T')[0])
+    if (filtroTipo === 'hoy') r = r.filter(s => s.fecha === fechaLocal())
     return r
   }, [sesiones, busqueda, filtroTipo])
 
   async function cargar() {
-    const [{ data: se }, { data: cl }] = await Promise.all([
+    const [{ data: se, error: errSe }, { data: cl, error: errCl }] = await Promise.all([
       supabase.from('sesiones').select('*, clientes(nombre, tipo, nivel)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(50),
       supabase.from('clientes').select('id,nombre,tipo,nivel').in('entrenador_id', equipo).eq('estado', 'activo'),
     ])
+    if (errSe || errCl) { setToast({ msg: 'Error al cargar: ' + (errSe?.message || errCl?.message), tipo: 'error' }); return }
     setSesiones(se || [])
     setClientes(cl || [])
   }
@@ -66,11 +73,12 @@ export default function Sesiones({ session }) {
     setRutinaCliente(null)
     setEjercicios([])
     const cliente = clientes.find(c => c.id === clienteId)
-    const [{ data: ru }, { data: cu }, { data: pf }] = await Promise.all([
+    const [{ data: ru, error: errRu }, { data: cu, error: errCu }, { data: pf, error: errPf }] = await Promise.all([
       supabase.from('rutinas').select('*').eq('cliente_id', clienteId).eq('estado', 'publicada').order('created_at', { ascending: false }).limit(1),
       supabase.from('cuestionarios').select('*').eq('cliente_id', clienteId).order('created_at', { ascending: false }).limit(1),
       supabase.from('progresion_fuerza').select('*').eq('cliente_id', clienteId).order('fecha', { ascending: false }).limit(1),
     ])
+    if (errRu || errCu || errPf) { setToast({ msg: 'Error al cargar rutina', tipo: 'error' }); return }
     const nivel = cliente?.nivel || 'principiante'
     const marcas = pf?.[0] || null
     const cuest = cu?.[0] || null
@@ -137,6 +145,7 @@ export default function Sesiones({ session }) {
         entrenador_id: uid,
         cliente_id: form.cliente_id,
         fecha: form.fecha,
+        hora: form.hora || null,
         tipo: form.tipo,
         completada: true,
         valoracion_pendiente: form.tipo === 'presencial',
@@ -179,9 +188,9 @@ export default function Sesiones({ session }) {
     )
   }
 
-  const hoy = new Date().toISOString().split('T')[0]
+  const hoy = fechaLocal()
   const lun = new Date(); lun.setDate(lun.getDate() - (lun.getDay() || 7) + 1)
-  const lunStr = lun.toISOString().split('T')[0]
+  const lunStr = fechaLocal(lun)
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
@@ -251,7 +260,7 @@ export default function Sesiones({ session }) {
                   {s.clientes?.nombre}
                 </button>
                 <p className="text-xs text-[#6B6B6B]">
-                  {new Date(s.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })} · {s.hora || '—'} · {s.tipo}
+                  {new Date(s.fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })} · {s.hora || '—'} · {s.tipo}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -273,7 +282,7 @@ export default function Sesiones({ session }) {
                 <button onClick={() => setQuickView(detalle.cliente_id)} className="font-bold text-[#0A0A0A] hover:text-acento transition-colors">
                   {detalle.clientes?.nombre}
                 </button>
-                <p className="text-xs text-[#6B6B6B]">{new Date(detalle.fecha).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                <p className="text-xs text-[#6B6B6B]">{new Date(detalle.fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
               </div>
               <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
             </div>
@@ -348,11 +357,14 @@ export default function Sesiones({ session }) {
                 <>
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
-                    <select value={form.cliente_id} onChange={async e => {
+                    <select value={form.cliente_id} disabled={cargandoRutina} onChange={async e => {
                       const val = e.target.value
                       setForm(f => ({ ...f, cliente_id: val, dia_rutina: 1 }))
-                      if (val) await cargarRutina(val, 1)
-                    }} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
+                      if (val) {
+                        setCargandoRutina(true)
+                        try { await cargarRutina(val, 1) } finally { setCargandoRutina(false) }
+                      }
+                    }} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white disabled:opacity-40">
                       <option value="">Selecciona cliente</option>
                       {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} {c.tipo === 'online' ? '🌐' : '📍'}</option>)}
                     </select>
@@ -369,14 +381,19 @@ export default function Sesiones({ session }) {
                         className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tipo</label>
-                      <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
-                        <option value="presencial">Presencial</option>
-                        <option value="online">Online</option>
-                        <option value="pareja_grupo">Pareja/Grupo</option>
-                      </select>
+                      <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Hora</label>
+                      <input type="time" value={form.hora || ''} onChange={e => setForm(f => ({ ...f, hora: e.target.value }))}
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
                     </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tipo</label>
+                    <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
+                      <option value="presencial">Presencial</option>
+                      <option value="online">Online</option>
+                      <option value="pareja_grupo">Pareja/Grupo</option>
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración: <span className="text-acento">{form.duracion_minutos} min</span></label>
@@ -394,12 +411,13 @@ export default function Sesiones({ session }) {
                       <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Día de rutina</label>
                       <div className="flex gap-2 flex-wrap">
                         {(rutinaCliente.contenido?.dias || rutinaCliente.borrador?.dias || []).map(dia => (
-                          <button key={dia.dia} type="button" onClick={async () => {
+                          <button key={dia.dia} type="button" disabled={cargandoRutina} onClick={async () => {
                             setForm(f => ({ ...f, dia_rutina: dia.dia }))
-                            await cargarRutina(form.cliente_id, dia.dia)
+                            setCargandoRutina(true)
+                            try { await cargarRutina(form.cliente_id, dia.dia) } finally { setCargandoRutina(false) }
                           }}
-                            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all ${form.dia_rutina === dia.dia ? 'bg-[#111] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
-                            {dia.nombre.split(' ').slice(0, 2).join(' ')}
+                            className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 ${form.dia_rutina === dia.dia ? 'bg-[#111] text-white' : 'border border-black/10 text-[#6B6B6B]'}`}>
+                            {dia.nombre?.split(' ').slice(0, 2).join(' ')}
                           </button>
                         ))}
                       </div>
