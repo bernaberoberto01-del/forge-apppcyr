@@ -518,16 +518,19 @@ export default function Nutricion({ session }) {
                               <div key={j} className="flex gap-2 items-center">
                                 <input value={al.nombre} onChange={e => {
                                   const copy = JSON.parse(JSON.stringify(editComidaData))
+                                  copy.alimentos = copy.alimentos ?? []
                                   copy.alimentos[j].nombre = e.target.value
                                   setEditComidaData(copy)
                                 }} className="flex-1 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="Alimento"/>
                                 <input value={al.cantidad} onChange={e => {
                                   const copy = JSON.parse(JSON.stringify(editComidaData))
+                                  copy.alimentos = copy.alimentos ?? []
                                   copy.alimentos[j].cantidad = e.target.value
                                   setEditComidaData(copy)
                                 }} className="w-24 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="150g"/>
                                 <button onClick={() => {
                                   const copy = JSON.parse(JSON.stringify(editComidaData))
+                                  copy.alimentos = copy.alimentos ?? []
                                   copy.alimentos.splice(j, 1)
                                   setEditComidaData(copy)
                                 }} className="text-red-400 hover:text-red-600 text-sm px-1">×</button>
