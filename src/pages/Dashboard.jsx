@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
 import { moduloVisible } from '../lib/modulos'
+import { diaLocal, mesLocal } from '../lib/dateUtils'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
@@ -26,13 +27,6 @@ function descartarAlertas(clienteIds, tipo) {
   const ahora = Date.now()
   clienteIds.forEach(id => { if (id) d[`${id}_${tipo}`] = ahora })
   try { localStorage.setItem(DESCARTE_KEY, JSON.stringify(d)) } catch {}
-}
-
-// Fecha en zona horaria LOCAL, no UTC. d.toISOString().split('T')[0] convierte
-// a UTC antes de cortar — entre medianoche y la 1-2 de la madrugada en horario
-// de España, eso devuelve el día anterior y "sesiones de hoy" sale vacío.
-function diaLocal(d) {
-  return [d.getFullYear(), String(d.getMonth()+1).padStart(2,'0'), String(d.getDate()).padStart(2,'0')].join('-')
 }
 
 function BarChart({ datos, max }) {
@@ -249,7 +243,7 @@ export default function Dashboard({ session }) {
 
     const ingresosPorMes = Array.from({length:6},(_,i) => {
       const d = new Date(hoy.getFullYear(), hoy.getMonth()-5+i, 1)
-      const mesStr = d.toISOString().slice(0,7)
+      const mesStr = mesLocal(d)
       const total = (pagos||[]).filter(p => p.fecha_pago?.startsWith(mesStr)).reduce((s,p) => s+Number(p.importe||0),0)
       return { mes: MESES[d.getMonth()], valor: Math.round(total) }
     })
