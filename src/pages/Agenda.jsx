@@ -6,6 +6,7 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
 import { SERVICIOS_EXTRA, ICONO_SERVICIO, NOMBRE_SERVICIO, esServicioExtra, hayAreas, areasDe } from '../lib/servicios'
+import { funcionActiva } from '../lib/modulos'
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -290,13 +291,18 @@ export default function Agenda({ session }) {
     setExcepcionesGrupo(excGrupo || [])
     setExcepcionesInd(excInd || [])
     setMiembrosAgenda(miem || [])
-    // Cargar clases — en try propio para no abortar el resto si falla
-    try {
-      const { data: cls } = await supabase.from('clases_con_plazas')
-        .select('*').in('entrenador_id', equipo).eq('cancelada', false)
-        .gte('fecha', hace60).order('fecha').order('hora')
-      setClases(cls || [])
-    } catch { setClases([]) }
+    // Cargar clases — solo si el centro activa la función "clases" (igual que
+    // bonos/historial). En try propio para no abortar el resto si falla.
+    if (funcionActiva('clases')) {
+      try {
+        const { data: cls } = await supabase.from('clases_con_plazas')
+          .select('*').in('entrenador_id', equipo).eq('cancelada', false)
+          .gte('fecha', hace60).order('fecha').order('hora')
+        setClases(cls || [])
+      } catch { setClases([]) }
+    } else {
+      setClases([])
+    }
 
     // Construir mapa grupo_id → info completa
     const gm = {}
