@@ -176,12 +176,15 @@ export default function RegistroCliente() {
         fecha_consentimiento: new Date().toISOString(),
       }
 
-      const { data: inserted, error: err2 } = await supabase.from('cuestionarios').insert(payload).select('id').single()
+      // Sin .select(): el visitante es anónimo y RLS solo le deja INSERT, no SELECT,
+      // así que un INSERT … RETURNING fallaría entero. El id se genera aquí.
+      const cuestionarioId = crypto.randomUUID()
+      const { error: err2 } = await supabase.from('cuestionarios').insert({ ...payload, id: cuestionarioId })
       if (err2) { setError('Error al enviar. Inténtalo de nuevo.'); return }
 
       // Lanzar análisis IA en background (no bloqueante)
       supabase.functions.invoke('analizar-diagnostico', {
-        body: { entrenador_id: entrenadorId, email: form.email.trim().toLowerCase(), cuestionario_id: inserted?.id }
+        body: { entrenador_id: entrenadorId, email: form.email.trim().toLowerCase(), cuestionario_id: cuestionarioId }
       }).catch(() => {})
 
       setEnviado(true)
