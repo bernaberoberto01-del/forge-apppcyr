@@ -159,7 +159,7 @@ export default function Dashboard({ session }) {
 
   // Auto-mostrar wizard en primer acceso (sin clientes y onboarding cargado)
   useEffect(() => {
-    if (cargado && datos && !completado('primer_cliente') && datos.activos?.length === 0) {
+    if (moduloVisible('tutorial') && cargado && datos && !completado('primer_cliente') && datos.activos?.length === 0) {
       const KEY = `forge_wizard_shown_${uid}`
       if (!localStorage.getItem(KEY)) {
         setMostrarWizard(true)
@@ -860,8 +860,8 @@ export default function Dashboard({ session }) {
                   <div className="px-5 py-6 space-y-3">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-bold text-[#0A0A0A]">{`👋 Bienvenido a ${BRAND.nombre}`}</p>
-                      <button onClick={() => setMostrarWizard(true)}
-                        className="text-xs text-acento font-semibold">Ver guía →</button>
+                      {moduloVisible('tutorial') && <button onClick={() => setMostrarWizard(true)}
+                        className="text-xs text-acento font-semibold">Ver guía →</button>}
                     </div>
                     <p className="text-xs text-[#6B6B6B]">Completa estos pasos para empezar:</p>
                     {[
@@ -871,7 +871,7 @@ export default function Dashboard({ session }) {
                       { paso: 'primera_sesion', n: '4', t: 'Agenda una sesión', s: 'Organiza tu semana', ruta: '/agenda', c: '#8b5cf6' },
                       { paso: 'primer_pago', n: '5', t: 'Registra un cobro', s: 'Configura planes de pago', ruta: '/pagos', c: '#10b981' },
                       { paso: 'primer_checkin', n: '6', t: 'Primer check-in', s: 'Haz seguimiento del cliente', ruta: '/seguimiento', c: '#06b6d4' },
-                    ].map(({ paso, n, t, s, ruta, c }) => {
+                    ].filter(x => moduloVisible(x.ruta.slice(1))).map(({ paso, n, t, s, ruta, c }) => {
                       const hecho = completado(paso)
                       return (
                         <button key={paso} onClick={() => !hecho && navigate(ruta)}
@@ -1048,7 +1048,7 @@ export default function Dashboard({ session }) {
             <p className="text-sm font-bold text-[#0A0A0A]">🚀 Empieza con {BRAND.nombre}</p>
             <button onClick={() => setMostrarWizard(false)} className="text-[#6B6B6B] text-xl leading-none">×</button>
           </div>
-          <p className="text-xs text-[#6B6B6B] mb-4">Completa estos 6 pasos para sacarle el máximo partido a la plataforma.</p>
+          <p className="text-xs text-[#6B6B6B] mb-4">Completa estos pasos para sacarle el máximo partido a la plataforma.</p>
           <div className="space-y-2">
             {[
               { paso: 'perfil', n: '1', t: 'Configura tu perfil', s: 'Nombre, logo y colores de marca', ruta: '/configuracion', c: BRAND.color },
@@ -1057,7 +1057,7 @@ export default function Dashboard({ session }) {
               { paso: 'primera_sesion', n: '4', t: 'Agenda una sesión', s: 'Organiza tu semana de trabajo', ruta: '/agenda', c: '#8b5cf6' },
               { paso: 'primer_pago', n: '5', t: 'Configura cobros', s: 'Automatiza tus planes de pago', ruta: '/pagos', c: '#10b981' },
               { paso: 'primer_checkin', n: '6', t: 'Primer check-in', s: 'Seguimiento real del cliente', ruta: '/seguimiento', c: '#06b6d4' },
-            ].map(({ paso, n, t, s, ruta, c }) => {
+            ].filter(x => moduloVisible(x.ruta.slice(1))).map(({ paso, n, t, s, ruta, c }) => {
               const hecho = completado(paso)
               return (
                 <button key={paso}
@@ -1082,7 +1082,7 @@ export default function Dashboard({ session }) {
               <p className="text-xs font-bold text-acento">{porcentaje}%</p>
             </div>
             <div className="w-full bg-black/8 rounded-full h-1.5">
-              <div className="h-1.5 rounded-full transition-all" style={{ width: `${porcentaje}%`, background: BRAND.color }} />
+              <div className="h-1.5 rounded-full transition-all bg-acento" style={{ width: `${porcentaje}%` }} />
             </div>
           </div>
         </div>
