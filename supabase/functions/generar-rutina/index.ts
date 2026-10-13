@@ -112,7 +112,7 @@ async function llamarIA(key: string, prompt: string, i: number): Promise<any> {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 700,
+        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1200,
           system: 'Responde SOLO con JSON valido. Sin texto ni markdown. Las notas de cada ejercicio van dirigidas directamente al cliente (tuteo), son breves, concretas y en español natural. Sin emojis ni asteriscos.',
           messages: [{ role: 'user', content: prompt }] })
       })
@@ -140,6 +140,29 @@ function buildPrompt(i: number, nombre: string, cliente: any, perfil: any, cuest
   const alertasTxt = perfil.alertas.length ? ` ALERTAS:${perfil.alertas.join(';')}` : ''
   const contrasTxt = perfil.contraindicaciones.length ? ` PROHIBIDO:${perfil.contraindicaciones.join(',')}` : ''
   const base = `${obj.replace(/_/g,' ')}|${nivel}|${material}|lesiones:${lesiones}${alertasTxt}${contrasTxt}`
+  // Contexto enriquecido del cliente desde cuestionario y perfil del cliente
+  const edad = Number(cuestionario?.edad || 0)
+  const peso = Number(cuestionario?.peso_actual || cliente.peso_actual || 0)
+  const anosEntr = Number(cuestionario?.anos_entrenando || 0)
+  const expPrevia = cuestionario?.experiencia_previa || ''
+  const dondeEntrena = cuestionario?.donde_entrena || ''
+  const horario = cuestionario?.horario_disponible || ''
+  const queNoFunciono = cuestionario?.que_no_funciono || ''
+  const expectativas = cuestionario?.expectativas_30dias || ''
+  const ocupacion = cuestionario?.ocupacion || ''
+  const nivelActividad = cuestionario?.nivel_actividad_diaria || ''
+  const contextoPerfil: string[] = []
+  if (edad > 0) contextoPerfil.push(`Edad:${edad}`)
+  if (peso > 0) contextoPerfil.push(`Peso:${peso}kg`)
+  if (anosEntr > 0) contextoPerfil.push(`Anos entrenando:${anosEntr}`)
+  if (expPrevia) contextoPerfil.push(`Exp previa:${expPrevia}`)
+  if (dondeEntrena) contextoPerfil.push(`Lugar:${dondeEntrena}`)
+  if (queNoFunciono) contextoPerfil.push(`Que no funciono antes:${queNoFunciono}`)
+  if (expectativas) contextoPerfil.push(`Expectativas:${expectativas}`)
+  if (ocupacion) contextoPerfil.push(`Ocupacion:${ocupacion}`)
+  if (nivelActividad) contextoPerfil.push(`Actividad diaria:${nivelActividad}`)
+  if (horario) contextoPerfil.push(`Horario:${horario}`)
+  const perfilTxt = contextoPerfil.length ? ` PERFIL_CLIENTE:[${contextoPerfil.join('|')}].` : ''
   const nombreLow = nombre.toLowerCase()
   const esCardio = nombreLow.includes('cardio') || nombreLow.includes('z2') || nombreLow.includes('fartlek')
   // El contexto del entrenador (boton "Regenerar con mas contexto") va SIEMPRE al final,
@@ -150,11 +173,11 @@ function buildPrompt(i: number, nombre: string, cliente: any, perfil: any, cuest
   const trailer = contexto
     ? `${tonoNota} El patron "${nombre}" indicado arriba es solo una orientacion por defecto, no obligatoria. INSTRUCCION PRIORITARIA DEL ENTRENADOR (tiene prioridad sobre todo lo anterior):${contexto}`
     : `${tonoNota} Sin contexto adicional: usa ejercicios especificos del patron "${nombre}", nunca genericos de otro dia del bloque.`
-  if (esCardio) return `Cardio dia${i}:${nombre}|${base}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Cardio","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"Cardio 30min","patron":"cardio","series":1,"reps":"30 min","descanso":"-","notas":""},{"orden":3,"nombre":"Core","patron":"core","series":3,"reps":"3x30s","descanso":"15s","notas":""}]}`
-  if (tipo === 'crossfit') return `WOD dia${i}:${nombre}|${base}${biblioPrompt}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"CrossFit","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"10 min","descanso":"-","notas":""},{"orden":2,"nombre":"Fuerza","patron":"fuerza","series":4,"reps":"3-5","descanso":"3 min","notas":""},{"orden":3,"nombre":"MetCon","patron":"metabolico","series":1,"reps":"AMRAP 10min","descanso":"-","notas":""}]}`
+  if (esCardio) return `Cardio dia${i}:${nombre}|${base}${perfilTxt}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Cardio","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"Cardio 30min","patron":"cardio","series":1,"reps":"30 min","descanso":"-","notas":""},{"orden":3,"nombre":"Core","patron":"core","series":3,"reps":"3x30s","descanso":"15s","notas":""}]}`
+  if (tipo === 'crossfit') return `WOD dia${i}:${nombre}|${base}${perfilTxt}${biblioPrompt}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"CrossFit","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"10 min","descanso":"-","notas":""},{"orden":2,"nombre":"Fuerza","patron":"fuerza","series":4,"reps":"3-5","descanso":"3 min","notas":""},{"orden":3,"nombre":"MetCon","patron":"metabolico","series":1,"reps":"AMRAP 10min","descanso":"-","notas":""}]}`
   const agrup = formato==='superseries'?' Agrupacion A1/A2,B1/B2.' : formato==='circuitos'?' Agrupacion A1/A2/A3.' : ''
   const int = esFase3 ? '82-88%RM 3-5x3-5' : '70-80%RM 3-4x6-10'
-  return `Fuerza dia${i}:${nombre}|${base}|${int}.${agrup}${biblioPrompt}${marcas}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Fuerza","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"[Compuesto1]","patron":"fuerza","series":${esFase3?5:4},"reps":"${esFase3?'3-5':'6-8'}","descanso":"${formato==='descanso_tradicional'?'3 min':'-'}","notas":""},{"orden":3,"nombre":"[Compuesto2]","patron":"fuerza","series":4,"reps":"8-10","descanso":"90s","notas":""},{"orden":4,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"10-12","descanso":"60s","notas":""},{"orden":5,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"12-15","descanso":"45s","notas":""}]}`
+  return `Fuerza dia${i}:${nombre}|${base}|${int}.${agrup}${perfilTxt}${biblioPrompt}${marcas}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Fuerza","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"[Compuesto1]","patron":"fuerza","series":${esFase3?5:4},"reps":"${esFase3?'3-5':'6-8'}","descanso":"${formato==='descanso_tradicional'?'3 min':'-'}","notas":""},{"orden":3,"nombre":"[Compuesto2]","patron":"fuerza","series":4,"reps":"8-10","descanso":"90s","notas":""},{"orden":4,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"10-12","descanso":"60s","notas":""},{"orden":5,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"12-15","descanso":"45s","notas":""}]}`
 }
 
 Deno.serve(async (req) => {
