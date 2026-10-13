@@ -233,14 +233,14 @@ Un cambio en `main` llega a TODOS los centros: no puede romper ni cambiar el asp
 
 ### Base de datos y edge functions (NO se despliegan solas)
 - **Migración nueva** (`supabase/migrations/NNNN_*.sql`): hay que aplicarla en el Supabase de Forge **y** en el de cada centro (Pablo: `focgysujvofpihjhvznl`). Indicarlo en el PR.
-- **Edge functions**: al mergear en `main`, la Action "Desplegar funciones" (`scripts/desplegar-funciones.sh`) despliega las que han cambiado en el Supabase de cada centro, conservando su `verify_jwt` y verificando que arrancan. NO desplegarlas a mano antes del merge (quedaría en producción código sin revisar). Una función que un centro no deba tener va en `supabase.funcionesExcluidas` de su ficha. Para redesplegar a mano: Actions → Desplegar funciones → Run workflow (con "prueba" marcado primero).
+- **Edge function nueva o modificada**: desplegarla en el Supabase de Forge y en el de cada centro. Indicarlo en el PR.
 - Mantener `supabase/esquema/esquema-base.sql` coherente con las migraciones (es lo que se usa para montar un centro nuevo).
 
 ### Cómo subir cambios
 1. `git checkout main && git pull` antes de empezar (si no, se puede deshacer el trabajo multi-centro).
 2. Trabajar en una rama (`feat/...`, `fix/...`), `npm run build`, push de la rama.
 3. Abrir PR y pedir revisión a @JuananGarcia. Indicar si hay migraciones o edge functions que desplegar en los centros.
-4. Al mergear: Vercel despliega Forge, la Action "Desplegar centros" despliega el resto (secreto `VERCEL_TOKEN`) y "Desplegar funciones" las edge functions cambiadas (secreto `SUPABASE_ACCESS_TOKEN`). Comprobar que las Actions salen en verde.
+4. Al mergear: Vercel despliega Forge y la Action "Desplegar centros" despliega el resto (necesita el secreto `VERCEL_TOKEN`). Comprobar que la Action sale en verde.
 
 ---
 
