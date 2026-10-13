@@ -166,6 +166,7 @@ export default function Agenda({ session }) {
   const [horasExtra, setHorasExtra] = useState([])
   const [vista, setVista] = useState(() => window.innerWidth < 768 ? 'lista' : 'timeline')
   const [modal, setModal] = useState(false)
+  const [mostrarAvanzado, setMostrarAvanzado] = useState(false)
   const [modalRecurrente, setModalRecurrente] = useState(false)
   const [editandoRecId, setEditandoRecId] = useState(null)
   const [modalExtra, setModalExtra] = useState(false)
@@ -709,6 +710,16 @@ export default function Agenda({ session }) {
   const extraSemana = horasExtra.filter(h => h.fecha >= inicioSemana && h.fecha <= finSemana).reduce((s,x) => s+Number(x.horas),0)
   const extraMes = horasExtra.filter(h => h.fecha >= inicioMes).reduce((s,x) => s+Number(x.horas),0)
 
+  const resumenSemana = useMemo(() => {
+    const sems = sesionesSemana.filter(s => !s.cancelada)
+    return {
+      total: sems.length,
+      completadas: sems.filter(s => s.completada).length,
+      horas: Math.round(sems.reduce((acc, s) => acc + (s.duracion_minutos || 60), 0) / 60 * 10) / 10,
+      clientesUnicos: new Set(sems.filter(s => s.cliente_id).map(s => s.cliente_id)).size,
+    }
+  }, [sesionesSemana])
+
   function abrirModalEnDia(dia, hora) {
     setDiaClick(formatFecha(dia))
     setHoraClick(hora || '09:00')
@@ -810,6 +821,19 @@ export default function Agenda({ session }) {
       {/* VISTA LISTA — ideal para móvil */}
       {vista === 'lista' && (
         <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3">
+          {/* Resumen semana */}
+          <div className="grid grid-cols-3 gap-2 pb-1">
+            {[
+              ['Sesiones', resumenSemana.total, resumenSemana.total > 0 ? 'text-acento' : 'text-[#9B9B9B]'],
+              ['Completadas', resumenSemana.completadas, resumenSemana.completadas > 0 ? 'text-emerald-500' : 'text-[#9B9B9B]'],
+              ['Horas', resumenSemana.horas + 'h', 'text-[#6366f1]'],
+            ].map(([label, val, cls]) => (
+              <div key={label} className="bg-white rounded-2xl border border-black/5 shadow-sm p-3 text-center">
+                <p className={`text-lg font-bold ${cls}`}>{val}</p>
+                <p className="text-xs text-[#9B9B9B] mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
           {diasSemana.map((dia, i) => {
             const fechaDia = formatFecha(dia)
             const esHoy = fechaDia === hoy
@@ -1235,7 +1259,7 @@ export default function Agenda({ session }) {
 
       {/* Modal nueva sesión */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModal(false)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => { setModal(false); setMostrarAvanzado(false) }}>
           <div className="bg-white rounded-2xl w-full max-w-md p-5" onClick={e => e.stopPropagation()}>
             <h2 className="font-bold text-[#0A0A0A] mb-4">
               Nueva sesión — {diaClick ? new Date(diaClick+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'}) : ''}
@@ -1304,24 +1328,34 @@ export default function Agenda({ session }) {
                   </select>
                 </div>
               </div>
-              {!esServicioExtra(form.servicio) && <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tipo</label>
-                <select value={form.tipo} onChange={e => setForm(f=>({...f,tipo:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
-                  <option value="presencial">📍 Presencial</option>
-                  <option value="online">🌐 Online</option>
-                  <option value="pareja_grupo">👥 Pareja/Grupo</option>
-                </select>
-              </div>}
-              <div>
-                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas</label>
-                <input value={form.notas} onChange={e => setForm(f=>({...f,notas:e.target.value}))}
-                  placeholder="Ej: Día de pierna, traer rodilleras..."
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
-              </div>
+              {/* Opciones avanzadas — colapsable */}
+              <button type="button" onClick={() => setMostrarAvanzado(v => !v)}
+                className="w-full flex items-center justify-between text-xs text-[#6B6B6B] font-semibold py-1">
+                <span>Opciones avanzadas</span>
+                <span>{mostrarAvanzado ? '▴' : '▾'}</span>
+              </button>
+              {mostrarAvanzado && (
+                <div className="space-y-3">
+                  {!esServicioExtra(form.servicio) && <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Tipo</label>
+                    <select value={form.tipo} onChange={e => setForm(f=>({...f,tipo:e.target.value}))}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
+                      <option value="presencial">📍 Presencial</option>
+                      <option value="online">🌐 Online</option>
+                      <option value="pareja_grupo">👥 Pareja/Grupo</option>
+                    </select>
+                  </div>}
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Notas</label>
+                    <input value={form.notas} onChange={e => setForm(f=>({...f,notas:e.target.value}))}
+                      placeholder="Ej: Día de pierna, traer rodilleras..."
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={() => setModal(false)} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
+              <button onClick={() => { setModal(false); setMostrarAvanzado(false) }} className="flex-1 border border-black/10 text-[#0A0A0A] text-sm py-2.5 rounded-xl">Cancelar</button>
               <button onClick={guardarSesion} disabled={(form.cliente_id === NUEVO ? !form.cliente_nombre.trim() : !form.cliente_id) || loading}
                 className="flex-1 bg-acento text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                 {loading ? 'Guardando...' : 'Añadir'}

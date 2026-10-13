@@ -455,6 +455,22 @@ export default function Pagos({ session }) {
                 <p className="text-2xl font-bold text-acento">{planes.reduce((s,p)=>s+Number(p.importe||0),0)}€</p>
                 <p className="text-xs text-[#9B9B9B] mt-1">/ mes si todos activos</p>
               </div>
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Este mes</p>
+                <div className="space-y-2">
+                  {[
+                    ['Esperado', planes.reduce((s,p)=>s+Number(p.importe||0),0).toFixed(0)+'€', '#0A0A0A'],
+                    ['Cobrado', ingresosMes.toFixed(0)+'€', '#10b981'],
+                    ['Pendiente', Math.max(0, planes.reduce((s,p)=>s+Number(p.importe||0),0) - ingresosMes).toFixed(0)+'€',
+                      Math.max(0, planes.reduce((s,p)=>s+Number(p.importe||0),0) - ingresosMes) > 0 ? '#f59e0b' : '#10b981'],
+                  ].map(([l,v,c]) => (
+                    <div key={l} className="flex justify-between items-center">
+                      <p className="text-xs text-[#6B6B6B]">{l}</p>
+                      <p className="text-sm font-bold" style={{color:c}}>{v}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

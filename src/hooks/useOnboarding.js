@@ -86,6 +86,7 @@ export function useOnboarding(uid) {
       { count: nPagos },
       { count: nMensajes },
       { count: nGrupos },
+      { data: cfg },
     ] = await Promise.all([
       supabase.from('clientes').select('*', {count:'exact',head:true}).eq('entrenador_id', uid).eq('estado','activo'),
       supabase.from('rutinas').select('*', {count:'exact',head:true}).eq('entrenador_id', uid),
@@ -94,9 +95,11 @@ export function useOnboarding(uid) {
       supabase.from('planes_cobro').select('*', {count:'exact',head:true}).eq('entrenador_id', uid),
       supabase.from('mensajes_cliente').select('*', {count:'exact',head:true}).eq('entrenador_id', uid).eq('tipo','entrenador'),
       supabase.from('grupos').select('*', {count:'exact',head:true}).eq('entrenador_id', uid).eq('activo',true),
+      supabase.from('configuracion').select('nombre_negocio').eq('entrenador_id', uid).maybeSingle(),
     ])
 
     const detectados = []
+    if (cfg?.nombre_negocio?.trim()) detectados.push('perfil')
     if (nClientes > 0) detectados.push('primer_cliente')
     if (nRutinas > 0) detectados.push('primera_rutina', 'ia_rutina')
     if (nSesiones > 0) detectados.push('primera_sesion')
