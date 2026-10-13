@@ -1039,10 +1039,9 @@ export default function Dashboard({ session }) {
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Wizard modal — guía paso a paso primer acceso */}
-    {mostrarWizard && (
+      {/* Wizard modal — guía paso a paso primer acceso */}
+      {mostrarWizard && (
       <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setMostrarWizard(false)}>
         <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
@@ -1089,5 +1088,6 @@ export default function Dashboard({ session }) {
         </div>
       </div>
     )}
+    </div>
   )
 }
