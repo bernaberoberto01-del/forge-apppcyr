@@ -113,7 +113,7 @@ async function llamarIA(key: string, prompt: string, i: number): Promise<any> {
         method: 'POST',
         headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 700,
-          system: 'Responde SOLO con JSON valido. Sin texto ni markdown.',
+          system: 'Responde SOLO con JSON valido. Sin texto ni markdown. Las notas de cada ejercicio van dirigidas directamente al cliente (tuteo), son breves, concretas y en español natural. Sin emojis ni asteriscos.',
           messages: [{ role: 'user', content: prompt }] })
       })
       if (res.status === 529 || res.status === 429) { await new Promise(r => setTimeout(r, 1000)); continue }
@@ -146,9 +146,10 @@ function buildPrompt(i: number, nombre: string, cliente: any, perfil: any, cuest
   // justo antes del JSON, con prioridad explicita e inequivoca sobre todo lo anterior
   // (incluido el nombre/patron de dia ya fijado mas arriba, que pasa a ser orientativo).
   // Si no hay contexto, se recuerda la regla de variacion por dia como guia por defecto.
+  const tonoNota = ` NOTAS DE EJERCICIOS: redactalas en segunda persona (tuteo) dirigidas directamente al cliente, en espanol natural y sin emojis ni asteriscos. Ejemplo correcto: "Controla la bajada en 3 segundos. Si notas dolor en rodilla, reduce el rango." Ejemplo incorrecto: "**Indicar al cliente** que controle... 💪".`
   const trailer = contexto
-    ? ` El patron "${nombre}" indicado arriba es solo una orientacion por defecto, no obligatoria. INSTRUCCION PRIORITARIA DEL ENTRENADOR (tiene prioridad sobre todo lo anterior):${contexto}`
-    : ` Sin contexto adicional: usa ejercicios especificos del patron "${nombre}", nunca genericos de otro dia del bloque.`
+    ? `${tonoNota} El patron "${nombre}" indicado arriba es solo una orientacion por defecto, no obligatoria. INSTRUCCION PRIORITARIA DEL ENTRENADOR (tiene prioridad sobre todo lo anterior):${contexto}`
+    : `${tonoNota} Sin contexto adicional: usa ejercicios especificos del patron "${nombre}", nunca genericos de otro dia del bloque.`
   if (esCardio) return `Cardio dia${i}:${nombre}|${base}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Cardio","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"Cardio 30min","patron":"cardio","series":1,"reps":"30 min","descanso":"-","notas":""},{"orden":3,"nombre":"Core","patron":"core","series":3,"reps":"3x30s","descanso":"15s","notas":""}]}`
   if (tipo === 'crossfit') return `WOD dia${i}:${nombre}|${base}${biblioPrompt}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"CrossFit","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"10 min","descanso":"-","notas":""},{"orden":2,"nombre":"Fuerza","patron":"fuerza","series":4,"reps":"3-5","descanso":"3 min","notas":""},{"orden":3,"nombre":"MetCon","patron":"metabolico","series":1,"reps":"AMRAP 10min","descanso":"-","notas":""}]}`
   const agrup = formato==='superseries'?' Agrupacion A1/A2,B1/B2.' : formato==='circuitos'?' Agrupacion A1/A2/A3.' : ''

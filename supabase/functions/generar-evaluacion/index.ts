@@ -176,7 +176,7 @@ function ejerciciosEvaluacion(cliente: any, cuestionario: any): any[] {
   }
 
   const final = { orden: tests.length + 2, nombre:'Registro de marcas', patron:'movilidad', series:1, reps:'-', descanso:'-',
-    notas:'📋 Registra TODOS los resultados en el apartado de Marcas de tu portal. Actualizarán tus referencias para el próximo mes.' }
+    notas:'Al terminar, anota todos los resultados en el apartado Marcas de tu portal. Servirán de referencia para ver tu progreso el próximo mes.' }
 
   return [...base, ...tests, final]
 }
@@ -239,8 +239,8 @@ Deno.serve(async (req) => {
       semanas: 1, dias_semana: 1,
       borrador: contenido,
       notas_entrenador: esInicial
-        ? `📋 EVALUACIÓN INICIAL — ${tipoMaterialLabel.toUpperCase()}\n\nAdaptada al material disponible del cliente.\nUna vez completada, los resultados actualizarán sus marcas de referencia.\nPublica ANTES de la rutina principal.`
-        : `📋 EVALUACIÓN ${numEval}\nComparar progreso desde evaluación anterior.`,
+        ? `Evaluación inicial — ${tipoMaterialLabel}.\nAdaptada al material del cliente. Publica antes de la rutina principal.`
+        : `Evaluación ${numEval} — comparar progreso desde evaluación anterior.`,
       estado: 'borrador',
       tipo: 'evaluacion'
     }).select().single()

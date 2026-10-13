@@ -119,7 +119,7 @@ JSON: {"resumen":"2-3 frases para el entrenador alertando de la situación. Reco
         method: 'POST',
         headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
         body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1200,
-          system: 'Responde SOLO con JSON válido. Sin texto ni markdown.',
+          system: 'Responde SOLO con JSON válido. Sin texto ni markdown. El campo mensaje_cliente debe estar en segunda persona (tuteo), en español natural, sin emojis ni asteriscos, como si lo escribiera un entrenador real.',
           messages: [{ role: 'user', content: prompts[accion] }] })
       })
       if (!res.ok) { await new Promise(r => setTimeout(r, 1500)); continue }
