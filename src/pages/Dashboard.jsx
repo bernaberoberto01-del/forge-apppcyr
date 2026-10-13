@@ -260,7 +260,23 @@ export default function Dashboard({ session }) {
     setCuestPendientes(cuestPendientes || [])
     setClientesIAPendiente(clientesIAPendiente || [])
     const activos = (clientes||[]).filter(c => c.estado === 'activo' && !c.nombre?.toLowerCase().includes('prueba') && !c.email?.includes('@forge-app.test'))
-    const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
+    // Ingresos = lo cobrado este mes (tabla pagos). Previsto = cobrado + lo que falta
+    // por cobrar, en 3 capas en cascada para no duplicar:
+    // 1. Pagos ya registrados en tabla pagos este mes
+    // 2. Planes_cobro activos de clientes sin pago este mes (cobros pendientes / efectivo no registrado)
+    // 3. precio_mensual del cliente si no tiene ni pago ni planes_cobro (cliente nuevo recién dado de alta)
+    const clientesConPagoEsteMes = new Set((pagos||[]).filter(p => p.fecha_pago >= inicioMes).map(p => p.cliente_id))
+    const clientesConPlanCobro = new Set((planesCobro||[]).map(pc => pc.cliente_id))
+    const ingresosPagosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
+    const ingresosPlanesSinPago = (planesCobro||[])
+      .filter(pc => !clientesConPagoEsteMes.has(pc.cliente_id))
+      .reduce((s,pc) => s+Number(pc.importe||0), 0)
+    // Fallback: clientes activos con precio_mensual pero sin pago ni planes_cobro (recién dados de alta)
+    const ingresosPrecioMensual = activos
+      .filter(c => Number(c.precio_mensual) > 0 && !clientesConPagoEsteMes.has(c.id) && !clientesConPlanCobro.has(c.id))
+      .reduce((s,c) => s+Number(c.precio_mensual||0), 0)
+    const ingresosMes = ingresosPagosMes
+    const previstoMes = ingresosPagosMes + ingresosPlanesSinPago + ingresosPrecioMensual
     const hace4s = diaLocal(new Date(Date.now()-28*864e5))
     const ciRecientes = (checkins||[]).filter(c => c.fecha >= hace4s)
     const adherenciaMedia = ciRecientes.length > 0
@@ -269,6 +285,7 @@ export default function Dashboard({ session }) {
     const ingresosPorMes = Array.from({length:6},(_,i) => {
       const d = new Date(hoy.getFullYear(), hoy.getMonth()-5+i, 1)
       const mesStr = mesLocal(d)
+      // Solo lo cobrado: así todos los meses del gráfico son comparables
       const total = (pagos||[]).filter(p => p.fecha_pago?.startsWith(mesStr)).reduce((s,p) => s+Number(p.importe||0),0)
       return { mes: MESES[d.getMonth()], valor: Math.round(total) }
     })
@@ -349,7 +366,7 @@ export default function Dashboard({ session }) {
     }))
 
     setDatos({
-      activos, ingresosMes, adherenciaMedia, ingresosPorMes, maxIngreso,
+      activos, ingresosMes, previstoMes, adherenciaMedia, ingresosPorMes, maxIngreso,
       alertasPagos, cobrosProximos, clientesSinCI, clientesSinCI14d, checkinsNuevos,
       mensajesNL: mensajesNL||[], rutinasIA: rutinasIA||[],
       alertasExtra: (alertas||[]).filter(a => !estaDescartada(a.cliente_id, `extra_${a.tipo}`)), tasaRetencion, totalClientes,
@@ -996,14 +1013,16 @@ export default function Dashboard({ session }) {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   ['Clientes', d.activos.length, BRAND.color, '/clientes'],
-                  ['Ingresos', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos'],
+                  ['Ingresos', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos',
+                    d.previstoMes > d.ingresosMes ? `previsto ${d.previstoMes.toFixed(0)}€` : null],
                   ['Sesiones hoy', sesionesHoy.length, '#6366f1', '/agenda'],
                   ['Adherencia', d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento'],
-                ].map(([l,v,c,ruta]) => (
+                ].map(([l,v,c,ruta,sub]) => (
                   <button key={l} onClick={() => navigate(ruta)}
                     className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
                     <p className="text-lg font-bold" style={{color:c}}>{v}</p>
                     <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
+                    {sub && <p className="text-[10px] text-[#9B9B9B]">{sub}</p>}
                   </button>
                 ))}
               </div>
