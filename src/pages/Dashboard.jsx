@@ -62,10 +62,11 @@ export default function Dashboard({ session }) {
   const [cuestPendientes, setCuestPendientes] = useState([])
   const [clientesIAPendiente, setClientesIAPendiente] = useState([])
   const [toast, setToast] = useState('')
+  const [mostrarWizard, setMostrarWizard] = useState(false)
   const navigate = useNavigate()
   const uid = session.user.id
   const equipo = useEquipo(uid)
-  const { completar, completado, porcentaje } = useOnboarding(uid)
+  const { completar, completado, porcentaje, cargado } = useOnboarding(uid)
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -155,6 +156,17 @@ export default function Dashboard({ session }) {
   }
 
   useEffect(() => { cargar() }, [uid])
+
+  // Auto-mostrar wizard en primer acceso (sin clientes y onboarding cargado)
+  useEffect(() => {
+    if (moduloVisible('tutorial') && cargado && datos && !completado('primer_cliente') && datos.activos?.length === 0) {
+      const KEY = `forge_wizard_shown_${uid}`
+      if (!localStorage.getItem(KEY)) {
+        setMostrarWizard(true)
+        localStorage.setItem(KEY, '1')
+      }
+    }
+  }, [cargado, datos, uid])
 
   // Realtime — recargar cuando llega cuestionario nuevo o alerta nueva
   useEffect(() => {
@@ -846,23 +858,36 @@ export default function Dashboard({ session }) {
                 {/* Onboarding — sistema vacío, usuario nuevo */}
                 {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && d.activos.length === 0 && (
                   <div className="px-5 py-6 space-y-3">
-                    <p className="text-sm font-bold text-[#0A0A0A]">{`👋 Bienvenido a ${BRAND.nombre}`}</p>
-                    <p className="text-xs text-[#6B6B6B]">Empieza en 3 pasos:</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-bold text-[#0A0A0A]">{`👋 Bienvenido a ${BRAND.nombre}`}</p>
+                      {moduloVisible('tutorial') && <button onClick={() => setMostrarWizard(true)}
+                        className="text-xs text-acento font-semibold">Ver guía →</button>}
+                    </div>
+                    <p className="text-xs text-[#6B6B6B]">Completa estos pasos para empezar:</p>
                     {[
-                      ['1', 'Configura tu perfil', 'Tu nombre, logo y colores', '/configuracion', BRAND.color],
-                      ['2', 'Añade tu primer cliente', 'Presencial u online', '/clientes', '#6366f1'],
-                      ['3', 'Genera su rutina con IA', 'En menos de 30 segundos', '/rutinas', '#10b981'],
-                    ].map(([n, t, s, ruta, c]) => (
-                      <button key={n} onClick={() => navigate(ruta)}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-[#F7F6F3] hover:bg-[#F0EEE8] transition-all text-left">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{background:c}}>{n}</div>
-                        <div>
-                          <p className="text-sm font-semibold text-[#0A0A0A]">{t}</p>
-                          <p className="text-xs text-[#9B9B9B]">{s}</p>
-                        </div>
-                        <span className="ml-auto text-xs text-[#9B9B9B]">→</span>
-                      </button>
-                    ))}
+                      { paso: 'perfil', n: '1', t: 'Configura tu perfil', s: 'Tu nombre, logo y colores', ruta: '/configuracion', c: BRAND.color },
+                      { paso: 'primer_cliente', n: '2', t: 'Añade tu primer cliente', s: 'Presencial u online', ruta: '/clientes', c: '#6366f1' },
+                      { paso: 'primera_rutina', n: '3', t: 'Crea una rutina', s: 'Planifica su entrenamiento', ruta: '/rutinas', c: '#f59e0b' },
+                      { paso: 'primera_sesion', n: '4', t: 'Agenda una sesión', s: 'Organiza tu semana', ruta: '/agenda', c: '#8b5cf6' },
+                      { paso: 'primer_pago', n: '5', t: 'Registra un cobro', s: 'Configura planes de pago', ruta: '/pagos', c: '#10b981' },
+                      { paso: 'primer_checkin', n: '6', t: 'Primer check-in', s: 'Haz seguimiento del cliente', ruta: '/seguimiento', c: '#06b6d4' },
+                    ].filter(x => moduloVisible(x.ruta.slice(1))).map(({ paso, n, t, s, ruta, c }) => {
+                      const hecho = completado(paso)
+                      return (
+                        <button key={paso} onClick={() => !hecho && navigate(ruta)}
+                          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${hecho ? 'bg-emerald-50 cursor-default' : 'bg-[#F7F6F3] hover:bg-[#F0EEE8]'}`}>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
+                            style={{ background: hecho ? '#10b981' : c, color: 'white' }}>
+                            {hecho ? '✓' : n}
+                          </div>
+                          <div>
+                            <p className={`text-sm font-semibold ${hecho ? 'text-[#9B9B9B] line-through' : 'text-[#0A0A0A]'}`}>{t}</p>
+                            <p className="text-xs text-[#9B9B9B]">{s}</p>
+                          </div>
+                          {!hecho && <span className="ml-auto text-xs text-[#9B9B9B]">→</span>}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -1014,6 +1039,55 @@ export default function Dashboard({ session }) {
           </div>
         </div>
       </div>
+
+      {/* Wizard modal — guía paso a paso primer acceso */}
+      {mostrarWizard && (
+      <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setMostrarWizard(false)}>
+        <div className="bg-white rounded-2xl w-full max-w-sm p-5" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-bold text-[#0A0A0A]">🚀 Empieza con {BRAND.nombre}</p>
+            <button onClick={() => setMostrarWizard(false)} className="text-[#6B6B6B] text-xl leading-none">×</button>
+          </div>
+          <p className="text-xs text-[#6B6B6B] mb-4">Completa estos pasos para sacarle el máximo partido a la plataforma.</p>
+          <div className="space-y-2">
+            {[
+              { paso: 'perfil', n: '1', t: 'Configura tu perfil', s: 'Nombre, logo y colores de marca', ruta: '/configuracion', c: BRAND.color },
+              { paso: 'primer_cliente', n: '2', t: 'Añade tu primer cliente', s: 'Presencial u online', ruta: '/clientes', c: '#6366f1' },
+              { paso: 'primera_rutina', n: '3', t: 'Crea una rutina', s: 'Planifica con IA en 30 segundos', ruta: '/rutinas', c: '#f59e0b' },
+              { paso: 'primera_sesion', n: '4', t: 'Agenda una sesión', s: 'Organiza tu semana de trabajo', ruta: '/agenda', c: '#8b5cf6' },
+              { paso: 'primer_pago', n: '5', t: 'Configura cobros', s: 'Automatiza tus planes de pago', ruta: '/pagos', c: '#10b981' },
+              { paso: 'primer_checkin', n: '6', t: 'Primer check-in', s: 'Seguimiento real del cliente', ruta: '/seguimiento', c: '#06b6d4' },
+            ].filter(x => moduloVisible(x.ruta.slice(1))).map(({ paso, n, t, s, ruta, c }) => {
+              const hecho = completado(paso)
+              return (
+                <button key={paso}
+                  onClick={() => { setMostrarWizard(false); if (!hecho) navigate(ruta) }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all ${hecho ? 'opacity-50 cursor-default' : 'hover:bg-[#F7F6F3]'}`}>
+                  <div className="w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                    style={{ background: hecho ? '#10b981' : c }}>
+                    {hecho ? '✓' : n}
+                  </div>
+                  <div>
+                    <p className={`text-sm font-semibold ${hecho ? 'line-through text-[#9B9B9B]' : 'text-[#0A0A0A]'}`}>{t}</p>
+                    <p className="text-xs text-[#9B9B9B]">{s}</p>
+                  </div>
+                  {!hecho && <span className="ml-auto text-xs text-[#9B9B9B]">→</span>}
+                </button>
+              )
+            })}
+          </div>
+          <div className="mt-4 bg-[#F7F6F3] rounded-xl p-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="text-xs font-semibold text-[#0A0A0A]">Progreso</p>
+              <p className="text-xs font-bold text-acento">{porcentaje}%</p>
+            </div>
+            <div className="w-full bg-black/8 rounded-full h-1.5">
+              <div className="h-1.5 rounded-full transition-all bg-acento" style={{ width: `${porcentaje}%` }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   )
 }
