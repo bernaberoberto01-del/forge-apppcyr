@@ -260,15 +260,21 @@ export default function Dashboard({ session }) {
     setCuestPendientes(cuestPendientes || [])
     setClientesIAPendiente(clientesIAPendiente || [])
     const activos = (clientes||[]).filter(c => c.estado === 'activo' && !c.nombre?.toLowerCase().includes('prueba') && !c.email?.includes('@forge-app.test'))
-    // Ingresos del mes: pagos ya registrados este mes + planes_cobro activos de
-    // clientes que aún no tienen pago registrado este mes (clientes nuevos, cobro
-    // pendiente o efectivo que no generó registro en pagos todavía).
+    // Ingresos del mes: 3 capas en cascada para no duplicar:
+    // 1. Pagos ya registrados en tabla pagos este mes
+    // 2. Planes_cobro activos de clientes sin pago este mes (cobros pendientes / efectivo no registrado)
+    // 3. precio_mensual del cliente si no tiene ni pago ni planes_cobro (cliente nuevo recién dado de alta)
     const clientesConPagoEsteMes = new Set((pagos||[]).filter(p => p.fecha_pago >= inicioMes).map(p => p.cliente_id))
+    const clientesConPlanCobro = new Set((planesCobro||[]).map(pc => pc.cliente_id))
     const ingresosPagosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
     const ingresosPlanesSinPago = (planesCobro||[])
       .filter(pc => !clientesConPagoEsteMes.has(pc.cliente_id))
       .reduce((s,pc) => s+Number(pc.importe||0), 0)
-    const ingresosMes = ingresosPagosMes + ingresosPlanesSinPago
+    // Fallback: clientes activos con precio_mensual pero sin pago ni planes_cobro (recién dados de alta)
+    const ingresosPrecioMensual = activos
+      .filter(c => Number(c.precio_mensual) > 0 && !clientesConPagoEsteMes.has(c.id) && !clientesConPlanCobro.has(c.id))
+      .reduce((s,c) => s+Number(c.precio_mensual||0), 0)
+    const ingresosMes = ingresosPagosMes + ingresosPlanesSinPago + ingresosPrecioMensual
     const hace4s = diaLocal(new Date(Date.now()-28*864e5))
     const ciRecientes = (checkins||[]).filter(c => c.fecha >= hace4s)
     const adherenciaMedia = ciRecientes.length > 0
@@ -279,8 +285,8 @@ export default function Dashboard({ session }) {
       const mesStr = mesLocal(d)
       const esEsteMes = i === 5
       const totalPagos = (pagos||[]).filter(p => p.fecha_pago?.startsWith(mesStr)).reduce((s,p) => s+Number(p.importe||0),0)
-      // Para el mes actual, añadir planes_cobro activos sin pago registrado (igual que ingresosMes)
-      const totalExtra = esEsteMes ? ingresosPlanesSinPago : 0
+      // Para el mes actual, añadir plans_cobro sin pago + precio_mensual sin planes ni pagos
+      const totalExtra = esEsteMes ? (ingresosPlanesSinPago + ingresosPrecioMensual) : 0
       return { mes: MESES[d.getMonth()], valor: Math.round(totalPagos + totalExtra) }
     })
     const maxIngreso = Math.max(...ingresosPorMes.map(m => m.valor), 1)
