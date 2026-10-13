@@ -1,0 +1,44 @@
+# Despliega las edge functions que cambian en main en el Supabase de cada centro
+# (centros/<id>.json con supabase.proyecto). Va aparte de "Desplegar centros":
+# si algo falla aquí, las webs se despliegan igual. Lógica: scripts/desplegar-funciones.sh
+# Requiere el secreto SUPABASE_ACCESS_TOKEN (token de una cuenta con acceso a todos los proyectos).
+name: Desplegar funciones
+
+on:
+  push:
+    branches: [main]
+    paths: ['supabase/functions/**']
+  workflow_dispatch:
+    inputs:
+      funciones:
+        description: 'Funciones separadas por espacios, o "todas"'
+        required: true
+        default: ''
+      prueba:
+        description: 'Solo mostrar lo que haría, sin desplegar'
+        type: boolean
+        default: true
+
+concurrency:
+  group: desplegar-funciones
+  cancel-in-progress: false
+
+jobs:
+  funciones:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.75.0
+      - name: Desplegar y verificar
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          FUNCIONES: ${{ inputs.funciones }}
+          PRUEBA: ${{ inputs.prueba && '1' || '0' }}
+          ANTES: ${{ github.event.before }}
+          DESPUES: ${{ github.sha }}
+        run: scripts/desplegar-funciones.sh
