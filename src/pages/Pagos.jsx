@@ -26,6 +26,19 @@ function proximoCobro(plan) {
   if (!plan.proximo_cobro) return null
   return new Date(plan.proximo_cobro + 'T12:00')
 }
+// Siguiente cobro de un plan a partir de una fecha (misma regla que marcarCobrado)
+function siguienteCobro(plan, desde) {
+  if (plan.frecuencia === 'quincenal') return new Date(desde.getTime() + 14*864e5)
+  if (plan.frecuencia === 'semanal') return new Date(desde.getTime() + 7*864e5)
+  return new Date(desde.getFullYear(), desde.getMonth() + 1, plan.dia_cobro || desde.getDate())
+}
+// Un mes después de una fecha 'YYYY-MM-DD', recortando al último día del mes
+// destino (31 ene → 28/29 feb, no 3 mar)
+function unMesDespues(fecha) {
+  const d = new Date(fecha + 'T12:00')
+  const ultimo = new Date(d.getFullYear(), d.getMonth() + 2, 0).getDate()
+  return diaLocal(new Date(d.getFullYear(), d.getMonth() + 1, Math.min(d.getDate(), ultimo)))
+}
 function diasRestantes(plan) {
   const p = proximoCobro(plan)
   if (!p) return null
@@ -139,26 +152,23 @@ export default function Pagos({ session }) {
       entrenador_id: uid, cliente_id: form.cliente_id,
       importe: Number(form.importe), concepto: form.concepto,
       fecha_pago: form.fecha_pago,
-      valido_hasta: new Date(new Date(form.fecha_pago).setMonth(new Date(form.fecha_pago).getMonth()+1)).toISOString().split('T')[0]
+      valido_hasta: unMesDespues(form.fecha_pago)
     })
-    if (error) setToast('Error al registrar')
-    else {
-      // Avanzar proximo_cobro de planes vencidos del cliente
-      const planesVencidos = planes.filter(p =>
-        p.cliente_id === form.cliente_id &&
-        p.activo &&
-        diasRestantes(p) !== null &&
-        diasRestantes(p) < 0
-      )
-      for (const plan of planesVencidos) {
-        const siguiente = new Date(proximoCobro(plan))
-        siguiente.setMonth(siguiente.getMonth() + 1)
-        await supabase.from('planes_cobro')
-          .update({ proximo_cobro: diaLocal(siguiente) })
-          .eq('id', plan.id)
-      }
-      setToast('Pago registrado'); setModal(false); setForm({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()) })
+    if (error) { setToast('Error al registrar'); setLoading(false); return }
+    // Un pago manual también cuenta como cobro del plan del cliente (igual que
+    // marcarCobrado): adelanta proximo_cobro según su frecuencia, tomando la
+    // fecha del pago. Vale tanto si estaba vencido como si paga por adelantado;
+    // nunca retrasa un proximo_cobro que ya fuese posterior.
+    const fechaPago = new Date(form.fecha_pago + 'T12:00')
+    for (const plan of planes.filter(p => p.cliente_id === form.cliente_id && p.activo)) {
+      const siguiente = siguienteCobro(plan, fechaPago)
+      const actual = proximoCobro(plan)
+      if (actual && actual >= siguiente) continue
+      await supabase.from('planes_cobro')
+        .update({ ultimo_cobro: form.fecha_pago, proximo_cobro: diaLocal(siguiente) })
+        .eq('id', plan.id)
     }
+    setToast('Pago registrado'); setModal(false); setForm({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()) })
     await cargar()
     setLoading(false)
   }
