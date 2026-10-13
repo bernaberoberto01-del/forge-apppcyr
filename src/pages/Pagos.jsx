@@ -46,7 +46,7 @@ export default function Pagos({ session }) {
   const [planExpandido, setPlanExpandido] = useState(null)
   const [mostrarPendientes, setMostrarPendientes] = useState(true)
   const [toast, setToast] = useState('')
-  const [form, setForm] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()), periodo:'' })
+  const [form, setForm] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()) })
   const [formPlan, setFormPlan] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', frecuencia:'mensual', dia_cobro:1 })
   const [loading, setLoading] = useState(false)
   const [generandoStripe, setGenerandoStripe] = useState(null)
@@ -138,11 +138,27 @@ export default function Pagos({ session }) {
     const { error } = await supabase.from('pagos').insert({
       entrenador_id: uid, cliente_id: form.cliente_id,
       importe: Number(form.importe), concepto: form.concepto,
-      fecha_pago: form.fecha_pago, periodo: form.periodo,
+      fecha_pago: form.fecha_pago,
       valido_hasta: new Date(new Date(form.fecha_pago).setMonth(new Date(form.fecha_pago).getMonth()+1)).toISOString().split('T')[0]
     })
     if (error) setToast('Error al registrar')
-    else { setToast('Pago registrado'); setModal(false); setForm({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()), periodo:'' }) }
+    else {
+      // Avanzar proximo_cobro de planes vencidos del cliente
+      const planesVencidos = planes.filter(p =>
+        p.cliente_id === form.cliente_id &&
+        p.activo &&
+        diasRestantes(p) !== null &&
+        diasRestantes(p) < 0
+      )
+      for (const plan of planesVencidos) {
+        const siguiente = new Date(proximoCobro(plan))
+        siguiente.setMonth(siguiente.getMonth() + 1)
+        await supabase.from('planes_cobro')
+          .update({ proximo_cobro: diaLocal(siguiente) })
+          .eq('id', plan.id)
+      }
+      setToast('Pago registrado'); setModal(false); setForm({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()) })
+    }
     await cargar()
     setLoading(false)
   }
