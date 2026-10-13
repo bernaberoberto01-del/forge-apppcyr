@@ -17,7 +17,11 @@
   "supabase": {
     "proyecto": "focgysujvofpihjhvznl",
     "url": "https://focgysujvofpihjhvznl.supabase.co",
-    "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvY2d5c3Vqdm9mcGloamh2em5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExMzE1NDQsImV4cCI6MjEwNjcwNzU0NH0.pB-FTNzTzffz4SDONVBR_BAtpfDcKvQ51TneZTnv51c"
+    "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvY2d5c3Vqdm9mcGloamh2em5sIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTExMzE1NDQsImV4cCI6MjEwNjcwNzU0NH0.pB-FTNzTzffz4SDONVBR_BAtpfDcKvQ51TneZTnv51c",
+    "funcionesExcluidas": [
+      "crear-demo",
+      "poblar-demo"
+    ]
   },
   "centro": {
     "ciudad": "Cabezo de Torres, Murcia",
