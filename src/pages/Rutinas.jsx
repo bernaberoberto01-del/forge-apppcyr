@@ -782,9 +782,18 @@ export default function Rutinas({ session }) {
                   </button>
                   {mostrarContextoIA && (
                     <div className="mt-2 space-y-2">
-                      <textarea value={contextoIA} onChange={e => setContextoIA(e.target.value)} rows={3}
-                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
-                        placeholder="Ej: Sustituir sentadilla por prensa porque tiene dolor de rodilla. Añadir más trabajo de espalda. Quitar ejercicios de impacto." />
+                      <p className="text-xs text-[#9B9B9B] leading-relaxed">
+                        Explícale a la IA exactamente cómo quieres el trabajo de este cliente. La IA ya tiene sus datos (objetivo, nivel, lesiones, marcas, historial) — aquí añades tu criterio como entrenador.
+                      </p>
+                      <textarea value={contextoIA} onChange={e => setContextoIA(e.target.value)} rows={6}
+                        className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-y"
+                        placeholder={`Cuéntame cómo quieres enfocar el trabajo:
+
+• Metodología: "Quiero bloques de 3+1 (3 semanas carga, 1 descarga). Fase de acumulación con volumen alto."
+• Ejercicios clave: "Que el día de piernas siempre lleve sentadilla frontal y hip thrust. Sin leg press."
+• Restricciones específicas: "Le duele el codo con tríceps en polea, sustituir por fondos asistidos."
+• Enfoque del ciclo: "Este mes trabajamos fuerza máxima en los compuestos, los accesorios al 12-15 reps."
+• Progresión: "Añadir 2.5kg cada semana en los compuestos principales."`} />
                       <button onClick={async () => {
                         if (!confirm('¿Regenerar con este contexto adicional?')) return
                         const clienteId = detalle.cliente_id

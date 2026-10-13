@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import TutorialBanner, { BarraProgreso } from '../components/TutorialBanner'
+import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
