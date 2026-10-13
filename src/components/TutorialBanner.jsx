@@ -82,16 +82,29 @@ export function TooltipDescubrimiento({ texto, visible, onCerrar }) {
  * Barra de progreso del onboarding — se muestra en el Layout
  * hasta que el usuario completa todos los pasos esenciales
  */
-export function BarraProgreso({ porcentaje, onClick }) {
-  if (porcentaje >= 100) return null
+const PASOS_LABELS = {
+  perfil: 'Perfil', primer_cliente: 'Primer cliente', primera_rutina: 'Primera rutina',
+  primera_sesion: 'Primera sesión', primer_checkin: 'Primer check-in', primer_pago: 'Primer pago',
+  primer_mensaje: 'Primer mensaje', ia_rutina: 'IA rutina', ia_analisis: 'IA análisis',
+  grupo_creado: 'Grupo creado', stripe_activo: 'Stripe activo'
+}
 
+export function BarraProgreso({ porcentaje, pasosPendientes = [], onClick }) {
+  if (porcentaje >= 100) return null
   return (
     <button onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 bg-[#F7F6F3] hover:bg-[#EEECEA] transition-all border-t border-black/5">
-      <div className="flex-1 bg-black/10 rounded-full h-1.5 overflow-hidden">
-        <div className="h-full bg-acento rounded-full transition-all duration-500" style={{width:`${porcentaje}%`}}/>
+      className="w-full flex flex-col gap-1.5 px-4 py-3 bg-[#F7F6F3] hover:bg-[#EEECEA] transition-all border-t border-black/5 text-left">
+      <div className="flex items-center gap-3 w-full">
+        <div className="flex-1 bg-black/10 rounded-full h-1.5 overflow-hidden">
+          <div className="h-full bg-acento rounded-full transition-all duration-500" style={{width:`${porcentaje}%`}}/>
+        </div>
+        <p className="text-xs text-[#6B6B6B] font-medium flex-shrink-0">{porcentaje}% completado</p>
       </div>
-      <p className="text-xs text-[#6B6B6B] font-medium flex-shrink-0">{porcentaje}% completado</p>
+      {pasosPendientes.length > 0 && (
+        <p className="text-xs text-[#9B9B9B] truncate">
+          Falta: {pasosPendientes.slice(0,3).map(p => PASOS_LABELS[p]).join(', ')}{pasosPendientes.length > 3 ? ` +${pasosPendientes.length - 3}` : ''}
+        </p>
+      )}
     </button>
   )
 }

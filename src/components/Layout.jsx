@@ -23,8 +23,16 @@ export default function Layout({ children, session, config }) {
   const [mensajesNL, setMensajesNL] = useState(0)
   const [alertasNL, setAlertasNL] = useState(0)
   const location = useLocation()
-  const { porcentaje } = useOnboarding(session?.user?.id)
+  const { porcentaje, progreso } = useOnboarding(session?.user?.id)
   const navigate = useNavigate()
+
+  const PASOS_LABELS = {
+    perfil: 'Perfil', primer_cliente: 'Primer cliente', primera_rutina: 'Primera rutina',
+    primera_sesion: 'Primera sesión', primer_checkin: 'Primer check-in', primer_pago: 'Primer pago',
+    primer_mensaje: 'Primer mensaje', ia_rutina: 'IA rutina', ia_analisis: 'IA análisis',
+    grupo_creado: 'Grupo creado', stripe_activo: 'Stripe activo'
+  }
+  const pasosPendientes = Object.keys(PASOS_LABELS).filter(p => !progreso?.has(p))
 
   // Al montar por primera vez en la sesión, ir siempre a dashboard
   useEffect(() => {
@@ -108,7 +116,7 @@ export default function Layout({ children, session, config }) {
       </nav>
 
       {/* Progreso onboarding — solo hasta que el usuario lo descarte */}
-      {moduloVisible('tutorial') && porcentaje < 100 && <BarraProgreso porcentaje={porcentaje} onClick={() => navigate('/dashboard')} />}
+      {moduloVisible('tutorial') && porcentaje < 100 && <BarraProgreso porcentaje={porcentaje} pasosPendientes={pasosPendientes} onClick={() => navigate('/dashboard')} />}
 
       {/* Footer */}
       <div className="px-3 py-3 border-t border-white/8 space-y-1">
