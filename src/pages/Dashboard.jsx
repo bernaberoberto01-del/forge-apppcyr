@@ -260,7 +260,15 @@ export default function Dashboard({ session }) {
     setCuestPendientes(cuestPendientes || [])
     setClientesIAPendiente(clientesIAPendiente || [])
     const activos = (clientes||[]).filter(c => c.estado === 'activo' && !c.nombre?.toLowerCase().includes('prueba') && !c.email?.includes('@forge-app.test'))
-    const ingresosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
+    // Ingresos del mes: pagos ya registrados este mes + planes_cobro activos de
+    // clientes que aún no tienen pago registrado este mes (clientes nuevos, cobro
+    // pendiente o efectivo que no generó registro en pagos todavía).
+    const clientesConPagoEsteMes = new Set((pagos||[]).filter(p => p.fecha_pago >= inicioMes).map(p => p.cliente_id))
+    const ingresosPagosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
+    const ingresosPlanesSinPago = (planesCobro||[])
+      .filter(pc => !clientesConPagoEsteMes.has(pc.cliente_id))
+      .reduce((s,pc) => s+Number(pc.importe||0), 0)
+    const ingresosMes = ingresosPagosMes + ingresosPlanesSinPago
     const hace4s = diaLocal(new Date(Date.now()-28*864e5))
     const ciRecientes = (checkins||[]).filter(c => c.fecha >= hace4s)
     const adherenciaMedia = ciRecientes.length > 0
@@ -269,8 +277,11 @@ export default function Dashboard({ session }) {
     const ingresosPorMes = Array.from({length:6},(_,i) => {
       const d = new Date(hoy.getFullYear(), hoy.getMonth()-5+i, 1)
       const mesStr = mesLocal(d)
-      const total = (pagos||[]).filter(p => p.fecha_pago?.startsWith(mesStr)).reduce((s,p) => s+Number(p.importe||0),0)
-      return { mes: MESES[d.getMonth()], valor: Math.round(total) }
+      const esEsteMes = i === 5
+      const totalPagos = (pagos||[]).filter(p => p.fecha_pago?.startsWith(mesStr)).reduce((s,p) => s+Number(p.importe||0),0)
+      // Para el mes actual, añadir planes_cobro activos sin pago registrado (igual que ingresosMes)
+      const totalExtra = esEsteMes ? ingresosPlanesSinPago : 0
+      return { mes: MESES[d.getMonth()], valor: Math.round(totalPagos + totalExtra) }
     })
     const maxIngreso = Math.max(...ingresosPorMes.map(m => m.valor), 1)
 
