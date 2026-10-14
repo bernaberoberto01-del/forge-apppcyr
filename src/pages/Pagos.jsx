@@ -7,6 +7,7 @@ import { BRAND, colorMarca, nombreMarca } from '../lib/brand'
 import { useConfig } from '../hooks/useConfig'
 import { useEquipo } from '../hooks/useCentro'
 import { diaLocal, mesLocal } from '../lib/dateUtils'
+import { useConfirm } from '../components/ConfirmModal'
 
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
 
@@ -66,6 +67,7 @@ export default function Pagos({ session }) {
   const uid = session.user.id
   const equipo = useEquipo(uid)
   const { completar, completado } = useOnboarding(uid)
+  const [confirm, ConfirmUI] = useConfirm()
 
   function generarRecibo(pago) {
     const negocio = escapeHtml(nombreMarca(config?.nombre_negocio))
@@ -217,13 +219,15 @@ export default function Pagos({ session }) {
   }
 
   async function eliminarPlan(id) {
-    if (!confirm('¿Eliminar este plan de cobro?')) return
+    const ok = await confirm({ title: '¿Eliminar plan de cobro?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('planes_cobro').delete().eq('id', id)
     setToast('Plan eliminado'); await cargar()
   }
 
   async function eliminarPago(id) {
-    if (!confirm('¿Eliminar este pago?')) return
+    const ok = await confirm({ title: '¿Eliminar este pago?', message: 'El registro de pago se eliminará permanentemente.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('pagos').delete().eq('id', id)
     await cargar()
   }
@@ -260,7 +264,8 @@ export default function Pagos({ session }) {
   }
 
   async function cancelarSuscripcion(clienteId) {
-    if (!confirm('¿Cancelar la suscripción? Se desactivará al final del período actual.')) return
+    const ok = await confirm({ title: '¿Cancelar suscripción?', message: 'Se desactivará al final del período actual. Tendrás que cancelarla también en Stripe si no está automatizado.', danger: true, confirmText: 'Sí, cancelar' })
+    if (!ok) return
     const { error } = await supabase.functions.invoke('gestionar-suscripcion', {
       body: { accion: 'cancelar_suscripcion', cliente_id: clienteId }
     })
@@ -294,6 +299,7 @@ export default function Pagos({ session }) {
         completado={completado('primer_pago') || (planes.length > 0)}
         onCompletar={() => completar('primer_pago')}
       />
+      {ConfirmUI}
       {toast && <Toast msg={toast} onClose={() => setToast('')} />}
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
 
