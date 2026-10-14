@@ -2337,6 +2337,8 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
   const [añadiendo,  setAñadiendo]  = useState(false)
   const [precioPP,   setPrecioPP]   = useState('')   // precio/persona editable
   const [vistaMovil, setVistaMovil] = useState('lista') // lista | detalle
+  const [toast,      setToast]      = useState('')     // '✓ …' o '❌ …'
+  const [confirm, ConfirmUI] = useConfirm()
 
   // Refrescar sel cuando cambian grupos
   useEffect(() => {
@@ -2665,6 +2667,8 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
           </div>
         </div>
       )}
+      {ConfirmUI}
+      {toast && <Toast msg={toast.replace(/^(✓|❌)\s*/, '')} tipo={toast.startsWith('❌') ? 'error' : 'ok'} onClose={() => setToast('')} />}
     </div>
   )
 }
