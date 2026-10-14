@@ -89,6 +89,8 @@ export default function Rutinas({ session }) {
   const [plantillas, setPlantillas] = useState([])
   const [plantillasCentro, setPlantillasCentro] = useState([])
   const [modalPlantillas, setModalPlantillas] = useState(false)
+  const [modalNombrePlantilla, setModalNombrePlantilla] = useState(null) // { rutina } cuando está abierto
+  const [nombrePlantillaInput, setNombrePlantillaInput] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [searchParams] = useSearchParams()
   const [filtroEstado, setFiltroEstado] = useState(() => searchParams.get('filtro') || 'activas')
@@ -201,9 +203,16 @@ export default function Rutinas({ session }) {
     setDetalle(null); setToast(`✓ Rutina publicada para ${rutina.clientes?.nombre}`); await cargar()
   }
 
-  async function guardarComoPlantilla(rutina) {
-    const nombre = prompt('Nombre de la plantilla:', rutina.borrador?.nombre || 'Mi plantilla')
+  function guardarComoPlantilla(rutina) {
+    setNombrePlantillaInput(rutina.borrador?.nombre || rutina.nombre || 'Mi plantilla')
+    setModalNombrePlantilla({ rutina })
+  }
+
+  async function confirmarGuardarPlantilla() {
+    const { rutina } = modalNombrePlantilla
+    const nombre = nombrePlantillaInput.trim()
     if (!nombre) return
+    setModalNombrePlantilla(null)
     await supabase.from('plantillas_rutina').insert({ entrenador_id: uid, nombre, objetivo: rutina.objetivo, dias_semana: rutina.dias_semana, descripcion: rutina.borrador?.descripcion || '', contenido: rutina.borrador || rutina.contenido })
     setToast('✓ Guardada como plantilla'); await cargar()
   }
@@ -832,7 +841,7 @@ export default function Rutinas({ session }) {
                 {detalle.estado==='borrador' && (
                   <button onClick={() => publicar(detalle)} className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl">✅ Publicar</button>
                 )}
-                <button onClick={() => guardarComoPlantilla(detalle)} className="border border-[#6366f1]/30 text-[#6366f1] text-sm py-3 px-3 rounded-xl hover:bg-[#6366f1]/5">📋</button>
+                <button onClick={() => guardarComoPlantilla(detalle)} title="Guardar como plantilla" className="border border-[#6366f1]/30 text-[#6366f1] text-sm py-3 px-3 rounded-xl hover:bg-[#6366f1]/5">📋</button>
                 <button onClick={async () => {
                   const ok = await confirm({ title: '¿Regenerar con IA?', message: 'Se eliminará la rutina actual y se generará una nueva desde cero.', danger: true, confirmText: 'Regenerar' })
                   if (!ok) return
@@ -842,6 +851,7 @@ export default function Rutinas({ session }) {
                   setDetalle(null)
                   await generarRutina(clienteId)
                 }} disabled={generando===detalle.cliente_id}
+                  title="Regenerar rutina con IA"
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
                   {generando===detalle.cliente_id?'⏳':'🔄'}
                 </button>
@@ -851,7 +861,7 @@ export default function Rutinas({ session }) {
                   const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
                   if (error) { setToast('❌ No se pudo eliminar: ' + error.message); return }
                   setDetalle(null); await cargar()
-                }} className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">🗑</button>
+                }} title="Eliminar rutina" className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">🗑</button>
               </div>
             </div>
             </div>
@@ -1012,6 +1022,28 @@ export default function Rutinas({ session }) {
 
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
       {ConfirmUI}
+
+      {/* Modal: nombre para plantilla (sustituye window.prompt) */}
+      {modalNombrePlantilla && (
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4" onClick={() => setModalNombrePlantilla(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[#0A0A0A] text-base mb-3">Guardar como plantilla</h3>
+            <input
+              type="text"
+              value={nombrePlantillaInput}
+              onChange={e => setNombrePlantillaInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && confirmarGuardarPlantilla()}
+              className="w-full border border-black/15 rounded-xl px-3 py-2.5 text-sm text-[#0A0A0A] mb-4 focus:outline-none focus:border-acento"
+              placeholder="Nombre de la plantilla"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setModalNombrePlantilla(null)} className="flex-1 py-2.5 rounded-xl border border-black/10 text-sm font-medium text-[#6B6B6B] hover:bg-[#F5F5F0] transition-all active:scale-95">Cancelar</button>
+              <button onClick={confirmarGuardarPlantilla} disabled={!nombrePlantillaInput.trim()} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 bg-acento hover:bg-acento-hover disabled:opacity-40">Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
