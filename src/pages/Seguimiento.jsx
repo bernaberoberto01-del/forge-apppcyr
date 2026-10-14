@@ -323,8 +323,8 @@ export default function Seguimiento({ session }) {
       {tabPrincipal === 'semana' && (() => {
         // Estado de cada cliente — solo check-in
         const estadoClientes = clientes.map(c => {
-          const ciUltimo = checkins.filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha.localeCompare(a.fecha))[0]
-          const diasSinCI = ciUltimo ? Math.floor((Date.now() - new Date(ciUltimo.fecha + 'T12:00').getTime()) / 864e5) : 999
+          const ciUltimo = checkins.filter(ci => ci.cliente_id === c.id && ci.fecha).sort((a,b) => b.fecha.localeCompare(a.fecha))[0]
+          const diasSinCI = ciUltimo?.fecha ? Math.floor((Date.now() - new Date(ciUltimo.fecha + 'T12:00').getTime()) / 864e5) : 999
 
           let alerta = 'ok' // ok | warning | critical
           if (diasSinCI >= 14) alerta = 'critical'

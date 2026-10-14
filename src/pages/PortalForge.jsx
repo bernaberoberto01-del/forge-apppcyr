@@ -1282,7 +1282,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             className="bg-white rounded-2xl p-4 text-left active:scale-[0.98] transition-all">
             <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Rutina</p>
             <p className="text-sm font-black text-[#0A0A0A] leading-tight line-clamp-2">
-              {rutina ? rutina.nombre : 'En preparación'}
+              {rutina ? limpiarNombreRutina(rutina.nombre) : 'En preparación'}
             </p>
             <p className="text-[10px] font-bold mt-2" style={{ color }}>
               {rutina ? `${diasRutina.length} días →` : '—'}
@@ -1373,6 +1373,14 @@ function BotonTemporizador({ segundos, label, color }) {
   )
 }
 
+// Limpia nombres de rutina con partes duplicadas (ej: "Rutina perdida grasa - perdida grasa - 5 dias")
+function limpiarNombreRutina(nombre) {
+  if (!nombre) return nombre
+  const partes = nombre.split(' - ')
+  const sinDups = partes.filter((p, i) => partes.indexOf(p) === i)
+  return sinDups.join(' - ')
+}
+
 function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline }) {
   const [diaAbierto, setDiaAbierto] = useState(null) // null = todos cerrados
 
@@ -1402,7 +1410,7 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline 
     <div className="space-y-3">
       <div className="pb-1 flex items-end justify-between">
         <div>
-          <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">{rutina.nombre}</h2>
+          <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">{limpiarNombreRutina(rutina.nombre)}</h2>
           <p className="text-xs text-[#9B9B9B] mt-0.5">{dias.length} días · {rutina.semanas || 4} semanas</p>
         </div>
         {diaAbierto !== null && (
@@ -1988,7 +1996,9 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
   ].filter(m => m.val)
 
   const tieneMenu = Array.isArray(contenido.menu) && contenido.menu.length > 0
-  const dias = tieneMenu ? contenido.menu : []
+  // Normalizar nombres de días (algunos planes guardados sin tildes)
+  const DIAS_NORM = { 'Miercoles': 'Miércoles', 'Sabado': 'Sábado', 'miercoles': 'Miércoles', 'sabado': 'Sábado' }
+  const dias = tieneMenu ? contenido.menu.map(d => ({ ...d, dia: DIAS_NORM[d.dia] || d.dia })) : []
   const hidratacion = contenido.hidratacion || macrosSrc.hidratacion_litros || null
 
   // Tracker: fechas registradas
