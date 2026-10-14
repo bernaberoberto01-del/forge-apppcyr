@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useConfirm } from '../components/ConfirmModal'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
@@ -195,6 +196,7 @@ export default function Agenda({ session }) {
   const [filtroEntrenador, setFiltroEntrenador] = useState('todos')
   const [mesVista, setMesVista] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1))
   const { centro, miembros, esAdmin } = useCentro() || {}
+  const [confirm, ConfirmUI] = useConfirm()
   const timelineRef = useRef()
   const uid = session.user.id
   const equipo = useEquipo(uid)
@@ -668,7 +670,8 @@ export default function Agenda({ session }) {
   }
 
   async function eliminarSesion(id) {
-    if (!confirm('¿Eliminar esta sesión?')) return
+    const ok = await confirm({ title: '¿Eliminar sesión?', message: 'Esta sesión se eliminará permanentemente.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('sesiones').delete().eq('id', id)
     setSesionDetalle(null)
     await cargar(centro?.id)
@@ -681,7 +684,8 @@ export default function Agenda({ session }) {
   }
 
   async function eliminarRecurrente(id) {
-    if (!confirm('¿Eliminar esta regla recurrente? No afecta a las sesiones ya registradas.')) return
+    const ok = await confirm({ title: '¿Eliminar regla recurrente?', message: 'No afecta a las sesiones ya registradas.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('sesiones_recurrentes').delete().eq('id', id)
     await cargar(centro?.id)
   }
@@ -1653,6 +1657,7 @@ export default function Agenda({ session }) {
           onGuardada={() => { setModalClase(false); cargar(centro?.id) }}
         />
       )}
+      {ConfirmUI}
     </div>
   )
 }

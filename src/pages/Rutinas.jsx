@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useConfirm } from '../components/ConfirmModal'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { useSearchParams } from 'react-router-dom'
@@ -103,6 +104,7 @@ export default function Rutinas({ session }) {
   const equipo = useEquipo(uid)
   const { completar, completado } = useOnboarding(uid)
   const { centro } = useCentro() || {}
+  const [confirm, ConfirmUI] = useConfirm()
 
   useEffect(() => { cargar() }, [uid])
 
@@ -136,10 +138,10 @@ export default function Rutinas({ session }) {
       body: { cliente_id: clienteId }
     })
     if (error || !data?.ok) {
-      alert('Error al generar la evaluación')
+      setToast('❌ Error al generar la evaluación')
     } else {
       const tipo = data.es_inicial ? 'inicial' : `nº ${data.numero}`
-      alert(`✓ Evaluación ${tipo} generada — revísala en la lista y publícala`)
+      setToast(`✓ Evaluación ${tipo} generada — revísala en la lista y publícala`)
       cargar()
     }
     setGenerando(null)
@@ -214,7 +216,8 @@ export default function Rutinas({ session }) {
   }
 
   async function eliminarPlantilla(id) {
-    if (!confirm('¿Eliminar plantilla?')) return
+    const ok = await confirm({ title: '¿Eliminar plantilla?', message: 'Esta plantilla se eliminará permanentemente.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('plantillas_rutina').delete().eq('id', id); await cargar()
   }
 
@@ -278,7 +281,8 @@ export default function Rutinas({ session }) {
   }
 
   async function eliminarEjercicio(id) {
-    if (!confirm('¿Eliminar este ejercicio de la biblioteca?')) return
+    const ok = await confirm({ title: '¿Eliminar ejercicio?', message: 'Se eliminará de la biblioteca permanentemente.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('ejercicios_biblioteca').delete().eq('id', id)
     setToast('Ejercicio eliminado'); await cargar()
   }
@@ -795,10 +799,11 @@ export default function Rutinas({ session }) {
 • Enfoque del ciclo: "Este mes trabajamos fuerza máxima en los compuestos, los accesorios al 12-15 reps."
 • Progresión: "Añadir 2.5kg cada semana en los compuestos principales."`} />
                       <button onClick={async () => {
-                        if (!confirm('¿Regenerar con este contexto adicional?')) return
+                        const ok = await confirm({ title: '¿Regenerar rutina?', message: 'Se eliminará la rutina actual y se generará una nueva con el contexto adicional.', danger: true, confirmText: 'Regenerar' })
+                        if (!ok) return
                         const clienteId = detalle.cliente_id
                         const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
-                        if (error) { alert('No se pudo eliminar la rutina actual: ' + error.message); return }
+                        if (error) { setToast('❌ No se pudo eliminar la rutina actual: ' + error.message); return }
                         setDetalle(null); setMostrarContextoIA(false)
                         await generarRutina(clienteId, contextoIA)
                         setContextoIA('')
@@ -829,10 +834,11 @@ export default function Rutinas({ session }) {
                 )}
                 <button onClick={() => guardarComoPlantilla(detalle)} className="border border-[#6366f1]/30 text-[#6366f1] text-sm py-3 px-3 rounded-xl hover:bg-[#6366f1]/5">📋</button>
                 <button onClick={async () => {
-                  if (!confirm('¿Regenerar con IA? Se eliminará la actual.')) return
+                  const ok = await confirm({ title: '¿Regenerar con IA?', message: 'Se eliminará la rutina actual y se generará una nueva desde cero.', danger: true, confirmText: 'Regenerar' })
+                  if (!ok) return
                   const clienteId = detalle.cliente_id
                   const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
-                  if (error) { alert('No se pudo eliminar: ' + error.message); return }
+                  if (error) { setToast('❌ No se pudo eliminar: ' + error.message); return }
                   setDetalle(null)
                   await generarRutina(clienteId)
                 }} disabled={generando===detalle.cliente_id}
@@ -840,9 +846,10 @@ export default function Rutinas({ session }) {
                   {generando===detalle.cliente_id?'⏳':'🔄'}
                 </button>
                 <button onClick={async () => {
-                  if (!confirm('¿Eliminar?')) return
+                  const ok = await confirm({ title: '¿Eliminar rutina?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
+                  if (!ok) return
                   const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
-                  if (error) { alert('No se pudo eliminar: ' + error.message); return }
+                  if (error) { setToast('❌ No se pudo eliminar: ' + error.message); return }
                   setDetalle(null); await cargar()
                 }} className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">🗑</button>
               </div>
@@ -1004,6 +1011,7 @@ export default function Rutinas({ session }) {
       )}
 
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
+      {ConfirmUI}
     </div>
   )
 }

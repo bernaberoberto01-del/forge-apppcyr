@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useConfirm } from '../components/ConfirmModal'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import JSZip from 'jszip'
 import { TIPOS_ENTRENAMIENTO, TIPOS_MAP } from '../utils/tiposEntrenamiento'
@@ -200,6 +201,7 @@ export default function Clientes({ session }) {
   const uid = session.user.id
   const equipo = useEquipo(uid)
   const enlaceRegistro = `${window.location.origin}/registro?e=${uid}`
+  const [confirm, ConfirmUI] = useConfirm()
 
   const showToast = (msg, tipo='ok') => { setToast({msg,tipo}); }
   const manejarRespuestaAcceso = (data, nombre) => {
@@ -501,7 +503,8 @@ export default function Clientes({ session }) {
   }
 
   async function descartarCuestionario(id) {
-    if (!confirm('¿Descartar este registro? No se creará el cliente.')) return
+    const ok = await confirm({ title: '¿Descartar registro?', message: 'No se creará el cliente. Esta acción no se puede deshacer.', danger: true, confirmText: 'Descartar' })
+    if (!ok) return
     await supabase.from('cuestionarios').update({ procesado: true }).eq('id', id)
     setCuestionarios(prev => prev.filter(x => x.id !== id))
     if (cuestionarios.length <= 1) setModalRegistros(false)
@@ -584,7 +587,8 @@ export default function Clientes({ session }) {
   }
 
   async function eliminar(id) {
-    if (!confirm('¿Eliminar este cliente?')) return
+    const ok = await confirm({ title: '¿Eliminar cliente?', message: 'Se eliminarán todos sus datos. Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('clientes').delete().eq('id', id)
     await cargar(); setDetalle(null)
   }
@@ -690,7 +694,8 @@ export default function Clientes({ session }) {
 
   async function cancelarSuscripcionAdmin() {
     if (!dData.planCobro) return
-    if (!confirm(`Esto solo marca la suscripción como cancelada en ${BRAND.nombre}. Tienes que cancelarla también manualmente en el dashboard de Stripe. ¿Continuar?`)) return
+    const ok = await confirm({ title: '¿Cancelar suscripción?', message: `Esto solo marca la suscripción como cancelada en ${BRAND.nombre}. Recuerda cancelarla también manualmente en el dashboard de Stripe.`, danger: true, confirmText: 'Sí, cancelar' })
+    if (!ok) return
     await supabase.from('planes_cobro').update({ estado: 'cancelado', activo: false }).eq('id', dData.planCobro.id)
     showToast('Suscripción marcada como cancelada — cancélala también en Stripe')
     await abrirDetalle(detalle)
@@ -778,6 +783,7 @@ export default function Clientes({ session }) {
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-6xl mx-auto">
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
+      {ConfirmUI}
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -1944,7 +1950,8 @@ export default function Clientes({ session }) {
                                       {f.visible_cliente ? '👁' : '🙈'}
                                     </button>
                                     <button onClick={async () => {
-                                      if (!confirm('¿Eliminar?')) return
+                                      const ok = await confirm({ title: '¿Eliminar foto?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
+                                      if (!ok) return
                                       await supabase.from('fotos_progreso').delete().eq('id', f.id)
                                       await abrirDetalle(detalle)
                                     }} className="text-white/70 hover:text-red-400 text-xs px-1">×</button>
@@ -2379,7 +2386,8 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
   }
 
   async function eliminar() {
-    if (!confirm('¿Eliminar este grupo?')) return
+    const ok = await confirm({ title: '¿Eliminar grupo?', message: 'El grupo se desactivará. Los clientes seguirán existiendo de forma individual.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('grupos').update({ activo: false }).eq('id', sel.id)
     setSel(null); await onActualizar()
   }
@@ -2388,7 +2396,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
     if (!cliAdd || !sel) return
     const miembros = sel.grupo_clientes?.filter(m=>m.activo)||[]
     const max = sel.tipo==='pareja'?2:6
-    if (miembros.length>=max) { alert(`Máximo ${max}`); return }
+    if (miembros.length>=max) { setToast(`❌ Máximo ${max} miembros`); return }
     setAñadiendo(true)
     const precioFinal = Number(precioPP) || getTarifaG(sel.tipo, sel.dias_semana?.length||0)?.pp || 0
     await supabase.from('grupo_clientes').upsert(
@@ -2410,14 +2418,15 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
 
   async function crearSesiones() {
     const miembros = sel?.grupo_clientes?.filter(m=>m.activo)||[]
-    if (!miembros.length) { alert('Añade clientes primero'); return }
-    if (!confirm(`¿Crear sesiones recurrentes para ${miembros.length} miembros?`)) return
+    if (!miembros.length) { setToast('❌ Añade clientes primero'); return }
+    const ok = await confirm({ title: `¿Crear sesiones recurrentes?`, message: `Se crearán sesiones recurrentes para ${miembros.length} miembro${miembros.length !== 1 ? 's' : ''} en la Agenda.`, confirmText: 'Crear sesiones' })
+    if (!ok) return
     await supabase.from('sesiones_recurrentes').insert(
       miembros.map(m=>({ entrenador_id:uid, cliente_id:m.cliente_id,
         hora:sel.hora, duracion_minutos:sel.duracion_minutos,
         dias_semana:sel.dias_semana, tipo:'presencial', activa:true, grupo_id:sel.id }))
     )
-    alert('✓ Sesiones creadas en la Agenda')
+    setToast('✓ Sesiones creadas en la Agenda')
   }
 
   const miembros = sel?.grupo_clientes?.filter(m=>m.activo)||[]
@@ -2860,6 +2869,7 @@ function HabitosCliente({ clienteId, entrenadorId }) {
   const [nuevoNombre, setNuevoNombre] = useState('')
   const [nuevoEmoji, setNuevoEmoji] = useState('✅')
   const [guardando, setGuardando] = useState(false)
+  const [confirm, ConfirmUI] = useConfirm()
   const EMOJIS = ['✅','💧','😴','🥗','🏃','🧘','💊','📖','🚶','🍎','🧴','☀️']
 
   useEffect(() => {
@@ -2891,7 +2901,8 @@ function HabitosCliente({ clienteId, entrenadorId }) {
   }
 
   async function eliminar(id) {
-    if (!confirm('¿Eliminar este hábito?')) return
+    const ok = await confirm({ title: '¿Eliminar hábito?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('habitos').delete().eq('id', id)
     await cargar()
   }
@@ -2969,6 +2980,7 @@ function HabitosCliente({ clienteId, entrenadorId }) {
           </button>
         </div>
       </div>
+      {ConfirmUI}
     </div>
   )
 }
@@ -2980,6 +2992,7 @@ function GestionHabitos({ clienteId, entrenadorId }) {
   const [form, setForm] = useState({ nombre:'', descripcion:'', icono:'⭐', frecuencia:'diario', meta_semanal:7 })
   const [guardando, setGuardando] = useState(false)
   const [mostrarForm, setMostrarForm] = useState(false)
+  const [confirm, ConfirmUI] = useConfirm()
 
   const ICONOS_RAPIDOS = ['💧','🥗','😴','🚶','🧘','📖','🍎','🏃','💊','🧘‍♂️','🌅','🚫']
 
@@ -3013,7 +3026,8 @@ function GestionHabitos({ clienteId, entrenadorId }) {
   }
 
   async function eliminar(id) {
-    if (!confirm('¿Eliminar este hábito?')) return
+    const ok = await confirm({ title: '¿Eliminar hábito?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     await supabase.from('habitos').delete().eq('id', id)
     cargar()
   }
@@ -3094,6 +3108,7 @@ function GestionHabitos({ clienteId, entrenadorId }) {
           + Añadir hábito
         </button>
       )}
+      {ConfirmUI}
     </div>
   )
 }
