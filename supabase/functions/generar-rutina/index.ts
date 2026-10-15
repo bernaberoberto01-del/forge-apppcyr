@@ -176,7 +176,7 @@ function buildPrompt(i: number, nombre: string, cliente: any, perfil: any, cuest
   if (esCardio) return `Cardio dia${i}:${nombre}|${base}${perfilTxt}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Cardio","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"Cardio 30min","patron":"cardio","series":1,"reps":"30 min","descanso":"-","notas":""},{"orden":3,"nombre":"Core","patron":"core","series":3,"reps":"3x30s","descanso":"15s","notas":""}]}`
   if (tipo === 'crossfit') return `WOD dia${i}:${nombre}|${base}${perfilTxt}${biblioPrompt}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"CrossFit","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"10 min","descanso":"-","notas":""},{"orden":2,"nombre":"Fuerza","patron":"fuerza","series":4,"reps":"3-5","descanso":"3 min","notas":""},{"orden":3,"nombre":"MetCon","patron":"metabolico","series":1,"reps":"AMRAP 10min","descanso":"-","notas":""}]}`
   const agrup = formato==='superseries'?' Agrupacion A1/A2,B1/B2.' : formato==='circuitos'?' Agrupacion A1/A2/A3.' : ''
-  const int = esFase3 ? '82-88%RM 3-5x3-5' : '70-80%RM 3-4x6-10'
+  const int = esFase3 ? '82-88%RM 3-5x3-5' : perfil.fase <= 1 ? '60-70%RM 2-3x10-12, prioriza tecnica' : '70-80%RM 3-4x6-10'
   return `Fuerza dia${i}:${nombre}|${base}|${int}.${agrup}${perfilTxt}${biblioPrompt}${marcas}.${trailer}\nJSON:{"dia":${i},"nombre":"${nombre}","patron_principal":"Fuerza","ejercicios":[{"orden":1,"nombre":"Calentamiento","patron":"calentamiento","series":1,"reps":"8 min","descanso":"-","notas":""},{"orden":2,"nombre":"[Compuesto1]","patron":"fuerza","series":${esFase3?5:4},"reps":"${esFase3?'3-5':'6-8'}","descanso":"${formato==='descanso_tradicional'?'3 min':'-'}","notas":""},{"orden":3,"nombre":"[Compuesto2]","patron":"fuerza","series":4,"reps":"8-10","descanso":"90s","notas":""},{"orden":4,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"10-12","descanso":"60s","notas":""},{"orden":5,"nombre":"[Accesorio]","patron":"accesorio","series":3,"reps":"12-15","descanso":"45s","notas":""}]}`
 }
 
@@ -224,12 +224,16 @@ Deno.serve(async (req) => {
     const promesas = Array.from({ length: dias }, (_, idx) => {
       const i = idx + 1
       const nombre = nombres[idx] || `Dia ${i}`
-      if (perfil.fase <= 1) return Promise.resolve(generarDiaBase(i, nombre, perfil))
+      // Fase <= 1 sin contexto: plantilla base sin IA. Con contexto del entrenador
+      // siempre IA: si no, su instruccion se ignoraba por completo en principiantes.
+      if (perfil.fase <= 1 && !contextoPrompt) return Promise.resolve(generarDiaBase(i, nombre, perfil))
       const prompt = buildPrompt(i, nombre, cliente, perfil, cuestionario, biblioPrompt, contextoPrompt, marcasPrompt)
       return llamarIA(key, prompt, i)
     })
 
     const resultados = await Promise.all(promesas)
+    // Dias que vienen de la IA (los demas son plantilla base por fallo/limite de la IA)
+    const diasIA = (perfil.fase <= 1 && !contextoPrompt) ? 0 : resultados.filter(Boolean).length
 
     // Si algun dia falla por rate limit, usar base como fallback
     const diasFinal = Array.from({ length: dias }, (_, idx) => {
@@ -252,7 +256,7 @@ Deno.serve(async (req) => {
     }).select().single()
 
     if (saveError) return new Response(JSON.stringify({ error: saveError.message }), { status: 500, headers: CORS })
-    return new Response(JSON.stringify({ ok: true, rutina: saved, dias_generados: diasFinal.length, fase: perfil.fase, fase_label: faseLabel, alertas: perfil.alertas }), { headers: CORS })
+    return new Response(JSON.stringify({ ok: true, rutina: saved, dias_generados: diasFinal.length, dias_ia: diasIA, contexto_aplicado: !!contextoPrompt, fase: perfil.fase, fase_label: faseLabel, alertas: perfil.alertas }), { headers: CORS })
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: CORS })
   }

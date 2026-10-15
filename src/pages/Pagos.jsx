@@ -7,6 +7,7 @@ import { BRAND, colorMarca, nombreMarca } from '../lib/brand'
 import { useConfig } from '../hooks/useConfig'
 import { useEquipo } from '../hooks/useCentro'
 import { diaLocal, mesLocal } from '../lib/dateUtils'
+import { cuentaParaCuotas } from '../lib/cobros'
 import { useConfirm } from '../components/ConfirmModal'
 
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]))
@@ -140,11 +141,12 @@ export default function Pagos({ session }) {
     const [{ data: pg }, { data: cl }, { data: pl }] = await Promise.all([
       supabase.from('pagos').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).order('fecha_pago', { ascending: false }),
       supabase.from('clientes').select('id,nombre,tipo,precio_mensual').in('entrenador_id', equipo).eq('estado','activo'),
-      supabase.from('planes_cobro').select('*, clientes(nombre,suscripcion_activa,proxima_factura)').in('entrenador_id', equipo).eq('activo', true).order('proximo_cobro'),
+      supabase.from('planes_cobro').select('*, clientes(nombre,estado,acceso_libre,is_demo,suscripcion_activa,proxima_factura)').in('entrenador_id', equipo).eq('activo', true).order('proximo_cobro'),
     ])
     setPagos(pg || [])
     setClientes(cl || [])
-    setPlanes(pl || [])
+    // Mismo criterio que Clientes y Dashboard: solo clientes activos y no exentos
+    setPlanes((pl || []).filter(p => p.clientes && cuentaParaCuotas(p.clientes)))
   }
 
   async function registrarPago() {

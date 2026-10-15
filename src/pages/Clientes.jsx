@@ -12,6 +12,8 @@ import { moduloVisible, funcionActiva } from '../lib/modulos'
 import { AREAS, NOMBRE_SERVICIO, ICONO_SERVICIO, hayAreas, areasDe } from '../lib/servicios'
 import HistorialClinico from '../components/cliente/HistorialClinico'
 import CobroAreas from '../components/cliente/CobroAreas'
+import { estadoCobro } from '../lib/cobros'
+import { diaLocal } from '../lib/dateUtils'
 import { ini, avatarColor } from '../lib/avatar'
 
 // En la lista de Clientes el área de entrenamiento se llama "Gimnasio"
@@ -165,6 +167,7 @@ export default function Clientes({ session }) {
   const [checkins, setCheckins] = useState([])
   const [pagos, setPagos] = useState([])
   const [clienteIdsConPlanCobro, setClienteIdsConPlanCobro] = useState(new Set())
+  const [planesCobro, setPlanesCobro] = useState([])
   const [busqueda, setBusqueda] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('todos')
   const [filtroObj, setFiltroObj] = useState('')
@@ -387,10 +390,10 @@ export default function Clientes({ session }) {
       supabase.from('clientes').select('*').in('entrenador_id', equipo).not('estado', 'in', '(rechazado,externo)').order('created_at', { ascending: false }),
       supabase.from('cuestionarios').select('*').in('entrenador_id', equipo).eq('procesado', false).order('created_at', { ascending: false }),
       supabase.from('checkins').select('cliente_id,fecha').in('entrenador_id', equipo).gte('fecha', hace14),
-      supabase.from('pagos').select('cliente_id,valido_hasta').in('entrenador_id', equipo),
+      supabase.from('pagos').select('cliente_id,fecha_pago,valido_hasta').in('entrenador_id', equipo),
       supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(cliente_id,activo)').in('entrenador_id', equipo).eq('activo', true),
       supabase.from('tarifas').select('*').in('entrenador_id', equipo).eq('activa', true).order('modalidad').order('dias_semana'),
-      supabase.from('planes_cobro').select('cliente_id').in('entrenador_id', equipo),
+      supabase.from('planes_cobro').select('cliente_id,activo,proximo_cobro').in('entrenador_id', equipo),
     ])
     setClientes(cl || [])
     setGrupos(gs || [])
@@ -399,20 +402,21 @@ export default function Clientes({ session }) {
     setCheckins(ci || [])
     setPagos(pg || [])
     setClienteIdsConPlanCobro(new Set((pc || []).map(p => p.cliente_id)))
+    setPlanesCobro(pc || [])
   }
 
   // Calcular alertas por cliente
   const alertas = useMemo(() => {
     const map = {}
     const hace7 = new Date(Date.now() - 7 * 864e5).toISOString().split('T')[0]
-    const hoy = new Date().toISOString().split('T')[0]
     clientes.forEach(c => {
       const tieneCI = checkins.some(x => x.cliente_id === c.id)
-      const pagoVencido = pagos.some(x => x.cliente_id === c.id && x.valido_hasta && x.valido_hasta < hoy)
+      // Mismo criterio que Dashboard y Pagos (src/lib/cobros.js)
+      const pagoVencido = estadoCobro(c, planesCobro, pagos).estado === 'vencido'
       map[c.id] = { sinCI: !tieneCI && c.estado === 'activo', pagoVencido }
     })
     return map
-  }, [clientes, checkins, pagos])
+  }, [clientes, checkins, pagos, planesCobro])
 
   // Filtrado y búsqueda
   const filtrados = useMemo(() => {
@@ -451,7 +455,25 @@ export default function Clientes({ session }) {
     if (hayAreas) camposCliente.areas = form.areas?.length ? form.areas : ['entrenamiento']
     let clienteId = editId
     if (editId) {
+      const previo = clientes.find(c => c.id === editId)
+      const pasaAInactivo = ['baja', 'pausado'].includes(form.estado) && previo?.estado === 'activo'
+      const vuelveAActivo = form.estado === 'activo' && ['baja', 'pausado'].includes(previo?.estado)
+      // Al pasar a baja/pausado la BD desactiva su plan de cobro (migración 0016);
+      // una suscripción de Stripe hay que cancelarla también allí.
+      if (pasaAInactivo && previo?.suscripcion_activa) {
+        const ok = await confirm({ title: 'Tiene suscripción en Stripe', message: 'Se desactivará su plan de cobro aquí, pero la suscripción de Stripe hay que cancelarla también (pestaña Pagos de su ficha o el panel de Stripe). ¿Continuar?', confirmText: 'Continuar' })
+        if (!ok) { setLoading(false); return }
+      }
       await supabase.from('clientes').update(camposCliente).eq('id', editId)
+      if (vuelveAActivo) {
+        const { data: plan } = await supabase.from('planes_cobro').select('id, proximo_cobro')
+          .eq('cliente_id', editId).eq('activo', false).or('estado.is.null,estado.neq.cancelado')
+          .order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (plan && await confirm({ title: '¿Reactivar su plan de cobro?', message: 'Se desactivó al pasarlo a baja/pausado. Si lo reactivas, el próximo cobro será hoy si ya había pasado.', confirmText: 'Reactivar' })) {
+          const hoy = diaLocal(new Date())
+          await supabase.from('planes_cobro').update({ activo: true, proximo_cobro: plan.proximo_cobro && plan.proximo_cobro > hoy ? plan.proximo_cobro : hoy }).eq('id', plan.id)
+        }
+      }
     } else {
       const { data: nuevo } = await supabase.from('clientes').insert(camposCliente).select('id').single()
       clienteId = nuevo?.id

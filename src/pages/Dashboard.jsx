@@ -7,6 +7,7 @@ import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
 import { moduloVisible } from '../lib/modulos'
 import { diaLocal, mesLocal } from '../lib/dateUtils'
+import { estadoCobro, diasHasta, cuentaParaCuotas } from '../lib/cobros'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
@@ -200,7 +201,6 @@ export default function Dashboard({ session }) {
     const inicioSemana = (() => { const d=new Date(); d.setDate(d.getDate()-((d.getDay()||7)-1)); return diaLocal(d) })()
     const hace7d = diaLocal(new Date(Date.now()-7*864e5))
     const hace14d = diaLocal(new Date(Date.now()-14*864e5))
-    const en7d   = diaLocal(new Date(Date.now()+7*864e5))
 
     const [
       { data: clientes },
@@ -226,7 +226,7 @@ export default function Dashboard({ session }) {
       { data: cuestConLead },
       { data: clientesContactoRaw },
     ] = await Promise.all([
-      supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio,stripe_subscription_id').in('entrenador_id', equipo),
+      supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio,stripe_subscription_id,acceso_libre,is_demo').in('entrenador_id', equipo),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').in('entrenador_id', equipo).gte('fecha_pago', hace6m),
       supabase.from('planes_cobro').select('cliente_id,importe,concepto,proximo_cobro').in('entrenador_id', equipo).eq('activo', true),
       supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').in('entrenador_id', equipo).gte('fecha', inicioSemana),
@@ -268,12 +268,13 @@ export default function Dashboard({ session }) {
     const clientesConPagoEsteMes = new Set((pagos||[]).filter(p => p.fecha_pago >= inicioMes).map(p => p.cliente_id))
     const clientesConPlanCobro = new Set((planesCobro||[]).map(pc => pc.cliente_id))
     const ingresosPagosMes = (pagos||[]).filter(p => p.fecha_pago >= inicioMes).reduce((s,p) => s+Number(p.importe||0), 0)
+    const idsCuotas = new Set(activos.filter(cuentaParaCuotas).map(c => c.id))
     const ingresosPlanesSinPago = (planesCobro||[])
-      .filter(pc => !clientesConPagoEsteMes.has(pc.cliente_id))
+      .filter(pc => idsCuotas.has(pc.cliente_id) && !clientesConPagoEsteMes.has(pc.cliente_id))
       .reduce((s,pc) => s+Number(pc.importe||0), 0)
     // Fallback: clientes activos con precio_mensual pero sin pago ni planes_cobro (recién dados de alta)
     const ingresosPrecioMensual = activos
-      .filter(c => Number(c.precio_mensual) > 0 && !clientesConPagoEsteMes.has(c.id) && !clientesConPlanCobro.has(c.id))
+      .filter(c => idsCuotas.has(c.id) && Number(c.precio_mensual) > 0 && !clientesConPagoEsteMes.has(c.id) && !clientesConPlanCobro.has(c.id))
       .reduce((s,c) => s+Number(c.precio_mensual||0), 0)
     const ingresosMes = ingresosPagosMes
     const previstoMes = ingresosPagosMes + ingresosPlanesSinPago + ingresosPrecioMensual
@@ -291,21 +292,15 @@ export default function Dashboard({ session }) {
     })
     const maxIngreso = Math.max(...ingresosPorMes.map(m => m.valor), 1)
 
-    // Solo cobros reales de Stripe — los presenciales que pagan en efectivo no deben
-    // disparar esta alerta (su "valido_hasta" es manual y no significa un cobro fallido).
-    const alertasPagos = activos.filter(c => c.stripe_subscription_id).filter(c => {
-      const p = (pagos||[]).filter(p=>p.cliente_id===c.id).sort((a,b)=>b.fecha_pago?.localeCompare(a.fecha_pago))[0]
-      return p?.valido_hasta && new Date(p.valido_hasta) < hoy
-    }).filter(c => !estaDescartada(c.id, 'pago_vencido'))
+    // Mismo criterio que Clientes y Pagos (src/lib/cobros.js): plan de cobro activo
+    // si lo tiene; si no, validez del último pago. Exentos y no activos no cuentan.
+    const cobroDe = c => estadoCobro(c, planesCobro || [], pagos || [], hoyStr)
+    const alertasPagos = activos.filter(c => cobroDe(c).estado === 'vencido')
+      .filter(c => !estaDescartada(c.id, 'pago_vencido'))
     const cobrosProximos = activos.filter(c => {
-      const p = (pagos||[]).filter(p=>p.cliente_id===c.id).sort((a,b)=>b.fecha_pago?.localeCompare(a.fecha_pago))[0]
-      const tieneVencimiento = p?.valido_hasta && new Date(p.valido_hasta) >= hoy && new Date(p.valido_hasta) <= new Date(en7d)
-      // También incluir si hay plan de cobro con proximo_cobro en los próximos 7 días
-      const planCobro = (planesCobro||[]).find(pc => pc.cliente_id === c.id)
-      const tienePlanProximo = planCobro?.proximo_cobro &&
-        new Date(planCobro.proximo_cobro) >= hoy &&
-        new Date(planCobro.proximo_cobro) <= new Date(en7d)
-      return tieneVencimiento || tienePlanProximo
+      const { estado, hasta } = cobroDe(c)
+      const d = diasHasta(hasta, hoyStr)
+      return estado === 'al_dia' && d !== null && d <= 7
     }).filter(c => !estaDescartada(c.id, 'cobro_proximo'))
     const clientesSinCI = activos.filter(c => !ciRecientes.some(ci => ci.cliente_id===c.id && ci.fecha>=hace7d)).filter(c => !estaDescartada(c.id, 'sin_checkin'))
     // Solo online: a los presenciales los ves en persona, no hace falta alertar por check-in digital.
