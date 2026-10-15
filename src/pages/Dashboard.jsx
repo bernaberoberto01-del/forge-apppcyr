@@ -277,7 +277,10 @@ export default function Dashboard({ session }) {
       .filter(c => idsCuotas.has(c.id) && Number(c.precio_mensual) > 0 && !clientesConPagoEsteMes.has(c.id) && !clientesConPlanCobro.has(c.id))
       .reduce((s,c) => s+Number(c.precio_mensual||0), 0)
     const ingresosMes = ingresosPagosMes
-    const previstoMes = ingresosPagosMes + ingresosPlanesSinPago + ingresosPrecioMensual
+    // Sin cobros configurados (ni planes de cobro ni pagos registrados, p. ej. un centro
+    // recién montado) no se muestra previsto: solo sumaría cuotas de ficha sin gestionar.
+    const cobrosConfigurados = (planesCobro||[]).length > 0 || (pagos||[]).length > 0
+    const previstoMes = cobrosConfigurados ? ingresosPagosMes + ingresosPlanesSinPago + ingresosPrecioMensual : ingresosPagosMes
     const hace4s = diaLocal(new Date(Date.now()-28*864e5))
     const ciRecientes = (checkins||[]).filter(c => c.fecha >= hace4s)
     const adherenciaMedia = ciRecientes.length > 0
