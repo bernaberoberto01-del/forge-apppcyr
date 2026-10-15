@@ -157,15 +157,20 @@ export default function Rutinas({ session }) {
       })
       if (error) throw new Error(error.message)
       if (data?.ok) {
-        setToast(`✓ Rutina generada (${data.dias_generados} días, Fase ${data.fase_label}) — revísala y publícala`)
+        const sinIA = data.contexto_aplicado && data.dias_ia < data.dias_generados
+          ? ` ⚠ ${data.dias_generados - data.dias_ia} día(s) sin tu contexto (la IA no respondió): revísalos`
+          : ''
+        setToast(`✓ Rutina generada (${data.dias_generados} días, Fase ${data.fase_label}) — revísala y publícala${sinIA}`)
         await cargar()
-      } else {
-        setToast('Error: ' + (data?.error || 'desconocido'))
+        setGenerando(null)
+        return data.rutina || true
       }
+      setToast('Error: ' + (data?.error || 'desconocido'))
     } catch (e) {
       setToast('Error al generar: ' + (e?.message || 'desconocido'))
     }
     setGenerando(null)
+    return null
   }
 
   async function analizarYActualizar(clienteId) {
@@ -245,15 +250,25 @@ export default function Rutinas({ session }) {
 
   const clientesSinRutina = clientes.filter(c => c.tipo === 'online' && !rutinas.find(r => r.cliente_id === c.id && r.estado !== 'archivada'))
 
+  // Vigentes: no archivadas y de clientes activos. El resto (archivadas al publicar
+  // una nueva, o de clientes que ya no están activos) va al Historial.
+  const idsActivos = useMemo(() => new Set(clientes.map(c => c.id)), [clientes])
+  const esVigente = x => x.estado !== 'archivada' && idsActivos.has(x.cliente_id)
+
   const rutinasFiltradas = useMemo(() => {
-    let r = rutinas.filter(x => x.estado !== 'archivada')
+    if (filtroEstado === 'historial') {
+      let h = rutinas.filter(x => !esVigente(x))
+      if (busqueda) { const b = busqueda.toLowerCase(); h = h.filter(x => x.clientes?.nombre?.toLowerCase().includes(b) || x.nombre?.toLowerCase().includes(b)) }
+      return h
+    }
+    let r = rutinas.filter(esVigente)
     if (filtroEstado === 'borrador') r = r.filter(x => x.estado === 'borrador')
     if (filtroEstado === 'publicada') r = r.filter(x => x.estado === 'publicada')
     if (busqueda) { const b = busqueda.toLowerCase(); r = r.filter(x => x.clientes?.nombre?.toLowerCase().includes(b) || x.nombre?.toLowerCase().includes(b)) }
     return r
-  }, [rutinas, filtroEstado, busqueda])
+  }, [rutinas, filtroEstado, busqueda, idsActivos])
 
-  const stats = { total: rutinas.filter(r=>r.estado!=='archivada').length, borradores: rutinas.filter(r=>r.estado==='borrador').length, publicadas: rutinas.filter(r=>r.estado==='publicada').length }
+  const stats = { total: rutinas.filter(esVigente).length, borradores: rutinas.filter(r=>esVigente(r)&&r.estado==='borrador').length, publicadas: rutinas.filter(r=>esVigente(r)&&r.estado==='publicada').length }
 
   // ===== BIBLIOTECA =====
   const bibFiltrada = useMemo(() => {
@@ -456,7 +471,7 @@ export default function Rutinas({ session }) {
 
           {/* Filtros */}
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-            {[['activas','Todas'],['borrador','Por revisar'],['publicada','Publicadas']].map(([v,l])=>(
+            {[['activas','Todas'],['borrador','Por revisar'],['publicada','Publicadas'],['historial','🗂 Historial']].map(([v,l])=>(
               <button key={v} onClick={() => setFiltroEstado(v)}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroEstado===v?'bg-acento text-white':'bg-white border border-black/10 text-[#6B6B6B] hover:border-acento'}`}>
                 {l}
@@ -522,8 +537,8 @@ export default function Rutinas({ session }) {
                     <button onClick={() => setQuickView(r.cliente_id)} className="text-sm font-semibold text-[#0A0A0A] hover:text-acento transition-colors truncate block text-left">{r.clientes?.nombre}</button>
                     <p className="text-xs text-[#6B6B6B] truncate">{r.borrador?.nombre || r.contenido?.nombre || 'Rutina'} · {r.dias_semana} días/sem</p>
                   </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${r.estado==='publicada'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
-                    {r.estado==='publicada'?'✓ Publicada':'Por revisar'}
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${r.estado==='archivada'?'bg-[#F5F5F0] text-[#6B6B6B]':r.estado==='publicada'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
+                    {r.estado==='archivada'?'🗂 Archivada':r.estado==='publicada'?'✓ Publicada':'Por revisar'}
                   </span>
                 </div>
                 <div className="flex gap-2 mt-3">
@@ -810,12 +825,15 @@ export default function Rutinas({ session }) {
                       <button onClick={async () => {
                         const ok = await confirm({ title: '¿Regenerar rutina?', message: 'Se eliminará la rutina actual y se generará una nueva con el contexto adicional.', danger: true, confirmText: 'Regenerar' })
                         if (!ok) return
-                        const clienteId = detalle.cliente_id
-                        const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
-                        if (error) { setToast('❌ No se pudo eliminar la rutina actual: ' + error.message); return }
+                        // Primero se genera la nueva; la actual solo se quita si la nueva se creó
+                        const anterior = detalle
                         setDetalle(null); setMostrarContextoIA(false)
-                        await generarRutina(clienteId, contextoIA)
+                        const nueva = await generarRutina(anterior.cliente_id, contextoIA)
+                        if (!nueva) { setMostrarContextoIA(true); setDetalle(anterior); return }
                         setContextoIA('')
+                        const { error } = await supabase.from('rutinas').delete().eq('id', anterior.id)
+                        if (error) setToast('⚠ Rutina nueva creada, pero no se pudo quitar la anterior: ' + error.message)
+                        await cargar()
                       }} disabled={generando===detalle.cliente_id}
                         className="w-full bg-[#6366f1] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
                         🔄 Regenerar con este contexto
@@ -845,11 +863,13 @@ export default function Rutinas({ session }) {
                 <button onClick={async () => {
                   const ok = await confirm({ title: '¿Regenerar con IA?', message: 'Se eliminará la rutina actual y se generará una nueva desde cero.', danger: true, confirmText: 'Regenerar' })
                   if (!ok) return
-                  const clienteId = detalle.cliente_id
-                  const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
-                  if (error) { setToast('❌ No se pudo eliminar: ' + error.message); return }
+                  const anterior = detalle
                   setDetalle(null)
-                  await generarRutina(clienteId)
+                  const nueva = await generarRutina(anterior.cliente_id)
+                  if (!nueva) { setDetalle(anterior); return }
+                  const { error } = await supabase.from('rutinas').delete().eq('id', anterior.id)
+                  if (error) setToast('⚠ Rutina nueva creada, pero no se pudo quitar la anterior: ' + error.message)
+                  await cargar()
                 }} disabled={generando===detalle.cliente_id}
                   title="Regenerar rutina con IA"
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
