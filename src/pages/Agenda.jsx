@@ -334,6 +334,7 @@ export default function Agenda({ session }) {
 
   // Generar sesiones virtuales de recurrentes y grupos para la semana actual
   const sesionesConRecurrentes = useMemo(() => {
+    const hoyVirtual = formatFecha(new Date())
     // Sesiones sin grupo_id van directo al resultado
     const sesionesIndividuales = sesiones.filter(s => !s.grupo_id)
     const resultado = [...sesionesIndividuales]
@@ -411,7 +412,7 @@ export default function Agenda({ session }) {
             cliente_id: rec.cliente_id,
             fecha: fechaDia, hora: rec.hora?.slice(0,5),
             duracion_minutos: rec.duracion_minutos, tipo: rec.tipo,
-            completada: false, notas: rec.notas, clientes: rec.clientes,
+            completada: fechaDia < hoyVirtual, notas: rec.notas, clientes: rec.clientes,
             _esVirtual: true, _recurrenteId: rec.id,
             _fechaOriginal: fechaDia,
           })
@@ -468,7 +469,7 @@ export default function Agenda({ session }) {
             cliente_id: miembros[0].cliente_id,
             fecha: fechaDia, hora: g.hora?.slice(0,5),
             duracion_minutos: g.duracion_minutos || 60,
-            tipo: 'presencial', completada: false,
+            tipo: 'presencial', completada: fechaDia < hoyVirtual,
             grupo_id: g.id,
             _esVirtual: true, _esGrupo: true, _grupoData: g,
             _fechaOriginal: fechaDia,
