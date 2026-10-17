@@ -324,7 +324,8 @@ export default function Seguimiento({ session }) {
         // Estado de cada cliente — solo check-in
         const estadoClientes = clientes.map(c => {
           const ciUltimo = checkins.filter(ci => ci.cliente_id === c.id && ci.fecha).sort((a,b) => b.fecha.localeCompare(a.fecha))[0]
-          const diasSinCI = ciUltimo?.fecha ? Math.floor((Date.now() - new Date(ciUltimo.fecha + 'T12:00').getTime()) / 864e5) : 999
+          const _fechaCI = ciUltimo?.fecha && !isNaN(new Date(ciUltimo.fecha + 'T12:00').getTime()) ? new Date(ciUltimo.fecha + 'T12:00').getTime() : null
+          const diasSinCI = _fechaCI != null ? Math.max(0, Math.floor((Date.now() - _fechaCI) / 864e5)) : 999
 
           let alerta = 'ok' // ok | warning | critical
           if (diasSinCI >= 14) alerta = 'critical'
@@ -699,7 +700,8 @@ export default function Seguimiento({ session }) {
           <div className="space-y-1.5">
             {clientes.map(cl => {
               const ultimo = checkins.find(x => x.cliente_id === cl.id)
-              const diasSinCI = ultimo?.fecha ? Math.floor((Date.now() - new Date(ultimo.fecha + 'T12:00').getTime()) / 864e5) : null
+              const _fechaUlt = ultimo?.fecha && !isNaN(new Date(ultimo.fecha + 'T12:00').getTime()) ? new Date(ultimo.fecha + 'T12:00').getTime() : null
+              const diasSinCI = _fechaUlt != null ? Math.max(0, Math.floor((Date.now() - _fechaUlt) / 864e5)) : null
               const alertaFatiga = ultimo && (ultimo.fatiga >= 4 || ultimo.estres >= 4)
               return (
                 <div key={cl.id} onClick={() => ultimo && setDetalleCI(ultimo)}

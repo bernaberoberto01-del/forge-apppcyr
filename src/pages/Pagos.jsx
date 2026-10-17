@@ -141,7 +141,7 @@ export default function Pagos({ session }) {
     const [{ data: pg }, { data: cl }, { data: pl }] = await Promise.all([
       supabase.from('pagos').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).order('fecha_pago', { ascending: false }),
       supabase.from('clientes').select('id,nombre,tipo,precio_mensual').in('entrenador_id', equipo).eq('estado','activo'),
-      supabase.from('planes_cobro').select('*, clientes(nombre,estado,acceso_libre,is_demo,suscripcion_activa,proxima_factura)').in('entrenador_id', equipo).eq('activo', true).order('proximo_cobro'),
+      supabase.from('planes_cobro').select('*, ultimo_cobro, clientes(nombre,estado,acceso_libre,is_demo,suscripcion_activa,proxima_factura)').in('entrenador_id', equipo).eq('activo', true).order('proximo_cobro'),
     ])
     setPagos(pg || [])
     setClientes(cl || [])
@@ -280,10 +280,16 @@ export default function Pagos({ session }) {
     return pagos.filter(p => p.fecha_pago?.startsWith(mes)).reduce((s,p) => s+Number(p.importe||0), 0)
   }, [pagos])
 
-  const pendientesMes = useMemo(() => planes.filter(p => {
-    const d = diasRestantes(p)
-    return d !== null && d <= 7
-  }), [planes])
+  const pendientesMes = useMemo(() => {
+    const mesCurrent = mesLocal(new Date())
+    return planes.filter(p => {
+      const d = diasRestantes(p)
+      if (d === null || d > 7) return false
+      // Excluir si ya se cobró este mes (manual o Stripe)
+      if (p.ultimo_cobro && p.ultimo_cobro.startsWith(mesCurrent)) return false
+      return true
+    })
+  }, [planes])
 
   const pagosFiltrados = useMemo(() => {
     let r = [...pagos]
