@@ -104,7 +104,7 @@ Deno.serve(async (req) => {
     const comidasDia = esAyuno ? 3 : Math.min(Math.max(comidasNum, 2), 6)
     const slots = esAyuno ? AYUNO : (DIST[comidasDia] || DIST[4])
     const estructura = slots.map(s => ({ ...s, kcal: Math.round(kcal * s.pct) }))
-    const dias = ['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo']
+    const dias = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
     const structureStr = estructura.map(s => `${s.nombre}(${s.hora}):${s.kcal}kcal`).join('|')
 
     const prompt = [
