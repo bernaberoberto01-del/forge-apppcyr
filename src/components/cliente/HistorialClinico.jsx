@@ -21,6 +21,7 @@ export default function HistorialClinico({ cliente, uid, onToast }) {
   const [form, setForm] = useState(vacio)
   const [guardando, setGuardando] = useState(false)
   const [filtro, setFiltro] = useState('')
+  const [confirmandoBorrar, setConfirmandoBorrar] = useState(null)
 
   async function cargar() {
     setCargando(true)
@@ -45,8 +46,8 @@ export default function HistorialClinico({ cliente, uid, onToast }) {
     setForm(vacio()); onToast?.('Entrada añadida'); cargar()
   }
 
-  async function borrar(id) {
-    if (!window.confirm('¿Borrar esta entrada del historial?')) return
+  async function borrarConfirmado(id) {
+    setConfirmandoBorrar(null)
     const { error } = await supabase.from('historial_clinico').delete().eq('id', id)
     if (error) { onToast?.('No se pudo borrar', 'error'); return }
     setEntradas(e => e.filter(x => x.id !== id))
@@ -110,7 +111,7 @@ export default function HistorialClinico({ cliente, uid, onToast }) {
                   <p className="text-xs font-semibold text-[#0A0A0A]">
                     {TIPOS[e.tipo]}{e.area ? ` · ${ICONO_SERVICIO[e.area]} ${NOMBRE_SERVICIO[e.area]}` : ''}
                   </p>
-                  <button onClick={() => borrar(e.id)} className="text-[#C0C0C0] hover:text-red-500 text-sm" title="Borrar">×</button>
+                  <button onClick={() => setConfirmandoBorrar(e.id)} className="text-[#C0C0C0] hover:text-red-500 text-sm" title="Borrar">×</button>
                 </div>
                 <p className="text-sm text-[#0A0A0A] whitespace-pre-wrap">{e.texto}</p>
                 <p className="text-[11px] text-[#9B9B9B] mt-1.5">
@@ -121,6 +122,18 @@ export default function HistorialClinico({ cliente, uid, onToast }) {
             ))}
           </div>
         )}
+      {confirmandoBorrar && (
+        <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center p-4" onClick={() => setConfirmandoBorrar(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[#0A0A0A] text-base mb-1">Borrar entrada</h3>
+            <p className="text-sm text-[#6B6B6B] mt-1 mb-4 leading-relaxed">¿Borrar esta entrada del historial? Esta acción no se puede deshacer.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmandoBorrar(null)} className="flex-1 py-2.5 rounded-xl border border-black/10 text-sm font-medium text-[#6B6B6B] hover:bg-[#F5F5F0] transition-all active:scale-95">Cancelar</button>
+              <button onClick={() => borrarConfirmado(confirmandoBorrar)} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 bg-red-500 hover:bg-red-600">Borrar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
