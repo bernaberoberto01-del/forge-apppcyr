@@ -393,7 +393,7 @@ export default function Clientes({ session }) {
       supabase.from('pagos').select('cliente_id,fecha_pago,valido_hasta').in('entrenador_id', equipo),
       supabase.from('grupos').select('id,nombre,tipo,dias_semana,hora,precio_por_persona,grupo_clientes(id,cliente_id,activo,clientes(id,nombre))').in('entrenador_id', equipo).eq('activo', true),
       supabase.from('tarifas').select('*').in('entrenador_id', equipo).eq('activa', true).order('modalidad').order('dias_semana'),
-      supabase.from('planes_cobro').select('cliente_id,activo,proximo_cobro').in('entrenador_id', equipo),
+      supabase.from('planes_cobro').select('cliente_id,activo,proximo_cobro,importe').in('entrenador_id', equipo),
     ])
     setClientes(cl || [])
     setGrupos(gs || [])
@@ -950,6 +950,10 @@ export default function Clientes({ session }) {
                 ? { label: '⏳ Contacto', cls: 'bg-amber-50 text-amber-700' }
                 : { label: 'Baja', cls: 'bg-red-50 text-red-600' }
 
+              // Importe a mostrar: precio_mensual del cliente o, como fallback, el importe del plan de cobro activo
+              const planActivoC = planesCobro.find(p => p.cliente_id === c.id && p.activo)
+              const importeEfectivo = c.precio_mensual > 0 ? c.precio_mensual : (planActivoC?.importe > 0 ? planActivoC.importe : null)
+
               return (
                 <div key={c.id} onClick={() => abrirDetalle(c)}
                   className="bg-white rounded-xl border border-black/5 shadow-sm hover:shadow-md hover:border-acento/30 transition-all cursor-pointer">
@@ -975,7 +979,7 @@ export default function Clientes({ session }) {
                       {modalidadBadge && (
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate max-w-[100px] ${modalidadBadge.cls}`}>{modalidadBadge.label}</span>
                       )}
-                      {c.precio_mensual > 0 && <span className="text-xs font-bold text-acento">{c.precio_mensual}€</span>}
+                      {importeEfectivo && <span className="text-xs font-bold text-acento">{importeEfectivo}€</span>}
                     </div>
                   </div>
 
@@ -1012,7 +1016,7 @@ export default function Clientes({ session }) {
                     </span>
                     <span className="text-right">
                       <p className={`text-sm font-bold ${al.pagoVencido ? 'text-red-500' : 'text-acento'}`}>
-                        {c.precio_mensual > 0 ? `${c.precio_mensual}€` : '—'}
+                        {importeEfectivo ? `${importeEfectivo}€` : '—'}
                       </p>
                     </span>
                   </div>
