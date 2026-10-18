@@ -50,6 +50,7 @@ export default function CobroAreas({ cliente, onToast, onCambio, onPagos }) {
   const [sueltas, setSueltas] = useState([])
   const [nuevoBono, setNuevoBono] = useState(null) // área con el formulario abierto
   const [formBono, setFormBono] = useState(bonoVacio)
+  const [confirmandoArchivar, setConfirmandoArchivar] = useState(null)
 
   async function cargar() {
     const [m, b, s] = await Promise.all([
@@ -103,8 +104,8 @@ export default function CobroAreas({ cliente, onToast, onCambio, onPagos }) {
     cargar()
   }
 
-  async function archivarBono(bono) {
-    if (!window.confirm('¿Archivar este bono? Dejará de descontar sesiones.')) return
+  async function archivarBonoConfirmado(bono) {
+    setConfirmandoArchivar(null)
     const { error } = await supabase.from('bonos').update({ activo: false }).eq('id', bono.id)
     if (error) { onToast?.('No se pudo archivar', 'error'); return }
     cargar()
@@ -130,7 +131,7 @@ export default function CobroAreas({ cliente, onToast, onCambio, onPagos }) {
 
             {(mod?.modalidad === 'bono' || bonosArea.length > 0) && (
               <div className="space-y-2">
-                {bonosArea.map(b => <TarjetaBono key={b.id} bono={b} onUsar={usarBono} onDesactivar={archivarBono} />)}
+                {bonosArea.map(b => <TarjetaBono key={b.id} bono={b} onUsar={usarBono} onDesactivar={b => setConfirmandoArchivar(b)} />)}
                 {nuevoBono === area ? (
                   <div className="border border-black/10 rounded-xl p-3 space-y-2">
                     <div className="grid grid-cols-3 gap-2">
@@ -175,6 +176,18 @@ export default function CobroAreas({ cliente, onToast, onCambio, onPagos }) {
           </div>
         )
       })}
+      {confirmandoArchivar && (
+        <div className="fixed inset-0 bg-black/50 z-[300] flex items-center justify-center p-4" onClick={() => setConfirmandoArchivar(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-[#0A0A0A] text-base mb-1">Archivar bono</h3>
+            <p className="text-sm text-[#6B6B6B] mt-1 mb-4 leading-relaxed">¿Archivar este bono? Dejará de descontar sesiones.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setConfirmandoArchivar(null)} className="flex-1 py-2.5 rounded-xl border border-black/10 text-sm font-medium text-[#6B6B6B] hover:bg-[#F5F5F0] transition-all active:scale-95">Cancelar</button>
+              <button onClick={() => archivarBonoConfirmado(confirmandoArchivar)} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 bg-[#0A0A0A] hover:bg-[#2A2A2A]">Archivar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
