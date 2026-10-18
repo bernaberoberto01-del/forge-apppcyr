@@ -390,7 +390,7 @@ Deno.serve(async (req)=>{
               ]
             },
             {
-              dia: 'Miercoles',
+              dia: 'Miércoles',
               nombre: esGrasa ? 'Full body B' : 'Jalon + Biceps',
               ejercicios: [
                 {
