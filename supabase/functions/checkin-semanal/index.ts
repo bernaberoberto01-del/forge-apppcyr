@@ -82,13 +82,13 @@ Deno.serve(async (req) => {
         const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f2f1ee}.w{max-width:520px;margin:0 auto;padding:20px 16px}.c{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,.06)}.h{background:#0A0A0A;padding:28px}.hl{font-size:20px;font-weight:800;color:${color}}.hs{font-size:12px;color:rgba(255,255,255,.3);margin-top:4px}.b{padding:28px}.hi{font-size:20px;font-weight:700;color:#0A0A0A;margin-bottom:12px}.t{font-size:14px;line-height:1.7;color:#555;margin-bottom:12px}.cta{text-align:center;margin:28px 0}.btn{display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:15px 36px;border-radius:12px}.note{font-size:11px;color:#aaa;text-align:center;margin-top:8px}.items{background:#f7f6f3;border-radius:12px;padding:16px 18px;margin:16px 0;border-left:3px solid ${color}}.item{font-size:13px;color:#444;padding:3px 0}.f{padding:16px 28px;background:#f7f6f3;font-size:11px;color:#aaa;text-align:center}</style></head><body><div class="w"><div class="c"><div class="h"><div class="hl">${eNegocio}</div><div class="hs">Tu check-in semanal</div></div><div class="b"><div class="hi">Hola ${eNombre} 👋</div><p class="t">${msg}</p><div class="items"><div class="item">⚡ ¿Cómo va tu energía?</div><div class="item">😴 ¿Estás durmiendo bien?</div><div class="item">🏋️ ¿Cómo está la fatiga muscular?</div><div class="item">🧠 ¿Cuánto estrés estás manejando?</div></div><p class="t" style="font-size:13px;color:#777">Con esos datos ajusto tu plan. <strong>Tarda menos de 1 minuto.</strong></p><div class="cta"><a href="${APP_URL}" class="btn">Hacer mi check-in →</a></div><p class="note">Entra al portal → pulsa 📋 Check-in semanal</p></div><div class="f">Un mensaje de ${eEntrenador} · ${eNegocio}</div></div></div></body></html>`
 
         try {
-          // Guard deduplicación: no insertar mensaje si ya se envió uno en las últimas 48h
+          // Guard deduplicación: no insertar si ya hay mensaje tipo='sistema' en las últimas 48h
+          // (solo checkin-semanal inserta tipo='sistema')
           const hace48h = new Date(hoy.getTime() - 2 * 864e5).toISOString()
           const { data: msgReciente } = await sb.from('mensajes_cliente')
             .select('id')
             .eq('cliente_id', cliente.id)
             .eq('tipo', 'sistema')
-            .like('contenido', '%Recordatorio de check-in%')
             .gte('created_at', hace48h)
             .limit(1)
           if (msgReciente?.length) {
