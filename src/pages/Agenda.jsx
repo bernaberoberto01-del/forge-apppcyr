@@ -198,6 +198,12 @@ export default function Agenda({ session }) {
   const { centro, miembros, esAdmin } = useCentro() || {}
   const [confirm, ConfirmUI] = useConfirm()
   const timelineRef = useRef()
+  // Arrastrar sesiones en la vista semanal (como el calendario de iOS):
+  // ratón → se arrastra al moverlo; táctil → mantener pulsado y arrastrar.
+  const gridRef = useRef()
+  const arrastreRef = useRef(null)
+  const ultimoArrastreRef = useRef(0)
+  const [arrastre, setArrastre] = useState(null) // { key, fecha, hora, dur } mientras se arrastra
   const uid = session.user.id
   const equipo = useEquipo(uid)
   const { completar, completado } = useOnboarding(uid)
@@ -582,6 +588,91 @@ export default function Agenda({ session }) {
     setModalRecurrente(true)
   }
 
+  function destinoArrastre(x, y, d) {
+    const r = gridRef.current?.getBoundingClientRect()
+    if (!r) return null
+    const n = diasSemana.length
+    const colW = (r.width - 48) / n
+    const idx = Math.min(n - 1, Math.max(0, Math.floor((x - r.left - 48) / colW)))
+    let min = ((y - r.top) / pxH) * 60 + HORA_INICIO * 60 - d.offsetMin
+    min = Math.round(min / 15) * 15
+    min = Math.max(HORA_INICIO * 60, Math.min((HORA_INICIO + HORAS.length) * 60 - d.dur, min))
+    return { fecha: formatFecha(diasSemana[idx]), hora: minAHora(min) }
+  }
+
+  function iniciarArrastre(s, x, y, tactil) {
+    if (s.cancelada || s._esClase) return
+    const r = gridRef.current?.getBoundingClientRect()
+    if (!r) return
+    const ini = horaAMin(s.hora || '09:00')
+    const offsetMin = ((y - r.top) / pxH) * 60 + HORA_INICIO * 60 - ini
+    const d = { s, x0: x, y0: y, activo: false, tactil, offsetMin, dur: s.duracion_minutos || 60, destino: null, timer: null }
+    const activar = () => {
+      d.activo = true
+      if (tactil && navigator.vibrate) navigator.vibrate(15)
+      d.destino = { fecha: s.fecha, hora: (s.hora || '09:00').slice(0, 5) }
+      setArrastre({ key: s.id, ...d.destino, dur: d.dur })
+    }
+    if (tactil) d.timer = setTimeout(activar, 350)
+    const mover = (mx, my, ev) => {
+      if (!d.activo) {
+        const lejos = Math.hypot(mx - d.x0, my - d.y0) > 8
+        if (tactil && lejos) return terminar(false) // se desliza antes de mantener: es scroll
+        if (!tactil && lejos) activar()
+        if (!d.activo) return
+      }
+      if (ev?.cancelable) ev.preventDefault()
+      const dest = destinoArrastre(mx, my, d)
+      if (dest && (dest.fecha !== d.destino?.fecha || dest.hora !== d.destino?.hora)) {
+        d.destino = dest
+        setArrastre({ key: s.id, ...dest, dur: d.dur })
+      }
+    }
+    const onMouseMove = e => mover(e.clientX, e.clientY, e)
+    const onTouchMove = e => { const t = e.touches[0]; if (t) mover(t.clientX, t.clientY, e) }
+    const terminar = (soltar = true) => {
+      clearTimeout(d.timer)
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onUp)
+      window.removeEventListener('touchcancel', onCancel)
+      arrastreRef.current = null
+      if (d.activo) {
+        ultimoArrastreRef.current = Date.now()
+        setArrastre(null)
+        if (soltar && d.destino) moverPorArrastre(s, d.destino.fecha, d.destino.hora)
+      }
+    }
+    const onUp = () => terminar(true)
+    const onCancel = () => terminar(false)
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchmove', onTouchMove, { passive: false })
+    window.addEventListener('touchend', onUp)
+    window.addEventListener('touchcancel', onCancel)
+    arrastreRef.current = d
+  }
+
+  async function moverPorArrastre(s, fecha, hora) {
+    if (s.fecha === fecha && (s.hora || '').slice(0, 5) === hora) return
+    // Clase fija semanal: se mueve solo ese día (excepción), igual que el botón "Mover"
+    if (s._esVirtual) return moverSesionVirtual(s, fecha, hora)
+    setLoading(true)
+    const q = supabase.from('sesiones').update({ fecha, hora })
+    // Sesión de grupo: una tarjeta = una fila por miembro; se mueven todas
+    const { error } = s._esGrupoReal
+      ? await q.eq('grupo_id', s.grupo_id).eq('fecha', s.fecha).eq('hora', s.hora)
+      : await q.eq('id', s.id)
+    if (error) setToast({ msg: 'No se pudo mover la sesión', tipo: 'error' })
+    else {
+      const label = new Date(fecha + 'T12:00').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })
+      setToast({ msg: `Sesión movida al ${label} a las ${hora}` })
+    }
+    await cargar(centro?.id)
+    setLoading(false)
+  }
+
   async function guardarEdicion() {
     if (!sesionDetalle?.id) return
     setLoading(true)
@@ -940,7 +1031,7 @@ export default function Agenda({ session }) {
         {/* Grid timeline - sin scroll en escritorio, scroll solo si no cabe */}
         <div ref={timelineRef} className="overflow-y-auto overflow-x-hidden relative flex-1"
           style={{ height: 'calc(100vh - 220px)' }}>
-          <div className="flex" style={{ height: HORAS.length * pxH }}>
+          <div ref={gridRef} className="flex" style={{ height: HORAS.length * pxH }}>
             {/* Columna horas */}
             <div className="w-12 flex-shrink-0 relative">
               {HORAS.map(h => (
@@ -976,6 +1067,14 @@ export default function Agenda({ session }) {
                         <div className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 -ml-1" />
                         <div className="flex-1 h-px bg-red-500" />
                       </div>
+                    </div>
+                  )}
+
+                  {/* Destino mientras se arrastra una sesión */}
+                  {arrastre && arrastre.fecha === fechaDia && (
+                    <div className="absolute left-0.5 right-0.5 z-30 rounded-lg border-2 border-dashed border-acento bg-acento/15 pointer-events-none flex items-start px-1.5 py-1"
+                      style={{ top: (horaAMin(arrastre.hora) / 60 - HORA_INICIO) * pxH + 2, height: Math.max((arrastre.dur / 60) * pxH - 4, 24) }}>
+                      <span className="text-xs font-bold text-acento">{arrastre.hora}</span>
                     </div>
                   )}
 
@@ -1042,8 +1141,11 @@ export default function Agenda({ session }) {
                       
                       return (
                         <div key={s.id || idx}
-                          onClick={e => { e.stopPropagation(); setSesionDetalle(s) }}
-                          className={`absolute cursor-pointer z-10 transition-all hover:shadow-md hover:scale-[1.01] ${s.completada ? 'opacity-55' : ''}`}
+                          onClick={e => { e.stopPropagation(); if (Date.now() - ultimoArrastreRef.current < 400) return; setSesionDetalle(s) }}
+                          onMouseDown={e => { if (e.button === 0) iniciarArrastre(s, e.clientX, e.clientY, false) }}
+                          onTouchStart={e => { const t = e.touches[0]; if (t) iniciarArrastre(s, t.clientX, t.clientY, true) }}
+                          onContextMenu={e => e.preventDefault()}
+                          className={`absolute cursor-pointer z-10 transition-all hover:shadow-md hover:scale-[1.01] select-none ${s.completada ? 'opacity-55' : ''} ${arrastre?.key === s.id ? 'opacity-30' : ''}`}
                           style={{
                             top: top + 2,
                             height,
