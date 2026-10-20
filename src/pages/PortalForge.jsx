@@ -2,6 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { BRAND, colorMarca } from '../lib/brand'
 import BrandMark from '../components/BrandMark'
+import { moduloVisible } from '../lib/modulos'
+
+// El portal respeta los módulos que el centro tiene ocultos: si el centro no usa
+// Seguimiento, Mensajes o Nutrición, sus clientes no ven el check-in, el chat ni
+// la nutrición (nadie les respondería). En Forge están todos visibles.
+const VER_CHECKIN = moduloVisible('seguimiento')
+const VER_MENSAJES = moduloVisible('mensajes')
+const VER_NUTRICION = moduloVisible('nutricion')
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const qa = p => p.then(r => r.data || []).catch(() => [])
@@ -149,7 +157,7 @@ export default function PortalForge() {
   useEffect(() => {
     if (!datos || modoOnboarding !== null) return
     const esNuevo = !datos.cuest && (datos.checkins?.length || 0) < 2 && !datos.rutina
-    setModoOnboarding(esNuevo)
+    setModoOnboarding(esNuevo && VER_CHECKIN)
   }, [datos])
 
   async function cargarTodo() {
@@ -425,7 +433,7 @@ export default function PortalForge() {
   }
   // Mostrar si tiene plan, o si directamente tiene datos en BD
   const verRutina = !esOnline || acceso.rutinas || !!(datos?.rutina)
-  const verNutricion = !esOnline || acceso.nutricion || !!(datos?.nutricion)
+  const verNutricion = VER_NUTRICION && (!esOnline || acceso.nutricion || !!(datos?.nutricion))
   const bloqueadoRutina = esOnline && !verRutina
   const bloqueadoNutricion = esOnline && !verNutricion
 
@@ -532,7 +540,7 @@ export default function PortalForge() {
   }
   const nombre = cliente.nombre?.split(' ')[0] || ''
   const iniciales = cliente.nombre?.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() || '?'
-  const msgNoLeidos = mensajes.filter(m => !m.leido && m.tipo === 'entrenador').length
+  const msgNoLeidos = VER_MENSAJES ? mensajes.filter(m => !m.leido && m.tipo === 'entrenador').length : 0
 
   // Racha de semanas activas
   const semanasActivas = (() => {
@@ -571,7 +579,7 @@ export default function PortalForge() {
     { id: 'mensajes', label: 'Mensajes',  icon: '✉️', badge: msgNoLeidos, desc: msgNoLeidos > 0 ? `${msgNoLeidos} sin leer` : 'Chat con tu entrenador' },
     ...(pagos?.length ? [{ id: 'pagos', label: 'Pagos', icon: '💳', badge: 0, desc: `${pagos.filter(p=>!['cobrado','pagado'].includes(p.estado)).length > 0 ? 'Tienes pagos pendientes' : 'Historial al día'}` }] : []),
     { id: 'ajustes', label: 'Ajustes', icon: '⚙️', badge: 0, desc: 'Objetivo, peso, contraseña' },
-  ]
+  ].filter(i => VER_MENSAJES || i.id !== 'mensajes')
 
   return (
     <>
@@ -706,7 +714,7 @@ export default function PortalForge() {
             </div>
           )}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
-          {tab === 'mensajes' && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} />}
+          {tab === 'mensajes' && VER_MENSAJES && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} />}
           {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
         </div>
 
@@ -996,7 +1004,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
   const sesionHoy = sesionesHoy?.[0]
   const pesos = checkins?.filter(c => c.peso).slice().reverse() || []
   const diasSinCI = checkins?.[0]?.fecha ? Math.floor((Date.now() - new Date(checkins[0].fecha).getTime()) / 864e5) : 999
-  const ciUrgente = diasSinCI >= 7
+  const ciUrgente = VER_CHECKIN && diasSinCI >= 7
   const diffPeso = pesos.length >= 2 ? +(pesos[pesos.length-1].peso - pesos[0].peso).toFixed(1) : null
   const diasRutina = rutina?.borrador?.dias || rutina?.contenido?.dias || []
   const sesCompletadas = (sesionesEstaSemana || []).filter(s => s.completada && s.fecha <= hoy).length
@@ -1094,10 +1102,12 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
               </a>
             )}
           </div>
+          {VER_MENSAJES && (
           <div className="px-5 py-3.5 bg-black/15 flex items-center justify-between">
             <p className="text-white/60 text-xs">¿Alguna duda?</p>
             <button onClick={() => setTab('mensajes')} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-white/20 text-white active:scale-95">Escribir →</button>
           </div>
+          )}
         </div>
       )}
 
@@ -1301,7 +1311,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             </p>
           </button>
         )}
-        <button onClick={() => setModalCI(true)}
+        {VER_CHECKIN && <button onClick={() => setModalCI(true)}
           className="rounded-2xl p-4 text-left active:scale-[0.98] transition-all"
           style={{
             background: ciUrgente ? '#0A0A0A' : 'white',
@@ -1318,7 +1328,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
           <p className="text-[10px] font-bold mt-2" style={{ color: ciUrgente ? color : '#9B9B9B' }}>
             {ciUrgente ? 'Registrar →' : 'Nuevo →'}
           </p>
-        </button>
+        </button>}
         <button onClick={() => setModalActividad(true)}
           className="bg-white rounded-2xl p-4 text-left active:scale-[0.98] transition-all">
           <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Actividad</p>
@@ -1643,7 +1653,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
       badge: 0,
       urgente: false,
     },
-  ]
+  ].filter(i => VER_MENSAJES || i.id !== 'mensajes')
 
   async function guardar(e) {
     e.preventDefault()
