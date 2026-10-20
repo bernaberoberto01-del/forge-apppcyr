@@ -329,6 +329,7 @@ export default function PortalForge() {
     const { data: sesNueva, error } = await supabase.from('sesiones').insert({
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
       fecha: hoyStr(), tipo: 'online', completada: true, cancelada: false, notas: modalRegistro.nombre,
+      valoracion_pendiente: true,
     }).select().single()
     if (error || !sesNueva) {
       setGuardandoRegistro(false)
@@ -338,7 +339,7 @@ export default function PortalForge() {
     const rows = (modalRegistro.ejercicios || []).map((ej, i) => ({
       sesion_id: sesNueva.id, cliente_id: cliente.id,
       ejercicio_nombre: ej.nombre, patron: ej.patron || null, orden: i,
-      sets: (registroSets[i] || []).filter(s => s.peso || s.reps),
+      sets: (registroSets[i] || []).filter(s => s.completada || s.peso || s.reps),
     })).filter(r => r.sets.length > 0)
     if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
     setSesionGuardadaId(sesNueva.id)
@@ -1311,24 +1312,18 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             </p>
           </button>
         )}
-        {VER_CHECKIN && <button onClick={() => setModalCI(true)}
-          className="rounded-2xl p-4 text-left active:scale-[0.98] transition-all"
-          style={{
-            background: ciUrgente ? '#0A0A0A' : 'white',
-            border: ciUrgente ? `1px solid ${color}` : undefined
-          }}>
-          <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-2"
-            style={{ color: ciUrgente ? color : '#9B9B9B' }}>Check-in</p>
-          <p className="text-sm font-black leading-tight"
-            style={{ color: ciUrgente ? 'white' : '#0A0A0A' }}>
-            {ciUrgente
-              ? diasSinCI > 900 ? 'Primer check-in' : `${diasSinCI} días`
-              : `Hace ${diasSinCI === 0 ? 'hoy' : diasSinCI + 'd'}`}
-          </p>
-          <p className="text-[10px] font-bold mt-2" style={{ color: ciUrgente ? color : '#9B9B9B' }}>
-            {ciUrgente ? 'Registrar →' : 'Nuevo →'}
-          </p>
-        </button>}
+        {/* Con check-in atrasado ya sale el aviso rojo arriba: aquí no se repite.
+            Sin módulo Seguimiento en el centro, no hay check-in. */}
+        {VER_CHECKIN && !ciUrgente && (
+          <button onClick={() => setModalCI(true)}
+            className="rounded-2xl p-4 text-left active:scale-[0.98] transition-all bg-white">
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Check-in</p>
+            <p className="text-sm font-black text-[#0A0A0A] leading-tight">
+              {`Hace ${diasSinCI === 0 ? 'hoy' : diasSinCI + 'd'}`}
+            </p>
+            <p className="text-[10px] font-bold mt-2" style={{ color }}>Nuevo →</p>
+          </button>
+        )}
         <button onClick={() => setModalActividad(true)}
           className="bg-white rounded-2xl p-4 text-left active:scale-[0.98] transition-all">
           <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Actividad</p>
