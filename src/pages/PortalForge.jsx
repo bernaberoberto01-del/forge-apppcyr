@@ -196,11 +196,11 @@ export default function PortalForge() {
       qa(supabase.from('fotos_progreso').select('*').eq('cliente_id', cid).eq('visible_cliente', true).order('fecha', { ascending: false })),
       q1(supabase.from('cuestionarios_nutricion').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(1)),
       qa(supabase.from('sesion_ejercicios').select('ejercicio_nombre,sets,patron,sesion_id').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(500)),
-      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(7)).lte('fecha', new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(30)).lte('fecha', new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
       qa(supabase.from('nutricion_registros').select('fecha,dia_nombre').eq('cliente_id', cid).gte('fecha', hace(30)).order('fecha', { ascending: false })),
       q1(supabase.from('suplementacion_cliente').select('*').eq('cliente_id', cid)),
       q1(supabase.from('planes_cobro').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(1)),
-      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('valoracion_pendiente', true).is('rpe', null).gte('fecha', hace(7)).order('fecha', { ascending: false })),
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('valoracion_pendiente', true).is('rpe', null).gte('fecha', hace(30)).order('fecha', { ascending: false })),
       qa(supabase.from('lesiones_cliente').select('*').eq('cliente_id', cid).order('created_at', { ascending: false })),
       qa(supabase.from('ejercicios_biblioteca').select('nombre,youtube_url,consejos_tecnica').eq('entrenador_id', eid)),
     ])
@@ -349,11 +349,11 @@ export default function PortalForge() {
     })).filter(r => r.sets.length > 0)
     if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
     setSesionGuardadaId(sesNueva.id)
-    setGuardandoRegistro(false)
+    // NO reseteamos guardandoRegistro aquí — lo reseteamos al cerrar para evitar doble registro
   }
 
   function cerrarModalRegistro() {
-    setModalRegistro(null); setRegistroSets({}); setSesionGuardadaId(null)
+    setModalRegistro(null); setRegistroSets({}); setSesionGuardadaId(null); setGuardandoRegistro(false)
     showToast('✓ Sesión registrada')
     cargarTodo()
   }
@@ -1014,7 +1014,11 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
   const ciUrgente = VER_CHECKIN && diasSinCI >= 7
   const diffPeso = pesos.length >= 2 ? +(pesos[pesos.length-1].peso - pesos[0].peso).toFixed(1) : null
   const diasRutina = rutina?.borrador?.dias || rutina?.contenido?.dias || []
-  const sesCompletadas = (sesionesEstaSemana || []).filter(s => s.completada && s.fecha <= hoy).length
+  // Día de rutina que toca: sesiones completadas desde el lunes de esta semana
+  // (sesionesEstaSemana trae 30 días para la agenda y las valoraciones; si se
+  // contaran todas, el día cambiaría según sesiones de semanas anteriores).
+  const lunesStr = (() => { const d = new Date(ahora); d.setDate(d.getDate() - (d.getDay() || 7) + 1); return d.toLocaleDateString('sv-SE') })()
+  const sesCompletadas = (sesionesEstaSemana || []).filter(s => s.completada && s.fecha >= lunesStr && s.fecha <= hoy).length
   const diaHoy = diasRutina.length > 0 ? diasRutina[sesCompletadas % diasRutina.length] : null
 
   // Agenda semana

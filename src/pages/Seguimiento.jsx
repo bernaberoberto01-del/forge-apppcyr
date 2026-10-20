@@ -836,7 +836,7 @@ export default function Seguimiento({ session }) {
                         <p className="text-sm font-semibold text-[#0A0A0A] mb-2">{ej.ejercicio_nombre}</p>
                         <div className="flex gap-2 flex-wrap">
                           {(ej.sets||[]).map((s,j) => (
-                            <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${s.completado?'bg-emerald-50 text-emerald-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                            <div key={j} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${(s.completada||s.completado)?'bg-emerald-50 text-emerald-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
                               {s.peso?`${s.peso}kg`:'—'} × {s.reps||'—'}
                             </div>
                           ))}
