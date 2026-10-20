@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { useEquipo } from '../hooks/useCentro'
 
 const GRUPOS = ['Todos','Pecho','Espalda','Hombros','Bíceps','Tríceps','Piernas','Glúteos','Posterior','Core','Full body']
 
@@ -12,12 +13,15 @@ export default function EjercicioInput({ value, onChange, onSelect, placeholder 
   const ref = useRef()
 
   // Cargar biblioteca una vez
+  // Biblioteca del equipo (en un centro que comparte clientes, la del centro),
+  // no solo la del usuario: si no, un entrenador del equipo no ve sugerencias.
+  const equipo = useEquipo(uid)
   useEffect(() => {
     if (!uid) return
-    supabase.from('ejercicios_biblioteca').select('*').eq('entrenador_id', uid)
-      .order('usos', { ascending: false }).limit(100)
+    supabase.from('ejercicios_biblioteca').select('*').in('entrenador_id', equipo)
+      .order('usos', { ascending: false }).limit(1000)
       .then(({ data }) => setBiblioteca(data || []))
-  }, [uid])
+  }, [uid, equipo])
 
   // Sincronizar value externo
   useEffect(() => { setQuery(value || '') }, [value])

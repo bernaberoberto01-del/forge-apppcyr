@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useEquipo } from '../hooks/useCentro'
+import { ytEmbed, ytMiniatura } from '../lib/youtube'
 
 const GRUPOS = ['Todos','Pecho','Espalda','Hombros','Bíceps','Tríceps','Piernas','Glúteos','Posterior','Isquios','Core','Full body','Cardio','Cadera','Gemelos','Movilidad']
 const NIVELES = ['Todos','principiante','intermedio','avanzado']
@@ -23,10 +24,10 @@ function VideoModal({ ejercicio, onClose }) {
         </div>
 
         {/* Video YouTube embed */}
-        {ejercicio.youtube_url && (
-          <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+        {ytEmbed(ejercicio.youtube_url) && (
+          <div className="relative w-full" style={{ paddingBottom:'56.25%' }}>
             <iframe
-              src={`${ejercicio.youtube_url}?autoplay=1&rel=0&modestbranding=1`}
+              src={`${ytEmbed(ejercicio.youtube_url)}?autoplay=1&rel=0&modestbranding=1`}
               className="absolute inset-0 w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
@@ -192,7 +193,7 @@ export default function Biblioteca({ session }) {
                   {e.youtube_url ? (
                     <div className="relative w-full h-full">
                       <img
-                        src={`https://img.youtube.com/vi/${e.youtube_url.split('/').pop()}/mqdefault.jpg`}
+                        src={ytMiniatura(e.youtube_url)}
                         alt={e.nombre}
                         className="w-full h-full object-cover"
                         onError={ev => ev.target.style.display='none'}
