@@ -1498,7 +1498,7 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
                   {ejercicios.map((ej, ei) => {
                     const hist = histPorEj[ej.nombre]
                     const bibEntry = biblioteca[(ej.nombre || '').toLowerCase()]
-                    const tieneVideo = !!(bibEntry?.youtube_url)
+                    const tieneVideo = !!ytEmbed(bibEntry?.youtube_url) // enlace válido, si no no hay botón ▶
                     return (
                       <div key={ei} className="px-4 py-3.5">
                         <div className="flex items-start gap-3">
@@ -3401,7 +3401,7 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
             const n = parseInt(ej.series) || 3
             const compEj = setsEj ? setsEj.filter(s => s.completada).length : 0
             const bibEntry = biblioteca[(ej.nombre || '').toLowerCase()]
-            const tieneVideo = !!(bibEntry?.youtube_url)
+            const tieneVideo = !!ytEmbed(bibEntry?.youtube_url) // enlace válido, si no no hay botón ▶
 
             return (
               <div key={ei} className="border-b border-black/4 last:border-0 px-5 py-4">
