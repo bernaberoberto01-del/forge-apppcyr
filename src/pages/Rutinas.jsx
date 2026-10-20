@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useConfirm } from '../components/ConfirmModal'
+import { funcionActiva } from '../lib/modulos'
 import TutorialBanner from '../components/TutorialBanner'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { useSearchParams } from 'react-router-dom'
@@ -8,6 +9,12 @@ import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import ClienteQuickView from '../components/ClienteQuickView'
 import EjercicioInput from '../components/EjercicioInput'
 import { BRAND } from '../lib/brand'
+
+// Opciones por centro (ficha → funciones): 'sin_ia' oculta la generación con IA
+// (centro sin clave de IA); 'rutinas_solo_online' limita Rutinas a clientes online
+// (los presenciales solo se gestionan en cobros y agenda). En Forge, ninguna.
+const IA = !funcionActiva('sin_ia')
+const SOLO_ONLINE = funcionActiva('rutinas_solo_online')
 
 const PATRONES = ['empuje_horizontal','empuje_vertical','tiron_vertical','tiron_horizontal','sentadilla','bisagra','hip_extension','core','cardio','aislamiento','movilidad']
 const GRUPOS_MUSCULARES = ['Pecho','Espalda','Hombros','Bíceps','Tríceps','Piernas','Glúteos','Posterior','Isquios','Core','Full body','Cardio','Cadera','Gemelos','Movilidad']
@@ -127,7 +134,7 @@ export default function Rutinas({ session }) {
       supabase.from('ejercicios_biblioteca').select('*').in('entrenador_id', equipo).order('grupo_muscular').order('nombre'),
     ])
     setRutinas(ru || [])
-    setClientes(cl || [])
+    setClientes(SOLO_ONLINE ? (cl || []).filter(c => c.tipo === 'online') : (cl || []))
     setPlantillas(pl || [])
     setBiblioteca(bib || [])
     setLoading(false)
@@ -411,7 +418,7 @@ export default function Rutinas({ session }) {
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Rutinas</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">Genera con IA, crea manualmente o aplica plantillas</p>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">{IA ? 'Genera con IA, crea manualmente o aplica plantillas' : 'Crea rutinas manualmente o aplica plantillas'}</p>
         </div>
         <div className="flex gap-2 flex-shrink-0">
           {tabPrincipal === 'rutinas' && (
@@ -501,14 +508,14 @@ export default function Rutinas({ session }) {
                         <p className="text-xs text-[#6B6B6B]">{c.nivel} · {c.tipo}</p>
                       </div>
                       <div className="flex gap-1.5 flex-shrink-0">
-                        <button onClick={() => generarRutina(c.id)} disabled={generando === c.id}
+                        {IA && <button onClick={() => generarRutina(c.id)} disabled={generando === c.id}
                           className="bg-acento text-white text-xs font-semibold px-3 py-1.5 rounded-lg disabled:opacity-50">
                           {generando === c.id ? '⏳ Generando...' : '✨ Generar con IA'}
-                        </button>
-                        <button onClick={() => generarEvaluacion(c.id)} disabled={generando === c.id}
+                        </button>}
+                        {IA && <button onClick={() => generarEvaluacion(c.id)} disabled={generando === c.id}
                           className="border border-[#6366f1] text-[#6366f1] text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-50">
                           📋 Evaluación inicial
-                        </button>
+                        </button>}
                         <button onClick={() => { setManualClienteId(c.id); setModalManual(true) }}
                           className="border border-black/15 text-[#6B6B6B] text-xs font-medium px-3 py-1.5 rounded-lg hover:border-[#111]">
                           ✍️ Crear manual
@@ -527,7 +534,7 @@ export default function Rutinas({ session }) {
               <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
                 <p className="text-4xl mb-3">💪</p>
                 <p className="font-semibold text-[#0A0A0A]">{busqueda ? 'Sin resultados' : 'Sin rutinas'}</p>
-                <p className="text-sm text-[#6B6B6B] mt-1">{busqueda ? `No hay resultados para "${busqueda}"` : 'Genera una con IA o créala manualmente'}</p>
+                <p className="text-sm text-[#6B6B6B] mt-1">{busqueda ? `No hay resultados para "${busqueda}"` : (IA ? 'Genera una con IA o créala manualmente' : 'Créala manualmente o desde una plantilla')}</p>
               </div>
             ) : rutinasFiltradas.map(r => (
               <div key={r.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
@@ -544,7 +551,7 @@ export default function Rutinas({ session }) {
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => { setDetalle(r); setNotasEdit(r.notas_entrenador||''); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }}
                     className="flex-1 border border-black/10 text-[#0A0A0A] text-xs font-medium py-2 rounded-lg hover:bg-[#F5F5F0]">Ver rutina</button>
-                  {r.estado === 'publicada' && (
+                  {r.estado === 'publicada' && IA && (
                     <button onClick={() => analizarYActualizar(r.cliente_id)} disabled={generando === r.cliente_id}
                       title="Analizar check-ins y generar propuesta de actualización"
                       className="border border-[#6366f1]/30 text-[#6366f1] text-xs py-2 px-3 rounded-lg hover:bg-[#6366f1]/5 disabled:opacity-40 flex items-center gap-1.5 flex-shrink-0">
@@ -666,7 +673,7 @@ export default function Rutinas({ session }) {
             <div className="overflow-y-auto flex-1 overscroll-contain" style={{WebkitOverflowScrolling:'touch'}}>
             <div className="p-4 space-y-3">
               {/* Badge borrador IA */}
-              {detalle.estado === 'borrador' && (
+              {detalle.estado === 'borrador' && IA && (
                 <div className="bg-[#6366f1]/8 border border-[#6366f1]/20 rounded-xl px-4 py-3">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm">🤖</span>
@@ -802,7 +809,7 @@ export default function Rutinas({ session }) {
               )}
 
               {/* Campo contexto adicional para IA */}
-              {!modoEdicion && (
+              {!modoEdicion && IA && (
                 <div>
                   <button onClick={() => setMostrarContextoIA(!mostrarContextoIA)}
                     className="text-xs text-[#6B6B6B] hover:text-acento transition-colors flex items-center gap-1">
@@ -860,7 +867,7 @@ export default function Rutinas({ session }) {
                   <button onClick={() => publicar(detalle)} className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl">✅ Publicar</button>
                 )}
                 <button onClick={() => guardarComoPlantilla(detalle)} title="Guardar como plantilla" className="border border-[#6366f1]/30 text-[#6366f1] text-sm py-3 px-3 rounded-xl hover:bg-[#6366f1]/5">📋</button>
-                <button onClick={async () => {
+                {IA && <button onClick={async () => {
                   const ok = await confirm({ title: '¿Regenerar con IA?', message: 'Se eliminará la rutina actual y se generará una nueva desde cero.', danger: true, confirmText: 'Regenerar' })
                   if (!ok) return
                   const anterior = detalle
@@ -874,7 +881,7 @@ export default function Rutinas({ session }) {
                   title="Regenerar rutina con IA"
                   className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40">
                   {generando===detalle.cliente_id?'⏳':'🔄'}
-                </button>
+                </button>}
                 <button onClick={async () => {
                   const ok = await confirm({ title: '¿Eliminar rutina?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
                   if (!ok) return
