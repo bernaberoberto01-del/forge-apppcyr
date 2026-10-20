@@ -195,11 +195,11 @@ export default function PortalForge() {
       qa(supabase.from('fotos_progreso').select('*').eq('cliente_id', cid).eq('visible_cliente', true).order('fecha', { ascending: false })),
       q1(supabase.from('cuestionarios_nutricion').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(1)),
       qa(supabase.from('sesion_ejercicios').select('ejercicio_nombre,sets,patron,sesion_id').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(500)),
-      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(7)).lte('fecha', new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('cancelada', false).gte('fecha', hace(30)).lte('fecha', new Date(Date.now() + 7 * 864e5).toISOString().split('T')[0]).order('fecha').order('hora')),
       qa(supabase.from('nutricion_registros').select('fecha,dia_nombre').eq('cliente_id', cid).gte('fecha', hace(30)).order('fecha', { ascending: false })),
       q1(supabase.from('suplementacion_cliente').select('*').eq('cliente_id', cid)),
       q1(supabase.from('planes_cobro').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(1)),
-      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('valoracion_pendiente', true).is('rpe', null).gte('fecha', hace(7)).order('fecha', { ascending: false })),
+      qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('valoracion_pendiente', true).is('rpe', null).gte('fecha', hace(30)).order('fecha', { ascending: false })),
       qa(supabase.from('lesiones_cliente').select('*').eq('cliente_id', cid).order('created_at', { ascending: false })),
     ])
 
@@ -343,11 +343,11 @@ export default function PortalForge() {
     })).filter(r => r.sets.length > 0)
     if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
     setSesionGuardadaId(sesNueva.id)
-    setGuardandoRegistro(false)
+    // NO reseteamos guardandoRegistro aquí — lo reseteamos al cerrar para evitar doble registro
   }
 
   function cerrarModalRegistro() {
-    setModalRegistro(null); setRegistroSets({}); setSesionGuardadaId(null)
+    setModalRegistro(null); setRegistroSets({}); setSesionGuardadaId(null); setGuardandoRegistro(false)
     showToast('✓ Sesión registrada')
     cargarTodo()
   }
