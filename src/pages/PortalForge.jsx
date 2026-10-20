@@ -1008,7 +1008,11 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
   const ciUrgente = VER_CHECKIN && diasSinCI >= 7
   const diffPeso = pesos.length >= 2 ? +(pesos[pesos.length-1].peso - pesos[0].peso).toFixed(1) : null
   const diasRutina = rutina?.borrador?.dias || rutina?.contenido?.dias || []
-  const sesCompletadas = (sesionesEstaSemana || []).filter(s => s.completada && s.fecha <= hoy).length
+  // Día de rutina que toca: sesiones completadas desde el lunes de esta semana
+  // (sesionesEstaSemana trae 30 días para la agenda y las valoraciones; si se
+  // contaran todas, el día cambiaría según sesiones de semanas anteriores).
+  const lunesStr = (() => { const d = new Date(ahora); d.setDate(d.getDate() - (d.getDay() || 7) + 1); return d.toLocaleDateString('sv-SE') })()
+  const sesCompletadas = (sesionesEstaSemana || []).filter(s => s.completada && s.fecha >= lunesStr && s.fecha <= hoy).length
   const diaHoy = diasRutina.length > 0 ? diasRutina[sesCompletadas % diasRutina.length] : null
 
   // Agenda semana
