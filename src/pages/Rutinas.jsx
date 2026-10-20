@@ -9,6 +9,7 @@ import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import ClienteQuickView from '../components/ClienteQuickView'
 import EjercicioInput from '../components/EjercicioInput'
 import { BRAND } from '../lib/brand'
+import { ytEmbed, ytMiniatura } from '../lib/youtube'
 
 // Opciones por centro (ficha → funciones): 'sin_ia' oculta la generación con IA
 // (centro sin clave de IA); 'rutinas_solo_online' limita Rutinas a clientes online
@@ -42,9 +43,9 @@ function VideoModal({ ejercicio, onClose }) {
           </div>
           <button onClick={onClose} className="text-white/50 hover:text-white text-2xl w-8 h-8 flex items-center justify-center">×</button>
         </div>
-        {ejercicio.youtube_url && (
+        {ytEmbed(ejercicio.youtube_url) && (
           <div className="relative w-full" style={{ paddingBottom:'56.25%' }}>
-            <iframe src={`${ejercicio.youtube_url}?autoplay=1&rel=0&modestbranding=1`}
+            <iframe src={`${ytEmbed(ejercicio.youtube_url)}?autoplay=1&rel=0&modestbranding=1`}
               className="absolute inset-0 w-full h-full"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen title={ejercicio.nombre} />
@@ -458,6 +459,20 @@ export default function Rutinas({ session }) {
       {/* ===== TAB RUTINAS ===== */}
       {tabPrincipal === 'rutinas' && (
         <>
+          {/* Centro que solo hace rutinas a clientes online y aún no tiene ninguno */}
+          {SOLO_ONLINE && !loading && clientes.length === 0 && (
+            <div className="bg-white border border-acento/20 rounded-2xl p-4 mb-4 flex items-start gap-3">
+              <span className="text-xl">🌐</span>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-[#0A0A0A]">Aún no tienes clientes online</p>
+                <p className="text-xs text-[#6B6B6B] mt-0.5 leading-relaxed">
+                  Las rutinas son para tus clientes online. En Clientes, abre la ficha del cliente → ✏️ Editar → Tipo: 🌐 Online, pon su email y guarda. Después aparecerá aquí para prepararle la rutina.
+                </p>
+              </div>
+              <a href="/clientes" className="text-xs font-bold text-white bg-acento px-3 py-2 rounded-xl flex-shrink-0">Ir a Clientes →</a>
+            </div>
+          )}
+
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mb-4">
             {[['Total',stats.total,BRAND.color],['Por revisar',stats.borradores,'#f59e0b'],['Publicadas',stats.publicadas,'#10b981']].map(([l,v,c])=>(
@@ -612,7 +627,7 @@ export default function Rutinas({ session }) {
                     className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden ${e.youtube_url ? 'cursor-pointer' : 'bg-[#F5F5F0] cursor-default'}`}>
                     {e.youtube_url ? (
                       <div className="relative w-full h-full">
-                        <img src={`https://img.youtube.com/vi/${e.youtube_url.split('/').pop()}/mqdefault.jpg`}
+                        <img src={ytMiniatura(e.youtube_url)}
                           alt={e.nombre} className="w-full h-full object-cover"
                           onError={ev => { ev.target.style.display='none'; ev.target.nextSibling.style.display='flex' }} />
                         <div className="absolute inset-0 bg-black/30 flex items-center justify-center hover:bg-acento/80 transition-colors">
@@ -914,6 +929,11 @@ export default function Rutinas({ session }) {
                   <option value="">Selecciona cliente</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                 </select>
+                {clientes.length === 0 && (
+                  <p className="text-xs text-amber-700 mt-1.5">
+                    {SOLO_ONLINE ? 'No tienes clientes online todavía: márcalo como Online en su ficha de Clientes.' : 'No tienes clientes activos.'}
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre de la rutina *</label>
