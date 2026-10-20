@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { BRAND, colorMarca } from '../lib/brand'
 import BrandMark from '../components/BrandMark'
 import { moduloVisible } from '../lib/modulos'
+import { ytEmbed, ytMiniatura } from '../lib/youtube'
 
 // El portal respeta los módulos que el centro tiene ocultos: si el centro no usa
 // Seguimiento, Mensajes o Nutrición, sus clientes no ven el check-in, el chat ni
@@ -180,7 +181,7 @@ export default function PortalForge() {
     const cid = cl.id, eid = cl.entrenador_id, hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
-      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones] = await Promise.all([
+      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, bibRaw] = await Promise.all([
       q1(supabase.from('configuracion').select('*').eq('entrenador_id', eid)),
       q1(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
@@ -201,10 +202,15 @@ export default function PortalForge() {
       q1(supabase.from('planes_cobro').select('*').eq('cliente_id', cid).order('created_at', { ascending: false }).limit(1)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('valoracion_pendiente', true).is('rpe', null).gte('fecha', hace(30)).order('fecha', { ascending: false })),
       qa(supabase.from('lesiones_cliente').select('*').eq('cliente_id', cid).order('created_at', { ascending: false })),
+      qa(supabase.from('ejercicios_biblioteca').select('nombre,youtube_url,consejos_tecnica').eq('entrenador_id', eid)),
     ])
 
+    // Índice nombre→datos para lookup O(1) en TabEntrena y ModalRegistroSesion
+    const biblioteca = {}
+    for (const e of bibRaw) if (e.nombre) biblioteca[e.nombre.toLowerCase()] = e
+
     setConfig(cfg)
-    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones })
+    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, biblioteca })
     if (!previewId) {
       supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
       setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
@@ -411,7 +417,7 @@ export default function PortalForge() {
 
   if (!datos) return <div className="min-h-screen" style={{ background: '#F2F1EE' }} />
 
-  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones } = datos
+  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, biblioteca = {} } = datos
   const esOnline = cliente.tipo === 'online'
 
   // Onboarding guiado — pasos 1 y 2 en vivo (badges), paso 3 informativo.
@@ -693,7 +699,7 @@ export default function PortalForge() {
           {tab === 'entrena' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoRutina) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
-                <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} esOnline={esOnline} />
+                <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} esOnline={esOnline} biblioteca={biblioteca} />
               </div>
               {pagoVencido ? (
                 <BloqueoOverlay mensaje="Tu plan está pausado. Renueva para seguir." boton="Renovar ahora" onClick={irAPagos} color={color} />
@@ -812,7 +818,7 @@ export default function PortalForge() {
         {modalActividad && <ModalActividad color={color} actForm={actForm} setActForm={setActForm} guardandoAct={guardandoAct} guardarActividad={guardarActividad} onClose={() => setModalActividad(false)} ACTIVIDADES={ACTIVIDADES} />}
 
         {/* Modal registro sesión */}
-        {modalRegistro && <ModalRegistroSesion dia={modalRegistro} color={color} registroSets={registroSets} setRegistroSets={setRegistroSets} ejerciciosHist={ejerciciosHist} guardandoRegistro={guardandoRegistro} guardarRegistroSesion={guardarRegistroSesion} onClose={() => { setModalRegistro(null); setRegistroSets({}); setSesionGuardadaId(null) }} sesionGuardadaId={sesionGuardadaId} cliente={cliente} onFinalizar={cerrarModalRegistro} acceso={acceso} solicitarCambioPlan={solicitarCambioPlan} modoPreview={modoPreview} />}
+        {modalRegistro && <ModalRegistroSesion dia={modalRegistro} color={color} registroSets={registroSets} setRegistroSets={setRegistroSets} ejerciciosHist={ejerciciosHist} guardandoRegistro={guardandoRegistro} guardarRegistroSesion={guardarRegistroSesion} onClose={() => { setModalRegistro(null); setRegistroSets({}); setSesionGuardadaId(null) }} sesionGuardadaId={sesionGuardadaId} cliente={cliente} onFinalizar={cerrarModalRegistro} acceso={acceso} solicitarCambioPlan={solicitarCambioPlan} modoPreview={modoPreview} biblioteca={biblioteca} />}
 
       </main>
     </div>
@@ -1390,8 +1396,9 @@ function limpiarNombreRutina(nombre) {
   return sinDups.join(' - ')
 }
 
-function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline }) {
+function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline, biblioteca = {} }) {
   const [diaAbierto, setDiaAbierto] = useState(null) // null = todos cerrados
+  const [videoEj, setVideoEj] = useState(null) // { nombre, youtube_url, consejos_tecnica }
 
   if (!rutina) return (
     <div className="text-center py-16">
@@ -1417,6 +1424,38 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline 
 
   return (
     <div className="space-y-3">
+      {/* Modal vídeo ejercicio */}
+      {videoEj && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+          onClick={() => setVideoEj(null)}>
+          <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 pt-5 pb-3">
+              <p className="font-bold text-[#0A0A0A] text-base leading-tight pr-4">{videoEj.nombre}</p>
+              <button onClick={() => setVideoEj(null)}
+                className="w-8 h-8 rounded-full bg-[#F2F1EE] flex items-center justify-center text-[#9B9B9B] text-lg flex-shrink-0 active:scale-95">✕</button>
+            </div>
+            <div className="aspect-video w-full bg-black">
+              <iframe
+                src={`${ytEmbed(videoEj.youtube_url)}?autoplay=1&rel=0&modestbranding=1`}
+                className="w-full h-full"
+                allow="autoplay; fullscreen"
+                allowFullScreen
+                title={videoEj.nombre}
+              />
+            </div>
+            {videoEj.consejos_tecnica && (
+              <div className="px-5 py-4 border-t border-black/5">
+                <p className="text-xs font-semibold text-[#0A0A0A] mb-1.5">💡 Técnica</p>
+                <p className="text-xs text-[#6B6B6B] leading-relaxed">{videoEj.consejos_tecnica}</p>
+              </div>
+            )}
+            <div className="h-safe-area-bottom pb-5" />
+          </div>
+        </div>
+      )}
+
       <div className="pb-1 flex items-end justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">{limpiarNombreRutina(rutina.nombre)}</h2>
@@ -1458,11 +1497,24 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline 
                 <div className="divide-y divide-black/4 border-t border-black/5">
                   {ejercicios.map((ej, ei) => {
                     const hist = histPorEj[ej.nombre]
+                    const bibEntry = biblioteca[(ej.nombre || '').toLowerCase()]
+                    const tieneVideo = !!ytEmbed(bibEntry?.youtube_url) // enlace válido, si no no hay botón ▶
                     return (
                       <div key={ei} className="px-4 py-3.5">
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-[#0A0A0A]">{ej.nombre}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-[#0A0A0A] flex-1">{ej.nombre}</p>
+                              {tieneVideo && (
+                                <button
+                                  onClick={() => setVideoEj(bibEntry)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-all"
+                                  style={{ background: `${color}15` }}
+                                  title="Ver vídeo">
+                                  <span className="text-[10px]" style={{ color }}>▶</span>
+                                </button>
+                              )}
+                            </div>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                               {ej.series && <span className="text-xs text-[#9B9B9B]">{ej.series} series</span>}
                               {ej.reps && <span className="text-xs text-[#9B9B9B]">· {ej.reps} reps</span>}
@@ -3149,7 +3201,7 @@ function ModalActividad({ color, actForm, setActForm, guardandoAct, guardarActiv
 }
 
 // ─── Modal registrar sesión ───────────────────────────────────────────────────
-function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerciciosHist, guardandoRegistro, guardarRegistroSesion, onClose, sesionGuardadaId, cliente, onFinalizar, acceso, solicitarCambioPlan, modoPreview }) {
+function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerciciosHist, guardandoRegistro, guardarRegistroSesion, onClose, sesionGuardadaId, cliente, onFinalizar, acceso, solicitarCambioPlan, modoPreview, biblioteca = {} }) {
   const ejercicios = dia?.ejercicios || []
   const [tieneMolestia, setTieneMolestia] = useState(null)
   const [molestiaForm, setMolestiaForm] = useState({ zona: '', severidad: 'leve', descripcion: '' })
@@ -3157,6 +3209,7 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
   const [molestiaBloqueada, setMolestiaBloqueada] = useState(false)
   const [solicitandoCambio, setSolicitandoCambio] = useState(false)
   const [cambioSolicitado, setCambioSolicitado] = useState(false)
+  const [videoEjModal, setVideoEjModal] = useState(null) // { nombre, youtube_url, consejos_tecnica }
 
   async function guardarMolestia() {
     if (modoPreview || !molestiaForm.zona) return
@@ -3310,16 +3363,57 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {/* Mini-modal vídeo dentro del modal de registro */}
+          {videoEjModal && (
+            <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center"
+              style={{ background: 'rgba(0,0,0,0.8)' }}
+              onClick={() => setVideoEjModal(null)}>
+              <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl overflow-hidden"
+                onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                  <p className="font-bold text-[#0A0A0A] text-base leading-tight pr-4">{videoEjModal.nombre}</p>
+                  <button onClick={() => setVideoEjModal(null)}
+                    className="w-8 h-8 rounded-full bg-[#F2F1EE] flex items-center justify-center text-[#9B9B9B] text-lg flex-shrink-0 active:scale-95">✕</button>
+                </div>
+                <div className="aspect-video w-full bg-black">
+                  <iframe
+                    src={`${ytEmbed(videoEjModal.youtube_url)}?autoplay=1&rel=0&modestbranding=1`}
+                    className="w-full h-full"
+                    allow="autoplay; fullscreen"
+                    allowFullScreen
+                    title={videoEjModal.nombre}
+                  />
+                </div>
+                {videoEjModal.consejos_tecnica && (
+                  <div className="px-5 py-4 border-t border-black/5">
+                    <p className="text-xs font-semibold text-[#0A0A0A] mb-1.5">💡 Técnica</p>
+                    <p className="text-xs text-[#6B6B6B] leading-relaxed">{videoEjModal.consejos_tecnica}</p>
+                  </div>
+                )}
+                <div className="pb-5" />
+              </div>
+            </div>
+          )}
+
           {ejercicios.map((ej, ei) => {
             const hist = histEj[ej.nombre]
             const setsEj = registroSets[ei]
             const n = parseInt(ej.series) || 3
             const compEj = setsEj ? setsEj.filter(s => s.completada).length : 0
+            const bibEntry = biblioteca[(ej.nombre || '').toLowerCase()]
+            const tieneVideo = !!ytEmbed(bibEntry?.youtube_url) // enlace válido, si no no hay botón ▶
 
             return (
               <div key={ei} className="border-b border-black/4 last:border-0 px-5 py-4">
                 <div className="flex items-center gap-2 mb-2">
                   <p className="text-sm font-bold text-[#0A0A0A] flex-1">{ej.nombre}</p>
+                  {tieneVideo && (
+                    <button onClick={() => setVideoEjModal(bibEntry)}
+                      className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-all"
+                      style={{ background: `${color}15` }}>
+                      <span className="text-[10px]" style={{ color }}>▶</span>
+                    </button>
+                  )}
                   {setsEj && compEj === n && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">✓</span>}
                 </div>
                 <div className="flex items-center gap-3 mb-3">
