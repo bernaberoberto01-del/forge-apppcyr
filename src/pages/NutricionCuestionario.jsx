@@ -19,6 +19,7 @@ export default function NutricionCuestionario() {
   const [aceptaIa, setAceptaIa] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [erroresPaso0, setErroresPaso0] = useState({})
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
   const toggleCondicion = c => setForm(f => ({...f, condiciones_salud: f.condiciones_salud.includes(c) ? f.condiciones_salud.filter(x=>x!==c) : [...f.condiciones_salud, c]}))
 
@@ -120,7 +121,9 @@ export default function NutricionCuestionario() {
               {[['Peso (kg)','peso','number'],['Altura (cm)','altura','number'],['Edad','edad','number']].map(([l,k,t])=>(
                 <div key={k}>
                   <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">{l}</label>
-                  <input type={t} value={form[k]} onChange={e=>set(k,e.target.value)} className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
+                  <input type={t} value={form[k]} onChange={e=>{set(k,e.target.value); setErroresPaso0(prev=>({...prev,[k]:undefined}))}}
+                    className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none ${erroresPaso0[k] ? 'border-red-400 focus:border-red-400' : 'border-black/10 focus:border-acento'}`} />
+                  {erroresPaso0[k] && <p className="text-xs text-red-500 mt-1">{erroresPaso0[k]}</p>}
                 </div>
               ))}
               <div>
@@ -284,7 +287,18 @@ export default function NutricionCuestionario() {
             <button onClick={()=>setPaso(p=>p-1)} className="flex-1 border border-white/20 text-white text-sm font-medium py-3 rounded-xl hover:bg-white/5">← Atrás</button>
           )}
           {paso < PASOS.length-1 ? (
-            <button onClick={()=>setPaso(p=>p+1)} className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl">Siguiente →</button>
+            <button onClick={() => {
+              if (paso === 0) {
+                const errs = {}
+                const p = Number(form.peso); const a = Number(form.altura); const e = Number(form.edad)
+                if (!form.peso || isNaN(p) || p < 30 || p > 300) errs.peso = 'Introduce un peso válido (30–300 kg)'
+                if (!form.altura || isNaN(a) || a < 100 || a > 250) errs.altura = 'Introduce una altura válida (100–250 cm)'
+                if (!form.edad || isNaN(e) || e < 10 || e > 100) errs.edad = 'Introduce una edad válida (10–100 años)'
+                setErroresPaso0(errs)
+                if (Object.keys(errs).length > 0) return
+              }
+              setPaso(p => p + 1)
+            }} className="flex-1 bg-acento text-white text-sm font-semibold py-3 rounded-xl">Siguiente →</button>
           ) : (
             <div className="flex-1 space-y-3">
               <label className="flex items-start gap-3 cursor-pointer">

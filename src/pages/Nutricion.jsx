@@ -127,8 +127,23 @@ export default function Nutricion({ session }) {
   }
 
   async function guardarCuest(clienteId) {
+    // Validar rangos de datos físicos antes de guardar
+    const peso = Number(cuest.peso); const altura = Number(cuest.altura); const edad = Number(cuest.edad)
+    if (cuest.peso && (isNaN(peso) || peso < 30 || peso > 300)) {
+      setToast({ msg: '⚠️ Peso inválido: debe estar entre 30 y 300 kg', tipo: 'error' }); setTimeout(() => setToast(null), 4000); return
+    }
+    if (cuest.altura && (isNaN(altura) || altura < 100 || altura > 250)) {
+      setToast({ msg: '⚠️ Altura inválida: debe estar entre 100 y 250 cm', tipo: 'error' }); setTimeout(() => setToast(null), 4000); return
+    }
+    if (cuest.edad && (isNaN(edad) || edad < 10 || edad > 100)) {
+      setToast({ msg: '⚠️ Edad inválida: debe estar entre 10 y 100 años', tipo: 'error' }); setTimeout(() => setToast(null), 4000); return
+    }
     const { error } = await supabase.from('cuestionarios_nutricion')
-      .upsert({ ...cuest, cliente_id: clienteId, entrenador_id: uid }, { onConflict: 'cliente_id' })
+      .upsert({ ...cuest, cliente_id: clienteId, entrenador_id: uid,
+        peso: cuest.peso ? Number(cuest.peso) : null,
+        altura: cuest.altura ? Number(cuest.altura) : null,
+        edad: cuest.edad ? Number(cuest.edad) : null,
+      }, { onConflict: 'cliente_id' })
     if (error) {
       setToast({ msg: 'Error al guardar el cuestionario', tipo: 'error' })
       return
