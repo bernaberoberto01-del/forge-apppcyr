@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useEquipo } from '../hooks/useCentro'
 import { ytEmbed, ytMiniatura } from '../lib/youtube'
@@ -11,10 +11,64 @@ const MODALIDADES_LABEL = {
   potencia:'💥 Potencia', movilidad:'🧘 Movilidad', calistenia:'🤸 Calistenia', wellness:'🌿 Wellness'
 }
 
-function VideoModal({ ejercicio, onClose }) {
+function VideoModal({ ejercicio, onClose, onVideoGuardado }) {
+  const [buscando, setBuscando] = useState(false)
+  const [sugerencias, setSugerencias] = useState([])
+  const [errorBusqueda, setErrorBusqueda] = useState(null)
+  const [guardando, setGuardando] = useState(null) // video_id del que se está guardando
+
+  async function buscarVideo() {
+    setBuscando(true)
+    setErrorBusqueda(null)
+    setSugerencias([])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/buscar-video-ejercicio`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ nombre: ejercicio.nombre }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || 'Error al buscar')
+      setSugerencias(data.resultados || [])
+      if ((data.resultados || []).length === 0) setErrorBusqueda('No se encontraron vídeos para este ejercicio.')
+    } catch (err) {
+      setErrorBusqueda(err.message)
+    } finally {
+      setBuscando(false)
+    }
+  }
+
+  async function aceptarVideo(video) {
+    setGuardando(video.video_id)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/buscar-video-ejercicio`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ nombre: ejercicio.nombre, ejercicio_id: ejercicio.id, guardar: true }),
+      })
+      // Notificar al padre para actualizar la lista
+      onVideoGuardado(ejercicio.id, video.youtube_url, video.video_id)
+      onClose()
+    } catch (err) {
+      setGuardando(null)
+    }
+  }
+
+  const tieneVideo = !!ytEmbed(ejercicio.youtube_url)
+
   return (
     <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#111] rounded-2xl w-full max-w-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#111] rounded-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div>
             <h2 className="text-white font-bold">{ejercicio.nombre}</h2>
@@ -24,7 +78,7 @@ function VideoModal({ ejercicio, onClose }) {
         </div>
 
         {/* Video YouTube embed */}
-        {ytEmbed(ejercicio.youtube_url) && (
+        {tieneVideo && (
           <div className="relative w-full" style={{ paddingBottom:'56.25%' }}>
             <iframe
               src={`${ytEmbed(ejercicio.youtube_url)}?autoplay=1&rel=0&modestbranding=1`}
@@ -33,6 +87,64 @@ function VideoModal({ ejercicio, onClose }) {
               allowFullScreen
               title={ejercicio.nombre}
             />
+          </div>
+        )}
+
+        {/* Sin video: buscar automáticamente */}
+        {!tieneVideo && (
+          <div className="p-4 border-b border-white/10">
+            <div className="bg-white/5 rounded-xl p-4 text-center">
+              <p className="text-white/40 text-sm mb-3">Este ejercicio no tiene vídeo asignado</p>
+              {sugerencias.length === 0 && !errorBusqueda && (
+                <button
+                  onClick={buscarVideo}
+                  disabled={buscando}
+                  className="bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-all active:scale-95 disabled:opacity-60 flex items-center gap-2 mx-auto">
+                  {buscando ? (
+                    <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Buscando...</>
+                  ) : (
+                    <><span>▶</span> Buscar vídeo en YouTube</>
+                  )}
+                </button>
+              )}
+              {errorBusqueda && (
+                <div className="space-y-2">
+                  <p className="text-red-400 text-xs">{errorBusqueda}</p>
+                  <button onClick={buscarVideo} className="text-white/50 hover:text-white text-xs underline">Reintentar</button>
+                </div>
+              )}
+            </div>
+
+            {/* Sugerencias de YouTube */}
+            {sugerencias.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-white/50 text-xs font-semibold uppercase tracking-wide">Sugerencias — elige el mejor:</p>
+                {sugerencias.map(v => (
+                  <div key={v.video_id} className="flex items-center gap-3 bg-white/5 hover:bg-white/10 rounded-xl p-2.5 transition-all">
+                    <a href={v.youtube_url} target="_blank" rel="noopener noreferrer"
+                      className="flex-shrink-0 relative w-20 h-14 rounded-lg overflow-hidden group">
+                      {v.thumbnail && <img src={v.thumbnail} alt={v.titulo} className="w-full h-full object-cover" />}
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-red-600/80 transition-colors">
+                        <span className="text-white text-lg">▶</span>
+                      </div>
+                    </a>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-medium line-clamp-2 leading-tight">{v.titulo}</p>
+                      <p className="text-white/40 text-xs mt-0.5">{v.canal}</p>
+                    </div>
+                    <button
+                      onClick={() => aceptarVideo(v)}
+                      disabled={!!guardando}
+                      className="flex-shrink-0 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-all active:scale-95 disabled:opacity-50">
+                      {guardando === v.video_id ? '...' : '✓ Usar'}
+                    </button>
+                  </div>
+                ))}
+                <button onClick={buscarVideo} disabled={buscando} className="text-white/40 hover:text-white/70 text-xs mt-1 underline transition-colors">
+                  🔄 Buscar de nuevo
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -79,6 +191,12 @@ export default function Biblioteca({ session }) {
   const [filtroNivel, setFiltroNivel] = useState('Todos')
   const [filtroModalidad, setFiltroModalidad] = useState('')
   const [videoActivo, setVideoActivo] = useState(null)
+
+  const handleVideoGuardado = useCallback((ejercicioId, youtubeUrl, ytId) => {
+    setEjercicios(prev => prev.map(e =>
+      e.id === ejercicioId ? { ...e, youtube_url: youtubeUrl, yt_id: ytId } : e
+    ))
+  }, [])
   const [modalNuevo, setModalNuevo] = useState(false)
   const [formNuevo, setFormNuevo] = useState({ nombre:'', grupo_muscular:'Pecho', patron:'empuje_horizontal', nivel:'principiante', modalidad:'fuerza', consejos_tecnica:'', youtube_url:'' })
   const uid = session.user.id
@@ -122,12 +240,20 @@ export default function Biblioteca({ session }) {
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-5xl mx-auto">
-      {videoActivo && <VideoModal ejercicio={videoActivo} onClose={() => setVideoActivo(null)} />}
+      {videoActivo && (
+        <VideoModal
+          ejercicio={videoActivo}
+          onClose={() => setVideoActivo(null)}
+          onVideoGuardado={handleVideoGuardado}
+        />
+      )}
 
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Biblioteca de ejercicios</h1>
-          <p className="text-sm text-[#6B6B6B] mt-0.5">{ejercicios.length} ejercicios · Vídeos explicativos y consejos de técnica</p>
+          <p className="text-sm text-[#6B6B6B] mt-0.5">
+            {ejercicios.length} ejercicios · {ejercicios.filter(e=>e.youtube_url).length} con vídeo
+          </p>
         </div>
         <button onClick={() => setModalNuevo(true)}
           className="bg-acento text-white text-sm font-semibold px-4 py-2.5 rounded-xl transition-all active:scale-95 flex-shrink-0">
@@ -218,6 +344,7 @@ export default function Biblioteca({ session }) {
                   <div className="flex gap-1.5 mt-2 flex-wrap">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${nivelColor(e.nivel)}`}>{e.nivel}</span>
                     {e.usos > 0 && <span className="text-xs bg-acento/8 text-acento px-2 py-0.5 rounded-full font-medium">{e.usos} usos</span>}
+                    {!e.youtube_url && <span className="text-xs bg-[#F5F5F0] text-[#9B9B9B] px-2 py-0.5 rounded-full">Sin vídeo</span>}
                   </div>
                 </div>
               </div>
