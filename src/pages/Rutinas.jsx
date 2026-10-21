@@ -10,6 +10,7 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import EjercicioInput from '../components/EjercicioInput'
 import { BRAND } from '../lib/brand'
 import { ytEmbed, ytMiniatura } from '../lib/youtube'
+import VideoEjercicioModal from '../components/VideoEjercicioModal'
 
 // Opciones por centro (ficha → funciones): 'sin_ia' oculta la generación con IA
 // (centro sin clave de IA); 'rutinas_solo_online' limita Rutinas a clientes online
@@ -28,44 +29,6 @@ function Toast({ msg, tipo='ok', onClose }) {
   return (
     <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[100] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
       <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
-    </div>
-  )
-}
-
-function VideoModal({ ejercicio, onClose }) {
-  return (
-    <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[#111] rounded-2xl w-full max-w-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <div>
-            <p className="text-white font-bold">{ejercicio.nombre}</p>
-            <p className="text-white/50 text-xs mt-0.5">{ejercicio.grupo_muscular} · {ejercicio.nivel}</p>
-          </div>
-          <button onClick={onClose} className="text-white/50 hover:text-white text-2xl w-8 h-8 flex items-center justify-center">×</button>
-        </div>
-        {ytEmbed(ejercicio.youtube_url) && (
-          <div className="relative w-full" style={{ paddingBottom:'56.25%' }}>
-            <iframe src={`${ytEmbed(ejercicio.youtube_url)}?autoplay=1&rel=0&modestbranding=1`}
-              className="absolute inset-0 w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen title={ejercicio.nombre} />
-          </div>
-        )}
-        <div className="p-4 space-y-3">
-          <div className="flex flex-wrap gap-2">
-            <span className="text-xs bg-acento/20 text-acento px-2.5 py-1 rounded-full font-medium">🎯 {ejercicio.grupo_muscular}</span>
-            {ejercicio.grupo_secundario && ejercicio.grupo_secundario.split(';').map(g=>(
-              <span key={g} className="text-xs bg-white/10 text-white/60 px-2.5 py-1 rounded-full">{g}</span>
-            ))}
-          </div>
-          {ejercicio.consejos_tecnica && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
-              <p className="text-xs font-semibold text-amber-400 mb-1.5">📋 Técnica correcta</p>
-              <p className="text-sm text-white/80 leading-relaxed">{ejercicio.consejos_tecnica}</p>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   )
 }
@@ -411,7 +374,8 @@ export default function Rutinas({ session }) {
         onCompletar={() => completar('primera_rutina')}
       />
 
-      {videoActivo && <VideoModal ejercicio={videoActivo} onClose={() => setVideoActivo(null)} />}
+      {videoActivo && <VideoEjercicioModal ejercicio={videoActivo} onClose={() => setVideoActivo(null)}
+        onVideoGuardado={(id, url, yt) => setBiblioteca(b => b.map(x => x.id === id ? { ...x, youtube_url: url, yt_id: yt } : x))} />}
 
       <div>
 
@@ -623,8 +587,8 @@ export default function Rutinas({ session }) {
               <div key={e.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
                 <div className="flex items-start gap-3">
                   {/* Thumbnail */}
-                  <button onClick={() => e.youtube_url && setVideoActivo(e)}
-                    className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden ${e.youtube_url ? 'cursor-pointer' : 'bg-[#F5F5F0] cursor-default'}`}>
+                  <button onClick={() => setVideoActivo(e)} title={ytEmbed(e.youtube_url) ? 'Ver vídeo' : 'Buscar vídeo en YouTube'}
+                    className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden ${e.youtube_url ? 'cursor-pointer' : 'bg-[#F5F5F0] cursor-pointer'}`}>
                     {e.youtube_url ? (
                       <div className="relative w-full h-full">
                         <img src={ytMiniatura(e.youtube_url)}
@@ -655,7 +619,7 @@ export default function Rutinas({ session }) {
                     <div className="flex gap-1.5 mt-1.5 flex-wrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${nivelColor(e.nivel)}`}>{e.nivel}</span>
                       {e.usos > 0 && <span className="text-xs bg-acento/8 text-acento px-2 py-0.5 rounded-full">{e.usos} usos</span>}
-                      {!e.youtube_url && <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Sin vídeo</span>}
+                      {!ytEmbed(e.youtube_url) && <button onClick={() => setVideoActivo(e)} className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full hover:bg-amber-100">Sin vídeo · 🔎 Buscar</button>}
                     </div>
                   </div>
                 </div>
