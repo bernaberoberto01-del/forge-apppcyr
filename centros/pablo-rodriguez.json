@@ -77,7 +77,8 @@
     "bonos",
     "historial",
     "rutinas_solo_online",
-    "sin_ia"
+    "sin_ia",
+    "sin_videos"
   ],
   "vercel": {
     "proyecto": "prj_3joP8L7WwZ6dJRiHbc5AQkMoHkNi",

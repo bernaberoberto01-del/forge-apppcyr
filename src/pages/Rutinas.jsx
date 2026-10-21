@@ -10,7 +10,7 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import EjercicioInput from '../components/EjercicioInput'
 import { BRAND } from '../lib/brand'
 import { ytEmbed, ytMiniatura } from '../lib/youtube'
-import VideoEjercicioModal from '../components/VideoEjercicioModal'
+import VideoEjercicioModal, { BUSCAR_VIDEOS } from '../components/VideoEjercicioModal'
 
 // Opciones por centro (ficha → funciones): 'sin_ia' oculta la generación con IA
 // (centro sin clave de IA); 'rutinas_solo_online' limita Rutinas a clientes online
@@ -587,7 +587,7 @@ export default function Rutinas({ session }) {
               <div key={e.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-4">
                 <div className="flex items-start gap-3">
                   {/* Thumbnail */}
-                  <button onClick={() => setVideoActivo(e)} title={ytEmbed(e.youtube_url) ? 'Ver vídeo' : 'Buscar vídeo en YouTube'}
+                  <button onClick={() => setVideoActivo(e)} title={ytEmbed(e.youtube_url) ? 'Ver vídeo' : BUSCAR_VIDEOS ? 'Buscar vídeo en YouTube' : 'Ver ejercicio'}
                     className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden ${e.youtube_url ? 'cursor-pointer' : 'bg-[#F5F5F0] cursor-pointer'}`}>
                     {e.youtube_url ? (
                       <div className="relative w-full h-full">
@@ -619,7 +619,9 @@ export default function Rutinas({ session }) {
                     <div className="flex gap-1.5 mt-1.5 flex-wrap">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${nivelColor(e.nivel)}`}>{e.nivel}</span>
                       {e.usos > 0 && <span className="text-xs bg-acento/8 text-acento px-2 py-0.5 rounded-full">{e.usos} usos</span>}
-                      {!ytEmbed(e.youtube_url) && <button onClick={() => setVideoActivo(e)} className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full hover:bg-amber-100">Sin vídeo · 🔎 Buscar</button>}
+                      {!ytEmbed(e.youtube_url) && (BUSCAR_VIDEOS
+                        ? <button onClick={() => setVideoActivo(e)} className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full hover:bg-amber-100">Sin vídeo · 🔎 Buscar</button>
+                        : <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Sin vídeo</span>)}
                     </div>
                   </div>
                 </div>

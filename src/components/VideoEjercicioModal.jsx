@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { ytEmbed } from '../lib/youtube'
+import { funcionActiva } from '../lib/modulos'
+
+// Búsqueda de vídeos en YouTube: activa salvo que la ficha del centro tenga
+// 'sin_videos' (centro sin clave de YouTube o que no la usa).
+export const BUSCAR_VIDEOS = !funcionActiva('sin_videos')
 
 export const MODALIDADES_LABEL = {
   fuerza:'💪 Fuerza', hipertrofia:'📈 Hipertrofia', perdida_grasa:'🔥 Pérdida de grasa',
@@ -85,7 +90,7 @@ export default function VideoEjercicioModal({ ejercicio, onClose, onVideoGuardad
 
         {/* Buscar en YouTube: sin vídeo, o para cambiarlo (vídeos borrados o poco
             adecuados). No en la vista previa de un ejercicio aún sin guardar. */}
-        {ejercicio.id && ejercicio.id !== 'preview' && (
+        {BUSCAR_VIDEOS && ejercicio.id && ejercicio.id !== 'preview' && (
           <div className="p-4 border-b border-white/10">
             <div className="bg-white/5 rounded-xl p-4 text-center">
               <p className="text-white/40 text-sm mb-3">{tieneVideo ? '¿El vídeo no funciona o no es el adecuado?' : 'Este ejercicio no tiene vídeo asignado'}</p>
