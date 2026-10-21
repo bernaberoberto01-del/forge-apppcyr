@@ -35,7 +35,7 @@ if (m.color && !/^#[0-9A-Fa-f]{6}$/.test(m.color)) errores.push(`marca.color deb
 for (const k of ['logo', 'icono']) {
   if (m[k] && m[k].startsWith('/') && !fs.existsSync(path.join(RAIZ, 'public', m[k]))) errores.push(`marca.${k}: no existe public${m[k]}`)
 }
-const FUNCIONES = ['bonos', 'historial', 'clases', 'rutinas_solo_online', 'sin_ia']
+const FUNCIONES = ['bonos', 'historial', 'clases', 'rutinas_solo_online', 'sin_ia', 'sin_videos']
 for (const f of ficha.funciones || []) if (!FUNCIONES.includes(f)) errores.push(`funciones: "${f}" no existe (válidas: ${FUNCIONES.join(', ')})`)
 if (errores.length) salir(`Ficha centros/${id}.json incorrecta:\n  - ${errores.join('\n  - ')}`)
 
