@@ -83,31 +83,34 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'YOUTUBE_API_KEY no configurada' }), { status: 500, headers: CORS })
     }
 
-    // Construir query de búsqueda
-    const searchQuery = construirQueryYouTube(nombre)
-
-    // Llamar YouTube Data API v3
-    const ytUrl = new URL('https://www.googleapis.com/youtube/v3/search')
-    ytUrl.searchParams.set('part', 'snippet')
-    ytUrl.searchParams.set('q', searchQuery)
-    ytUrl.searchParams.set('type', 'video')
-    ytUrl.searchParams.set('maxResults', '3')
-    ytUrl.searchParams.set('videoDuration', 'short') // < 4 min, mejor para tutoriales
-    ytUrl.searchParams.set('relevanceLanguage', 'es')
-    ytUrl.searchParams.set('key', apiKey)
-
-    const ytRes = await fetch(ytUrl.toString())
-    if (!ytRes.ok) {
-      const errText = await ytRes.text()
-      console.error('YouTube API error:', ytRes.status, errText)
-      return new Response(
-        JSON.stringify({ error: `YouTube API error: ${ytRes.status}` }),
-        { status: 502, headers: CORS }
-      )
+    // Búsqueda en YouTube con un segundo intento: la primera (frase larga, solo
+    // vídeos cortos) a menudo no devuelve nada; entonces se prueba algo más simple.
+    async function buscarEnYouTube(q: string, soloCortos: boolean) {
+      const ytUrl = new URL('https://www.googleapis.com/youtube/v3/search')
+      ytUrl.searchParams.set('part', 'snippet')
+      ytUrl.searchParams.set('q', q)
+      ytUrl.searchParams.set('type', 'video')
+      ytUrl.searchParams.set('maxResults', '5')
+      if (soloCortos) ytUrl.searchParams.set('videoDuration', 'short') // < 4 min, mejor para tutoriales
+      ytUrl.searchParams.set('relevanceLanguage', 'es')
+      ytUrl.searchParams.set('key', apiKey!)
+      const res = await fetch(ytUrl.toString())
+      if (!res.ok) {
+        console.error('YouTube API error:', res.status, await res.text())
+        return { error: res.status, items: [] as any[] }
+      }
+      return { error: null, items: ((await res.json()).items || []) as any[] }
     }
 
-    const ytData = await ytRes.json()
-    const items = ytData.items || []
+    let searchQuery = construirQueryYouTube(nombre)
+    let { error: ytError, items } = await buscarEnYouTube(searchQuery, true)
+    if (!ytError && items.length === 0) {
+      searchQuery = `${nombre} ejercicio`
+      ;({ error: ytError, items } = await buscarEnYouTube(searchQuery, false))
+    }
+    if (ytError) {
+      return new Response(JSON.stringify({ error: `YouTube API error: ${ytError}` }), { status: 502, headers: CORS })
+    }
 
     if (items.length === 0) {
       return new Response(JSON.stringify({ ok: true, resultados: [] }), { headers: CORS })
