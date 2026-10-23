@@ -197,12 +197,15 @@ export default function Seguimiento({ session }) {
   async function reenviarCheckin() {
     setEnviando(true)
     try {
-      const { error } = await supabase.functions.invoke('checkin-semanal', { body: {} })
-      if (error) throw error
-      setToast('Check-in enviado a todos los clientes activos ✓')
-    } catch { setToast('Error al enviar') }
+      const { data, error } = await supabase.functions.invoke('checkin-semanal', { body: {} })
+      if (error) { setToast(`⚠️ Error: ${error.message || 'No se pudo enviar'}`); return }
+      const enviados = data?.enviados || 0
+      const fallidos = data?.fallidos || 0
+      if (enviados === 0 && fallidos === 0) setToast('ℹ️ Todos los clientes ya tienen recordatorio reciente (48h)')
+      else setToast(`✓ Enviados: ${enviados}${fallidos > 0 ? ` · Fallidos: ${fallidos}` : ''}`)
+    } catch { setToast('⚠️ Error al conectar con el servidor') }
     setEnviando(false)
-    setTimeout(() => setToast(''), 3000)
+    setTimeout(() => setToast(''), 4000)
   }
 
   async function copiarEnlaceCheckin(clienteId) {

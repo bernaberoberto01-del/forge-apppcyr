@@ -343,7 +343,7 @@ export default function PortalForge() {
       return
     }
     const rows = (modalRegistro.ejercicios || []).map((ej, i) => ({
-      sesion_id: sesNueva.id, cliente_id: cliente.id,
+      sesion_id: sesNueva.id, cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
       ejercicio_nombre: ej.nombre, patron: ej.patron || null, orden: i,
       sets: (registroSets[i] || []).filter(s => s.completada || s.peso || s.reps),
     })).filter(r => r.sets.length > 0)

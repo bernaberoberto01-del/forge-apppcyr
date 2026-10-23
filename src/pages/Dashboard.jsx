@@ -823,9 +823,12 @@ export default function Dashboard({ session }) {
                         <button onClick={async () => {
                           try {
                             const r = await supabase.functions.invoke('checkin-semanal', { body: { dias_umbral: 7 } })
+                            if (r.error) { showToast(`⚠️ Error: ${r.error.message || 'No se pudo enviar'}`); return }
                             const enviados = r.data?.enviados || 0
-                            showToast(`✓ Recordatorio enviado a ${enviados} cliente${enviados!==1?'s':''}`)
-                          } catch(e) { showToast('Error al enviar') }
+                            const fallidos = r.data?.fallidos || 0
+                            if (enviados === 0 && fallidos === 0) { showToast('ℹ️ Todos los clientes ya tienen recordatorio reciente'); return }
+                            showToast(`✓ Enviados: ${enviados}${fallidos > 0 ? ` · Fallidos: ${fallidos}` : ''}`)
+                          } catch(e) { showToast('⚠️ Error al conectar con el servidor') }
                         }} className={`text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 text-white ${criticos.length > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
                           Recordar →
                         </button>
