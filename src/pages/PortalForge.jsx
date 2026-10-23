@@ -332,23 +332,51 @@ export default function PortalForge() {
     if (modoPreview) return bloqueadoPreview()
     if (!modalRegistro || guardandoRegistro) return
     setGuardandoRegistro(true)
-    const { data: sesNueva, error } = await supabase.from('sesiones').insert({
-      cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
-      fecha: hoyStr(), tipo: 'online', completada: true, cancelada: false, notas: modalRegistro.nombre,
-      valoracion_pendiente: true,
-    }).select().single()
-    if (error || !sesNueva) {
-      setGuardandoRegistro(false)
-      showToast('⚠️ Error al guardar la sesión — inténtalo de nuevo')
-      return
+
+    // Buscar si ya existe una sesión online del mismo día y mismo nombre de rutina.
+    // Así, si el cliente registra ejercicio a ejercicio en momentos distintos,
+    // todos se agrupan en la misma sesión en lugar de crear una por cada registro.
+    let sesId = null
+    const { data: sesExistente } = await supabase
+      .from('sesiones')
+      .select('id')
+      .eq('cliente_id', cliente.id)
+      .eq('fecha', hoyStr())
+      .eq('tipo', 'online')
+      .eq('notas', modalRegistro.nombre)
+      .eq('cancelada', false)
+      .maybeSingle()
+
+    if (sesExistente) {
+      sesId = sesExistente.id
+    } else {
+      const { data: sesNueva, error } = await supabase.from('sesiones').insert({
+        cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
+        fecha: hoyStr(), tipo: 'online', completada: true, cancelada: false, notas: modalRegistro.nombre,
+        valoracion_pendiente: true,
+      }).select().single()
+      if (error || !sesNueva) {
+        setGuardandoRegistro(false)
+        showToast('⚠️ Error al guardar la sesión — inténtalo de nuevo')
+        return
+      }
+      sesId = sesNueva.id
     }
+
+    // Calcular el orden a partir de los ejercicios ya existentes en esta sesión
+    const { data: ejExistentes } = await supabase
+      .from('sesion_ejercicios')
+      .select('orden')
+      .eq('sesion_id', sesId)
+    const baseOrden = ejExistentes?.length ? Math.max(...ejExistentes.map(e => e.orden)) + 1 : 0
+
     const rows = (modalRegistro.ejercicios || []).map((ej, i) => ({
-      sesion_id: sesNueva.id, cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
-      ejercicio_nombre: ej.nombre, patron: ej.patron || null, orden: i,
+      sesion_id: sesId, cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
+      ejercicio_nombre: ej.nombre, patron: ej.patron || null, orden: baseOrden + i,
       sets: (registroSets[i] || []).filter(s => s.completada || s.peso || s.reps),
     })).filter(r => r.sets.length > 0)
     if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
-    setSesionGuardadaId(sesNueva.id)
+    setSesionGuardadaId(sesId)
     // NO reseteamos guardandoRegistro aquí — lo reseteamos al cerrar para evitar doble registro
   }
 
