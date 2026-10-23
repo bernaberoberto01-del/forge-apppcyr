@@ -8,7 +8,7 @@ serve(async () => {
   if (!pendientes?.length) return new Response(JSON.stringify({ enviados: 0 }))
   let enviados = 0
   for (const msg of pendientes) {
-    const { error } = await supabase.from('mensajes_cliente').insert({ entrenador_id: msg.entrenador_id, cliente_id: msg.cliente_id, contenido: msg.contenido, enviado_por: 'entrenador', leido_cliente: false })
+    const { error } = await supabase.from('mensajes_cliente').insert({ entrenador_id: msg.entrenador_id, cliente_id: msg.cliente_id, contenido: msg.contenido, tipo: 'entrenador', leido: false, leido_entrenador: true })
     if (!error) {
       await supabase.from('mensajes_programados').update({ enviado: true, enviado_en: ahora }).eq('id', msg.id)
       enviados++

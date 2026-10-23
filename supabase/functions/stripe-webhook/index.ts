@@ -67,7 +67,7 @@ serve(async (req) => {
         const { data: plan } = await supabase.from('planes_cobro').select('id, cliente_id, entrenador_id').eq('stripe_subscription_id', subId).single()
         if (!plan) break
         await supabase.from('planes_cobro').update({ estado: 'pago_fallido' }).eq('id', plan.id)
-        await supabase.from('mensajes_cliente').insert({ entrenador_id: plan.entrenador_id, cliente_id: plan.cliente_id, contenido: '⚠️ Ha habido un problema con tu pago mensual. Por favor, actualiza tu método de pago para seguir con tu plan.', enviado_por: 'entrenador', leido_cliente: false })
+        await supabase.from('mensajes_cliente').insert({ entrenador_id: plan.entrenador_id, cliente_id: plan.cliente_id, contenido: '⚠️ Ha habido un problema con tu pago mensual. Por favor, actualiza tu método de pago para seguir con tu plan.', tipo: 'entrenador', leido: false, leido_entrenador: true })
         break
       }
       case 'customer.subscription.deleted': {

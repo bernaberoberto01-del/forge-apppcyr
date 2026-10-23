@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
         sb.from('mensajes_cliente').insert({
           entrenador_id: sesion.entrenador_id, cliente_id: sesion.cliente_id,
           contenido: `He tenido que cancelar mi sesion del ${fechaLabel} a las ${sesion.hora}.${motivo ? ' Motivo: ' + motivo : ''}`,
-          tipo: 'cliente', leido: false
+          tipo: 'cliente', leido: false, leido_entrenador: false
         })
       ])
       return new Response(JSON.stringify({ ok: true }), { headers: CORS })
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
       const { error: mErr } = await sb.from('mensajes_cliente').insert({
         entrenador_id: cli.entrenador_id, cliente_id: cli.id,
-        contenido: contenido.trim(), tipo: 'cliente', leido: false
+        contenido: contenido.trim(), tipo: 'cliente', leido: false, leido_entrenador: false
       })
       if (mErr) throw new Error('Error enviando: ' + mErr.message)
       return new Response(JSON.stringify({ ok: true }), { headers: CORS })

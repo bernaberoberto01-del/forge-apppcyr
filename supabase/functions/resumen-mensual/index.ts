@@ -114,8 +114,9 @@ Escribe un mensaje personal de 3-4 párrafos: 1) Reconocer el trabajo del mes co
           entrenador_id: cliente.entrenador_id,
           cliente_id: cliente.id,
           contenido: `📊 RESUMEN MENSUAL\n\n${resumen}`,
-          tipo: 'resumen_mensual',
-          leido: false
+          tipo: 'sistema',
+          leido: false,
+          leido_entrenador: true
         });
       }
       // Actualizar nutrición si tiene plan y hay checkins

@@ -208,7 +208,7 @@ export default function Rutinas({ session }) {
 
   async function enviarMensaje(clienteId) {
     if (!msgTexto.trim()) return
-    await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: clienteId, contenido: msgTexto.trim() })
+    await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: clienteId, contenido: msgTexto.trim(), tipo: 'entrenador', leido: false, leido_entrenador: true })
     setMsgTexto(''); setMsgModal(null); setToast('Mensaje enviado')
   }
 

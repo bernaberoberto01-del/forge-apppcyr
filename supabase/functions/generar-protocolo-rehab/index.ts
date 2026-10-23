@@ -30,7 +30,7 @@ serve(async (req) => {
     let protocolo
     try { protocolo = JSON.parse(data.content?.[0]?.text || '') } catch { protocolo = { resumen: data.content?.[0]?.text, error_parse: true } }
     await supabase.from('lesiones_cliente').update({ protocolo_ia: protocolo, protocolo_generado: true, estado: 'en_seguimiento' }).eq('id', lesion_id)
-    await supabase.from('mensajes_cliente').insert({ cliente_id: lesion.cliente_id, entrenador_id: user.id, contenido: 'He revisado tu lesión en ' + lesion.zona + ' y he preparado un protocolo de recuperación. Lo verás en tu sección de Lesiones.', enviado_por: 'entrenador', leido_cliente: false })
+    await supabase.from('mensajes_cliente').insert({ cliente_id: lesion.cliente_id, entrenador_id: user.id, contenido: 'He revisado tu lesión en ' + lesion.zona + ' y he preparado un protocolo de recuperación. Lo verás en tu sección de Lesiones.', tipo: 'entrenador', leido: false, leido_entrenador: true })
     return new Response(JSON.stringify({ ok: true, protocolo }), { headers: { ...cors, 'Content-Type': 'application/json' } })
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: cors })

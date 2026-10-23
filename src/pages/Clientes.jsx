@@ -580,7 +580,10 @@ export default function Clientes({ session }) {
         supabase.from('mensajes_cliente').insert({
           entrenador_id: uid,
           cliente_id: cliente.id,
-          contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu ${cliente.plan_online === 'nutricion' ? 'plan nutricional' : cliente.plan_online === 'entrenamiento' ? 'rutina' : 'rutina y plan nutricional'}. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
+          contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu ${cliente.plan_online === 'nutricion' ? 'plan nutricional' : cliente.plan_online === 'entrenamiento' ? 'rutina' : 'rutina y plan nutricional'}. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`,
+          tipo: 'entrenador',
+          leido: false,
+          leido_entrenador: true
         })
       ])
       // Si es cliente online con plan asignado, lanzar IA automáticamente
@@ -678,7 +681,7 @@ export default function Clientes({ session }) {
     if (dData.planCobro) await supabase.from('planes_cobro').update({ plan: sol.plan_solicitado }).eq('id', dData.planCobro.id)
     await supabase.from('solicitudes_cambio_plan').update({ estado: 'aprobado' }).eq('id', sol.id)
     const PLAN_LABEL = { nutricion: 'Nutrición', entrenamiento: 'Entrenamiento', completo: 'Completo' }
-    await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: detalle.id, contenido: `✓ Tu cambio al plan ${PLAN_LABEL[sol.plan_solicitado] || sol.plan_solicitado} ha sido aprobado.`, enviado_por: 'entrenador', leido_cliente: false })
+    await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: detalle.id, contenido: `✓ Tu cambio al plan ${PLAN_LABEL[sol.plan_solicitado] || sol.plan_solicitado} ha sido aprobado.`, tipo: 'entrenador', leido: false, leido_entrenador: true })
     showToast('✓ Cambio de plan aprobado')
     await abrirDetalle(detalle)
   }
@@ -688,7 +691,7 @@ export default function Clientes({ session }) {
     if (!sol || !detalle) return
     await supabase.from('solicitudes_cambio_plan').update({ estado: 'rechazado' }).eq('id', sol.id)
     const PLAN_LABEL = { nutricion: 'Nutrición', entrenamiento: 'Entrenamiento', completo: 'Completo' }
-    await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: detalle.id, contenido: `Hemos revisado tu solicitud de cambio al plan ${PLAN_LABEL[sol.plan_solicitado] || sol.plan_solicitado}. Escríbenos si quieres que lo hablemos.`, enviado_por: 'entrenador', leido_cliente: false })
+    await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: detalle.id, contenido: `Hemos revisado tu solicitud de cambio al plan ${PLAN_LABEL[sol.plan_solicitado] || sol.plan_solicitado}. Escríbenos si quieres que lo hablemos.`, tipo: 'entrenador', leido: false, leido_entrenador: true })
     showToast('Solicitud rechazada')
     await abrirDetalle(detalle)
   }
