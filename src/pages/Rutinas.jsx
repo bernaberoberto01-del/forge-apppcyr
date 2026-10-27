@@ -394,6 +394,12 @@ export default function Rutinas({ session }) {
                   📋 {plantillas.length}
                 </button>
               )}
+              {IA && (
+                <button onClick={() => { setMostrarSinRutina(true); setTimeout(() => document.getElementById('seccion-sin-rutina')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100) }}
+                  className="bg-acento text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
+                  🤖 Con IA
+                </button>
+              )}
               <button onClick={() => setModalManual(true)} className="bg-[#111] text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
                 ✍️ Manual
               </button>
@@ -467,7 +473,7 @@ export default function Rutinas({ session }) {
 
           {/* Clientes sin rutina — colapsable */}
           {clientesSinRutina.length > 0 && !busqueda && filtroEstado === 'activas' && (
-            <div className="border border-amber-200 rounded-2xl overflow-hidden mb-4">
+            <div id="seccion-sin-rutina" className="border border-amber-200 rounded-2xl overflow-hidden mb-4">
               <button
                 onClick={() => setMostrarSinRutina(v => !v)}
                 className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-all">

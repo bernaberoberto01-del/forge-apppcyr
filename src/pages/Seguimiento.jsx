@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useOnboarding, TUTORIALES } from '../hooks/useOnboarding'
 import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
@@ -80,6 +80,9 @@ export default function Seguimiento({ session }) {
   const [filtroAlerta, setFiltroAlerta] = useState('todos')
   const [detalleCI, setDetalleCI] = useState(null)
   const [quickView, setQuickView] = useState(null)
+  // ?cliente=<id> (p. ej. desde la lista de críticos del Dashboard) abre su ficha rápida
+  const [searchParams] = useSearchParams()
+  useEffect(() => { const id = searchParams.get('cliente'); if (id) setQuickView(id) }, [searchParams])
   const [analizando, setAnalizando] = useState(false)
   const [mensajeSugerido, setMensajeSugerido] = useState(null)
   const [enviandoMensaje, setEnviandoMensaje] = useState(false)

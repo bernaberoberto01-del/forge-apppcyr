@@ -889,7 +889,7 @@ export default function Agenda({ session }) {
             🔄 Recurrentes {recurrentes.length > 0 ? `(${recurrentes.length})` : ''}
           </button>
           <button onClick={() => { setEditandoRecId(null); setModalRecurrente(true) }}
-            className="border border-acento/30 text-acento text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-acento/5">↻ Nueva regla</button>
+            className="border border-acento/30 text-acento text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-acento/5">↻ Sesión recurrente</button>
           {centro && funcionActiva('clases') && (
             <button onClick={() => setModalClase(true)}
               className="border border-emerald-300 text-emerald-700 text-xs font-medium px-2.5 py-1.5 rounded-lg hover:bg-emerald-50">
