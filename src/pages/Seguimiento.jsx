@@ -754,7 +754,8 @@ export default function Seguimiento({ session }) {
               const grupos = []
               const visto = {}
               for (const s of filtradas) {
-                const key = `${s.cliente_id}__${s.fecha}`
+                // Sin cliente (p. ej. escrito a mano en la agenda) no se agrupa: serían personas distintas
+                const key = s.cliente_id ? `${s.cliente_id}__${s.fecha}` : s.id
                 if (!visto[key]) {
                   visto[key] = grupos.length
                   grupos.push({ key, sesiones: [s], cliente_id: s.cliente_id, fecha: s.fecha, clientes: s.clientes })
@@ -792,7 +793,8 @@ export default function Seguimiento({ session }) {
                         </button>
                         <p className="text-xs text-[#6B6B6B]">
                           {new Date(g.fecha).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}
-                          {hayLibre ? ' · 🏃 Actividad libre' : ' · online'}
+                          {g.sesiones.length === 1 && primera.hora ? ` · ${primera.hora}` : ''}
+                          {hayLibre ? ' · 🏃 Actividad libre' : ` · ${primera.tipo}`}
                           {duracion > 0 ? ` · ${duracion}min` : ''}
                           {g.sesiones.length > 1 ? ` · ${g.sesiones.length} bloques` : ''}
                         </p>
