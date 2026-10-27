@@ -748,46 +748,70 @@ export default function Seguimiento({ session }) {
               className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
           </div>
           <div className="space-y-2">
-            {sesiones
-              .filter(s => !busquedaSes || s.clientes?.nombre?.toLowerCase().includes(busquedaSes.toLowerCase()))
-              .map(s => {
+            {(() => {
+              // Agrupar sesiones por cliente_id + fecha para evitar duplicados visuales
+              const filtradas = sesiones.filter(s => !busquedaSes || s.clientes?.nombre?.toLowerCase().includes(busquedaSes.toLowerCase()))
+              const grupos = []
+              const visto = {}
+              for (const s of filtradas) {
+                const key = `${s.cliente_id}__${s.fecha}`
+                if (!visto[key]) {
+                  visto[key] = grupos.length
+                  grupos.push({ key, sesiones: [s], cliente_id: s.cliente_id, fecha: s.fecha, clientes: s.clientes })
+                } else {
+                  grupos[visto[key]].sesiones.push(s)
+                }
+              }
+              return grupos.map(g => {
+                const primera = g.sesiones[0]
+                const rpe = g.sesiones.find(s => s.rpe)?.rpe
+                const fatiga = g.sesiones.find(s => s.fatiga_post)?.fatiga_post
+                const duracion = g.sesiones.reduce((acc, s) => acc + (s.duracion_minutos || 0), 0)
+                const completadas = g.sesiones.filter(s => s.completada).length
+                const todaCompletada = completadas === g.sesiones.length
+                const hayLibre = g.sesiones.some(s => s.tipo === 'libre')
                 return (
-                  <div key={s.id} onClick={async () => {
+                  <div key={g.key} onClick={async () => {
+                      // Cargar ejercicios de TODAS las sesiones del grupo
+                      const ids = g.sesiones.map(s => s.id)
                       const { data: ejes } = await supabase.from('sesion_ejercicios')
-                        .select('*').eq('sesion_id', s.id).order('orden')
-                      setDetalleSesion({ ...s, ejercicios: ejes || [] })
+                        .select('*').in('sesion_id', ids).order('sesion_id').order('orden')
+                      // Sesión "representativa" para el modal (la que tenga RPE, o la primera)
+                      const rep = g.sesiones.find(s => s.rpe) || primera
+                      setDetalleSesion({ ...rep, ejercicios: ejes || [], _grupo: g.sesiones })
                     }}
                     className="bg-white rounded-xl border border-black/5 shadow-sm p-4 cursor-pointer hover:shadow-md hover:border-acento/20 transition-all">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 bg-acento/10 rounded-xl flex items-center justify-center text-acento font-bold text-sm flex-shrink-0">
-                        {ini(s.clientes?.nombre)}
+                        {ini(g.clientes?.nombre)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <button onClick={e => { e.stopPropagation(); setQuickView(s.cliente_id) }}
+                        <button onClick={e => { e.stopPropagation(); setQuickView(g.cliente_id) }}
                           className="text-sm font-semibold text-[#0A0A0A] hover:text-acento truncate block text-left">
-                          {s.clientes?.nombre}
+                          {g.clientes?.nombre}
                         </button>
                         <p className="text-xs text-[#6B6B6B]">
-                          {new Date(s.fecha).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}
-                          {s.hora ? ` · ${s.hora}` : ''} · {s.tipo === 'libre' ? '🏃 Actividad libre' : s.tipo}
-                          {s.duracion_minutos ? ` · ${s.duracion_minutos}min` : ''}
-                          {s.notas && s.tipo === 'libre' ? ` · ${s.notas}` : ''}
+                          {new Date(g.fecha).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'})}
+                          {hayLibre ? ' · 🏃 Actividad libre' : ' · online'}
+                          {duracion > 0 ? ` · ${duracion}min` : ''}
+                          {g.sesiones.length > 1 ? ` · ${g.sesiones.length} bloques` : ''}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        {s.rpe
-                          ? <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">RPE {s.rpe}</span>
-                          : s.completada && <span className="text-xs bg-[#F7F6F3] text-[#C0C0C0] px-2 py-1 rounded-full font-medium">Sin valorar</span>
+                        {rpe
+                          ? <span className="text-xs bg-orange-50 text-orange-700 px-2 py-1 rounded-full font-medium">RPE {rpe}</span>
+                          : todaCompletada && <span className="text-xs bg-[#F7F6F3] text-[#C0C0C0] px-2 py-1 rounded-full font-medium">Sin valorar</span>
                         }
-                        {s.fatiga_post && <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.fatiga_post >= 4 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>💪 {s.fatiga_post}/5</span>}
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${s.completada?'bg-emerald-50 text-emerald-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
-                          {s.completada ? '✓' : 'Pendiente'}
+                        {fatiga && <span className={`text-xs px-2 py-1 rounded-full font-medium ${fatiga >= 4 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-700'}`}>💪 {fatiga}/5</span>}
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${todaCompletada?'bg-emerald-50 text-emerald-700':'bg-[#F5F5F0] text-[#6B6B6B]'}`}>
+                          {todaCompletada ? '✓' : 'Pendiente'}
                         </span>
                       </div>
                     </div>
                   </div>
                 )
-              })}
+              })
+            })()}
             {sesiones.length === 0 && (
               <div className="bg-white rounded-2xl border border-black/5 p-8 text-center">
                 <p className="text-3xl mb-2">🏋️</p>
