@@ -64,6 +64,7 @@ export default function Dashboard({ session }) {
   const [clientesIAPendiente, setClientesIAPendiente] = useState([])
   const [toast, setToast] = useState('')
   const [mostrarWizard, setMostrarWizard] = useState(false)
+  const [expandirCriticos, setExpandirCriticos] = useState(false)
   const navigate = useNavigate()
   const uid = session.user.id
   const equipo = useEquipo(uid)
@@ -811,14 +812,22 @@ export default function Dashboard({ session }) {
                       <div className="flex items-center gap-3 mb-2">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 ${criticos.length > 0 ? 'bg-red-500 text-white' : 'bg-amber-100 text-amber-700'}`}>📋</div>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-bold ${criticos.length > 0 ? 'text-red-700' : 'text-[#0A0A0A]'}`}>
-                            {d.clientesSinCI.length} sin check-in
-                            {criticos.length > 0 && ` · ${criticos.length} crítico${criticos.length>1?'s':''}`}
-                          </p>
-                          <p className="text-xs text-[#6B6B6B] truncate">
-                            {d.clientesSinCI.slice(0,4).map(c=>c.nombre.split(' ')[0]).join(', ')}
-                            {d.clientesSinCI.length > 4 && ` +${d.clientesSinCI.length-4}`}
-                          </p>
+                          <button onClick={() => criticos.length > 0 && setExpandirCriticos(v => !v)}
+                            className={`w-full text-left ${criticos.length > 0 ? 'cursor-pointer' : 'cursor-default'}`}>
+                            <p className={`text-sm font-bold flex items-center gap-1 ${criticos.length > 0 ? 'text-red-700' : 'text-[#0A0A0A]'}`}>
+                              {d.clientesSinCI.length} sin check-in
+                              {criticos.length > 0 && (
+                                <span className="inline-flex items-center gap-0.5 bg-red-200 text-red-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                  {criticos.length} crítico{criticos.length>1?'s':''}
+                                  <span className="text-[9px]">{expandirCriticos ? '▲' : '▼'}</span>
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-[#6B6B6B] truncate">
+                              {d.clientesSinCI.slice(0,4).map(c=>c.nombre.split(' ')[0]).join(', ')}
+                              {d.clientesSinCI.length > 4 && ` +${d.clientesSinCI.length-4}`}
+                            </p>
+                          </button>
                         </div>
                         <button onClick={async () => {
                           try {
@@ -832,6 +841,28 @@ export default function Dashboard({ session }) {
                         <button onClick={() => descartarGrupo(d.clientesSinCI.map(c=>c.id), 'sin_checkin', 'clientesSinCI')}
                           title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                       </div>
+                      {expandirCriticos && criticos.length > 0 && (
+                        <div className="mt-1 mb-1 space-y-1">
+                          {criticos.map(c => {
+                            const ultimoCI = (d.checkins||[]).filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha?.localeCompare(a.fecha))[0]
+                            const diasSinCI = ultimoCI
+                              ? Math.floor((Date.now() - new Date(ultimoCI.fecha).getTime()) / 864e5)
+                              : null
+                            return (
+                              <button key={c.id} onClick={() => navigate(`/seguimiento?cliente=${c.id}`)}
+                                className="w-full flex items-center gap-2 bg-red-100 hover:bg-red-200 rounded-xl px-3 py-2 transition-all text-left">
+                                <div className="w-6 h-6 bg-red-500 rounded-lg flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
+                                  {c.nombre.charAt(0).toUpperCase()}
+                                </div>
+                                <span className="text-xs font-semibold text-red-800 flex-1">{c.nombre.split(' ').slice(0,2).join(' ')}</span>
+                                <span className="text-[10px] text-red-600 font-medium flex-shrink-0">
+                                  {diasSinCI ? `${diasSinCI}d sin CI` : 'Nunca'}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   )
                 })()}
@@ -1012,15 +1043,23 @@ export default function Dashboard({ session }) {
                 {[
                   ['Clientes', d.activos.length, BRAND.color, '/clientes'],
                   ['Ingresos', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos',
-                    d.previstoMes > d.ingresosMes ? `previsto ${d.previstoMes.toFixed(0)}€` : null],
+                    d.previstoMes > d.ingresosMes ? { label: `/${d.previstoMes.toFixed(0)}€`, tipo: 'previsto' } : null],
                   ['Sesiones hoy', sesionesHoy.length, '#6366f1', '/agenda'],
                   ['Adherencia', d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento'],
                 ].map(([l,v,c,ruta,sub]) => (
                   <button key={l} onClick={() => navigate(ruta)}
                     className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
-                    <p className="text-lg font-bold" style={{color:c}}>{v}</p>
+                    <div className="flex items-baseline gap-1">
+                      <p className="text-lg font-bold" style={{color:c}}>{v}</p>
+                      {sub?.tipo === 'previsto' && (
+                        <span className="text-sm font-medium text-[#10b981]/60">{sub.label}</span>
+                      )}
+                    </div>
                     <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
-                    {sub && <p className="text-[10px] text-[#9B9B9B]">{sub}</p>}
+                    {sub?.tipo === 'previsto' && (
+                      <p className="text-[10px] text-[#10b981]/70 font-medium">previsto este mes</p>
+                    )}
+                    {sub && typeof sub === 'string' && <p className="text-[10px] text-[#9B9B9B]">{sub}</p>}
                   </button>
                 ))}
               </div>

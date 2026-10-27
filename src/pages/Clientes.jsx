@@ -894,14 +894,26 @@ export default function Clientes({ session }) {
           <Chip key={k} field="obj" label={v.label} value={k} count={clientes.filter(c=>c.objetivo===k).length} />
         ))}
         <div className="w-px bg-black/10 flex-shrink-0" />
-        {moduloVisible('seguimiento') && <button onClick={() => { setFiltroTipo('sinCI'); setPagina(1) }}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo==='sinCI' ? 'bg-amber-500 text-white' : 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>
-          ⚠ Sin seguimiento (todos)
-        </button>}
-        <button onClick={() => { setFiltroTipo('vencidos'); setPagina(1) }}
-          className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all ${filtroTipo==='vencidos' ? 'bg-red-500 text-white' : 'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100'}`}>
-          💳 Pago vencido
-        </button>
+        {moduloVisible('seguimiento') && (() => {
+          const cntSinCI = Object.values(alertas).filter(a => a.sinCI).length
+          return (
+            <button onClick={() => { setFiltroTipo(filtroTipo === 'sinCI' ? 'todos' : 'sinCI'); setPagina(1) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all flex items-center gap-1.5 ${filtroTipo==='sinCI' ? 'bg-amber-500 text-white' : 'bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100'}`}>
+              ⚠ Sin CI
+              {cntSinCI > 0 && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filtroTipo==='sinCI' ? 'bg-amber-400/60 text-white' : 'bg-amber-200 text-amber-800'}`}>{cntSinCI}</span>}
+            </button>
+          )
+        })()}
+        {(() => {
+          const cntVencidos = Object.values(alertas).filter(a => a.pagoVencido).length
+          return (
+            <button onClick={() => { setFiltroTipo(filtroTipo === 'vencidos' ? 'todos' : 'vencidos'); setPagina(1) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium flex-shrink-0 transition-all flex items-center gap-1.5 ${filtroTipo==='vencidos' ? 'bg-red-500 text-white' : 'bg-red-50 border border-red-200 text-red-700 hover:bg-red-100'}`}>
+              💳 Cobro vencido
+              {cntVencidos > 0 && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filtroTipo==='vencidos' ? 'bg-red-400/60 text-white' : 'bg-red-200 text-red-800'}`}>{cntVencidos}</span>}
+            </button>
+          )
+        })()}
       </div>
 
       {/* Enlace registro */}
