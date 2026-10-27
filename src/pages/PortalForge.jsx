@@ -328,7 +328,7 @@ export default function PortalForge() {
     setGuardandoAct(false)
   }
 
-  async function guardarRegistroSesion() {
+  async function guardarRegistroSesion(duracionMinutos) {
     if (modoPreview) return bloqueadoPreview()
     if (!modalRegistro || guardandoRegistro) return
     setGuardandoRegistro(true)
@@ -336,6 +336,7 @@ export default function PortalForge() {
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
       fecha: hoyStr(), tipo: 'online', completada: true, cancelada: false, notas: modalRegistro.nombre,
       valoracion_pendiente: true,
+      duracion_minutos: duracionMinutos || null,
     }).select().single()
     if (error || !sesNueva) {
       setGuardandoRegistro(false)
@@ -3210,6 +3211,20 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
   const [solicitandoCambio, setSolicitandoCambio] = useState(false)
   const [cambioSolicitado, setCambioSolicitado] = useState(false)
   const [videoEjModal, setVideoEjModal] = useState(null) // { nombre, youtube_url, consejos_tecnica }
+  const [confirmando, setConfirmando] = useState(false) // panel de confirmación antes de guardar
+
+  // ── Timer ──
+  const [segundos, setSegundos] = useState(0)
+  const timerRef = useRef(null)
+  useEffect(() => {
+    if (sesionGuardadaId) return // no seguir contando tras guardar
+    timerRef.current = setInterval(() => setSegundos(s => s + 1), 1000)
+    return () => clearInterval(timerRef.current)
+  }, [sesionGuardadaId])
+  const duracionMinutos = Math.max(1, Math.round(segundos / 60))
+  const timerStr = segundos < 3600
+    ? `${String(Math.floor(segundos / 60)).padStart(2, '0')}:${String(segundos % 60).padStart(2, '0')}`
+    : `${Math.floor(segundos / 3600)}h ${String(Math.floor((segundos % 3600) / 60)).padStart(2, '0')}m`
 
   async function guardarMolestia() {
     if (modoPreview || !molestiaForm.zona) return
@@ -3343,13 +3358,58 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
   const totalComp = Object.values(registroSets).reduce((a, sets) => a + sets.filter(s => s.completada).length, 0)
   const totalSets = Object.values(registroSets).reduce((a, sets) => a + sets.length, 0)
 
+  // ── Panel de confirmación ──
+  if (confirmando) return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-md p-6 space-y-4">
+        <div className="text-center">
+          <p className="text-2xl mb-1">🏋️</p>
+          <p className="text-lg font-bold text-[#0A0A0A]">¿Terminas el entrenamiento?</p>
+          <p className="text-sm text-[#9B9B9B] mt-1">Duración: <span className="font-bold text-[#0A0A0A]">{timerStr}</span></p>
+        </div>
+        <div className="bg-[#F7F6F3] rounded-2xl p-4 space-y-2">
+          {Object.entries(registroSets).map(([ei, sets]) => {
+            const ej = ejercicios[parseInt(ei)]
+            if (!ej) return null
+            const comp = sets.filter(s => s.completada).length
+            const maxPeso = Math.max(0, ...sets.filter(s => s.peso).map(s => parseFloat(s.peso) || 0))
+            return (
+              <div key={ei} className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-[#0A0A0A] flex-1 min-w-0 truncate pr-2">{ej.nombre}</p>
+                <p className="text-xs text-[#9B9B9B] flex-shrink-0">
+                  {comp}/{sets.length} series{maxPeso > 0 ? ` · ${maxPeso} kg` : ''}
+                  {comp === sets.length ? ' ✓' : ''}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button onClick={() => setConfirmando(false)}
+            className="flex-1 py-3.5 rounded-2xl border border-black/10 text-[#6B6B6B] font-bold text-sm active:scale-95 transition-all">
+            Revisar
+          </button>
+          <button onClick={() => { clearInterval(timerRef.current); guardarRegistroSesion(duracionMinutos) }}
+            disabled={guardandoRegistro}
+            className="flex-1 py-3.5 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
+            style={{ background: color }}>
+            {guardandoRegistro ? '⏳ Guardando...' : 'Confirmar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-3xl w-full max-w-md max-h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-start justify-between flex-shrink-0">
           <div className="flex-1 min-w-0 mr-3">
             <p className="font-bold text-[#0A0A0A] text-lg">{dia.nombre}</p>
-            <p className="text-xs text-[#9B9B9B] mt-1">{ejercicios.length} ejercicios</p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-xs text-[#9B9B9B]">{ejercicios.length} ejercicios</p>
+              <p className="text-xs font-bold tabular-nums" style={{ color }}>{timerStr}</p>
+            </div>
             {totalSets > 0 && (
               <div className="flex items-center gap-2 mt-2">
                 <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#F2F1EE' }}>
@@ -3456,10 +3516,10 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
         </div>
 
         <div className="px-5 py-4 border-t border-black/5 flex-shrink-0">
-          <button onClick={guardarRegistroSesion} disabled={guardandoRegistro || Object.keys(registroSets).length === 0}
+          <button onClick={() => setConfirmando(true)} disabled={guardandoRegistro || Object.keys(registroSets).length === 0}
             className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
             style={{ background: color }}>
-            {guardandoRegistro ? '⏳ Guardando...' : `✓ Guardar sesión${totalComp > 0 ? ` · ${totalComp} series` : ''}`}
+            {`✓ Terminar entrenamiento${totalComp > 0 ? ` · ${totalComp} series` : ''}`}
           </button>
         </div>
       </div>
