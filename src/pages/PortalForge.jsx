@@ -722,7 +722,7 @@ export default function PortalForge() {
             </div>
           )}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
-          {tab === 'mensajes' && VER_MENSAJES && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} />}
+          {tab === 'mensajes' && VER_MENSAJES && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} config={config} />}
           {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
         </div>
 
@@ -1090,10 +1090,10 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             )}
           </div>
           <div className="flex gap-2.5 flex-wrap">
-            {checkins[0].energia != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ {checkins[0].energia}/5</span>}
-            {checkins[0].sueno != null && <span className="text-[10px] font-bold text-[#9B9B9B]">😴 {checkins[0].sueno}/5</span>}
-            {checkins[0].fatiga != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ {checkins[0].fatiga}/5</span>}
-            {checkins[0].estres != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 {checkins[0].estres}/5</span>}
+            {checkins[0].energia != null && <span className="text-[10px] font-bold text-[#9B9B9B]" title="Energía">⚡ Energía {checkins[0].energia}/5</span>}
+            {checkins[0].sueno != null && <span className="text-[10px] font-bold text-[#9B9B9B]" title="Sueño">😴 Sueño {checkins[0].sueno}/5</span>}
+            {checkins[0].fatiga != null && <span className="text-[10px] font-bold text-[#9B9B9B]" title="Fatiga">🏋️ Fatiga {checkins[0].fatiga}/5</span>}
+            {checkins[0].estres != null && <span className="text-[10px] font-bold text-[#9B9B9B]" title="Estrés">🧠 Estrés {checkins[0].estres}/5</span>}
             {checkins[0].peso != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚖️ {checkins[0].peso}kg</span>}
           </div>
         </div>
@@ -1204,14 +1204,16 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
       {/* Check-in urgente */}
       {ciUrgente && (
         <button onClick={() => setModalCI(true)}
-          className="w-full flex items-center gap-4 rounded-2xl p-4 active:scale-95 text-left animate-pulse"
+          className="w-full flex items-center gap-4 rounded-2xl p-4 active:scale-95 text-left"
           style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)' }}>
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><span className="text-xl">⏰</span></div>
+          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 flex-shrink-0">
+            <span className="text-xl">⏰</span>
+          </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-white">{diasSinCI>900?'Haz tu primer check-in':`${diasSinCI} días sin check-in`}</p>
-            <p className="text-xs text-white/70 mt-0.5">Tu entrenador necesita saber cómo estás</p>
+            <p className="text-xs text-white/80 mt-0.5 leading-relaxed">El check-in semanal ayuda a tu entrenador a ajustar tu plan · solo 30 segundos</p>
           </div>
-          <span className="text-white/80 text-xl">→</span>
+          <span className="text-white/80 text-xl flex-shrink-0">→</span>
         </button>
       )}
 
@@ -1572,10 +1574,21 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
 }
 
 // ─── Tab Mensajes ─────────────────────────────────────────────────────────────
-function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensaje, color, endRef, modoPreview }) {
+function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensaje, color, endRef, modoPreview, config }) {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes?.length])
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+      {/* Header entrenador */}
+      <div className="flex items-center gap-3 pb-3 mb-1 border-b border-black/5 flex-shrink-0">
+        {config?.foto_url
+          ? <img src={config.foto_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+          : <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: `${color}18`, color }}>{(config?.nombre_entrenador || 'E').slice(0, 2).toUpperCase()}</div>
+        }
+        <div>
+          <p className="text-sm font-bold text-[#0A0A0A]">{config?.nombre_entrenador || 'Tu entrenador'}</p>
+          <p className="text-[10px] text-[#9B9B9B]">Tu entrenador personal</p>
+        </div>
+      </div>
       <div className="flex-1 overflow-y-auto space-y-2 pb-2">
         {!mensajes?.length && (
           <div className="text-center py-10">
@@ -1733,12 +1746,12 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
         <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Ajustes</p>
         <form onSubmit={guardar} className="bg-white rounded-2xl p-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            {[['Peso actual (kg)','peso_actual'],['Peso objetivo (kg)','peso_objetivo']].map(([label,key]) => (
+            {[['Peso actual (kg)','peso_actual','ej. 75'],['Peso objetivo (kg)','peso_objetivo','ej. 70']].map(([label,key,ph]) => (
               <div key={key}>
                 <label className="text-[10px] font-black uppercase tracking-widest text-[#9B9B9B] block mb-2">{label}</label>
-                <input type="number" step="0.1" value={form[key]}
+                <input type="number" step="0.1" value={form[key]} placeholder={ph}
                   onChange={e => setForm(f => ({...f,[key]:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none" />
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none placeholder:font-normal placeholder:text-[#C0C0C0]" />
               </div>
             ))}
           </div>
@@ -2585,10 +2598,10 @@ function SubPeso({ checkins, color }) {
                   {formatearFecha(c.fecha, {weekday:'short',day:'numeric',month:'short'})}
                 </p>
                 <div className="flex gap-2.5 mt-1.5 flex-wrap">
-                  {c.energia  != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ {c.energia}/5</span>}
-                  {c.fatiga   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ {c.fatiga}/5</span>}
-                  {c.sueno    != null && <span className="text-[10px] font-bold text-[#9B9B9B]">😴 {c.sueno}/5</span>}
-                  {c.estres   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 {c.estres}/5</span>}
+                  {c.energia  != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ Energía {c.energia}/5</span>}
+                  {c.fatiga   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ Fatiga {c.fatiga}/5</span>}
+                  {c.sueno    != null && <span className="text-[10px] font-bold text-[#9B9B9B]">😴 Sueño {c.sueno}/5</span>}
+                  {c.estres   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 Estrés {c.estres}/5</span>}
                 </div>
                 {c.comentario && (
                   <p className="text-[10px] text-[#9B9B9B] mt-1.5 italic leading-relaxed">"{c.comentario}"</p>
