@@ -33,6 +33,7 @@ export default function Mensajes({ session }) {
   const [enviando, setEnviando] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [noLeidos, setNoLeidos] = useState({})
+  const [ultimoMensaje, setUltimoMensaje] = useState({}) // { clienteId: { contenido, tipo, created_at } }
   const [showPlantillas, setShowPlantillas] = useState(false)
   const [generandoLink, setGenerandoLink] = useState(false)
   const [modalPago, setModalPago] = useState(false)
@@ -92,16 +93,23 @@ export default function Mensajes({ session }) {
 
   async function cargarClientes() {
     setLoading(true)
-    const [{ data: cl, error: errCl }, { data: ms, error: errMs }] = await Promise.all([
+    const [{ data: cl, error: errCl }, { data: ms, error: errMs }, { data: ult, error: errUlt }] = await Promise.all([
       supabase.from('clientes').select('id,nombre,tipo,estado,plan_online,suscripcion_activa,email').in('entrenador_id', equipo).eq('estado','activo').order('nombre'),
       supabase.from('mensajes_cliente').select('cliente_id,leido_entrenador,tipo,created_at')
-        .in('entrenador_id', equipo).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema')
+        .in('entrenador_id', equipo).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema'),
+      // Último mensaje por cliente: top 1 por cliente_id ordenado por created_at desc
+      supabase.from('mensajes_cliente').select('cliente_id,contenido,tipo,created_at')
+        .in('entrenador_id', equipo).order('created_at', { ascending: false }).limit(200)
     ])
     if (errCl || errMs) setToast('Error al cargar clientes: ' + (errCl?.message || errMs?.message))
     setClientes(cl || [])
     const nl = {}
     ;(ms || []).forEach(m => { nl[m.cliente_id] = (nl[m.cliente_id] || 0) + 1 })
     setNoLeidos(nl)
+    // Último mensaje por cliente (el primer resultado ya es el más reciente por el order desc)
+    const um = {}
+    ;(ult || []).forEach(m => { if (!um[m.cliente_id]) um[m.cliente_id] = m })
+    setUltimoMensaje(um)
     setLoading(false)
   }
 
@@ -136,6 +144,11 @@ export default function Mensajes({ session }) {
       if (error) { setToast('Error al enviar mensaje: ' + error.message); return }
       setTexto('')
       setShowPlantillas(false)
+      // Actualizar preview del último mensaje en la lista
+      setUltimoMensaje(prev => ({
+        ...prev,
+        [seleccionado.id]: { cliente_id: seleccionado.id, contenido: msg, tipo: 'entrenador', created_at: new Date().toISOString() }
+      }))
       await cargarMensajes(seleccionado.id)
       // Notificar al cliente por email (fire & forget — no bloquea el envío)
       supabase.functions.invoke('notificar-mensaje', {
@@ -148,7 +161,15 @@ export default function Mensajes({ session }) {
 
   const clientesFiltrados = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(busqueda.toLowerCase())
-  ).sort((a,b) => (noLeidos[b.id]||0) - (noLeidos[a.id]||0))
+  ).sort((a,b) => {
+    // Primero clientes con no leídos
+    const nlDiff = (noLeidos[b.id]||0) - (noLeidos[a.id]||0)
+    if (nlDiff !== 0) return nlDiff
+    // Luego por fecha del último mensaje (más reciente primero)
+    const fechaA = ultimoMensaje[a.id]?.created_at || ''
+    const fechaB = ultimoMensaje[b.id]?.created_at || ''
+    return fechaB.localeCompare(fechaA)
+  })
 
   const totalNoLeidos = Object.values(noLeidos).reduce((s,v) => s+v, 0)
 
@@ -207,8 +228,21 @@ export default function Mensajes({ session }) {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${nl > 0 ? 'font-bold text-[#0A0A0A]' : 'font-medium text-[#0A0A0A]'}`}>{c.nombre}</p>
-                  <p className="text-xs text-[#6B6B6B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}</p>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <p className={`text-sm truncate ${nl > 0 ? 'font-bold text-[#0A0A0A]' : 'font-medium text-[#0A0A0A]'}`}>{c.nombre}</p>
+                    {ultimoMensaje[c.id] && (
+                      <span className="text-[10px] text-[#9B9B9B] flex-shrink-0">
+                        {new Date(ultimoMensaje[c.id].created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
+                      </span>
+                    )}
+                  </div>
+                  {ultimoMensaje[c.id] ? (
+                    <p className={`text-xs truncate ${nl > 0 ? 'font-semibold text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>
+                      {ultimoMensaje[c.id].tipo === 'entrenador' ? '↗ ' : ''}{ultimoMensaje[c.id].contenido}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-[#9B9B9B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'} · Sin mensajes</p>
+                  )}
                 </div>
               </button>
             )
