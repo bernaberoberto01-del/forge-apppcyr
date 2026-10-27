@@ -922,7 +922,7 @@ export default function Clientes({ session }) {
       ) : (
         <>
           {/* Header tabla — solo desktop */}
-          <div className="hidden md:grid grid-cols-[2fr_1fr_1.2fr_1fr_80px] gap-3 px-4 mb-2">
+          <div className="hidden md:grid grid-cols-[2fr_1fr_1.2fr_1fr_80px] gap-3 px-4 mb-2 sticky top-0 bg-[#F7F6F3] z-10 py-2 -mt-2">
             {['Cliente','Modalidad','Objetivo','Estado','Importe'].map(h => (
               <p key={h} className="text-xs font-semibold text-[#6B6B6B] uppercase tracking-wide">{h}</p>
             ))}

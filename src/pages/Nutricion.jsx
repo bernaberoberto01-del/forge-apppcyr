@@ -380,7 +380,9 @@ export default function Nutricion({ session }) {
                         className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all hover:opacity-75 ${activo ? 'bg-acento/10 text-acento' : 'bg-black/5 text-[#9B9B9B]'}`}>
                         {activo ? (c.plan_online === 'completo' ? '⚡ Completo' : '🥗 Online') : 'Sin plan →'}
                       </button>
-                    : <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
+                    : <button
+                        onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
+                        title={activo ? 'Desactivar: el cliente dejará de ver el plan nutricional en su portal' : 'Activar: el cliente podrá ver su plan nutricional en el portal'}
                         className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
                         <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
                       </button>
@@ -428,7 +430,9 @@ export default function Nutricion({ session }) {
                   ? <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${activo ? 'bg-acento/10 text-acento' : 'bg-black/5 text-[#9B9B9B]'}`}>
                       {activo ? '🟠 Online' : 'Sin plan'}
                     </span>
-                  : <button onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
+                  : <button
+                      onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
+                      title={activo ? 'Desactivar: el cliente dejará de ver el plan nutricional en su portal' : 'Activar: el cliente podrá ver su plan nutricional en el portal'}
                       className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
                       <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
                     </button>

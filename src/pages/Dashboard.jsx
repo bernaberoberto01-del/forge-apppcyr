@@ -460,9 +460,12 @@ export default function Dashboard({ session }) {
             </p>
           </div>
           {totalPendiente > 0 && (
-            <div className="bg-acento text-white text-sm font-bold px-3 py-1.5 rounded-full">
+            <button
+              onClick={() => document.getElementById('atencion-requerida')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="bg-acento text-white text-sm font-bold px-3 py-1.5 rounded-full active:scale-95 transition-all cursor-pointer hover:opacity-90"
+            >
               {totalPendiente} pendiente{totalPendiente > 1 ? 's' : ''}
-            </div>
+            </button>
           )}
         </div>
 
@@ -473,7 +476,7 @@ export default function Dashboard({ session }) {
           <div className="lg:col-span-2 space-y-4">
 
             {/* Lista de atención priorizada */}
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+            <div id="atencion-requerida" className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
                 <p className="font-bold text-[#0A0A0A] text-sm">Atención requerida</p>
                 {totalPendiente === 0 && (
