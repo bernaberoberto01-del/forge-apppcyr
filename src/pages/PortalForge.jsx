@@ -680,7 +680,8 @@ export default function PortalForge() {
               <div className="flex gap-2">
                 <input type="tel" value={telefonoInput} onChange={e => setTelefonoInput(e.target.value)}
                   placeholder="+34 600 000 000"
-                  className="flex-1 border border-amber-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-amber-400" />
+                  className="flex-1 rounded-xl px-3 py-2.5 text-sm focus:outline-none"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFFFFF' }} />
                 <button onClick={guardarTelefono} disabled={guardandoTelefono || !telefonoInput.trim()}
                   className="px-4 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-40 active:scale-95 transition-all"
                   style={{ background: color }}>
@@ -3446,12 +3447,12 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
 
   if (sesionGuardadaId) return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4">
-      <div className="bg-white rounded-3xl w-full max-w-md p-6 space-y-4">
+      <div className="rounded-3xl w-full max-w-md p-6 space-y-4" style={{ background: '#1A1A18', border: '1px solid rgba(255,255,255,0.07)' }}>
         {molestiaBloqueada ? (
           <>
-            <p className="text-sm font-bold text-[#0A0A0A] text-center">Para recibir un protocolo de recuperación muscular necesitas el plan Entrenamiento o Completo</p>
+            <p className="text-sm font-bold text-center" style={{ color: '#FFFFFF' }}>Para recibir un protocolo de recuperación muscular necesitas el plan Entrenamiento o Completo</p>
             {cambioSolicitado ? (
-              <p className="text-xs text-emerald-600 font-bold text-center">Solicitud enviada. Tu entrenador se pondrá en contacto contigo.</p>
+              <p className="text-xs font-bold text-center" style={{ color: '#34d399' }}>Solicitud enviada. Tu entrenador se pondrá en contacto contigo.</p>
             ) : (
               <button onClick={async () => { setSolicitandoCambio(true); await solicitarCambioPlan?.('entrenamiento'); setSolicitandoCambio(false); setCambioSolicitado(true) }}
                 disabled={solicitandoCambio}
@@ -3459,52 +3460,53 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
                 {solicitandoCambio ? 'Enviando...' : 'Solicitar cambio de plan'}
               </button>
             )}
-            <button onClick={onFinalizar} className="w-full py-3 rounded-xl border border-black/10 text-[#6B6B6B] font-bold text-sm active:scale-95 transition-all">Cerrar</button>
+            <button onClick={onFinalizar} className="w-full py-3 rounded-xl font-bold text-sm active:scale-95 transition-all" style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)' }}>Cerrar</button>
           </>
         ) : tieneMolestia === null ? (
           <>
             <div className="text-center">
               <p className="text-3xl mb-2">✅</p>
-              <p className="text-lg font-bold text-[#0A0A0A]">¡Sesión guardada!</p>
+              <p className="text-lg font-bold" style={{ color: '#FFFFFF' }}>¡Sesión guardada!</p>
             </div>
-            <p className="text-sm font-bold text-[#0A0A0A] text-center mt-2">¿Has sentido alguna molestia hoy?</p>
+            <p className="text-sm font-bold text-center mt-2" style={{ color: '#FFFFFF' }}>¿Has sentido alguna molestia hoy?</p>
             <div className="flex gap-2">
-              <button onClick={onFinalizar} className="flex-1 py-3 rounded-xl border border-black/10 text-[#6B6B6B] font-bold text-sm active:scale-95 transition-all">No</button>
+              <button onClick={onFinalizar} className="flex-1 py-3 rounded-xl font-bold text-sm active:scale-95 transition-all" style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)' }}>No</button>
               <button onClick={() => setTieneMolestia(true)} className="flex-1 py-3 rounded-xl text-white font-bold text-sm active:scale-95 transition-all" style={{ background: color }}>Sí</button>
             </div>
           </>
         ) : (
           <>
-            <p className="text-sm font-bold text-[#0A0A0A]">Cuéntanos qué ha pasado</p>
+            <p className="text-sm font-bold" style={{ color: '#FFFFFF' }}>Cuéntanos qué ha pasado</p>
             <div>
-              <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Zona afectada</p>
+              <p className="text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Zona afectada</p>
               <div className="grid grid-cols-3 gap-2">
                 {ZONAS_LESION.map(z => (
                   <button key={z} type="button" onClick={() => setMolestiaForm(f => ({...f, zona: z}))}
                     className="py-2 rounded-xl text-xs font-bold border transition-all"
-                    style={molestiaForm.zona === z ? { background: color, color: 'white', borderColor: color } : { borderColor: 'rgba(0,0,0,0.1)', color: '#6B6B6B' }}>
+                    style={molestiaForm.zona === z ? { background: color, color: 'white', borderColor: color } : { borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)' }}>
                     {z}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Severidad</p>
+              <p className="text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Severidad</p>
               <div className="flex gap-2">
                 {SEVERIDADES.map(([k, l]) => (
                   <button key={k} type="button" onClick={() => setMolestiaForm(f => ({...f, severidad: k}))}
                     className="flex-1 py-2 rounded-xl text-xs font-bold border transition-all"
-                    style={molestiaForm.severidad === k ? { background: color, color: 'white', borderColor: color } : { borderColor: 'rgba(0,0,0,0.1)', color: '#6B6B6B' }}>
+                    style={molestiaForm.severidad === k ? { background: color, color: 'white', borderColor: color } : { borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)' }}>
                     {l}
                   </button>
                 ))}
               </div>
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Descripción (opcional)</p>
+              <p className="text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>Descripción (opcional)</p>
               <textarea value={molestiaForm.descripcion} onChange={e => setMolestiaForm(f => ({...f, descripcion: e.target.value}))} rows={2}
                 placeholder="Qué ha pasado..."
-                className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none" />
+                className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFFFFF' }} />
             </div>
             <button onClick={guardarMolestia} disabled={!molestiaForm.zona || guardandoMolestia}
               className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all" style={{ background: color }}>
