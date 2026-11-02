@@ -2206,17 +2206,18 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
 
   if (!nutricion) return (
     <div className="space-y-3">
-      <div className="text-center py-16">
+      <div className="rounded-3xl overflow-hidden py-16 text-center"
+        style={{ background: C.bg, border: `1px solid ${C.border}` }}>
         <div className="text-4xl mb-3">🥗</div>
-        <p className="text-lg font-black text-[#0A0A0A]">Plan en preparación</p>
+        <p className="text-lg font-black text-white">Plan en preparación</p>
         {!cuest
           ? <div className="mt-5">
-              <p className="text-sm text-[#6B6B6B] mb-4 leading-relaxed max-w-xs mx-auto">Tu entrenador necesita tu cuestionario para crear tu plan.</p>
+              <p className="text-sm mb-4 leading-relaxed max-w-xs mx-auto" style={{ color: C.textSecondary }}>Tu entrenador necesita tu cuestionario para crear tu plan.</p>
               <a href={`${window.location.origin}/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
-                className="inline-block text-white text-sm font-black px-6 py-3 rounded-xl"
-                style={{ background: color }}>Rellenar cuestionario →</a>
+                className="inline-block text-white text-sm font-black px-6 py-3 rounded-xl active:scale-95 transition-all"
+                style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>Rellenar cuestionario →</a>
             </div>
-          : <p className="text-sm text-[#9B9B9B] mt-3">Cuestionario enviado · Pendiente</p>
+          : <p className="text-sm mt-3" style={{ color: C.textSecondary }}>Cuestionario enviado · Pendiente</p>
         }
       </div>
       {cuest && <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />}
@@ -2263,14 +2264,16 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="pb-1">
-        <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Nutrición</p>
-        <h2 className="text-xl font-black text-[#0A0A0A] tracking-tight mt-0.5">{nutricion.nombre}</h2>
+      <div className="rounded-3xl overflow-hidden px-5 py-4"
+        style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+        <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-1" style={{ color: C.textSecondary }}>Nutrición</p>
+        <h2 className="text-2xl font-black text-white tracking-tight leading-none"
+          style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>{nutricion.nombre}</h2>
       </div>
 
-      {/* Macros hero negro */}
+      {/* Macros hero */}
       {macros.length > 0 && (
-        <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
           <div className="grid grid-cols-4">
             {macros.map((m, i) => (
               <div key={m.label} className="px-3 py-4 text-center"
@@ -2313,9 +2316,9 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
 
       {/* Tracker semanal */}
       {tieneMenu && (
-        <div className="bg-white rounded-2xl p-4">
+        <div className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Seguimiento</p>
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>Seguimiento</p>
             <p className="text-[10px] font-black" style={{ color }}>{totalRegistros} días registrados</p>
           </div>
           <div className="flex gap-1.5">
@@ -2332,18 +2335,19 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                 <button key={di} onClick={() => setDiaAbierto(diaAbierto === di ? null : di)}
                   className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl active:scale-95 transition-all"
                   style={{
-                    background: completado ? `${color}15` : esHoyDia ? '#0A0A0A' : '#F4F3F0',
-                    border: esHoyDia && !completado ? `1.5px solid ${color}` : undefined
+                    background: completado ? `${color}20` : esHoyDia ? `${color}15` : C.card,
+                    border: esHoyDia && !completado ? `1.5px solid ${color}40` : `1px solid ${C.borderSubtle}`
                   }}>
                   <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black"
                     style={{
-                      background: completado ? color : esHoyDia ? color : 'rgba(0,0,0,0.08)',
-                      color: completado || esHoyDia ? 'white' : '#9B9B9B'
+                      background: completado ? color : esHoyDia ? `${color}40` : C.card,
+                      border: !completado && !esHoyDia ? `1px solid ${C.border}` : 'none',
+                      color: completado ? 'white' : esHoyDia ? color : C.textMuted
                     }}>
                     {completado ? '✓' : (di + 1)}
                   </div>
                   <p className="text-[8px] font-black uppercase"
-                    style={{ color: completado ? color : esHoyDia ? 'white' : '#B0B0B0' }}>
+                    style={{ color: completado ? color : esHoyDia ? color : C.textMuted }}>
                     {dia.dia?.slice(0, 3)}
                   </p>
                 </button>
@@ -2357,9 +2361,9 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
       {dias.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between px-1">
-            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Plan semanal</p>
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>Plan semanal</p>
             {diaAbierto !== null && (
-              <button onClick={() => setDiaAbierto(null)} className="text-[10px] font-bold text-[#9B9B9B]">Cerrar</button>
+              <button onClick={() => setDiaAbierto(null)} className="text-[10px] font-bold" style={{ color: C.textSecondary }}>Cerrar</button>
             )}
           </div>
 
@@ -2372,42 +2376,46 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
             const esHoyDia = dia.dia?.toLowerCase() === DIAS_ES[new Date().getDay()].toLowerCase()
 
             return (
-              <div key={di} className="bg-white rounded-2xl overflow-hidden">
+              <div key={di} className="rounded-2xl overflow-hidden"
+                style={{ background: C.bg, border: abierto ? `1px solid ${color}30` : `1px solid ${C.border}` }}>
                 {/* Header colapsable */}
-                <button className="w-full px-4 py-3.5 flex items-center gap-3 text-left active:bg-black/2 transition-colors"
+                <button className="w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors"
                   onClick={() => setDiaAbierto(abierto ? null : di)}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0"
-                    style={{ background: registradoEste ? '#10b981' : esHoyDia ? color : '#0A0A0A' }}>
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0"
+                    style={{
+                      background: registradoEste ? '#10b981' : esHoyDia ? color : C.card,
+                      border: !registradoEste && !esHoyDia ? `1px solid ${C.border}` : 'none',
+                      color: registradoEste || esHoyDia ? 'white' : C.textSecondary
+                    }}>
                     {registradoEste ? '✓' : di + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-black text-[#0A0A0A]">{dia.dia}</p>
-                    <p className="text-[10px] text-[#9B9B9B] font-medium mt-0.5">
+                    <p className="text-sm font-black text-white">{dia.dia}</p>
+                    <p className="text-[10px] font-medium mt-0.5" style={{ color: C.textSecondary }}>
                       {comidas.length} comidas · {totalKcal} kcal
                       {registradoEste && <span className="text-emerald-500 ml-1.5">· ✓ registrado</span>}
                       {esHoyDia && !registradoEste && <span style={{ color }} className="ml-1.5">· HOY</span>}
                     </p>
                   </div>
-                  <span className="text-[#C0C0C0] text-sm transition-transform duration-200 flex-shrink-0"
-                    style={{ transform: abierto ? 'rotate(180deg)' : 'none' }}>▾</span>
+                  <span className="text-sm transition-transform duration-200 flex-shrink-0" style={{ color: C.textMuted, transform: abierto ? 'rotate(180deg)' : 'none' }}>▾</span>
                 </button>
 
                 {/* Comidas del día */}
                 {abierto && (
                   <>
-                    <div className="divide-y border-t" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
+                    <div className="divide-y border-t" style={{ borderColor: C.borderSubtle }}>
                       {comidas.map((comida, ci) => (
                         <div key={ci} className="px-4 py-3.5">
                           {/* Cabecera comida */}
                           <div className="flex items-start justify-between mb-2">
                             <div>
-                              <p className="text-sm font-black text-[#0A0A0A]">{comida.nombre}</p>
-                              {comida.hora && <p className="text-[10px] text-[#9B9B9B] font-medium">{comida.hora}</p>}
+                              <p className="text-sm font-black text-white">{comida.nombre}</p>
+                              {comida.hora && <p className="text-[10px] font-medium" style={{ color: C.textMuted }}>{comida.hora}</p>}
                             </div>
                             {comida.kcal && (
                               <div className="text-right flex-shrink-0 ml-2">
                                 <p className="text-base font-black" style={{ color }}>{comida.kcal}</p>
-                                <p className="text-[9px] text-[#9B9B9B]">kcal</p>
+                                <p className="text-[9px]" style={{ color: C.textMuted }}>kcal</p>
                               </div>
                             )}
                           </div>
@@ -2423,14 +2431,14 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                           <div className="space-y-1.5">
                             {(comida.alimentos || []).map((al, ai) => (
                               <div key={ai} className="flex items-center justify-between">
-                                <p className="text-sm text-[#0A0A0A] font-medium">{typeof al === 'string' ? al : al.nombre}</p>
-                                {al.cantidad && <p className="text-xs font-black text-[#9B9B9B] flex-shrink-0 ml-3">{al.cantidad}</p>}
+                                <p className="text-sm font-medium" style={{ color: C.textPrimary }}>{typeof al === 'string' ? al : al.nombre}</p>
+                                {al.cantidad && <p className="text-xs font-black flex-shrink-0 ml-3" style={{ color: C.textSecondary }}>{al.cantidad}</p>}
                               </div>
                             ))}
                           </div>
                           {/* Preparación */}
                           {comida.prep && (
-                            <p className="text-[10px] text-[#9B9B9B] italic mt-2.5 leading-relaxed border-t pt-2 border-black/5">
+                            <p className="text-[10px] italic mt-2.5 leading-relaxed border-t pt-2" style={{ color: C.textMuted, borderColor: C.borderSubtle }}>
                               {comida.prep}
                             </p>
                           )}
@@ -2438,13 +2446,13 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                       ))}
                     </div>
                     {/* Botón registrar */}
-                    <div className="px-4 py-3 border-t" style={{ borderColor: 'rgba(0,0,0,0.05)', background: registradoEste ? '#f0fdf4' : `${color}04` }}>
+                    <div className="px-4 py-3 border-t" style={{ borderColor: C.borderSubtle, background: registradoEste ? 'rgba(16,185,129,0.08)' : `${color}08` }}>
                       {registradoEste
-                        ? <p className="text-xs font-black text-emerald-600 text-center">✓ Este día está registrado</p>
+                        ? <p className="text-xs font-black text-emerald-500 text-center">✓ Este día está registrado</p>
                         : (
                           <button onClick={() => registrarDia(dia, dia.dia)} disabled={!!guardandoDia || modoPreview}
                             className="w-full py-3 rounded-xl text-sm font-black text-white active:scale-95 transition-all disabled:opacity-40"
-                            style={{ background: color }}>
+                            style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
                             {guardandoDia === dia.dia ? '⏳ Registrando...' : `✓ He seguido el plan de ${dia.dia}`}
                           </button>
                         )
@@ -2481,11 +2489,11 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
           lista.map(item => `• ${item.nombre}${item.cantidades.length ? ` (${[...new Set(item.cantidades)].join(', ')})` : ''}`).join('\n')
 
         return (
-          <div className="bg-white rounded-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-black/5 flex items-center justify-between">
+          <div className="rounded-2xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+            <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${C.borderSubtle}` }}>
               <div>
-                <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Lista de la compra</p>
-                <p className="text-[10px] text-[#9B9B9B] mt-0.5">{lista.length} productos del plan</p>
+                <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>Lista de la compra</p>
+                <p className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>{lista.length} productos del plan</p>
               </div>
               <button onClick={() => {
                 if (navigator.share) {
@@ -2496,14 +2504,14 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                     .catch(() => alert('Copia el texto manualmente'))
                 }
               }} className="text-xs font-black px-3 py-1.5 rounded-xl text-white active:scale-95 transition-all"
-                style={{ background: color }}>
+                style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
                 Compartir 🛒
               </button>
             </div>
-            <div className="divide-y divide-black/4 max-h-64 overflow-y-auto">
+            <div className="max-h-64 overflow-y-auto" style={{ borderTop: `1px solid ${C.borderSubtle}` }}>
               {lista.map((item, i) => (
-                <div key={i} className="px-4 py-2.5 flex items-center justify-between">
-                  <p className="text-sm text-[#0A0A0A] font-medium">{item.nombre}</p>
+                <div key={i} className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: i < lista.length - 1 ? `1px solid ${C.borderSubtle}` : 'none' }}>
+                  <p className="text-sm font-medium" style={{ color: C.textPrimary }}>{item.nombre}</p>
                   {item.cantidades.length > 0 && (
                     <p className="text-xs font-black flex-shrink-0 ml-3" style={{ color }}>
                       {[...new Set(item.cantidades)].join(' · ')}
@@ -2518,13 +2526,13 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
 
       {/* Recomendaciones */}
       {contenido.recomendaciones?.length > 0 && (
-        <div className="bg-white rounded-2xl p-4">
-          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-3">Recomendaciones</p>
+        <div className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-3" style={{ color: C.textSecondary }}>Recomendaciones</p>
           <div className="space-y-2">
             {contenido.recomendaciones.map((r, i) => (
               <div key={i} className="flex gap-2">
                 <span className="text-[10px] font-black mt-0.5 flex-shrink-0" style={{ color }}>—</span>
-                <p className="text-xs text-[#444] leading-relaxed">{r}</p>
+                <p className="text-xs leading-relaxed" style={{ color: C.textSecondary }}>{r}</p>
               </div>
             ))}
           </div>
@@ -2551,22 +2559,22 @@ function SuplementacionSection({ cuest, suplementacion, color, cliente, cargarTo
   const recomendaciones = suplementacion?.recomendaciones || []
 
   return (
-    <div className="bg-white rounded-2xl p-4 space-y-3">
-      <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Suplementación</p>
+    <div className="rounded-2xl p-4 space-y-3" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+      <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>Suplementación</p>
       {!cuest?.interes_suplementacion ? (
         acceso && !acceso.suplementacion ? (
           <div className="text-center py-4">
             <p className="text-2xl mb-2">💊</p>
-            <p className="text-sm font-black text-[#0A0A0A] mb-3 leading-relaxed max-w-xs mx-auto">La suplementación personalizada está incluida en el plan Completo</p>
-            <button onClick={irAPagos} className="text-white text-sm font-black px-5 py-2.5 rounded-xl active:scale-95 transition-all" style={{ background: color }}>Ver planes</button>
+            <p className="text-sm font-black text-white mb-3 leading-relaxed max-w-xs mx-auto">La suplementación personalizada está incluida en el plan Completo</p>
+            <button onClick={irAPagos} className="text-white text-sm font-black px-5 py-2.5 rounded-xl active:scale-95 transition-all" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>Ver planes</button>
           </div>
         ) : (
           <div className="text-center py-4">
             <p className="text-2xl mb-2">💊</p>
-            <p className="text-sm font-black text-[#0A0A0A] mb-1">¿Quieres llevar tu nutrición un paso más allá?</p>
-            <p className="text-xs text-[#6B6B6B] mb-3 leading-relaxed max-w-xs mx-auto">Tu entrenador puede prepararte recomendaciones de suplementación personalizadas.</p>
+            <p className="text-sm font-black text-white mb-1">¿Quieres llevar tu nutrición un paso más allá?</p>
+            <p className="text-xs mb-3 leading-relaxed max-w-xs mx-auto" style={{ color: C.textSecondary }}>Tu entrenador puede prepararte recomendaciones de suplementación personalizadas.</p>
             <button onClick={activarSuplementacion} disabled={activando || modoPreview}
-              className="text-white text-sm font-black px-5 py-2.5 rounded-xl disabled:opacity-40 active:scale-95 transition-all" style={{ background: color }}>
+              className="text-white text-sm font-black px-5 py-2.5 rounded-xl disabled:opacity-40 active:scale-95 transition-all" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
               {activando ? 'Activando...' : 'Activar suplementación'}
             </button>
           </div>
@@ -2574,7 +2582,7 @@ function SuplementacionSection({ cuest, suplementacion, color, cliente, cargarTo
       ) : !recomendaciones.length ? (
         <div className="text-center py-4">
           <p className="text-2xl mb-2">⏳</p>
-          <p className="text-sm font-black text-[#0A0A0A]">Tu entrenador está preparando tus recomendaciones</p>
+          <p className="text-sm font-black text-white">Tu entrenador está preparando tus recomendaciones</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -2583,16 +2591,16 @@ function SuplementacionSection({ cuest, suplementacion, color, cliente, cargarTo
             if (!items.length) return null
             return (
               <div key={key}>
-                <p className="text-[10px] font-black text-[#9B9B9B] uppercase tracking-widest mb-2">{label}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest mb-2" style={{ color: C.textSecondary }}>{label}</p>
                 <div className="space-y-2">
                   {items.map((r, i) => (
-                    <div key={i} className="bg-[#F4F3F0] rounded-xl p-3">
+                    <div key={i} className="rounded-xl p-3" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <p className="text-sm font-black text-[#0A0A0A]">{r.nombre}</p>
+                        <p className="text-sm font-black text-white">{r.nombre}</p>
                         {r.prioridad && <span className={`text-[10px] font-black px-2 py-0.5 rounded-full flex-shrink-0 ${PRIORIDAD_COLOR[r.prioridad] || PRIORIDAD_COLOR.baja}`}>{r.prioridad.toUpperCase()}</span>}
                       </div>
-                      {r.dosis && <p className="text-xs text-[#6B6B6B]">📏 {r.dosis}{r.cuando ? ` · ${r.cuando}` : ''}</p>}
-                      {r.motivo && <p className="text-xs text-[#6B6B6B] mt-1 leading-relaxed">{r.motivo}</p>}
+                      {r.dosis && <p className="text-xs" style={{ color: C.textSecondary }}>📏 {r.dosis}{r.cuando ? ` · ${r.cuando}` : ''}</p>}
+                      {r.motivo && <p className="text-xs mt-1 leading-relaxed" style={{ color: C.textSecondary }}>{r.motivo}</p>}
                     </div>
                   ))}
                 </div>
