@@ -65,6 +65,8 @@ export default function Dashboard({ session }) {
   const [toast, setToast] = useState('')
   const [mostrarWizard, setMostrarWizard] = useState(false)
   const [expandirCriticos, setExpandirCriticos] = useState(false)
+  const [incidencias, setIncidencias] = useState([])
+  const [incidenciasExpandidas, setIncidenciasExpandidas] = useState(false)
   const navigate = useNavigate()
   const uid = session.user.id
   const equipo = useEquipo(uid)
@@ -78,6 +80,23 @@ export default function Dashboard({ session }) {
       const id = item.cliente_id || item.id
       return !clienteIds.includes(id)
     }) }))
+  }
+
+  async function resolverIncidencia(id) {
+    try {
+      await supabase.from('alertas').update({ leida: true }).eq('id', id)
+      setIncidencias(prev => prev.filter(i => i.id !== id))
+      showToast('✓ Incidencia marcada como resuelta')
+    } catch { showToast('Error al resolver la incidencia') }
+  }
+
+  async function resolverTodasIncidencias() {
+    try {
+      const ids = incidencias.map(i => i.id)
+      await supabase.from('alertas').update({ leida: true }).in('id', ids)
+      setIncidencias([])
+      showToast('✓ Todas las incidencias resueltas')
+    } catch { showToast('Error al resolver las incidencias') }
   }
 
   const [procesandoLead, setProcesandoLead] = useState(null)
@@ -255,6 +274,23 @@ export default function Dashboard({ session }) {
       await supabase.from('alertas').update({ leida:true }).in('entrenador_id', equipo).eq('leida', false)
       window.dispatchEvent(new Event('alertas-leidas'))
     }
+
+    // Incidencias del sistema: errores técnicos históricos, cargados aparte para no bloquear
+    // Incluye tanto no leídas como leídas recientes (30 días) — es un registro, no solo alertas activas
+    setTimeout(async () => {
+      try {
+        const hace30d = new Date(Date.now() - 30 * 864e5).toISOString()
+        const { data: incidenciasData } = await supabase
+          .from('alertas')
+          .select('id, tipo, mensaje, cliente_id, created_at, leida, clientes(nombre)')
+          .in('entrenador_id', equipo)
+          .in('tipo', ['error_smtp_config', 'error_smtp_cliente', 'error_ia', 'error_bienvenida'])
+          .gte('created_at', hace30d)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        if (incidenciasData?.length) setIncidencias(incidenciasData)
+      } catch {}
+    }, 500)
 
     setSesionesHoy(sesHoy || [])
     setSesionesManana(sesManana || [])
@@ -903,6 +939,90 @@ export default function Dashboard({ session }) {
                       title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0 mt-1">✕</button>
                   </div>
                 ))}
+
+                {/* Registro de incidencias del sistema */}
+                {incidencias.length > 0 && (
+                  <div className="border-t border-black/5">
+                    <button
+                      onClick={() => setIncidenciasExpandidas(v => !v)}
+                      className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#F7F6F3] transition-all text-left"
+                    >
+                      <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center text-sm flex-shrink-0">
+                        🔴
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-red-700">
+                          {incidencias.filter(i => !i.leida).length > 0
+                            ? `${incidencias.filter(i => !i.leida).length} incidencia${incidencias.filter(i => !i.leida).length > 1 ? 's' : ''} sin resolver`
+                            : `${incidencias.length} incidencia${incidencias.length > 1 ? 's' : ''} del sistema`
+                          }
+                        </p>
+                        <p className="text-xs text-[#9B9B9B]">Errores técnicos detectados automáticamente</p>
+                      </div>
+                      <span className="text-[#9B9B9B] text-sm">{incidenciasExpandidas ? '▲' : '▼'}</span>
+                    </button>
+
+                    {incidenciasExpandidas && (
+                      <div className="pb-2">
+                        {/* Cabecera del registro */}
+                        <div className="flex items-center justify-between px-5 pb-2">
+                          <p className="text-[10px] font-semibold text-[#9B9B9B] uppercase tracking-wider">Últimos 30 días</p>
+                          {incidencias.filter(i => !i.leida).length > 0 && (
+                            <button
+                              onClick={resolverTodasIncidencias}
+                              className="text-[10px] text-acento font-semibold hover:opacity-70"
+                            >
+                              Marcar todo resuelto
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Lista de incidencias */}
+                        <div className="space-y-0 divide-y divide-black/5 mx-4">
+                          {incidencias.map(inc => {
+                            const fecha = new Date(inc.created_at)
+                            const esHoy = fecha.toDateString() === new Date().toDateString()
+                            const fechaStr = esHoy
+                              ? `Hoy ${fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`
+                              : fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            const tipoLabel = {
+                              error_smtp_config: 'Email · Config SMTP',
+                              error_smtp_cliente: 'Email · Cliente',
+                              error_ia: 'IA',
+                              error_bienvenida: 'Acceso cliente',
+                            }[inc.tipo] || inc.tipo
+                            return (
+                              <div key={inc.id}
+                                className={`flex items-start gap-3 py-3 px-2 rounded-xl ${inc.leida ? 'opacity-50' : ''}`}
+                              >
+                                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${inc.leida ? 'bg-[#C0C0C0]' : 'bg-red-500'}`} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <span className="text-[10px] font-semibold text-[#9B9B9B] uppercase tracking-wider">{tipoLabel}</span>
+                                    {inc.clientes?.nombre && (
+                                      <span className="text-[10px] text-[#9B9B9B]">· {inc.clientes.nombre.split(' ')[0]}</span>
+                                    )}
+                                    <span className="text-[10px] text-[#C0C0C0] ml-auto">{fechaStr}</span>
+                                  </div>
+                                  <p className="text-xs text-[#444] leading-relaxed">{inc.mensaje}</p>
+                                </div>
+                                {!inc.leida && (
+                                  <button
+                                    onClick={() => resolverIncidencia(inc.id)}
+                                    title="Marcar como resuelta"
+                                    className="text-[10px] text-[#9B9B9B] hover:text-emerald-600 flex-shrink-0 mt-0.5 px-1 py-0.5 rounded hover:bg-emerald-50 transition-all"
+                                  >
+                                    ✓
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Onboarding — sistema vacío, usuario nuevo */}
                 {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && d.activos.length === 0 && (
