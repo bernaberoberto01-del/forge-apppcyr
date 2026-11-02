@@ -1756,16 +1756,18 @@ function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensa
         {!mensajes?.length && (
           <div className="text-center py-10">
             <div className="text-3xl mb-2">✉️</div>
-            <p className="text-sm font-bold text-[#0A0A0A]">Sin mensajes aún</p>
-            <p className="text-xs text-[#9B9B9B] mt-1">Escríbele a tu entrenador</p>
+            <p className="text-sm font-bold text-white">Sin mensajes aún</p>
+            <p className="text-xs mt-1" style={{ color: C.textSecondary }}>Escríbele a tu entrenador</p>
           </div>
         )}
         {mensajes?.map((m, i) => {
           const esEntrenador = m.tipo === 'entrenador' || m.tipo === 'sistema'
           return (
             <div key={i} className={`flex ${esEntrenador ? 'justify-start' : 'justify-end'}`}>
-              <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${esEntrenador ? 'bg-white border border-black/5 text-[#0A0A0A]' : 'text-white'}`}
-                style={!esEntrenador ? { background: color } : {}}>
+              <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed`}
+                style={esEntrenador
+                  ? { background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary }
+                  : { background: `linear-gradient(135deg, ${color}, ${color}cc)`, color: 'white' }}>
                 {m.contenido}
               </div>
             </div>
@@ -1773,14 +1775,17 @@ function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensa
         })}
         <div ref={endRef} />
       </div>
-      <form onSubmit={enviarMensaje} className="flex gap-2 pt-3 border-t border-black/5">
+      <form onSubmit={enviarMensaje} className="flex gap-2 pt-3" style={{ borderTop: `1px solid ${C.borderSubtle}` }}>
         <input value={textoMsg} onChange={e => setTextoMsg(e.target.value)}
           placeholder={modoPreview ? 'Solo lectura en vista previa' : 'Escribe un mensaje...'}
           disabled={modoPreview}
-          className="flex-1 border border-black/10 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-acento bg-white disabled:opacity-50" />
+          className="flex-1 rounded-2xl px-4 py-3 text-sm focus:outline-none disabled:opacity-50"
+          style={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary, outline: 'none' }}
+          onFocus={e => e.target.style.borderColor = color}
+          onBlur={e => e.target.style.borderColor = C.border} />
         <button type="submit" disabled={!textoMsg.trim() || enviandoMsg || modoPreview}
           className="px-4 py-3 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
-          style={{ background: color }}>
+          style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
           {enviandoMsg ? '…' : '→'}
         </button>
       </form>
@@ -1791,21 +1796,23 @@ function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensa
 // ─── Tab Pagos ────────────────────────────────────────────────────────────────
 function TabPagos({ pagos, color }) {
   if (!pagos?.length) return (
-    <div className="text-center py-10"><div className="text-3xl mb-2">💳</div><p className="text-sm font-bold text-[#0A0A0A]">Sin pagos registrados</p></div>
+    <div className="text-center py-10"><div className="text-3xl mb-2">💳</div><p className="text-sm font-bold text-white">Sin pagos registrados</p></div>
   )
   return (
     <div className="space-y-2">
       {pagos.map((p, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-black/5 p-4 flex items-center gap-3">
+        <div key={i} className="rounded-2xl p-4 flex items-center gap-3"
+          style={{ background: C.bg, border: `1px solid ${C.border}` }}>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A]">{p.concepto || 'Pago mensual'}</p>
-            <p className="text-xs text-[#9B9B9B] mt-0.5">
+            <p className="text-sm font-bold text-white">{p.concepto || 'Pago mensual'}</p>
+            <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>
               {p.fecha_pago ? new Date(p.fecha_pago + 'T12:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
             </p>
           </div>
           <div className="text-right flex-shrink-0">
-            <p className="text-lg font-bold text-[#0A0A0A]">{p.importe}€</p>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.estado === 'cobrado' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+            <p className="text-lg font-bold text-white">{p.importe}€</p>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.estado === 'cobrado' ? 'text-emerald-400' : 'text-amber-400'}`}
+              style={{ background: p.estado === 'cobrado' ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.12)' }}>
               {p.estado === 'cobrado' ? '✓ Cobrado' : 'Pendiente'}
             </span>
           </div>
@@ -1906,40 +1913,46 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
     return (
       <div className="space-y-4">
         <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
-        <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Ajustes</p>
-        <form onSubmit={guardar} className="bg-white rounded-2xl p-4 space-y-4">
+        <p className="text-xl font-black text-white tracking-tight">Ajustes</p>
+        <form onSubmit={guardar} className="rounded-2xl p-4 space-y-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
           <div className="grid grid-cols-2 gap-3">
             {[['Peso actual (kg)','peso_actual'],['Peso objetivo (kg)','peso_objetivo']].map(([label,key]) => (
               <div key={key}>
-                <label className="text-[10px] font-black uppercase tracking-widest text-[#9B9B9B] block mb-2">{label}</label>
+                <label className="text-[10px] font-black uppercase tracking-widest block mb-2" style={{ color: C.textSecondary }}>{label}</label>
                 <input type="number" step="0.1" value={form[key]}
                   onChange={e => setForm(f => ({...f,[key]:e.target.value}))}
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none" />
+                  className="w-full rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none"
+                  style={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary }} />
               </div>
             ))}
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-widest text-[#9B9B9B] block mb-2">Mi objetivo</label>
+            <label className="text-[10px] font-black uppercase tracking-widest block mb-2" style={{ color: C.textSecondary }}>Mi objetivo</label>
             <div className="grid grid-cols-2 gap-2">
               {OBJETIVOS.map(([v,l]) => (
                 <button key={v} type="button" onClick={() => setForm(f=>({...f,objetivo:v}))}
-                  className={`py-2.5 px-3 rounded-xl text-xs font-bold border text-left transition-all ${form.objetivo===v?'text-white border-transparent':'border-black/10 text-[#6B6B6B]'}`}
-                  style={form.objetivo===v?{background:color}:{}}>{l}</button>
+                  className="py-2.5 px-3 rounded-xl text-xs font-bold text-left transition-all"
+                  style={form.objetivo===v
+                    ? { background: `linear-gradient(135deg, ${color}, ${color}cc)`, color: 'white', border: 'none' }
+                    : { background: C.card, border: `1px solid ${C.border}`, color: C.textSecondary }}>
+                  {l}
+                </button>
               ))}
             </div>
           </div>
           <button type="submit" disabled={guardando || modoPreview}
-            className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40"
-            style={{background:ok?'#10b981':color}}>
+            className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all"
+            style={{ background: ok ? '#10b981' : `linear-gradient(135deg, ${color}, ${color}cc)` }}>
             {guardando?'Guardando...':ok?'✓ Guardado':'Guardar'}
           </button>
         </form>
-        <div className="bg-white rounded-2xl p-4">
+        <div className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
           <button onClick={async()=>{await supabase.auth.resetPasswordForEmail(cliente?.email||'',{redirectTo:`${window.location.origin}/`});alert('Email enviado.')}}
-            className="text-sm font-bold text-[#6B6B6B]">Cambiar contraseña →</button>
+            className="text-sm font-bold" style={{ color: C.textSecondary }}>Cambiar contraseña →</button>
         </div>
         <button onClick={()=>supabase.auth.signOut()}
-          className="w-full py-3.5 rounded-xl border border-red-100 text-red-400 text-sm font-bold">
+          className="w-full py-3.5 rounded-xl text-sm font-bold"
+          style={{ border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
           Cerrar sesión
         </button>
       </div>
@@ -1950,11 +1963,11 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
     return (
       <div className="space-y-3">
         <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
-        <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Pagos</p>
+        <p className="text-xl font-black text-white tracking-tight">Pagos</p>
         {planCobro?.estado === 'pago_fallido' && (
-          <div className="rounded-2xl p-4 border border-red-200 bg-red-50">
-            <p className="text-sm font-black text-red-700 mb-1">⚠️ Hay un problema con tu pago</p>
-            <p className="text-xs text-red-600 leading-relaxed">Contacta con tu entrenador para actualizar tu método de pago y no perder el acceso a tu plan.</p>
+          <div className="rounded-2xl p-4" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)' }}>
+            <p className="text-sm font-black text-red-400 mb-1">⚠️ Hay un problema con tu pago</p>
+            <p className="text-xs leading-relaxed" style={{ color: 'rgba(239,68,68,0.7)' }}>Contacta con tu entrenador para actualizar tu método de pago y no perder el acceso a tu plan.</p>
           </div>
         )}
         {planCobro?.estado === 'activo' && (
@@ -1979,12 +1992,12 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
             {mostrarCambioPlan && !solicitudEnviada && (
               <div className="space-y-2 mt-2">
                 {PLANES_INFO.filter(p => p.id !== plan).map(p => (
-                  <div key={p.id} className="bg-white rounded-2xl p-4 border border-black/5">
+                  <div key={p.id} className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <p className="text-sm font-black text-[#0A0A0A]">{p.nombre}</p>
+                      <p className="text-sm font-black text-white">{p.nombre}</p>
                       <p className="text-sm font-black" style={{ color }}>{p.precio}€/mes</p>
                     </div>
-                    <ul className="text-xs text-[#6B6B6B] space-y-0.5 mb-2.5 list-disc list-inside">
+                    <ul className="text-xs space-y-0.5 mb-2.5 list-disc list-inside" style={{ color: C.textSecondary }}>
                       {p.incluye.map((inc, idx) => <li key={idx}>{inc}</li>)}
                     </ul>
                     <button onClick={async () => { setEnviandoSolicitud(p.id); await solicitarCambioPlan(p.id); setEnviandoSolicitud(null); setSolicitudEnviada(true) }}
@@ -1997,29 +2010,30 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
               </div>
             )}
             {solicitudEnviada && (
-              <p className="text-xs text-emerald-600 font-bold mt-2">Solicitud enviada. Tu entrenador se pondrá en contacto contigo.</p>
+              <p className="text-xs text-emerald-400 font-bold mt-2">Solicitud enviada. Tu entrenador se pondrá en contacto contigo.</p>
             )}
           </div>
         )}
         {!pagos?.length ? (
-          <p className="text-sm text-[#6B6B6B] text-center py-4">Sin pagos registrados aún</p>
+          <p className="text-sm text-center py-4" style={{ color: C.textSecondary }}>Sin pagos registrados aún</p>
         ) : (
           <>
             {pagos.map((p, i) => (
-              <div key={i} className="bg-white rounded-2xl p-3 flex items-center justify-between border border-black/5">
+              <div key={i} className="rounded-2xl p-3 flex items-center justify-between" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
                 <div>
-                  <p className="text-sm font-medium text-[#0A0A0A]">{p.concepto||'Mensualidad'}</p>
-                  <p className="text-xs text-[#6B6B6B]">{p.fecha_pago?new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}):''}</p>
+                  <p className="text-sm font-medium text-white">{p.concepto||'Mensualidad'}</p>
+                  <p className="text-xs" style={{ color: C.textSecondary }}>{p.fecha_pago?new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}):''}</p>
                 </div>
                 <div className="text-right flex flex-col items-end gap-1">
-                  <p className="font-bold text-emerald-600">{p.importe}€</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.estado==='pendiente' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-700'}`}>
+                  <p className="font-bold text-emerald-400">{p.importe}€</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.estado==='pendiente' ? 'text-amber-400' : 'text-emerald-400'}`}
+                    style={{ background: p.estado==='pendiente' ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)' }}>
                     {p.estado==='pendiente' ? '⏳ Pendiente' : '✓ Pagado'}
                   </span>
                 </div>
               </div>
             ))}
-            <p className="text-xs text-[#9B9B9B] text-right pt-1">Total facturado: {pagos.reduce((s,p)=>s+Number(p.importe||0),0)}€</p>
+            <p className="text-xs text-right pt-1" style={{ color: C.textSecondary }}>Total facturado: {pagos.reduce((s,p)=>s+Number(p.importe||0),0)}€</p>
           </>
         )}
       </div>
@@ -2027,88 +2041,98 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
   }
 
   if (seccion === 'lesiones') {
-    const SEVERIDAD_COLOR = { leve: 'bg-[#F4F3F0] text-[#6B6B6B]', moderada: 'bg-amber-50 text-amber-600', grave: 'bg-red-50 text-red-600' }
+    const SEVERIDAD_STYLE = {
+      leve: { background: C.card, color: C.textSecondary },
+      moderada: { background: 'rgba(245,158,11,0.12)', color: '#fbbf24' },
+      grave: { background: 'rgba(239,68,68,0.12)', color: '#f87171' }
+    }
     const ESTADO_LABEL = { activa: 'Activa', en_seguimiento: 'En seguimiento', resuelta: 'Resuelta' }
     return (
       <div className="space-y-4">
         <button onClick={() => setSeccion('menu')} className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>← Volver</button>
-        <p className="text-xl font-black text-[#0A0A0A] tracking-tight">Lesiones</p>
+        <p className="text-xl font-black text-white tracking-tight">Lesiones</p>
 
-        <div className="bg-white rounded-2xl p-4 space-y-3">
-          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Reportar una molestia</p>
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>Reportar una molestia</p>
           <div>
-            <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Zona afectada</p>
+            <p className="text-xs font-semibold mb-1.5" style={{ color: C.textSecondary }}>Zona afectada</p>
             <div className="grid grid-cols-3 gap-2">
               {ZONAS_LESION.map(z => (
                 <button key={z} type="button" onClick={() => setLesionForm(f => ({ ...f, zona: z }))}
-                  className="py-2 rounded-xl text-xs font-bold border transition-all"
-                  style={lesionForm.zona === z ? { background: color, color: 'white', borderColor: color } : { borderColor: 'rgba(0,0,0,0.1)', color: '#6B6B6B' }}>
+                  className="py-2 rounded-xl text-xs font-bold transition-all"
+                  style={lesionForm.zona === z
+                    ? { background: `linear-gradient(135deg, ${color}, ${color}cc)`, color: 'white', border: 'none' }
+                    : { background: C.card, border: `1px solid ${C.border}`, color: C.textSecondary }}>
                   {z}
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Severidad</p>
+            <p className="text-xs font-semibold mb-1.5" style={{ color: C.textSecondary }}>Severidad</p>
             <div className="flex gap-2">
               {SEVERIDADES.map(([k, l]) => (
                 <button key={k} type="button" onClick={() => setLesionForm(f => ({ ...f, severidad: k }))}
-                  className="flex-1 py-2 rounded-xl text-xs font-bold border transition-all"
-                  style={lesionForm.severidad === k ? { background: color, color: 'white', borderColor: color } : { borderColor: 'rgba(0,0,0,0.1)', color: '#6B6B6B' }}>
+                  className="flex-1 py-2 rounded-xl text-xs font-bold transition-all"
+                  style={lesionForm.severidad === k
+                    ? { background: `linear-gradient(135deg, ${color}, ${color}cc)`, color: 'white', border: 'none' }
+                    : { background: C.card, border: `1px solid ${C.border}`, color: C.textSecondary }}>
                   {l}
                 </button>
               ))}
             </div>
           </div>
           <div>
-            <p className="text-xs font-semibold text-[#6B6B6B] mb-1.5">Descripción (opcional)</p>
+            <p className="text-xs font-semibold mb-1.5" style={{ color: C.textSecondary }}>Descripción (opcional)</p>
             <textarea value={lesionForm.descripcion} onChange={e => setLesionForm(f => ({ ...f, descripcion: e.target.value }))} rows={2}
               placeholder="Qué ha pasado..."
-              className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none" />
+              className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none"
+              style={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary }} />
           </div>
           <button onClick={guardarLesion} disabled={!lesionForm.zona || guardandoLesion || modoPreview}
             className="w-full py-3.5 rounded-xl text-white font-black text-sm disabled:opacity-40 active:scale-95 transition-all"
-            style={{ background: lesionEnviada ? '#10b981' : color }}>
+            style={{ background: lesionEnviada ? '#10b981' : `linear-gradient(135deg, ${color}, ${color}cc)` }}>
             {guardandoLesion ? 'Enviando...' : lesionEnviada ? '✓ Reportada' : 'Reportar lesión'}
           </button>
         </div>
 
         {!lesiones?.length ? (
-          <p className="text-sm text-[#6B6B6B] text-center py-4">Sin lesiones reportadas</p>
+          <p className="text-sm text-center py-4" style={{ color: C.textSecondary }}>Sin lesiones reportadas</p>
         ) : (
           <div className="space-y-3">
             {lesiones.map(l => (
-              <div key={l.id} className="bg-white rounded-2xl p-4 border border-black/5">
+              <div key={l.id} className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-sm font-black text-[#0A0A0A]">{l.zona}</p>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${SEVERIDAD_COLOR[l.severidad] || SEVERIDAD_COLOR.leve}`}>{(l.severidad || 'leve').toUpperCase()}</span>
+                  <p className="text-sm font-black text-white">{l.zona}</p>
+                  <span className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                    style={SEVERIDAD_STYLE[l.severidad] || SEVERIDAD_STYLE.leve}>{(l.severidad || 'leve').toUpperCase()}</span>
                 </div>
-                <p className="text-[10px] text-[#9B9B9B] mb-1.5">{formatearFecha(l.fecha_inicio)} · {ESTADO_LABEL[l.estado] || l.estado}</p>
-                {l.descripcion && <p className="text-xs text-[#6B6B6B] leading-relaxed mb-2">{l.descripcion}</p>}
+                <p className="text-[10px] mb-1.5" style={{ color: C.textSecondary }}>{formatearFecha(l.fecha_inicio)} · {ESTADO_LABEL[l.estado] || l.estado}</p>
+                {l.descripcion && <p className="text-xs leading-relaxed mb-2" style={{ color: C.textSecondary }}>{l.descripcion}</p>}
                 {l.protocolo_generado && l.protocolo_ia ? (
-                  <div className="mt-2 pt-2 border-t border-black/5 space-y-2">
+                  <div className="mt-2 pt-2 space-y-2" style={{ borderTop: `1px solid ${C.borderSubtle}` }}>
                     <p className="text-[10px] font-black uppercase tracking-widest" style={{ color }}>🩹 Protocolo de recuperación</p>
-                    {l.protocolo_ia.resumen && <p className="text-xs text-[#0A0A0A] leading-relaxed">{l.protocolo_ia.resumen}</p>}
+                    {l.protocolo_ia.resumen && <p className="text-xs text-white leading-relaxed">{l.protocolo_ia.resumen}</p>}
                     {Array.isArray(l.protocolo_ia.ejercicios_rehab) && l.protocolo_ia.ejercicios_rehab.length > 0 && (
                       <div>
-                        <p className="text-[10px] font-bold text-[#9B9B9B] mb-1">Ejercicios de rehabilitación</p>
+                        <p className="text-[10px] font-bold mb-1" style={{ color: C.textSecondary }}>Ejercicios de rehabilitación</p>
                         <div className="space-y-1">
                           {l.protocolo_ia.ejercicios_rehab.map((e, i) => (
-                            <p key={i} className="text-xs text-[#444]">• {e.ejercicio} — {e.series}x{e.reps}{e.notas ? ` (${e.notas})` : ''}</p>
+                            <p key={i} className="text-xs" style={{ color: C.textSecondary }}>• {e.ejercicio} — {e.series}x{e.reps}{e.notas ? ` (${e.notas})` : ''}</p>
                           ))}
                         </div>
                       </div>
                     )}
                     {Array.isArray(l.protocolo_ia.ejercicios_evitar) && l.protocolo_ia.ejercicios_evitar.length > 0 && (
                       <div>
-                        <p className="text-[10px] font-bold text-red-500 mb-1">Evitar</p>
-                        <p className="text-xs text-[#444]">{l.protocolo_ia.ejercicios_evitar.join(', ')}</p>
+                        <p className="text-[10px] font-bold text-red-400 mb-1">Evitar</p>
+                        <p className="text-xs" style={{ color: C.textSecondary }}>{l.protocolo_ia.ejercicios_evitar.join(', ')}</p>
                       </div>
                     )}
-                    {l.protocolo_ia.progresion && <p className="text-xs text-[#6B6B6B] italic">{l.protocolo_ia.progresion}</p>}
+                    {l.protocolo_ia.progresion && <p className="text-xs italic" style={{ color: C.textSecondary }}>{l.protocolo_ia.progresion}</p>}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-[#9B9B9B] mt-1">⏳ Tu entrenador está preparando tu protocolo de recuperación</p>
+                  <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>⏳ Tu entrenador está preparando tu protocolo de recuperación</p>
                 )}
               </div>
             ))}
@@ -2122,7 +2146,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
     return (
       <div>
         <button onClick={() => setSeccion('menu')} className="text-xs font-bold mb-4 flex items-center gap-1.5" style={{ color }}>← Volver</button>
-        <p className="text-xl font-black text-[#0A0A0A] tracking-tight mb-4">Mensajes</p>
+        <p className="text-xl font-black text-white tracking-tight mb-4">Mensajes</p>
         <button onClick={() => { setSeccion('menu'); setTab('mensajes') }}
           className="w-full py-4 rounded-2xl text-white font-black text-sm active:scale-95 transition-all"
           style={{ background: color }}>Ir a Mensajes →</button>
@@ -2132,7 +2156,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
 
   return (
     <div className="space-y-3">
-      <p className="text-2xl font-black text-[#0A0A0A] tracking-tight pt-1">Más</p>
+      <p className="text-2xl font-black text-white tracking-tight pt-1" style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>Más</p>
 
       {/* Tarjetas grandes — cada sección bien visible */}
       {ITEMS.map(item => (
@@ -2143,25 +2167,24 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
           }}
           className="w-full rounded-2xl p-5 flex items-center gap-4 text-left active:scale-[0.98] transition-all"
           style={{
-            background: item.urgente ? '#0A0A0A' : 'white',
-            border: item.urgente ? `1px solid ${color}` : undefined,
+            background: item.urgente ? C.bg : C.bg,
+            border: item.urgente ? `1px solid ${color}` : `1px solid ${C.border}`,
           }}>
           {/* Icono */}
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
             style={{
-              background: item.urgente ? `${color}20` : '#F4F3F0',
-              color: item.urgente ? color : '#6B6B6B',
+              background: item.urgente ? `${color}20` : C.card,
+              color: item.urgente ? color : C.textSecondary,
             }}>
             {item.icon}
           </div>
           {/* Texto */}
           <div className="flex-1 min-w-0">
-            <p className="text-base font-black leading-tight"
-              style={{ color: item.urgente ? 'white' : '#0A0A0A' }}>
+            <p className="text-base font-black leading-tight text-white">
               {item.label}
             </p>
             <p className="text-xs mt-0.5 font-medium"
-              style={{ color: item.urgente ? `${color}` : '#9B9B9B' }}>
+              style={{ color: item.urgente ? color : C.textSecondary }}>
               {item.desc}
             </p>
           </div>
@@ -2169,29 +2192,30 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
           {item.badge > 0
             ? <span className="w-7 h-7 rounded-full text-sm font-black flex items-center justify-center text-white flex-shrink-0"
                 style={{ background: color }}>{item.badge > 9 ? '9+' : item.badge}</span>
-            : <span className="text-2xl flex-shrink-0" style={{ color: 'rgba(0,0,0,0.15)' }}>›</span>
+            : <span className="text-2xl flex-shrink-0" style={{ color: 'rgba(255,255,255,0.15)' }}>›</span>
           }
         </button>
       ))}
 
       {/* Perfil del cliente */}
-      <div className="bg-white rounded-2xl p-4 flex items-center gap-3 mt-2">
+      <div className="rounded-2xl p-4 flex items-center gap-3 mt-2" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
         <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black text-white flex-shrink-0"
-          style={{ background: color }}>
+          style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
           {cliente?.nombre?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-black text-[#0A0A0A] truncate">{cliente?.nombre}</p>
-          <p className="text-[10px] text-[#9B9B9B] truncate font-medium">{cliente?.email}</p>
+          <p className="text-sm font-black text-white truncate">{cliente?.nombre}</p>
+          <p className="text-[10px] truncate font-medium" style={{ color: C.textSecondary }}>{cliente?.email}</p>
         </div>
         <span className="text-[10px] font-bold px-2 py-1 rounded-lg capitalize"
-          style={{ background: '#F4F3F0', color: '#9B9B9B' }}>
+          style={{ background: C.card, color: C.textSecondary, border: `1px solid ${C.borderSubtle}` }}>
           {cliente?.tipo}
         </span>
       </div>
 
       <button onClick={() => supabase.auth.signOut()}
-        className="w-full py-3.5 rounded-2xl text-sm font-bold border border-red-100 text-red-400 active:scale-95 transition-all">
+        className="w-full py-3.5 rounded-2xl text-sm font-bold active:scale-95 transition-all"
+        style={{ border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
         Cerrar sesión
       </button>
     </div>
