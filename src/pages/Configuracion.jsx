@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import EquipoTab from '../components/EquipoTab'
 import { useCentro } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
+import { useConfirm } from '../components/ConfirmModal'
 
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊', desc: 'Métricas, alertas y resumen general', obligatorio: true },
@@ -384,6 +385,7 @@ function TarifasTab({ uid, showToast }) {
   const [editando, setEditando] = useState(null)
   const [form, setForm] = useState({ nombre: '', modalidad: 'individual', dias_semana: 2, precio: '', tipo: 'presencial' })
   const [guardando, setGuardando] = useState(false)
+  const { confirm: askConfirm, ConfirmUI } = useConfirm()
 
   useEffect(() => { cargar() }, [uid])
 
@@ -416,7 +418,8 @@ function TarifasTab({ uid, showToast }) {
   }
 
   async function eliminar(id) {
-    if (!confirm('¿Eliminar esta tarifa?')) return
+    const ok = await askConfirm({ title: '¿Eliminar tarifa?', message: 'Esta tarifa quedará desactivada y no aparecerá en nuevos cobros.', danger: true, confirmText: 'Eliminar' })
+    if (!ok) return
     const { error } = await supabase.from('tarifas').update({ activa: false }).eq('id', id)
     if (error) { showToast('Error al eliminar la tarifa: ' + error.message, 'error'); return }
     await cargar(); showToast('Tarifa eliminada')
@@ -442,6 +445,7 @@ function TarifasTab({ uid, showToast }) {
 
   return (
     <div>
+      {ConfirmUI}
       <div className="flex items-start justify-between mb-5">
         <div>
           <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">Tarifas</h2>

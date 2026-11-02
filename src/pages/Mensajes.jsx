@@ -5,6 +5,7 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 import { useEquipo } from '../hooks/useCentro'
 import { BRAND } from '../lib/brand'
+import { ini } from '../lib/avatar'
 
 const PLANTILLAS = [
   { id: 'bienvenida', icon: '👋', label: 'Bienvenida', texto: '¡Hola! Bienvenido/a al equipo. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve tendrás tu rutina lista. Cualquier duda, escríbeme aquí o por WhatsApp. ¡Vamos a por ello! 💪' },
@@ -19,7 +20,16 @@ const PLANTILLAS = [
 
 const AVATARES = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6']
 const avatarColor = n => AVATARES[(n||'').charCodeAt(0) % AVATARES.length]
-const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+
+function Toast({ msg, tipo, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  const bg = tipo === 'error' ? 'bg-red-500' : 'bg-[#111]'
+  return (
+    <div className={`fixed bottom-4 right-4 z-[60] ${bg} text-white text-sm px-4 py-2.5 rounded-xl shadow-lg max-w-xs`}>
+      {msg}
+    </div>
+  )
+}
 
 export default function Mensajes({ session }) {
   const uid = session.user.id
@@ -44,7 +54,7 @@ export default function Mensajes({ session }) {
     supabase.from('tarifas').select('id,nombre,tipo,precio,stripe_price_id,modalidad,dias_semana')
       .in('entrenador_id', equipo).eq('activa', true).not('stripe_price_id', 'is', null)
       .then(({ data, error }) => {
-        if (error) { setToast('Error al cargar tarifas: ' + error.message); return }
+        if (error) { setToast({ msg: 'Error al cargar tarifas: ' + error.message, tipo: 'error' }); return }
         setTarifas(data || [])
       })
   }, [uid, equipo])
@@ -62,14 +72,14 @@ export default function Mensajes({ session }) {
       const linkMsg = `Aquí tienes el enlace para formalizar tu plan:\n\n${data.url}\n\nUna vez completado el pago, activo tu plan y en menos de 24h tienes todo preparado. ¡Vamos a por ello! 💪`
       setTexto(linkMsg)
       await navigator.clipboard.writeText(data.url).catch(() => {})
-      setToast('✓ Link generado y añadido al mensaje')
+      setToast({ msg: 'Link generado y añadido al mensaje', tipo: 'ok' })
     } catch (e) {
-      setToast('Error al generar link: ' + e.message)
+      setToast({ msg: 'Error al generar link: ' + e.message, tipo: 'error' })
     }
     setGenerandoLink(false)
   }
   const [quickView, setQuickView] = useState(null)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(true)
   const endRef = useRef()
 
@@ -85,11 +95,6 @@ export default function Mensajes({ session }) {
   }, [location.state, clientes])
   useEffect(() => { if (seleccionado) cargarMensajes(seleccionado.id) }, [seleccionado, equipo])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes])
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(''), 3000)
-    return () => clearTimeout(t)
-  }, [toast])
 
   async function cargarClientes() {
     setLoading(true)
@@ -101,7 +106,7 @@ export default function Mensajes({ session }) {
       supabase.from('mensajes_cliente').select('cliente_id,contenido,tipo,created_at')
         .in('entrenador_id', equipo).order('created_at', { ascending: false }).limit(200)
     ])
-    if (errCl || errMs) setToast('Error al cargar clientes: ' + (errCl?.message || errMs?.message))
+    if (errCl || errMs) setToast({ msg: 'Error al cargar clientes: ' + (errCl?.message || errMs?.message), tipo: 'error' })
     setClientes(cl || [])
     const nl = {}
     ;(ms || []).forEach(m => { nl[m.cliente_id] = (nl[m.cliente_id] || 0) + 1 })
@@ -116,7 +121,7 @@ export default function Mensajes({ session }) {
   async function cargarMensajes(clienteId) {
     const { data, error } = await supabase.from('mensajes_cliente')
       .select('*').eq('cliente_id', clienteId).order('created_at', { ascending: true })
-    if (error) setToast('Error al cargar mensajes: ' + error.message)
+    if (error) setToast({ msg: 'Error al cargar mensajes: ' + error.message, tipo: 'error' })
     setMensajes(data || [])
     // Marcar como leídos por el entrenador en la BD
     const { error: errUpd } = await supabase.from('mensajes_cliente')
@@ -124,7 +129,7 @@ export default function Mensajes({ session }) {
       .eq('cliente_id', clienteId)
       .in('entrenador_id', equipo)
       .neq('tipo', 'entrenador')
-    if (errUpd) setToast('Error al marcar como leído: ' + errUpd.message)
+    if (errUpd) setToast({ msg: 'Error al marcar como leído: ' + errUpd.message, tipo: 'error' })
     setNoLeidos(prev => { const n = {...prev}; delete n[clienteId]; return n })
   }
 
@@ -141,7 +146,7 @@ export default function Mensajes({ session }) {
         leido: false,
         leido_entrenador: true
       })
-      if (error) { setToast('Error al enviar mensaje: ' + error.message); return }
+      if (error) { setToast({ msg: 'Error al enviar mensaje: ' + error.message, tipo: 'error' }); return }
       setTexto('')
       setShowPlantillas(false)
       // Actualizar preview del último mensaje en la lista
@@ -175,11 +180,7 @@ export default function Mensajes({ session }) {
 
   return (
     <div className="flex h-[calc(100vh-64px)] md:h-screen overflow-hidden">
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-[60] bg-[#111] text-white text-sm px-4 py-2.5 rounded-xl shadow-lg max-w-xs">
-          {toast}
-        </div>
-      )}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
       {/* Sidebar clientes */}
       <div className={`${seleccionado ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-72 bg-white border-r border-black/5 flex-shrink-0`}>
