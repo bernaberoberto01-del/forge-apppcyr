@@ -14,35 +14,20 @@ function safeColor(c: string | null | undefined): string {
   return c && /^#[0-9A-Fa-f]{3,8}$/.test(c) ? c : '#FF5C00'
 }
 
-// Inserta una alerta en la tabla alertas para que sea visible en el panel admin
-async function insertarAlerta(entrenadorId: string, clienteId: string, tipo: string, mensaje: string) {
-  try {
-    await sb.from('alertas').insert({
-      entrenador_id: entrenadorId,
-      cliente_id: clienteId,
-      tipo,
-      mensaje,
-      leida: false
-    })
-  } catch (_) {
-    // No propagamos: la alerta es informativa, no crítica
-  }
-}
+// Tras este número de fallos seguidos sin ningún envío correcto se da el correo por caído
+const MAX_FALLOS_SEGUIDOS = 3
+const VENTANA_DEDUP_MS = 2 * 864e5
 
-// Inserta un mensaje de sistema visible en el panel de mensajes del admin
-async function insertarMensajeError(clienteId: string, entrenadorId: string, texto: string) {
-  try {
-    await sb.from('mensajes_cliente').insert({
-      cliente_id: clienteId,
-      entrenador_id: entrenadorId,
-      contenido: texto,
-      tipo: 'sistema',
-      leido: false,
-      leido_entrenador: false  // false = aparece como no leído en el panel admin
-    })
-  } catch (_) {
-    // No propagamos
-  }
+// Alerta visible en el panel (Dashboard → incidencias), sin repetirla en 48 h.
+// Nunca propaga: un fallo al avisar no debe parar el envío a los demás clientes.
+async function avisarIncidencia(entrenadorId: string, clienteId: string, tipo: string, mensaje: string) {
+  const desde = new Date(Date.now() - VENTANA_DEDUP_MS).toISOString()
+  let consulta = sb.from('alertas').select('id').eq('entrenador_id', entrenadorId).eq('tipo', tipo).gte('created_at', desde).limit(1)
+  if (tipo === 'error_smtp_cliente') consulta = consulta.eq('cliente_id', clienteId)
+  const { data: existente } = await consulta
+  if (existente?.length) return
+  const { error } = await sb.from('alertas').insert({ entrenador_id: entrenadorId, cliente_id: clienteId, tipo, mensaje, leida: false })
+  if (error) console.error('checkin-semanal: no se pudo guardar la alerta', tipo, error.message)
 }
 
 Deno.serve(async (req) => {
@@ -103,50 +88,8 @@ Deno.serve(async (req) => {
         return !ultimo || ultimo < fechaCorte
       })
 
-      // Detectar si Gmail falla de forma global (credenciales expiradas)
-      // Enviamos primero un test SMTP antes del bucle para detectarlo rápido
-      let smtpGlobalFallido = false
-      let smtpErrorMsg = ''
-      if (clientesConNecesidad.length > 0) {
-        try {
-          const smtpTest = new SMTPClient({ connection: { hostname: 'smtp.gmail.com', port: 465, tls: true, auth: { username: gmailUser, password: gmailPass } } })
-          await smtpTest.close() // Solo abre la conexión sin enviar nada
-        } catch (testErr: any) {
-          smtpGlobalFallido = true
-          smtpErrorMsg = testErr.message || 'Error de conexión SMTP'
-        }
-      }
-
-      // Si Gmail falla globalmente: registrar UNA alerta por entrenador y saltar
-      if (smtpGlobalFallido) {
-        // Alerta visible en el panel admin usando el primer cliente como referencia
-        const primerCliente = clientesConNecesidad[0]
-        if (primerCliente) {
-          // Verificar si ya hay una alerta de este tipo reciente (últimas 48h) para no duplicar
-          const hace48h = new Date(hoy.getTime() - 2 * 864e5).toISOString()
-          const { data: alertaExistente } = await sb.from('alertas')
-            .select('id')
-            .eq('entrenador_id', eid)
-            .eq('tipo', 'error_smtp_config')
-            .gte('created_at', hace48h)
-            .limit(1)
-
-          if (!alertaExistente?.length) {
-            await insertarAlerta(
-              eid,
-              primerCliente.id,
-              'error_smtp_config',
-              `⚠️ Los recordatorios de check-in no se están enviando. El email de Forge no puede conectarse a Gmail. Puede que la contraseña de aplicación haya expirado. Contacta con soporte para renovarla. Error: ${smtpErrorMsg}`
-            )
-          }
-        }
-
-        // Añadir todos al resumen como fallidos
-        for (const c of clientesConNecesidad) {
-          resumen.push({ cliente: c.nombre.split(' ')[0], ok: false, error: `SMTP global: ${smtpErrorMsg}` })
-        }
-        continue // Siguiente entrenador
-      }
+      let enviadosEntrenador = 0
+      const fallos: { cliente: any; nombre: string; error: string }[] = []
 
       for (const cliente of clientesConNecesidad) {
         const nombre = cliente.nombre.split(' ')[0]
@@ -177,34 +120,23 @@ Deno.serve(async (req) => {
           await smtp.close()
           await sb.from('mensajes_cliente').insert({ cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, contenido: `📋 Recordatorio de check-in enviado. ${diasSin ? `Llevas ${diasSin} días sin check-in.` : '¡Es tu primer check-in!'} ¡Cuéntame cómo estás!`, tipo: 'sistema', leido: false, leido_entrenador: true })
           resumen.push({ cliente: nombre, ok: true, diasSin })
+          enviadosEntrenador++
         } catch(e: any) {
-          // SMTP falló para este cliente específico: registrar error visible en el panel
           const errorMsg = e.message || 'Error desconocido al enviar email'
           resumen.push({ cliente: nombre, ok: false, error: errorMsg })
+          fallos.push({ cliente, nombre, error: errorMsg })
+          if (enviadosEntrenador === 0 && fallos.length >= MAX_FALLOS_SEGUIDOS) break
+        }
+      }
 
-          // Insertar mensaje de error visible para el admin (leido_entrenador: false = aparece como nuevo)
-          await insertarMensajeError(
-            cliente.id,
-            cliente.entrenador_id,
-            `⚠️ No se pudo enviar el recordatorio de check-in a ${nombre}. Error: ${errorMsg}`
-          )
-
-          // Insertar alerta en el panel (evitar duplicados en 48h)
-          const hace48h = new Date(hoy.getTime() - 2 * 864e5).toISOString()
-          const { data: alertaExistente } = await sb.from('alertas')
-            .select('id')
-            .eq('cliente_id', cliente.id)
-            .eq('tipo', 'error_smtp_cliente')
-            .gte('created_at', hace48h)
-            .limit(1)
-          if (!alertaExistente?.length) {
-            await insertarAlerta(
-              cliente.entrenador_id,
-              cliente.id,
-              'error_smtp_cliente',
-              `No se pudo enviar recordatorio de check-in a ${nombre} (${cliente.email}). Error SMTP: ${errorMsg}`
-            )
-          }
+      if (fallos.length && enviadosEntrenador === 0) {
+        // Ni un envío correcto: es el correo, no los clientes. Un solo aviso.
+        await avisarIncidencia(eid, fallos[0].cliente.id, 'error_smtp_config',
+          `Los recordatorios de check-in no se están enviando: no se ha podido enviar ningún email. Puede que la contraseña de aplicación de Gmail haya caducado. Error: ${fallos[0].error}`)
+      } else {
+        for (const f of fallos) {
+          await avisarIncidencia(eid, f.cliente.id, 'error_smtp_cliente',
+            `No se pudo enviar el recordatorio de check-in a ${f.nombre} (${f.cliente.email}). Error: ${f.error}`)
         }
       }
     }

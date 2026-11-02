@@ -131,7 +131,7 @@ CREATE TABLE IF NOT EXISTS "public"."alertas" (
     "mensaje" "text",
     "leida" boolean DEFAULT false,
     "created_at" timestamp with time zone DEFAULT "now"(),
-    CONSTRAINT "alertas_tipo_check" CHECK (("tipo" = ANY (ARRAY['fatiga_alta'::"text", 'abandono'::"text", 'pago_vencido'::"text", 'rutina_lista'::"text", 'resumen_listo'::"text", 'cancelacion_sesion'::"text", 'sin_checkin'::"text", 'mensaje_nuevo'::"text", 'nuevo_cuestionario'::"text", 'error_ia'::"text", 'pago_recibido'::"text", 'pago_fallido'::"text", 'suscripcion_cancelada'::"text", 'cuestionario_pendiente'::"text"])))
+    CONSTRAINT "alertas_tipo_check" CHECK (("tipo" = ANY (ARRAY['fatiga_alta'::"text", 'abandono'::"text", 'pago_vencido'::"text", 'rutina_lista'::"text", 'resumen_listo'::"text", 'cancelacion_sesion'::"text", 'sin_checkin'::"text", 'mensaje_nuevo'::"text", 'nuevo_cuestionario'::"text", 'error_ia'::"text", 'pago_recibido'::"text", 'pago_fallido'::"text", 'suscripcion_cancelada'::"text", 'cuestionario_pendiente'::"text", 'error_smtp_config'::"text", 'error_smtp_cliente'::"text"])))
 );
 
 
