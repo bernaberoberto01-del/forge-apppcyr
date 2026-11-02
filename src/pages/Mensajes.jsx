@@ -5,6 +5,7 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 import { useEquipo } from '../hooks/useCentro'
 import { BRAND } from '../lib/brand'
+import { ini } from '../lib/avatar'
 
 const PLANTILLAS = [
   { id: 'bienvenida', icon: '👋', label: 'Bienvenida', texto: '¡Hola! Bienvenido/a al equipo. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve tendrás tu rutina lista. Cualquier duda, escríbeme aquí o por WhatsApp. ¡Vamos a por ello! 💪' },
@@ -19,7 +20,16 @@ const PLANTILLAS = [
 
 const AVATARES = [BRAND.color,'#6366f1','#10b981','#f59e0b','#ec4899','#0ea5e9','#8b5cf6']
 const avatarColor = n => AVATARES[(n||'').charCodeAt(0) % AVATARES.length]
-const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+
+function Toast({ msg, tipo, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  const bg = tipo === 'error' ? 'bg-red-500' : 'bg-[#111]'
+  return (
+    <div className={`fixed bottom-4 right-4 z-[60] ${bg} text-white text-sm px-4 py-2.5 rounded-xl shadow-lg max-w-xs`}>
+      {msg}
+    </div>
+  )
+}
 
 export default function Mensajes({ session }) {
   const uid = session.user.id
@@ -33,6 +43,7 @@ export default function Mensajes({ session }) {
   const [enviando, setEnviando] = useState(false)
   const [busqueda, setBusqueda] = useState('')
   const [noLeidos, setNoLeidos] = useState({})
+  const [ultimoMensaje, setUltimoMensaje] = useState({}) // { clienteId: { contenido, tipo, created_at } }
   const [showPlantillas, setShowPlantillas] = useState(false)
   const [generandoLink, setGenerandoLink] = useState(false)
   const [modalPago, setModalPago] = useState(false)
@@ -43,7 +54,7 @@ export default function Mensajes({ session }) {
     supabase.from('tarifas').select('id,nombre,tipo,precio,stripe_price_id,modalidad,dias_semana')
       .in('entrenador_id', equipo).eq('activa', true).not('stripe_price_id', 'is', null)
       .then(({ data, error }) => {
-        if (error) { setToast('Error al cargar tarifas: ' + error.message); return }
+        if (error) { setToast({ msg: 'Error al cargar tarifas: ' + error.message, tipo: 'error' }); return }
         setTarifas(data || [])
       })
   }, [uid, equipo])
@@ -61,14 +72,14 @@ export default function Mensajes({ session }) {
       const linkMsg = `Aquí tienes el enlace para formalizar tu plan:\n\n${data.url}\n\nUna vez completado el pago, activo tu plan y en menos de 24h tienes todo preparado. ¡Vamos a por ello! 💪`
       setTexto(linkMsg)
       await navigator.clipboard.writeText(data.url).catch(() => {})
-      setToast('✓ Link generado y añadido al mensaje')
+      setToast({ msg: 'Link generado y añadido al mensaje', tipo: 'ok' })
     } catch (e) {
-      setToast('Error al generar link: ' + e.message)
+      setToast({ msg: 'Error al generar link: ' + e.message, tipo: 'error' })
     }
     setGenerandoLink(false)
   }
   const [quickView, setQuickView] = useState(null)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState(null)
   const [loading, setLoading] = useState(true)
   const endRef = useRef()
 
@@ -84,31 +95,33 @@ export default function Mensajes({ session }) {
   }, [location.state, clientes])
   useEffect(() => { if (seleccionado) cargarMensajes(seleccionado.id) }, [seleccionado, equipo])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes])
-  useEffect(() => {
-    if (!toast) return
-    const t = setTimeout(() => setToast(''), 3000)
-    return () => clearTimeout(t)
-  }, [toast])
 
   async function cargarClientes() {
     setLoading(true)
-    const [{ data: cl, error: errCl }, { data: ms, error: errMs }] = await Promise.all([
+    const [{ data: cl, error: errCl }, { data: ms, error: errMs }, { data: ult, error: errUlt }] = await Promise.all([
       supabase.from('clientes').select('id,nombre,tipo,estado,plan_online,suscripcion_activa,email').in('entrenador_id', equipo).eq('estado','activo').order('nombre'),
       supabase.from('mensajes_cliente').select('cliente_id,leido_entrenador,tipo,created_at')
-        .in('entrenador_id', equipo).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema')
+        .in('entrenador_id', equipo).eq('leido_entrenador', false).neq('tipo','entrenador').neq('tipo','sistema'),
+      // Último mensaje por cliente: top 1 por cliente_id ordenado por created_at desc
+      supabase.from('mensajes_cliente').select('cliente_id,contenido,tipo,created_at')
+        .in('entrenador_id', equipo).order('created_at', { ascending: false }).limit(200)
     ])
-    if (errCl || errMs) setToast('Error al cargar clientes: ' + (errCl?.message || errMs?.message))
+    if (errCl || errMs) setToast({ msg: 'Error al cargar clientes: ' + (errCl?.message || errMs?.message), tipo: 'error' })
     setClientes(cl || [])
     const nl = {}
     ;(ms || []).forEach(m => { nl[m.cliente_id] = (nl[m.cliente_id] || 0) + 1 })
     setNoLeidos(nl)
+    // Último mensaje por cliente (el primer resultado ya es el más reciente por el order desc)
+    const um = {}
+    ;(ult || []).forEach(m => { if (!um[m.cliente_id]) um[m.cliente_id] = m })
+    setUltimoMensaje(um)
     setLoading(false)
   }
 
   async function cargarMensajes(clienteId) {
     const { data, error } = await supabase.from('mensajes_cliente')
       .select('*').eq('cliente_id', clienteId).order('created_at', { ascending: true })
-    if (error) setToast('Error al cargar mensajes: ' + error.message)
+    if (error) setToast({ msg: 'Error al cargar mensajes: ' + error.message, tipo: 'error' })
     setMensajes(data || [])
     // Marcar como leídos por el entrenador en la BD
     const { error: errUpd } = await supabase.from('mensajes_cliente')
@@ -116,7 +129,7 @@ export default function Mensajes({ session }) {
       .eq('cliente_id', clienteId)
       .in('entrenador_id', equipo)
       .neq('tipo', 'entrenador')
-    if (errUpd) setToast('Error al marcar como leído: ' + errUpd.message)
+    if (errUpd) setToast({ msg: 'Error al marcar como leído: ' + errUpd.message, tipo: 'error' })
     setNoLeidos(prev => { const n = {...prev}; delete n[clienteId]; return n })
   }
 
@@ -133,9 +146,14 @@ export default function Mensajes({ session }) {
         leido: false,
         leido_entrenador: true
       })
-      if (error) { setToast('Error al enviar mensaje: ' + error.message); return }
+      if (error) { setToast({ msg: 'Error al enviar mensaje: ' + error.message, tipo: 'error' }); return }
       setTexto('')
       setShowPlantillas(false)
+      // Actualizar preview del último mensaje en la lista
+      setUltimoMensaje(prev => ({
+        ...prev,
+        [seleccionado.id]: { cliente_id: seleccionado.id, contenido: msg, tipo: 'entrenador', created_at: new Date().toISOString() }
+      }))
       await cargarMensajes(seleccionado.id)
       // Notificar al cliente por email (fire & forget — no bloquea el envío)
       supabase.functions.invoke('notificar-mensaje', {
@@ -148,17 +166,21 @@ export default function Mensajes({ session }) {
 
   const clientesFiltrados = clientes.filter(c =>
     c.nombre?.toLowerCase().includes(busqueda.toLowerCase())
-  ).sort((a,b) => (noLeidos[b.id]||0) - (noLeidos[a.id]||0))
+  ).sort((a,b) => {
+    // Primero clientes con no leídos
+    const nlDiff = (noLeidos[b.id]||0) - (noLeidos[a.id]||0)
+    if (nlDiff !== 0) return nlDiff
+    // Luego por fecha del último mensaje (más reciente primero)
+    const fechaA = ultimoMensaje[a.id]?.created_at || ''
+    const fechaB = ultimoMensaje[b.id]?.created_at || ''
+    return fechaB.localeCompare(fechaA)
+  })
 
   const totalNoLeidos = Object.values(noLeidos).reduce((s,v) => s+v, 0)
 
   return (
     <div className="flex h-[calc(100vh-64px)] md:h-screen overflow-hidden">
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-[60] bg-[#111] text-white text-sm px-4 py-2.5 rounded-xl shadow-lg max-w-xs">
-          {toast}
-        </div>
-      )}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
       {/* Sidebar clientes */}
       <div className={`${seleccionado ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-72 bg-white border-r border-black/5 flex-shrink-0`}>
@@ -207,8 +229,21 @@ export default function Mensajes({ session }) {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm truncate ${nl > 0 ? 'font-bold text-[#0A0A0A]' : 'font-medium text-[#0A0A0A]'}`}>{c.nombre}</p>
-                  <p className="text-xs text-[#6B6B6B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'}</p>
+                  <div className="flex items-baseline justify-between gap-1">
+                    <p className={`text-sm truncate ${nl > 0 ? 'font-bold text-[#0A0A0A]' : 'font-medium text-[#0A0A0A]'}`}>{c.nombre}</p>
+                    {ultimoMensaje[c.id] && (
+                      <span className="text-[10px] text-[#9B9B9B] flex-shrink-0">
+                        {new Date(ultimoMensaje[c.id].created_at).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
+                      </span>
+                    )}
+                  </div>
+                  {ultimoMensaje[c.id] ? (
+                    <p className={`text-xs truncate ${nl > 0 ? 'font-semibold text-[#0A0A0A]' : 'text-[#6B6B6B]'}`}>
+                      {ultimoMensaje[c.id].tipo === 'entrenador' ? '↗ ' : ''}{ultimoMensaje[c.id].contenido}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-[#9B9B9B]">{c.tipo === 'online' ? '🌐 Online' : '📍 Presencial'} · Sin mensajes</p>
+                  )}
                 </div>
               </button>
             )

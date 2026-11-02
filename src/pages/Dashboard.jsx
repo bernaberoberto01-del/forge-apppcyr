@@ -8,10 +8,14 @@ import { useEquipo } from '../hooks/useCentro'
 import { moduloVisible } from '../lib/modulos'
 import { diaLocal, mesLocal } from '../lib/dateUtils'
 import { estadoCobro, diasHasta, cuentaParaCuotas } from '../lib/cobros'
+import { ini } from '../lib/avatar'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
 const DESCARTE_KEY = 'forge-alertas-descartadas'
+// Errores técnicos: van al registro de incidencias y solo se marcan leídos al resolverlos
+const TIPOS_INCIDENCIA = ['error_smtp_config', 'error_smtp_cliente', 'error_ia', 'error_bienvenida']
+const FILTRO_NO_INCIDENCIA = `(${TIPOS_INCIDENCIA.join(',')})`
 const DESCARTE_DIAS = 30
 
 function leerDescartadas() {
@@ -55,6 +59,16 @@ function BarChart({ datos, max }) {
   )
 }
 
+function Toast({ msg, tipo, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  const bg = tipo === 'error' ? 'bg-red-500' : 'bg-acento'
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl ${bg} whitespace-nowrap`}>
+      {msg}
+    </div>
+  )
+}
+
 export default function Dashboard({ session }) {
   const [datos, setDatos] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -62,15 +76,17 @@ export default function Dashboard({ session }) {
   const [sesionesManana, setSesionesManana] = useState([])
   const [cuestPendientes, setCuestPendientes] = useState([])
   const [clientesIAPendiente, setClientesIAPendiente] = useState([])
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState(null)
   const [mostrarWizard, setMostrarWizard] = useState(false)
   const [expandirCriticos, setExpandirCriticos] = useState(false)
+  const [incidencias, setIncidencias] = useState([])
+  const [incidenciasExpandidas, setIncidenciasExpandidas] = useState(false)
   const navigate = useNavigate()
   const uid = session.user.id
   const equipo = useEquipo(uid)
   const { completar, completado, porcentaje, cargado } = useOnboarding(uid)
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
+  function showToast(msg, tipo = 'ok') { setToast({ msg, tipo }) }
 
   function descartarGrupo(clienteIds, tipo, campo) {
     descartarAlertas(clienteIds, tipo)
@@ -79,6 +95,17 @@ export default function Dashboard({ session }) {
       return !clienteIds.includes(id)
     }) }))
   }
+
+  async function marcarIncidenciasResueltas(ids, aviso) {
+    const { error } = await supabase.from('alertas').update({ leida: true }).in('id', ids)
+    if (error) { showToast('Error al resolver la incidencia', 'error'); return }
+    setIncidencias(prev => prev.map(i => ids.includes(i.id) ? { ...i, leida: true } : i))
+    window.dispatchEvent(new Event('alertas-leidas'))
+    showToast(aviso)
+  }
+
+  const resolverIncidencia = id => marcarIncidenciasResueltas([id], 'Incidencia marcada como resuelta')
+  const resolverTodasIncidencias = () => marcarIncidenciasResueltas(incidencias.filter(i => !i.leida).map(i => i.id), 'Todas las incidencias resueltas')
 
   const [procesandoLead, setProcesandoLead] = useState(null)
   const [leadExpandido, setLeadExpandido] = useState(null)
@@ -138,7 +165,7 @@ export default function Dashboard({ session }) {
       }
       generarMensajeBienvenida(lead, huboModalAcceso)
     } catch (e) {
-      showToast('Error al aceptar el lead')
+      showToast('Error al aceptar el lead', 'error')
     } finally {
       setProcesandoLead(null)
     }
@@ -151,7 +178,7 @@ export default function Dashboard({ session }) {
       if (error) throw error
       setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
     } catch (e) {
-      showToast('Error al rechazar el lead')
+      showToast('Error al rechazar el lead', 'error')
     } finally {
       setProcesandoLead(null)
     }
@@ -232,7 +259,7 @@ export default function Dashboard({ session }) {
       supabase.from('planes_cobro').select('cliente_id,importe,concepto,proximo_cobro').in('entrenador_id', equipo).eq('activo', true),
       supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').in('entrenador_id', equipo).gte('fecha', inicioSemana),
       supabase.from('checkins').select('cliente_id,fecha,adherencia_entreno,energia,fatiga').in('entrenador_id', equipo).gte('fecha', hace6m).order('fecha', {ascending:false}),
-      supabase.from('alertas').select('*').in('entrenador_id', equipo).eq('leida', false).order('created_at',{ascending:false}).limit(20),
+      supabase.from('alertas').select('*').in('entrenador_id', equipo).eq('leida', false).not('tipo', 'in', FILTRO_NO_INCIDENCIA).order('created_at',{ascending:false}).limit(20),
       supabase.from('mensajes_cliente').select('id,cliente_id,contenido,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('leido_entrenador', false).eq('tipo','cliente').order('created_at',{ascending:false}).limit(10),
       supabase.from('rutinas').select('id,cliente_id,estado,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('estado','borrador').order('created_at',{ascending:false}).limit(10),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
@@ -252,9 +279,26 @@ export default function Dashboard({ session }) {
     ])
 
     if (alertas?.length > 0) {
-      await supabase.from('alertas').update({ leida:true }).in('entrenador_id', equipo).eq('leida', false)
+      await supabase.from('alertas').update({ leida:true }).in('entrenador_id', equipo).eq('leida', false).not('tipo', 'in', FILTRO_NO_INCIDENCIA)
       window.dispatchEvent(new Event('alertas-leidas'))
     }
+
+    // Incidencias del sistema: errores técnicos históricos, cargados aparte para no bloquear
+    // Incluye tanto no leídas como leídas recientes (30 días) — es un registro, no solo alertas activas
+    setTimeout(async () => {
+      try {
+        const hace30d = new Date(Date.now() - 30 * 864e5).toISOString()
+        const { data: incidenciasData } = await supabase
+          .from('alertas')
+          .select('id, tipo, mensaje, cliente_id, created_at, leida, clientes(nombre)')
+          .in('entrenador_id', equipo)
+          .in('tipo', TIPOS_INCIDENCIA)
+          .gte('created_at', hace30d)
+          .order('created_at', { ascending: false })
+          .limit(50)
+        if (incidenciasData?.length) setIncidencias(incidenciasData)
+      } catch {}
+    }, 500)
 
     setSesionesHoy(sesHoy || [])
     setSesionesManana(sesManana || [])
@@ -402,11 +446,7 @@ export default function Dashboard({ session }) {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl bg-acento whitespace-nowrap">
-          {toast}
-        </div>
-      )}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
       {/* Modal acceso manual — email no configurado, hay que copiar el link */}
       {modalAccesoManual && (
@@ -461,9 +501,12 @@ export default function Dashboard({ session }) {
             </p>
           </div>
           {totalPendiente > 0 && (
-            <div className="bg-acento text-white text-sm font-bold px-3 py-1.5 rounded-full">
+            <button
+              onClick={() => document.getElementById('atencion-requerida')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="bg-acento text-white text-sm font-bold px-3 py-1.5 rounded-full active:scale-95 transition-all cursor-pointer hover:opacity-90"
+            >
               {totalPendiente} pendiente{totalPendiente > 1 ? 's' : ''}
-            </div>
+            </button>
           )}
         </div>
 
@@ -474,7 +517,7 @@ export default function Dashboard({ session }) {
           <div className="lg:col-span-2 space-y-4">
 
             {/* Lista de atención priorizada */}
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+            <div id="atencion-requerida" className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
                 <p className="font-bold text-[#0A0A0A] text-sm">Atención requerida</p>
                 {totalPendiente === 0 && (
@@ -834,7 +877,7 @@ export default function Dashboard({ session }) {
                             const r = await supabase.functions.invoke('checkin-semanal', { body: { dias_umbral: 7 } })
                             const enviados = r.data?.enviados || 0
                             showToast(`✓ Recordatorio enviado a ${enviados} cliente${enviados!==1?'s':''}`)
-                          } catch(e) { showToast('Error al enviar') }
+                          } catch(e) { showToast('Error al enviar', 'error') }
                         }} className={`text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 text-white ${criticos.length > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
                           Recordar →
                         </button>
@@ -900,6 +943,90 @@ export default function Dashboard({ session }) {
                       title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0 mt-1">✕</button>
                   </div>
                 ))}
+
+                {/* Registro de incidencias del sistema */}
+                {incidencias.length > 0 && (
+                  <div className="border-t border-black/5">
+                    <button
+                      onClick={() => setIncidenciasExpandidas(v => !v)}
+                      className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-[#F7F6F3] transition-all text-left"
+                    >
+                      <div className="w-8 h-8 bg-red-100 rounded-xl flex items-center justify-center text-sm flex-shrink-0">
+                        🔴
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-red-700">
+                          {incidencias.filter(i => !i.leida).length > 0
+                            ? `${incidencias.filter(i => !i.leida).length} incidencia${incidencias.filter(i => !i.leida).length > 1 ? 's' : ''} sin resolver`
+                            : `${incidencias.length} incidencia${incidencias.length > 1 ? 's' : ''} del sistema`
+                          }
+                        </p>
+                        <p className="text-xs text-[#9B9B9B]">Errores técnicos detectados automáticamente</p>
+                      </div>
+                      <span className="text-[#9B9B9B] text-sm">{incidenciasExpandidas ? '▲' : '▼'}</span>
+                    </button>
+
+                    {incidenciasExpandidas && (
+                      <div className="pb-2">
+                        {/* Cabecera del registro */}
+                        <div className="flex items-center justify-between px-5 pb-2">
+                          <p className="text-[10px] font-semibold text-[#9B9B9B] uppercase tracking-wider">Últimos 30 días</p>
+                          {incidencias.filter(i => !i.leida).length > 0 && (
+                            <button
+                              onClick={resolverTodasIncidencias}
+                              className="text-[10px] text-acento font-semibold hover:opacity-70"
+                            >
+                              Marcar todo resuelto
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Lista de incidencias */}
+                        <div className="space-y-0 divide-y divide-black/5 mx-4">
+                          {incidencias.map(inc => {
+                            const fecha = new Date(inc.created_at)
+                            const esHoy = fecha.toDateString() === new Date().toDateString()
+                            const fechaStr = esHoy
+                              ? `Hoy ${fecha.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`
+                              : fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                            const tipoLabel = {
+                              error_smtp_config: 'Email · Config SMTP',
+                              error_smtp_cliente: 'Email · Cliente',
+                              error_ia: 'IA',
+                              error_bienvenida: 'Acceso cliente',
+                            }[inc.tipo] || inc.tipo
+                            return (
+                              <div key={inc.id}
+                                className={`flex items-start gap-3 py-3 px-2 rounded-xl ${inc.leida ? 'opacity-50' : ''}`}
+                              >
+                                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${inc.leida ? 'bg-[#C0C0C0]' : 'bg-red-500'}`} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-0.5">
+                                    <span className="text-[10px] font-semibold text-[#9B9B9B] uppercase tracking-wider">{tipoLabel}</span>
+                                    {inc.clientes?.nombre && (
+                                      <span className="text-[10px] text-[#9B9B9B]">· {inc.clientes.nombre.split(' ')[0]}</span>
+                                    )}
+                                    <span className="text-[10px] text-[#C0C0C0] ml-auto">{fechaStr}</span>
+                                  </div>
+                                  <p className="text-xs text-[#444] leading-relaxed">{inc.mensaje}</p>
+                                </div>
+                                {!inc.leida && (
+                                  <button
+                                    onClick={() => resolverIncidencia(inc.id)}
+                                    title="Marcar como resuelta"
+                                    className="text-[10px] text-[#9B9B9B] hover:text-emerald-600 flex-shrink-0 mt-0.5 px-1 py-0.5 rounded hover:bg-emerald-50 transition-all"
+                                  >
+                                    ✓
+                                  </button>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Onboarding — sistema vacío, usuario nuevo */}
                 {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && d.activos.length === 0 && (
@@ -995,7 +1122,6 @@ export default function Dashboard({ session }) {
               ) : (
                 <div className="divide-y divide-black/4">
                   {sesionesHoy.map(s => {
-                    const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                     return (
                       <div key={s.id} className={`flex items-center gap-3 px-5 py-3 ${s.completada?'bg-emerald-50':''}`}>
                         <div className="w-8 h-8 bg-acento/10 rounded-xl flex items-center justify-center text-acento font-bold text-xs flex-shrink-0">
@@ -1020,7 +1146,6 @@ export default function Dashboard({ session }) {
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     {sesionesManana.map(s => {
-                      const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                       return (
                         <div key={s.id} className="flex items-center gap-2 bg-white border border-black/8 px-3 py-1.5 rounded-xl">
                           <span className="text-xs font-bold text-[#6366f1]">{ini(s.clientes?.nombre)}</span>

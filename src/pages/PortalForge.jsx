@@ -72,6 +72,18 @@ function BloqueoOverlay({ mensaje, boton, onClick, color }) {
 }
 
 // ─── Portal principal ─────────────────────────────────────────────────────────
+// Colores del portal (tema oscuro Carbono). El acento sigue siendo el de cada centro.
+const C = {
+  bg: '#0F0F0D',
+  card: 'rgba(255,255,255,0.04)',
+  border: 'rgba(255,255,255,0.07)',
+  borderSubtle: 'rgba(255,255,255,0.04)',
+  textPrimary: '#FFFFFF',
+  textSecondary: 'rgba(255,255,255,0.45)',
+  textMuted: 'rgba(255,255,255,0.2)',
+  textDisabled: 'rgba(255,255,255,0.12)',
+}
+
 export default function PortalForge() {
   const [sesion, setSesion] = useState(undefined)
   const [cliente, setCliente] = useState(null)
@@ -328,7 +340,7 @@ export default function PortalForge() {
     setGuardandoAct(false)
   }
 
-  async function guardarRegistroSesion() {
+  async function guardarRegistroSesion(duracionMinutos) {
     if (modoPreview) return bloqueadoPreview()
     if (!modalRegistro || guardandoRegistro) return
     setGuardandoRegistro(true)
@@ -336,6 +348,7 @@ export default function PortalForge() {
       cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
       fecha: hoyStr(), tipo: 'online', completada: true, cancelada: false, notas: modalRegistro.nombre,
       valoracion_pendiente: true,
+      duracion_minutos: duracionMinutos || null,
     }).select().single()
     if (error || !sesNueva) {
       setGuardandoRegistro(false)
@@ -584,7 +597,7 @@ export default function PortalForge() {
   // Secciones dentro del menú Más
   const MAS_ITEMS = [
     { id: 'mensajes', label: 'Mensajes',  icon: '✉️', badge: msgNoLeidos, desc: msgNoLeidos > 0 ? `${msgNoLeidos} sin leer` : 'Chat con tu entrenador' },
-    ...(pagos?.length ? [{ id: 'pagos', label: 'Pagos', icon: '💳', badge: 0, desc: `${pagos.filter(p=>!['cobrado','pagado'].includes(p.estado)).length > 0 ? 'Tienes pagos pendientes' : 'Historial al día'}` }] : []),
+    ...((pagos?.length || planCobro) ? [{ id: 'pagos', label: 'Pagos', icon: '💳', badge: 0, desc: pagos?.filter(p=>!['cobrado','pagado'].includes(p.estado)).length > 0 ? 'Tienes pagos pendientes' : planCobro?.estado === 'activo' ? 'Suscripción activa' : 'Historial al día' }] : []),
     { id: 'ajustes', label: 'Ajustes', icon: '⚙️', badge: 0, desc: 'Objetivo, peso, contraseña' },
   ].filter(i => VER_MENSAJES || i.id !== 'mensajes')
 
@@ -722,7 +735,7 @@ export default function PortalForge() {
             </div>
           )}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
-          {tab === 'mensajes' && VER_MENSAJES && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} />}
+          {tab === 'mensajes' && VER_MENSAJES && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} config={config} />}
           {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
         </div>
 
@@ -1034,17 +1047,6 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
   const hayAgenda = esOnline ? (sesionesEstaSemana||[]).length>0 : (sesiones||[]).filter(s=>s.fecha>=lunesEsta.toISOString().split('T')[0]).length>0
   const esNuevo = !rutina && !nutricion && !checkins?.length && !hayAgenda
 
-  // Carbono design tokens
-  const C = {
-    bg: '#0F0F0D',
-    card: 'rgba(255,255,255,0.04)',
-    border: 'rgba(255,255,255,0.07)',
-    borderSubtle: 'rgba(255,255,255,0.04)',
-    textPrimary: '#FFFFFF',
-    textSecondary: 'rgba(255,255,255,0.45)',
-    textMuted: 'rgba(255,255,255,0.2)',
-    textDisabled: 'rgba(255,255,255,0.12)',
-  }
 
   return (
     <div className="space-y-2.5 pb-2" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -1267,7 +1269,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
       {/* ── CHECK-IN URGENTE ── */}
       {ciUrgente && (
         <button onClick={() => setModalCI(true)}
-          className="w-full flex items-center gap-4 rounded-2xl p-4 active:scale-95 text-left animate-pulse"
+          className="w-full flex items-center gap-4 rounded-2xl p-4 active:scale-95 text-left"
           style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)' }}>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: 'rgba(255,255,255,0.2)' }}>
@@ -1275,9 +1277,9 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
           </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-white">{diasSinCI>900?'Haz tu primer check-in':`${diasSinCI} días sin check-in`}</p>
-            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.7)' }}>Tu entrenador necesita saber cómo estás</p>
+            <p className="text-xs mt-0.5 leading-relaxed" style={{ color: 'rgba(255,255,255,0.8)' }}>El check-in semanal ayuda a tu entrenador a ajustar tu plan · solo 30 segundos</p>
           </div>
-          <span className="text-xl" style={{ color: 'rgba(255,255,255,0.8)' }}>→</span>
+          <span className="text-xl flex-shrink-0" style={{ color: 'rgba(255,255,255,0.8)' }}>→</span>
         </button>
       )}
 
@@ -1397,25 +1399,25 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             {checkins[0].energia != null && (
               <div className="flex flex-col items-center gap-0.5">
                 <span className="text-sm">⚡</span>
-                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].energia}/5</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>Energía {checkins[0].energia}/5</span>
               </div>
             )}
             {checkins[0].sueno != null && (
               <div className="flex flex-col items-center gap-0.5">
                 <span className="text-sm">😴</span>
-                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].sueno}/5</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>Sueño {checkins[0].sueno}/5</span>
               </div>
             )}
             {checkins[0].fatiga != null && (
               <div className="flex flex-col items-center gap-0.5">
                 <span className="text-sm">🏋️</span>
-                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].fatiga}/5</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>Fatiga {checkins[0].fatiga}/5</span>
               </div>
             )}
             {checkins[0].estres != null && (
               <div className="flex flex-col items-center gap-0.5">
                 <span className="text-sm">🧠</span>
-                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].estres}/5</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>Estrés {checkins[0].estres}/5</span>
               </div>
             )}
             {checkins[0].peso != null && (
@@ -1535,16 +1537,6 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
   const [diaAbierto, setDiaAbierto] = useState(null) // null = todos cerrados
   const [videoEj, setVideoEj] = useState(null) // { nombre, youtube_url, consejos_tecnica }
 
-  const C = {
-    bg: '#0F0F0D',
-    card: 'rgba(255,255,255,0.04)',
-    border: 'rgba(255,255,255,0.07)',
-    borderSubtle: 'rgba(255,255,255,0.04)',
-    textPrimary: '#FFFFFF',
-    textSecondary: 'rgba(255,255,255,0.45)',
-    textMuted: 'rgba(255,255,255,0.2)',
-    textDisabled: 'rgba(255,255,255,0.12)',
-  }
 
   if (!rutina) return (
     <div className="rounded-3xl overflow-hidden py-16 text-center"
@@ -1750,10 +1742,21 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
 }
 
 // ─── Tab Mensajes ─────────────────────────────────────────────────────────────
-function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensaje, color, endRef, modoPreview }) {
+function TabMensajes({ mensajes, textoMsg, setTextoMsg, enviandoMsg, enviarMensaje, color, endRef, modoPreview, config }) {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [mensajes?.length])
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 180px)' }}>
+      {/* Header entrenador */}
+      <div className="flex items-center gap-3 pb-3 mb-1 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+        {config?.foto_url
+          ? <img src={config.foto_url} alt="" className="w-9 h-9 rounded-full object-cover flex-shrink-0" />
+          : <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ background: `${color}18`, color }}>{(config?.nombre_entrenador || 'E').slice(0, 2).toUpperCase()}</div>
+        }
+        <div>
+          <p className="text-sm font-bold" style={{ color: '#FFFFFF' }}>{config?.nombre_entrenador || 'Tu entrenador'}</p>
+          <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.45)' }}>Tu entrenador personal</p>
+        </div>
+      </div>
       <div className="flex-1 overflow-y-auto space-y-2 pb-2">
         {!mensajes?.length && (
           <div className="text-center py-10">
@@ -1918,12 +1921,12 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
         <p className="text-xl font-black text-white tracking-tight">Ajustes</p>
         <form onSubmit={guardar} className="rounded-2xl p-4 space-y-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
           <div className="grid grid-cols-2 gap-3">
-            {[['Peso actual (kg)','peso_actual'],['Peso objetivo (kg)','peso_objetivo']].map(([label,key]) => (
+            {[['Peso actual (kg)','peso_actual','ej. 75'],['Peso objetivo (kg)','peso_objetivo','ej. 70']].map(([label,key,ph]) => (
               <div key={key}>
                 <label className="text-[10px] font-black uppercase tracking-widest block mb-2" style={{ color: C.textSecondary }}>{label}</label>
-                <input type="number" step="0.1" value={form[key]}
+                <input type="number" step="0.1" value={form[key]} placeholder={ph}
                   onChange={e => setForm(f => ({...f,[key]:e.target.value}))}
-                  className="w-full rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none"
+                  className="w-full rounded-xl px-3 py-2.5 text-sm font-bold focus:outline-none placeholder:font-normal placeholder:text-white/30"
                   style={{ background: C.card, border: `1px solid ${C.border}`, color: C.textPrimary }} />
               </div>
             ))}
@@ -2795,10 +2798,10 @@ function SubPeso({ checkins, color }) {
                   {formatearFecha(c.fecha, {weekday:'short',day:'numeric',month:'short'})}
                 </p>
                 <div className="flex gap-2.5 mt-1.5 flex-wrap">
-                  {c.energia  != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>⚡ {c.energia}/5</span>}
-                  {c.fatiga   != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>🏋️ {c.fatiga}/5</span>}
-                  {c.sueno    != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>😴 {c.sueno}/5</span>}
-                  {c.estres   != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>🧠 {c.estres}/5</span>}
+                  {c.energia  != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>⚡ Energía {c.energia}/5</span>}
+                  {c.fatiga   != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>🏋️ Fatiga {c.fatiga}/5</span>}
+                  {c.sueno    != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>😴 Sueño {c.sueno}/5</span>}
+                  {c.estres   != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>🧠 Estrés {c.estres}/5</span>}
                 </div>
                 {c.comentario && (
                   <p className="text-[10px] mt-1.5 italic leading-relaxed" style={{ color: C.textSecondary }}>"{c.comentario}"</p>
@@ -3428,6 +3431,20 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
   const [solicitandoCambio, setSolicitandoCambio] = useState(false)
   const [cambioSolicitado, setCambioSolicitado] = useState(false)
   const [videoEjModal, setVideoEjModal] = useState(null) // { nombre, youtube_url, consejos_tecnica }
+  const [confirmando, setConfirmando] = useState(false) // panel de confirmación antes de guardar
+
+  // ── Timer ──
+  const [segundos, setSegundos] = useState(0)
+  const timerRef = useRef(null)
+  useEffect(() => {
+    if (sesionGuardadaId) return // no seguir contando tras guardar
+    timerRef.current = setInterval(() => setSegundos(s => s + 1), 1000)
+    return () => clearInterval(timerRef.current)
+  }, [sesionGuardadaId])
+  const duracionMinutos = Math.max(1, Math.round(segundos / 60))
+  const timerStr = segundos < 3600
+    ? `${String(Math.floor(segundos / 60)).padStart(2, '0')}:${String(segundos % 60).padStart(2, '0')}`
+    : `${Math.floor(segundos / 3600)}h ${String(Math.floor((segundos % 3600) / 60)).padStart(2, '0')}m`
 
   async function guardarMolestia() {
     if (modoPreview || !molestiaForm.zona) return
@@ -3562,13 +3579,59 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
   const totalComp = Object.values(registroSets).reduce((a, sets) => a + sets.filter(s => s.completada).length, 0)
   const totalSets = Object.values(registroSets).reduce((a, sets) => a + sets.length, 0)
 
+  // ── Panel de confirmación ──
+  if (confirmando) return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4">
+      <div className="rounded-3xl w-full max-w-md p-6 space-y-4" style={{ background: '#1A1A18' }}>
+        <div className="text-center">
+          <p className="text-2xl mb-1">🏋️</p>
+          <p className="text-lg font-bold" style={{ color: '#FFFFFF' }}>¿Terminas el entrenamiento?</p>
+          <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>Duración: <span className="font-bold" style={{ color: '#FFFFFF' }}>{timerStr}</span></p>
+        </div>
+        <div className="rounded-2xl p-4 space-y-2" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          {Object.entries(registroSets).map(([ei, sets]) => {
+            const ej = ejercicios[parseInt(ei)]
+            if (!ej) return null
+            const comp = sets.filter(s => s.completada).length
+            const maxPeso = Math.max(0, ...sets.filter(s => s.peso).map(s => parseFloat(s.peso) || 0))
+            return (
+              <div key={ei} className="flex items-center justify-between">
+                <p className="text-xs font-semibold flex-1 min-w-0 truncate pr-2" style={{ color: '#FFFFFF' }}>{ej.nombre}</p>
+                <p className="text-xs flex-shrink-0" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                  {comp}/{sets.length} series{maxPeso > 0 ? ` · ${maxPeso} kg` : ''}
+                  {comp === sets.length ? ' ✓' : ''}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button onClick={() => setConfirmando(false)}
+            className="flex-1 py-3.5 rounded-2xl font-bold text-sm active:scale-95 transition-all"
+            style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)' }}>
+            Revisar
+          </button>
+          <button onClick={() => { clearInterval(timerRef.current); guardarRegistroSesion(duracionMinutos) }}
+            disabled={guardandoRegistro}
+            className="flex-1 py-3.5 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95 transition-all"
+            style={{ background: color }}>
+            {guardandoRegistro ? '⏳ Guardando...' : 'Confirmar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
       <div className="rounded-3xl w-full max-w-md max-h-[95vh] flex flex-col" style={{ background: '#1A1A18', border: '1px solid rgba(255,255,255,0.07)' }} onClick={e => e.stopPropagation()}>
         <div className="px-5 pt-5 pb-4 flex items-start justify-between flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="flex-1 min-w-0 mr-3">
             <p className="font-bold text-lg" style={{ color: '#FFFFFF' }}>{dia.nombre}</p>
-            <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>{ejercicios.length} ejercicios</p>
+            <div className="flex items-center gap-3 mt-1">
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{ejercicios.length} ejercicios</p>
+              <p className="text-xs font-bold tabular-nums" style={{ color }}>{timerStr}</p>
+            </div>
             {totalSets > 0 && (
               <div className="flex items-center gap-2 mt-2">
                 <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
@@ -3677,10 +3740,10 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
         </div>
 
         <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-          <button onClick={guardarRegistroSesion} disabled={guardandoRegistro || Object.keys(registroSets).length === 0}
+          <button onClick={() => setConfirmando(true)} disabled={guardandoRegistro || Object.keys(registroSets).length === 0}
             className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
             style={{ background: color }}>
-            {guardandoRegistro ? '⏳ Guardando...' : `✓ Guardar sesión${totalComp > 0 ? ` · ${totalComp} series` : ''}`}
+            {`✓ Terminar entrenamiento${totalComp > 0 ? ` · ${totalComp} series` : ''}`}
           </button>
         </div>
       </div>

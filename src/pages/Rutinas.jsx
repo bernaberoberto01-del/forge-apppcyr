@@ -11,6 +11,7 @@ import EjercicioInput from '../components/EjercicioInput'
 import { BRAND } from '../lib/brand'
 import { ytEmbed, ytMiniatura } from '../lib/youtube'
 import VideoEjercicioModal, { BUSCAR_VIDEOS } from '../components/VideoEjercicioModal'
+import { ini } from '../lib/avatar'
 
 // Opciones por centro (ficha → funciones): 'sin_ia' oculta la generación con IA
 // (centro sin clave de IA); 'rutinas_solo_online' limita Rutinas a clientes online
@@ -22,8 +23,6 @@ const PATRONES = ['empuje_horizontal','empuje_vertical','tiron_vertical','tiron_
 const GRUPOS_MUSCULARES = ['Pecho','Espalda','Hombros','Bíceps','Tríceps','Piernas','Glúteos','Posterior','Isquios','Core','Full body','Cardio','Cadera','Gemelos','Movilidad']
 const initEj = () => ({ nombre:'', patron:'empuje_horizontal', series:3, reps:'8-10', descanso:'90s', notas:'' })
 const initDia = (n) => ({ dia:n, nombre:`Día ${String.fromCharCode(64+n)}`, patron_principal:'', ejercicios:[initEj()] })
-const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-
 function Toast({ msg, tipo='ok', onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
   return (
@@ -55,7 +54,7 @@ export default function Rutinas({ session }) {
   const [manualDescripcion, setManualDescripcion] = useState('')
   const [manualDias, setManualDias] = useState([initDia(1), initDia(2), initDia(3)])
   const [guardandoManual, setGuardandoManual] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState(null)
   const [quickView, setQuickView] = useState(null)
   const [plantillas, setPlantillas] = useState([])
   const [plantillasCentro, setPlantillasCentro] = useState([])
@@ -111,10 +110,10 @@ export default function Rutinas({ session }) {
       body: { cliente_id: clienteId }
     })
     if (error || !data?.ok) {
-      setToast('❌ Error al generar la evaluación')
+      setToast({ msg: 'Error al generar la evaluación', tipo: 'error' })
     } else {
       const tipo = data.es_inicial ? 'inicial' : `nº ${data.numero}`
-      setToast(`✓ Evaluación ${tipo} generada — revísala en la lista y publícala`)
+      setToast({ msg: `Evaluación ${tipo} generada — revísala en la lista y publícala`, tipo: 'ok' })
       cargar()
     }
     setGenerando(null)
@@ -131,14 +130,14 @@ export default function Rutinas({ session }) {
         const sinIA = data.contexto_aplicado && data.dias_ia < data.dias_generados
           ? ` ⚠ ${data.dias_generados - data.dias_ia} día(s) sin tu contexto (la IA no respondió): revísalos`
           : ''
-        setToast(`✓ Rutina generada (${data.dias_generados} días, Fase ${data.fase_label}) — revísala y publícala${sinIA}`)
+        setToast({ msg: `Rutina generada (${data.dias_generados} días, Fase ${data.fase_label}) — revísala y publícala${sinIA}`, tipo: 'ok' })
         await cargar()
         setGenerando(null)
         return data.rutina || true
       }
-      setToast('Error: ' + (data?.error || 'desconocido'))
+      setToast({ msg: 'Error: ' + (data?.error || 'desconocido'), tipo: 'error' })
     } catch (e) {
-      setToast('Error al generar: ' + (e?.message || 'desconocido'))
+      setToast({ msg: 'Error al generar: ' + (e?.message || 'desconocido'), tipo: 'error' })
     }
     setGenerando(null)
     return null
@@ -151,15 +150,15 @@ export default function Rutinas({ session }) {
         body: { cliente_id: clienteId, forzar: true }
       })
       if (data?.ok || data?.generadas > 0) {
-        setToast('🤖 Análisis completado — plan listo para revisar y publicar')
+        setToast({ msg: 'Análisis completado — plan listo para revisar y publicar', tipo: 'ok' })
         await cargar()
       } else if (data?.sin_datos) {
-        setToast('Sin check-ins suficientes para analizar — necesita al menos 2')
+        setToast({ msg: 'Sin check-ins suficientes para analizar — necesita al menos 2', tipo: 'error' })
       } else {
-        setToast('Error en el análisis: ' + (data?.error || 'desconocido'))
+        setToast({ msg: 'Error en el análisis: ' + (data?.error || 'desconocido'), tipo: 'error' })
       }
     } catch (e) {
-      setToast('Error: ' + e.message)
+      setToast({ msg: 'Error: ' + e.message, tipo: 'error' })
     }
     setGenerando(null)
   }
@@ -171,12 +170,12 @@ export default function Rutinas({ session }) {
     const borrador = { nombre: manualNombre, descripcion: manualDescripcion, semanas: 4, dias: manualDias.filter(d => d.ejercicios.some(e => e.nombre)) }
     await supabase.from('rutinas').insert({ cliente_id: manualClienteId, entrenador_id: uid, nombre: manualNombre, objetivo: cliente?.objetivo, semanas: 4, dias_semana: borrador.dias.length, borrador, estado: 'borrador' })
     setModalManual(false); setManualClienteId(''); setManualNombre(''); setManualDescripcion(''); setManualDias([initDia(1), initDia(2), initDia(3)]); setGuardandoManual(false)
-    setToast('Rutina creada — revísala y publícala pendiente'); await cargar()
+    setToast({ msg: 'Rutina creada — revísala y publícala pendiente', tipo: 'ok' }); await cargar()
   }
 
   async function publicar(rutina) {
     await supabase.from('rutinas').update({ estado: 'publicada', contenido: rutina.borrador, notas_entrenador: notasEdit }).eq('id', rutina.id)
-    setDetalle(null); setToast(`✓ Rutina publicada para ${rutina.clientes?.nombre}`); await cargar()
+    setDetalle(null); setToast({ msg: `Rutina publicada para ${rutina.clientes?.nombre}`, tipo: 'ok' }); await cargar()
   }
 
   function guardarComoPlantilla(rutina) {
@@ -190,14 +189,14 @@ export default function Rutinas({ session }) {
     if (!nombre) return
     setModalNombrePlantilla(null)
     await supabase.from('plantillas_rutina').insert({ entrenador_id: uid, nombre, objetivo: rutina.objetivo, dias_semana: rutina.dias_semana, descripcion: rutina.borrador?.descripcion || '', contenido: rutina.borrador || rutina.contenido })
-    setToast('✓ Guardada como plantilla'); await cargar()
+    setToast({ msg: 'Guardada como plantilla', tipo: 'ok' }); await cargar()
   }
 
   async function aplicarPlantilla(plantilla, clienteId) {
     if (!clienteId) return
     await supabase.from('plantillas_rutina').update({ usos: (plantilla.usos||0)+1 }).eq('id', plantilla.id)
     await supabase.from('rutinas').insert({ cliente_id: clienteId, entrenador_id: uid, nombre: plantilla.nombre, objetivo: plantilla.objetivo, semanas: 4, dias_semana: plantilla.dias_semana, borrador: plantilla.contenido, estado: 'borrador' })
-    setModalPlantillas(false); setToast('Plantilla aplicada — revisa y publica'); await cargar()
+    setModalPlantillas(false); setToast({ msg: 'Plantilla aplicada — revisa y publica', tipo: 'ok' }); await cargar()
   }
 
   async function eliminarPlantilla(id) {
@@ -209,7 +208,7 @@ export default function Rutinas({ session }) {
   async function enviarMensaje(clienteId) {
     if (!msgTexto.trim()) return
     await supabase.from('mensajes_cliente').insert({ entrenador_id: uid, cliente_id: clienteId, contenido: msgTexto.trim() })
-    setMsgTexto(''); setMsgModal(null); setToast('Mensaje enviado')
+    setMsgTexto(''); setMsgModal(null); setToast({ msg: 'Mensaje enviado', tipo: 'ok' })
   }
 
   const updateDia = (di, field, val) => setManualDias(prev => prev.map((d,i) => i===di ? {...d,[field]:val} : d))
@@ -254,11 +253,11 @@ export default function Rutinas({ session }) {
     const data = { ...formEj, entrenador_id: uid }
     if (isEdit && modalEditarEj) {
       await supabase.from('ejercicios_biblioteca').update(data).eq('id', modalEditarEj.id)
-      setToast('Ejercicio actualizado')
+      setToast({ msg: 'Ejercicio actualizado', tipo: 'ok' })
       setModalEditarEj(null)
     } else {
       await supabase.from('ejercicios_biblioteca').insert(data)
-      setToast('Ejercicio añadido a la biblioteca')
+      setToast({ msg: 'Ejercicio añadido a la biblioteca', tipo: 'ok' })
       setModalNuevoEj(false)
     }
     setFormEj({ nombre:'', sinonimos:'', grupo_muscular:'Pecho', grupo_secundario:'', patron:'empuje_horizontal', nivel:'principiante', modalidad:'fuerza', consejos_tecnica:'', youtube_url:'' })
@@ -279,7 +278,7 @@ export default function Rutinas({ session }) {
     const ok = await confirm({ title: '¿Eliminar ejercicio?', message: 'Se eliminará de la biblioteca permanentemente.', danger: true, confirmText: 'Eliminar' })
     if (!ok) return
     await supabase.from('ejercicios_biblioteca').delete().eq('id', id)
-    setToast('Ejercicio eliminado'); await cargar()
+    setToast({ msg: 'Ejercicio eliminado', tipo: 'ok' }); await cargar()
   }
 
   const FormEjercicio = ({ onSave, onCancel, isEdit }) => (
@@ -789,7 +788,7 @@ export default function Rutinas({ session }) {
                   await supabase.from('rutinas').update({ borrador: contenido, contenido }).eq('id', detalle.id)
                   setDetalle(d => ({ ...d, borrador: contenido, contenido }))
                   setModoEdicion(false); setRutinaBorrador(null)
-                  setToast('✓ Rutina guardada')
+                  setToast({ msg: 'Rutina guardada', tipo: 'ok' })
                 }} className="w-full bg-emerald-500 text-white text-sm font-bold py-3 rounded-xl">
                   ✓ Guardar cambios
                 </button>
@@ -826,7 +825,7 @@ export default function Rutinas({ session }) {
                         if (!nueva) { setMostrarContextoIA(true); setDetalle(anterior); return }
                         setContextoIA('')
                         const { error } = await supabase.from('rutinas').delete().eq('id', anterior.id)
-                        if (error) setToast('⚠ Rutina nueva creada, pero no se pudo quitar la anterior: ' + error.message)
+                        if (error) setToast({ msg: 'Rutina nueva creada, pero no se pudo quitar la anterior: ' + error.message, tipo: 'error' })
                         await cargar()
                       }} disabled={generando===detalle.cliente_id}
                         className="w-full bg-[#6366f1] text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-40">
@@ -862,7 +861,7 @@ export default function Rutinas({ session }) {
                   const nueva = await generarRutina(anterior.cliente_id)
                   if (!nueva) { setDetalle(anterior); return }
                   const { error } = await supabase.from('rutinas').delete().eq('id', anterior.id)
-                  if (error) setToast('⚠ Rutina nueva creada, pero no se pudo quitar la anterior: ' + error.message)
+                  if (error) setToast({ msg: 'Rutina nueva creada, pero no se pudo quitar la anterior: ' + error.message, tipo: 'error' })
                   await cargar()
                 }} disabled={generando===detalle.cliente_id}
                   title="Regenerar rutina con IA"
@@ -873,7 +872,7 @@ export default function Rutinas({ session }) {
                   const ok = await confirm({ title: '¿Eliminar rutina?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
                   if (!ok) return
                   const { error } = await supabase.from('rutinas').delete().eq('id', detalle.id)
-                  if (error) { setToast('❌ No se pudo eliminar: ' + error.message); return }
+                  if (error) { setToast({ msg: 'No se pudo eliminar: ' + error.message, tipo: 'error' }); return }
                   setDetalle(null); await cargar()
                 }} title="Eliminar rutina" className="border border-black/10 text-[#6B6B6B] text-sm py-3 px-3 rounded-xl hover:bg-[#F5F5F0]">🗑</button>
               </div>
@@ -1041,6 +1040,7 @@ export default function Rutinas({ session }) {
 
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
       {ConfirmUI}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
       {/* Modal: nombre para plantilla (sustituye window.prompt) */}
       {modalNombrePlantilla && (
