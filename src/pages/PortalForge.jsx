@@ -585,7 +585,7 @@ export default function PortalForge() {
   // Secciones dentro del menú Más
   const MAS_ITEMS = [
     { id: 'mensajes', label: 'Mensajes',  icon: '✉️', badge: msgNoLeidos, desc: msgNoLeidos > 0 ? `${msgNoLeidos} sin leer` : 'Chat con tu entrenador' },
-    ...(pagos?.length ? [{ id: 'pagos', label: 'Pagos', icon: '💳', badge: 0, desc: `${pagos.filter(p=>!['cobrado','pagado'].includes(p.estado)).length > 0 ? 'Tienes pagos pendientes' : 'Historial al día'}` }] : []),
+    ...((pagos?.length || planCobro) ? [{ id: 'pagos', label: 'Pagos', icon: '💳', badge: 0, desc: pagos?.filter(p=>!['cobrado','pagado'].includes(p.estado)).length > 0 ? 'Tienes pagos pendientes' : planCobro?.estado === 'activo' ? 'Suscripción activa' : 'Historial al día' }] : []),
     { id: 'ajustes', label: 'Ajustes', icon: '⚙️', badge: 0, desc: 'Objetivo, peso, contraseña' },
   ].filter(i => VER_MENSAJES || i.id !== 'mensajes')
 
