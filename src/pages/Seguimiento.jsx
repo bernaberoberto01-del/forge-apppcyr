@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
+import { useConfirm } from '../components/ConfirmModal'
+import { ini } from '../lib/avatar'
 
 const ESCALAS = [
   { label: 'Energía', field: 'energia', min: 1, max: 5, suffix: '/5', color: 'blue' },
@@ -53,6 +55,15 @@ function renderTextoOLista(texto) {
   return <span className="whitespace-pre-line">{texto}</span>
 }
 
+function Toast({ msg, tipo='ok', onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  return (
+    <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[100] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
+      <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
+    </div>
+  )
+}
+
 export default function Seguimiento({ session }) {
   const [checkins, setCheckins] = useState([])
   const [clientes, setClientes] = useState([])
@@ -90,7 +101,8 @@ export default function Seguimiento({ session }) {
   const [detalleSesion, setDetalleSesion] = useState(null)
   const [busquedaSes, setBusquedaSes] = useState('')
   const [enviando, setEnviando] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState(null)
+  const { confirm: askConfirm, ConfirmUI } = useConfirm()
   const [editandoMensajeAnalisis, setEditandoMensajeAnalisis] = useState(null)
   const [borradorMensajeAnalisis, setBorradorMensajeAnalisis] = useState('')
   const [enviandoAnalisisId, setEnviandoAnalisisId] = useState(null)
@@ -262,15 +274,10 @@ export default function Seguimiento({ session }) {
     }
     return escalas[campo]?.[valor] || `${valor}`
   }
-  const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
-      {toast && (
-        <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
-          <span className="text-emerald-400">✓</span> {toast}
-        </div>
-      )}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
+      {ConfirmUI}
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Seguimiento</h1>
@@ -1110,11 +1117,10 @@ export default function Seguimiento({ session }) {
                                 setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
                                 setHistorialAnalisis(prev => [{ ...a, enviado_cliente: true, revisado: true, mensaje_cliente: texto, accion_tomada: 'mensaje_enviado' }, ...prev])
                                 setEditandoMensajeAnalisis(null)
-                                setToast('✓ Mensaje enviado al cliente')
+                                setToast({ msg: 'Mensaje enviado al cliente', tipo: 'ok' })
                               } else {
-                                setToast('Error al enviar el mensaje')
+                                setToast({ msg: 'Error al enviar el mensaje', tipo: 'error' })
                               }
-                              setTimeout(() => setToast(''), 3000)
                               setEnviandoAnalisisId(null)
                             } else {
                               // Ya hay mensaje_cliente listo: envío directo
@@ -1126,11 +1132,10 @@ export default function Seguimiento({ session }) {
                                 await supabase.from('analisis_mensual').update({ enviado_cliente: true, revisado: true, accion_tomada: 'mensaje_enviado' }).eq('id', a.id)
                                 setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
                                 setHistorialAnalisis(prev => [{ ...a, enviado_cliente: true, revisado: true, accion_tomada: 'mensaje_enviado' }, ...prev])
-                                setToast('✓ Mensaje enviado al cliente')
+                                setToast({ msg: 'Mensaje enviado al cliente', tipo: 'ok' })
                               } else {
-                                setToast('Error al enviar el mensaje')
+                                setToast({ msg: 'Error al enviar el mensaje', tipo: 'error' })
                               }
-                              setTimeout(() => setToast(''), 3000)
                               setEnviandoAnalisisId(null)
                             }
                           }}
@@ -1288,8 +1293,7 @@ export default function Seguimiento({ session }) {
                       await supabase.from('rutinas').update({ estado: 'archivada' })
                         .eq('cliente_id', b.cliente_id).eq('estado', 'publicada')
                       await supabase.from('rutinas').update({ estado: 'publicada' }).eq('id', b.id)
-                      setToast(`✓ Rutina de ${b.clientes?.nombre} publicada`)
-                      setTimeout(() => setToast(''), 3000)
+                      setToast({ msg: `Rutina de ${b.clientes?.nombre} publicada`, tipo: 'ok' })
                       cargar()
                       setPublicandoBorrador(null)
                     }} disabled={publicandoBorrador === b.id}
@@ -1298,7 +1302,8 @@ export default function Seguimiento({ session }) {
                       {publicandoBorrador === b.id ? 'Publicando...' : '▶ Publicar rutina'}
                     </button>
                     <button onClick={async () => {
-                      if (!confirm(`¿Descartar la rutina borrador de ${b.clientes?.nombre}?`)) return
+                      const ok = await askConfirm({ title: `¿Descartar borrador?`, message: `Se eliminará la rutina borrador de ${b.clientes?.nombre}.`, danger: true, confirmText: 'Descartar' })
+                      if (!ok) return
                       await supabase.from('rutinas').delete().eq('id', b.id)
                       cargar()
                     }} className="border border-red-100 text-red-400 text-sm px-3 py-2.5 rounded-xl hover:bg-red-50">
@@ -1318,7 +1323,6 @@ export default function Seguimiento({ session }) {
 
 // ─── Tarjeta cliente semana ────────────────────────────────────────────────────
 function TarjetaClienteSemana({ c, color, navigate, setQuickView }) {
-  const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
   const alDia = c.diasSinCI < 7
   const texto = alDia ? '✓ Esta semana' : c.diasSinCI === 999 ? 'Sin check-in nunca' : `${c.diasSinCI} días sin check-in`
 
