@@ -53,7 +53,7 @@ const CATEGORIAS_SUPLEMENTO = [
   ['rendimiento', 'Rendimiento'], ['recuperacion', 'Recuperación'], ['salud', 'Salud'], ['bienestar', 'Bienestar'],
 ]
 const normalizaCategoria = c => (c || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-const PRIORIDAD_COLOR = { alta: 'bg-emerald-50 text-emerald-600', media: 'bg-amber-50 text-amber-600', baja: 'bg-[#F4F3F0] text-[#9B9B9B]' }
+const PRIORIDAD_COLOR = { alta: 'text-emerald-400', media: 'text-amber-400', baja: 'text-[rgba(255,255,255,0.3)]' }
 const PLANES_INFO = [
   { id: 'nutricion', nombre: 'Nutrición', precio: 29, incluye: ['Plan de nutrición personalizado', 'Seguimiento de comidas', 'Ajustes periódicos'] },
   { id: 'entrenamiento', nombre: 'Entrenamiento', precio: 35, incluye: ['Rutina de entrenamiento personalizada', 'Seguimiento de cargas', 'Protocolos de recuperación ante lesiones'] },
@@ -63,8 +63,8 @@ const PLANES_INFO = [
 function BloqueoOverlay({ mensaje, boton, onClick, color }) {
   return (
     <div className="absolute inset-0 flex items-center justify-center z-10 p-6">
-      <div className="bg-white rounded-2xl p-5 max-w-xs text-center shadow-xl border border-black/5">
-        <p className="text-sm font-bold text-[#0A0A0A] mb-3 leading-relaxed">{mensaje}</p>
+      <div className="rounded-2xl p-5 max-w-xs text-center" style={{ background: '#1A1A18', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <p className="text-sm font-bold mb-3 leading-relaxed" style={{ color: 'rgba(255,255,255,0.85)' }}>{mensaje}</p>
         <button onClick={onClick} className="text-white text-xs font-black px-4 py-2.5 rounded-xl active:scale-95 transition-all" style={{ background: color }}>{boton}</button>
       </div>
     </div>
@@ -404,18 +404,18 @@ export default function PortalForge() {
   if (!sesion) return <LoginPortal />
 
   if (sinCuenta || !cliente) return (
-    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
-      <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
+    <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0F0F0D' }}>
+      <div className="rounded-3xl p-8 max-w-sm w-full text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
         <p className="text-5xl mb-4">🔗</p>
-        <p className="font-bold text-xl mb-2 text-[#0A0A0A]">Cuenta no vinculada</p>
-        <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">Este email no está asociado a ningún cliente. Contacta con tu entrenador.</p>
+        <p className="font-bold text-xl mb-2" style={{ color: '#FFFFFF' }}>Cuenta no vinculada</p>
+        <p className="text-sm mb-6 leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>Este email no está asociado a ningún cliente. Contacta con tu entrenador.</p>
         <button onClick={() => supabase.auth.signOut().then(() => window.location.reload())}
           className="w-full font-bold py-3.5 rounded-2xl text-white text-sm" style={{ background: color }}>Probar con otro email</button>
       </div>
     </div>
   )
 
-  if (!datos) return <div className="min-h-screen" style={{ background: '#F2F1EE' }} />
+  if (!datos) return <div className="min-h-screen" style={{ background: '#0F0F0D' }} />
 
   const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, biblioteca = {} } = datos
   const esOnline = cliente.tipo === 'online'
@@ -474,17 +474,17 @@ export default function PortalForge() {
 
   if (faltaAsignarPlan) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0F0F0D' }}>
         {modoPreview && (
           <div className="fixed top-0 inset-x-0 z-50 w-full px-4 py-2 text-center text-xs md:text-sm font-bold text-white"
             style={{ background: '#F59E0B', paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}>
             👁 Modo vista previa — estás viendo el portal de {cliente.nombre}
           </div>
         )}
-        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
+        <div className="rounded-3xl p-8 max-w-sm w-full text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <p className="text-5xl mb-4">📋</p>
-          <p className="font-bold text-xl mb-2 text-[#0A0A0A]">¡Ya casi está!</p>
-          <p className="text-sm text-[#6B6B6B] leading-relaxed">
+          <p className="font-bold text-xl mb-2" style={{ color: '#FFFFFF' }}>¡Ya casi está!</p>
+          <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
             Tu entrenador está preparando tu plan personalizado. En breve recibirás el enlace para activarlo.
           </p>
         </div>
@@ -495,21 +495,21 @@ export default function PortalForge() {
   if (faltaActivarPlan) {
     const planInfo = PLANES_INFO.find(p => p.id === cliente.plan_online)
     return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#F2F1EE' }}>
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0F0F0D' }}>
         {modoPreview && (
           <div className="fixed top-0 inset-x-0 z-50 w-full px-4 py-2 text-center text-xs md:text-sm font-bold text-white"
             style={{ background: '#F59E0B', paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))' }}>
             👁 Modo vista previa — estás viendo el portal de {cliente.nombre}
           </div>
         )}
-        <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center border border-black/5">
+        <div className="rounded-3xl p-8 max-w-sm w-full text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <p className="text-5xl mb-4">💳</p>
-          <p className="font-bold text-xl mb-2 text-[#0A0A0A]">Activa tu plan para acceder</p>
-          <p className="text-sm text-[#6B6B6B] mb-1 leading-relaxed">
-            Tu entrenador te ha preparado el plan <strong>{planInfo?.nombre || cliente.plan_online}</strong>
+          <p className="font-bold text-xl mb-2" style={{ color: '#FFFFFF' }}>Activa tu plan para acceder</p>
+          <p className="text-sm mb-1 leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
+            Tu entrenador te ha preparado el plan <strong style={{ color: '#FFFFFF' }}>{planInfo?.nombre || cliente.plan_online}</strong>
             {planInfo ? ` (${planInfo.precio}€/mes)` : ''}.
           </p>
-          <p className="text-sm text-[#6B6B6B] mb-6 leading-relaxed">
+          <p className="text-sm mb-6 leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>
             Activa tu suscripción para empezar a usar tu rutina, tu plan de nutrición y todo tu seguimiento.
           </p>
           <button onClick={async () => {
@@ -596,46 +596,46 @@ export default function PortalForge() {
         👁 Modo vista previa — estás viendo el portal de {cliente.nombre}
       </div>
     )}
-    <div className="min-h-screen flex" style={{ background: '#F4F3F0', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica Neue,sans-serif' }}>
+    <div className="min-h-screen flex" style={{ background: C.bg, fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica Neue,sans-serif' }}>
 
       {/* Sidebar desktop */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-black/6 fixed h-full z-20">
-        <div className="px-5 py-6 border-b border-black/5">
+      <aside className="hidden md:flex flex-col w-64 fixed h-full z-20" style={{ background: C.card, borderRight: `1px solid ${C.border}` }}>
+        <div className="px-5 py-6" style={{ borderBottom: `1px solid ${C.border}` }}>
           <div className="flex items-center gap-3 mb-5">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: color }}>
               <BrandMark size={18} />
             </div>
-            <div><p className="text-xs font-bold text-[#0A0A0A]">{BRAND.nombre}</p><p className="text-[10px] text-[#9B9B9B]">Tu portal</p></div>
+            <div><p className="text-xs font-bold" style={{ color: C.textPrimary }}>{BRAND.nombre}</p><p className="text-[10px]" style={{ color: C.textSecondary }}>Tu portal</p></div>
           </div>
           <div className="flex items-center gap-3">
             {config?.foto_url
               ? <img src={config.foto_url} alt="" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
-              : <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: `${color}15`, color }}>{(config?.nombre_entrenador || 'E').slice(0,2).toUpperCase()}</div>
+              : <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: `${color}20`, color }}>{(config?.nombre_entrenador || 'E').slice(0,2).toUpperCase()}</div>
             }
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#0A0A0A] truncate">{nombre}</p>
-              <p className="text-[10px] text-[#9B9B9B] truncate">con {config?.nombre_entrenador || 'tu entrenador'}</p>
+              <p className="text-sm font-semibold truncate" style={{ color: C.textPrimary }}>{nombre}</p>
+              <p className="text-[10px] truncate" style={{ color: C.textSecondary }}>con {config?.nombre_entrenador || 'tu entrenador'}</p>
             </div>
           </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'text-white' : 'text-[#6B6B6B] hover:bg-[#F2F1EE] hover:text-[#0A0A0A]'}`}
-              style={tab === t.id ? { background: color } : {}}>
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+              style={tab === t.id ? { background: color, color: '#fff' } : { color: C.textSecondary }}>
               <span>{t.icon}</span><span>{t.label}</span>
               {t.badge > 0 && <span className="ml-auto w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: tab === t.id ? 'rgba(255,255,255,0.3)' : color, color: 'white' }}>{t.badge}</span>}
             </button>
           ))}
         </nav>
         {semanasActivas > 0 && (
-          <div className="px-5 py-4 border-t border-black/5 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15` }}><span>🔥</span></div>
-            <div><p className="text-xs font-bold text-[#0A0A0A]">{semanasActivas} sem. seguidas</p><p className="text-[10px] text-[#9B9B9B]">Racha activa</p></div>
+          <div className="px-5 py-4 flex items-center gap-3" style={{ borderTop: `1px solid ${C.border}` }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}20` }}><span>🔥</span></div>
+            <div><p className="text-xs font-bold" style={{ color: C.textPrimary }}>{semanasActivas} sem. seguidas</p><p className="text-[10px]" style={{ color: C.textSecondary }}>Racha activa</p></div>
           </div>
         )}
         <div className="px-3 pb-4">
-          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[#9B9B9B] hover:bg-[#F2F1EE] transition-all">
+          <button onClick={() => supabase.auth.signOut()} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all" style={{ color: C.textMuted }}>
             <span>↩</span><span>Cerrar sesión</span>
           </button>
         </div>
@@ -776,36 +776,37 @@ export default function PortalForge() {
         {/* Modal valorar */}
         {valorando && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setValorando(null)}>
-            <div className="bg-white rounded-3xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <div className="rounded-3xl w-full max-w-md p-6" style={{ background: C.card, border: `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-1">
-                <p className="font-bold text-[#0A0A0A] text-lg">¿Cómo fue la sesión?</p>
-                <button onClick={() => setValorando(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl">×</button>
+                <p className="font-bold text-lg" style={{ color: C.textPrimary }}>¿Cómo fue la sesión?</p>
+                <button onClick={() => setValorando(null)} className="w-8 h-8 flex items-center justify-center rounded-full text-xl" style={{ background: C.bg, color: C.textSecondary }}>×</button>
               </div>
-              <p className="text-sm text-[#9B9B9B] mb-5">{new Date(valorando.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</p>
+              <p className="text-sm mb-5" style={{ color: C.textSecondary }}>{new Date(valorando.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</p>
               {[
                 { label: '💪 Esfuerzo percibido (RPE)', val: rpe, set: setRpe, max: 10, lo: 'Suave', hi: 'Máximo' },
                 { label: '🏋️ Fatiga muscular', val: fatigaVal, set: setFatigaVal, max: 5, lo: 'Ninguna', hi: 'Muy alta' },
               ].map(({ label, val, set, max, lo, hi }) => (
                 <div key={label} className="mb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
+                    <p className="text-sm font-bold" style={{ color: C.textPrimary }}>{label}</p>
                     {val && <span className="text-sm font-bold" style={{ color }}>{val}/{max}</span>}
                   </div>
                   <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${max},1fr)` }}>
                     {Array.from({length:max},(_,i)=>i+1).map(v => (
                       <button key={v} onClick={() => set(v)}
-                        className={`py-3 rounded-xl text-sm font-bold transition-all ${val===v?'text-white':'border border-black/10 text-[#9B9B9B]'}`}
-                        style={val===v?{background:v>=(max*.7)?'#ef4444':v>=(max*.4)?'#f59e0b':color}:{}}>{v}</button>
+                        className="py-3 rounded-xl text-sm font-bold transition-all"
+                        style={val===v ? { background: v>=(max*.7)?'#ef4444':v>=(max*.4)?'#f59e0b':color, color: '#fff' } : { border: `1px solid ${C.border}`, color: C.textSecondary }}>{v}</button>
                     ))}
                   </div>
-                  <div className="flex justify-between mt-1.5"><span className="text-[10px] text-[#C0C0C0]">{lo}</span><span className="text-[10px] text-[#C0C0C0]">{hi}</span></div>
+                  <div className="flex justify-between mt-1.5"><span className="text-[10px]" style={{ color: C.textMuted }}>{lo}</span><span className="text-[10px]" style={{ color: C.textMuted }}>{hi}</span></div>
                 </div>
               ))}
               <div className="mb-4">
-                <p className="text-sm font-bold text-[#0A0A0A] mb-2">📝 Nota (opcional)</p>
+                <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>📝 Nota (opcional)</p>
                 <textarea value={notaValoracion} onChange={e => setNotaValoracion(e.target.value)} rows={2}
                   placeholder="Algo que quieras contarle a tu entrenador..."
-                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none" />
+                  className="w-full rounded-xl px-3 py-2.5 text-sm focus:outline-none resize-none"
+                  style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textPrimary }} />
               </div>
               <button onClick={guardarValoracion} disabled={!rpe||!fatigaVal||guardandoVal}
                 className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
@@ -933,14 +934,14 @@ function OnboardingNuevoCliente({ cliente, color, config, pasoCuestionarioDone, 
         </div>
 
         {/* Paso 1 — Cuestionario */}
-        <div className="bg-white rounded-2xl p-5 border border-black/5">
+        <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="flex items-start justify-between gap-3 mb-2">
-            <p className="font-black text-[#0A0A0A] text-base leading-tight">1. Cuéntame cómo eres</p>
+            <p className="font-black text-base leading-tight" style={{ color: '#FFFFFF' }}>1. Cuéntame cómo eres</p>
             {pasoCuestionarioDone
-              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
-              : <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange-50 flex-shrink-0" style={{ color }}>Pendiente</span>}
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399' }}>✓ Listo</span>
+              : <span className="text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: `${color}20`, color }}> Pendiente</span>}
           </div>
-          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+          <p className="text-sm leading-relaxed mb-4" style={{ color: 'rgba(255,255,255,0.45)' }}>
             Necesito conocer tu alimentación, rutinas y objetivos para preparar tu plan personalizado
           </p>
           {!pasoCuestionarioDone && (
@@ -953,14 +954,14 @@ function OnboardingNuevoCliente({ cliente, color, config, pasoCuestionarioDone, 
         </div>
 
         {/* Paso 2 — Check-in */}
-        <div className="bg-white rounded-2xl p-5 border border-black/5">
+        <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="flex items-start justify-between gap-3 mb-2">
-            <p className="font-black text-[#0A0A0A] text-base leading-tight">2. Tu primer check-in</p>
+            <p className="font-black text-base leading-tight" style={{ color: '#FFFFFF' }}>2. Tu primer check-in</p>
             {pasoCheckinDone
-              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
-              : <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-orange-50 flex-shrink-0" style={{ color }}>Pendiente</span>}
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399' }}>✓ Listo</span>
+              : <span className="text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: `${color}20`, color }}>Pendiente</span>}
           </div>
-          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+          <p className="text-sm leading-relaxed mb-4" style={{ color: 'rgba(255,255,255,0.45)' }}>
             Cuéntame cómo estás hoy — energía, sueño, estrés. Es el punto de partida de todo
           </p>
           {!pasoCheckinDone && (
@@ -973,14 +974,14 @@ function OnboardingNuevoCliente({ cliente, color, config, pasoCuestionarioDone, 
         </div>
 
         {/* Paso 3 — Plan (informativo) */}
-        <div className="bg-white rounded-2xl p-5 border border-black/5">
+        <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="flex items-start justify-between gap-3 mb-2">
-            <p className="font-black text-[#0A0A0A] text-base leading-tight">3. Tu plan {pasoRutinaDone ? 'está listo' : 'está en camino'}</p>
+            <p className="font-black text-base leading-tight" style={{ color: '#FFFFFF' }}>3. Tu plan {pasoRutinaDone ? 'está listo' : 'está en camino'}</p>
             {pasoRutinaDone
-              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">✓ Listo</span>
+              ? <span className="text-[10px] font-black px-2.5 py-1 rounded-full flex-shrink-0" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399' }}>✓ Listo</span>
               : <span className="text-xl flex-shrink-0">⏳</span>}
           </div>
-          <p className="text-sm text-[#6B6B6B] leading-relaxed mb-4">
+          <p className="text-sm leading-relaxed mb-4" style={{ color: 'rgba(255,255,255,0.45)' }}>
             {pasoRutinaDone
               ? 'Tu entrenador ya ha preparado tu rutina personalizada.'
               : `En cuanto completes los pasos anteriores, ${nombreEntrenador} preparará tu plan personalizado. Te avisaremos cuando esté listo.`}
@@ -1185,8 +1186,8 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             <p className="text-sm mt-2" style={{ color: 'rgba(255,255,255,0.6)' }}>En breve tendrás tu rutina, plan de nutrición y progreso.</p>
             {verNutricion && !cuest && (
               <a href={`${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
-                className="mt-4 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white font-black text-sm active:scale-95 transition-all"
-                style={{ color }}>
+                className="mt-4 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm active:scale-95 transition-all"
+                style={{ background: 'rgba(255,255,255,0.08)', color }}>
                 🥗 Rellenar cuestionario →
               </a>
             )}
@@ -3197,13 +3198,13 @@ function SubFuerza({ ejerciciosHist, color }) {
 function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, editando, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
+      <div className="rounded-3xl w-full max-w-md max-h-[92vh] overflow-y-auto" style={{ background: '#1A1A18', border: `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 px-6 pt-6 pb-4 flex items-center justify-between" style={{ background: '#1A1A18', borderBottom: `1px solid ${C.border}` }}>
           <div>
-            <p className="font-bold text-[#0A0A0A] text-lg">{editando ? 'Editar check-in' : 'Check-in semanal'}</p>
-            <p className="text-xs text-[#9B9B9B] mt-0.5">{editando ? 'Corrige los datos que hayas enviado' : 'Cuéntame cómo ha ido la semana'}</p>
+            <p className="font-bold text-lg" style={{ color: C.textPrimary }}>{editando ? 'Editar check-in' : 'Check-in semanal'}</p>
+            <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>{editando ? 'Corrige los datos que hayas enviado' : 'Cuéntame cómo ha ido la semana'}</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F7F6F3] text-[#6B6B6B] text-xl font-light">×</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-xl font-light" style={{ background: C.bg, color: C.textSecondary }}>×</button>
         </div>
         <div className="px-6 py-5 space-y-6">
 
@@ -3217,7 +3218,7 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
             <div key={k}>
               <div className="flex items-center gap-2 mb-3">
                 <span>{icon}</span>
-                <p className="text-sm font-bold text-[#0A0A0A]">{label}</p>
+                <p className="text-sm font-bold" style={{ color: C.textPrimary }}>{label}</p>
               </div>
               <div className="grid grid-cols-5 gap-1.5">
                 {[1,2,3,4,5].map(v => {
@@ -3227,10 +3228,10 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
                     : (v <= 2 ? '#10b981' : v === 3 ? '#f59e0b' : '#ef4444')
                   return (
                     <button key={v} onClick={() => setCiForm(f => ({ ...f, [k]: v }))}
-                      className={`flex flex-col items-center gap-1 py-4 rounded-xl transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
-                      style={sel ? { background: bg } : {}}>
+                      className="flex flex-col items-center gap-1 py-4 rounded-xl transition-all active:scale-95"
+                      style={sel ? { background: bg, color: '#fff' } : { border: `1px solid ${C.border}`, color: C.textSecondary }}>
                       <span className="text-base font-bold">{v}</span>
-                      <span className={`text-[9px] leading-tight text-center ${sel ? 'text-white/90' : 'text-[#9B9B9B]'}`}>{opciones[v - 1]}</span>
+                      <span className="text-[9px] leading-tight text-center" style={{ color: sel ? 'rgba(255,255,255,0.8)' : C.textMuted }}>{opciones[v - 1]}</span>
                     </button>
                   )
                 })}
@@ -3242,7 +3243,7 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span>🔥</span>
-              <p className="text-sm font-bold text-[#0A0A0A]">Motivación</p>
+              <p className="text-sm font-bold" style={{ color: C.textPrimary }}>Motivación</p>
             </div>
             <div className="grid grid-cols-7 gap-1">
               {[1,2,3,4,5,6,7].map(v => {
@@ -3251,27 +3252,27 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
                 const bg = v <= 2 ? '#ef4444' : v <= 4 ? '#f59e0b' : color
                 return (
                   <button key={v} onClick={() => setCiForm(f => ({ ...f, motivacion: v }))}
-                    className={`flex flex-col items-center gap-1 py-3 rounded-xl transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
-                    style={sel ? { background: bg } : {}}>
+                    className="flex flex-col items-center gap-1 py-3 rounded-xl transition-all active:scale-95"
+                    style={sel ? { background: bg, color: '#fff' } : { border: `1px solid ${C.border}`, color: C.textSecondary }}>
                     <span className="text-sm">{motivLabels[v - 1]}</span>
                     <span className="text-xs font-bold">{v}</span>
                   </button>
                 )
               })}
             </div>
-            <p className="text-[10px] text-[#C0C0C0] mt-1.5 text-center">1 = sin ganas · 7 = imparable</p>
+            <p className="text-[10px] mt-1.5 text-center" style={{ color: C.textDisabled }}>1 = sin ganas · 7 = imparable</p>
           </div>
 
           {/* — Sesiones completadas — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">🏃 Sesiones completadas <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>🏃 Sesiones completadas <span className="font-normal text-xs" style={{ color: C.textSecondary }}>(opcional)</span></p>
             <div className="grid grid-cols-6 gap-1.5">
               {[0,1,2,3,4,5].map(v => {
                 const sel = ciForm.sesiones === v
                 return (
                   <button key={v} onClick={() => setCiForm(f => ({ ...f, sesiones: v }))}
-                    className={`py-4 rounded-xl text-base font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
-                    style={sel ? { background: color } : {}}>
+                    className="py-4 rounded-xl text-base font-bold transition-all active:scale-95"
+                    style={sel ? { background: color, color: '#fff' } : { border: `1px solid ${C.border}`, color: C.textSecondary }}>
                     {v === 5 ? '5+' : v}
                   </button>
                 )
@@ -3281,14 +3282,14 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
 
           {/* — Sensación de cargas — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">💪 Sensación con las cargas <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>💪 Sensación con las cargas <span className="font-normal text-xs" style={{ color: C.textSecondary }}>(opcional)</span></p>
             <div className="grid grid-cols-2 gap-2">
               {[['muy_facil','😴 Muy fácil'],['bien','💪 En mi punto'],['duro','😤 Exigente'],['muy_duro','🔥 Al límite']].map(([v,l]) => {
                 const sel = ciForm.cargas === v
                 return (
                   <button key={v} onClick={() => setCiForm(f => ({ ...f, cargas: v }))}
-                    className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${sel ? 'text-white' : 'border border-black/10 text-[#9B9B9B] hover:border-black/20'}`}
-                    style={sel ? { background: color } : {}}>
+                    className="py-3 rounded-xl text-sm font-bold transition-all active:scale-95"
+                    style={sel ? { background: color, color: '#fff' } : { border: `1px solid ${C.border}`, color: C.textSecondary }}>
                     {l}
                   </button>
                 )
@@ -3298,40 +3299,44 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
 
           {/* — Pasos diarios (media) — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">👟 Pasos diarios (media) <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>👟 Pasos diarios (media) <span className="font-normal text-xs" style={{ color: C.textSecondary }}>(opcional)</span></p>
             <div className="flex items-center gap-2">
               <input type="number" step="100" min="0" placeholder="8000" value={ciForm.pasos}
                 onChange={e => setCiForm(f => ({ ...f, pasos: e.target.value }))}
-                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black/20" />
-              <span className="text-sm text-[#9B9B9B] font-medium">pasos/día</span>
+                className="flex-1 rounded-xl px-4 py-3 text-sm focus:outline-none"
+                style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textPrimary }} />
+              <span className="text-sm font-medium" style={{ color: C.textSecondary }}>pasos/día</span>
             </div>
           </div>
 
           {/* — Peso — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">⚖️ Peso <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>⚖️ Peso <span className="font-normal text-xs" style={{ color: C.textSecondary }}>(opcional)</span></p>
             <div className="flex items-center gap-2">
               <input type="number" step="0.1" placeholder="75.0" value={ciForm.peso}
                 onChange={e => setCiForm(f => ({ ...f, peso: e.target.value }))}
-                className="flex-1 border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black/20" />
-              <span className="text-sm text-[#9B9B9B] font-medium">kg</span>
+                className="flex-1 rounded-xl px-4 py-3 text-sm focus:outline-none"
+                style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textPrimary }} />
+              <span className="text-sm font-medium" style={{ color: C.textSecondary }}>kg</span>
             </div>
           </div>
 
           {/* — Logro de la semana — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">🏆 Tu mayor logro esta semana <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>🏆 Tu mayor logro esta semana <span className="font-normal text-xs" style={{ color: C.textSecondary }}>(opcional)</span></p>
             <input type="text" maxLength={120} placeholder="Ej: completé las 4 sesiones, subí peso en press banca…" value={ciForm.logro}
               onChange={e => setCiForm(f => ({ ...f, logro: e.target.value }))}
-              className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black/20" />
+              className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
+              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textPrimary }} />
           </div>
 
           {/* — Nota libre — */}
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">💬 ¿Algo más que contarle a tu entrenador? <span className="text-[#9B9B9B] font-normal text-xs">(opcional)</span></p>
+            <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>💬 ¿Algo más que contarle a tu entrenador? <span className="font-normal text-xs" style={{ color: C.textSecondary }}>(opcional)</span></p>
             <textarea rows={2} placeholder="Lesión, viaje, cambio en la dieta, lo que sea..." value={ciForm.nota}
               onChange={e => setCiForm(f => ({ ...f, nota: e.target.value }))}
-              className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none resize-none" />
+              className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none resize-none"
+              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textPrimary }} />
           </div>
 
           <button onClick={enviarCheckin}
@@ -3350,56 +3355,58 @@ function ModalCheckin({ color, ciForm, setCiForm, enviandoCI, enviarCheckin, edi
 function ModalActividad({ color, actForm, setActForm, guardandoAct, guardarActividad, onClose, ACTIVIDADES }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-black/5 flex items-center justify-between">
-          <div><p className="font-bold text-[#0A0A0A] text-lg">Registrar actividad</p><p className="text-xs text-[#9B9B9B] mt-0.5">Tu entrenador lo verá en tu historial</p></div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl">×</button>
+      <div className="rounded-3xl w-full max-w-md max-h-[90vh] overflow-y-auto" style={{ background: '#1A1A18', border: `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 px-6 pt-6 pb-4 flex items-center justify-between" style={{ background: '#1A1A18', borderBottom: `1px solid ${C.border}` }}>
+          <div><p className="font-bold text-lg" style={{ color: C.textPrimary }}>Registrar actividad</p><p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>Tu entrenador lo verá en tu historial</p></div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-xl" style={{ background: C.bg, color: C.textSecondary }}>×</button>
         </div>
         <div className="px-6 py-5 space-y-5">
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-3">¿Qué has hecho?</p>
+            <p className="text-sm font-bold mb-3" style={{ color: C.textPrimary }}>¿Qué has hecho?</p>
             <div className="grid grid-cols-2 gap-2">
               {ACTIVIDADES.map(a => (
                 <button key={a.id} onClick={() => setActForm(f => ({ ...f, tipo: a.id }))}
-                  className={`py-2.5 px-3 rounded-xl text-xs font-medium text-left border transition-all active:scale-95 ${actForm.tipo === a.id ? 'text-white border-transparent' : 'border-black/10 text-[#6B6B6B]'}`}
-                  style={actForm.tipo === a.id ? { background: color } : {}}>{a.label}</button>
+                  className="py-2.5 px-3 rounded-xl text-xs font-medium text-left transition-all active:scale-95"
+                  style={actForm.tipo === a.id ? { background: color, color: '#fff' } : { border: `1px solid ${C.border}`, color: C.textSecondary }}>{a.label}</button>
               ))}
             </div>
           </div>
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">⏱ Duración</p>
+            <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>⏱ Duración</p>
             <div className="grid grid-cols-4 gap-2">
               {[30, 45, 60, 90].map(min => (
                 <button key={min} onClick={() => setActForm(f => ({ ...f, duracion: String(min) }))}
-                  className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${actForm.duracion === String(min) ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'}`}
-                  style={actForm.duracion === String(min) ? { background: color } : {}}>{min}'</button>
+                  className="py-3 rounded-xl text-sm font-bold transition-all active:scale-95"
+                  style={actForm.duracion === String(min) ? { background: color, color: '#fff' } : { border: `1px solid ${C.border}`, color: C.textSecondary }}>{min}'</button>
               ))}
             </div>
             <div className="flex items-center gap-2 mt-2">
               <input type="number" placeholder="Otro (min)" value={[30,45,60,90].includes(+actForm.duracion) ? '' : actForm.duracion}
                 onChange={e => setActForm(f => ({ ...f, duracion: e.target.value }))}
-                className="flex-1 border border-black/10 rounded-xl px-4 py-2.5 text-sm focus:outline-none" />
-              <span className="text-sm text-[#9B9B9B]">min</span>
+                className="flex-1 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
+                style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textPrimary }} />
+              <span className="text-sm" style={{ color: C.textSecondary }}>min</span>
             </div>
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-bold text-[#0A0A0A]">💓 Intensidad</p>
+              <p className="text-sm font-bold" style={{ color: C.textPrimary }}>💓 Intensidad</p>
               {actForm.rpe && <span className="text-sm font-bold" style={{ color }}>{actForm.rpe}/10</span>}
             </div>
             <div className="grid grid-cols-5 gap-1.5">
               {[[2,'Suave'],[4,'Fácil'],[6,'Moderado'],[8,'Duro'],[10,'Máximo']].map(([v,l]) => (
                 <button key={v} onClick={() => setActForm(f => ({ ...f, rpe: v }))}
-                  className={`py-3 rounded-xl text-[10px] font-bold transition-all active:scale-95 ${actForm.rpe === v ? 'text-white' : 'border border-black/10 text-[#6B6B6B]'}`}
-                  style={actForm.rpe === v ? { background: v>=8?'#ef4444':v>=6?'#f59e0b':color } : {}}>{l}</button>
+                  className="py-3 rounded-xl text-[10px] font-bold transition-all active:scale-95"
+                  style={actForm.rpe === v ? { background: v>=8?'#ef4444':v>=6?'#f59e0b':color, color: '#fff' } : { border: `1px solid ${C.border}`, color: C.textSecondary }}>{l}</button>
               ))}
             </div>
           </div>
           <div>
-            <p className="text-sm font-bold text-[#0A0A0A] mb-2">📝 Nota <span className="text-xs text-[#9B9B9B] font-normal">(opcional)</span></p>
+            <p className="text-sm font-bold mb-2" style={{ color: C.textPrimary }}>📝 Nota <span className="text-xs font-normal" style={{ color: C.textSecondary }}>(opcional)</span></p>
             <input type="text" placeholder="Ej: 5km en el parque…" value={actForm.nota}
               onChange={e => setActForm(f => ({ ...f, nota: e.target.value }))}
-              className="w-full border border-black/10 rounded-xl px-4 py-3 text-sm focus:outline-none" />
+              className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none"
+              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.textPrimary }} />
           </div>
           <button onClick={guardarActividad} disabled={!actForm.tipo || !actForm.duracion || guardandoAct}
             className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
@@ -3555,21 +3562,21 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-3xl w-full max-w-md max-h-[95vh] flex flex-col" onClick={e => e.stopPropagation()}>
-        <div className="px-5 pt-5 pb-4 border-b border-black/5 flex items-start justify-between flex-shrink-0">
+      <div className="rounded-3xl w-full max-w-md max-h-[95vh] flex flex-col" style={{ background: '#1A1A18', border: '1px solid rgba(255,255,255,0.07)' }} onClick={e => e.stopPropagation()}>
+        <div className="px-5 pt-5 pb-4 flex items-start justify-between flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="flex-1 min-w-0 mr-3">
-            <p className="font-bold text-[#0A0A0A] text-lg">{dia.nombre}</p>
-            <p className="text-xs text-[#9B9B9B] mt-1">{ejercicios.length} ejercicios</p>
+            <p className="font-bold text-lg" style={{ color: '#FFFFFF' }}>{dia.nombre}</p>
+            <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.45)' }}>{ejercicios.length} ejercicios</p>
             {totalSets > 0 && (
               <div className="flex items-center gap-2 mt-2">
-                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: '#F2F1EE' }}>
+                <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
                   <div className="h-full rounded-full" style={{ width: `${(totalComp/totalSets*100).toFixed(0)}%`, background: color }} />
                 </div>
-                <span className="text-[10px] font-bold text-[#9B9B9B]">{totalComp}/{totalSets}</span>
+                <span className="text-[10px] font-bold" style={{ color: 'rgba(255,255,255,0.45)' }}>{totalComp}/{totalSets}</span>
               </div>
             )}
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-[#F2F1EE] text-xl flex-shrink-0">×</button>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-xl flex-shrink-0" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}>×</button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -3578,12 +3585,14 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
             <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center"
               style={{ background: 'rgba(0,0,0,0.8)' }}
               onClick={() => setVideoEjModal(null)}>
-              <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl overflow-hidden"
+              <div className="w-full md:max-w-lg rounded-t-3xl md:rounded-2xl overflow-hidden"
+                style={{ background: '#1A1A18' }}
                 onClick={e => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                  <p className="font-bold text-[#0A0A0A] text-base leading-tight pr-4">{videoEjModal.nombre}</p>
+                  <p className="font-bold text-base leading-tight pr-4" style={{ color: '#FFFFFF' }}>{videoEjModal.nombre}</p>
                   <button onClick={() => setVideoEjModal(null)}
-                    className="w-8 h-8 rounded-full bg-[#F2F1EE] flex items-center justify-center text-[#9B9B9B] text-lg flex-shrink-0 active:scale-95">✕</button>
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-lg flex-shrink-0 active:scale-95"
+                    style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)' }}>✕</button>
                 </div>
                 <div className="aspect-video w-full bg-black">
                   <iframe
@@ -3595,9 +3604,9 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
                   />
                 </div>
                 {videoEjModal.consejos_tecnica && (
-                  <div className="px-5 py-4 border-t border-black/5">
-                    <p className="text-xs font-semibold text-[#0A0A0A] mb-1.5">💡 Técnica</p>
-                    <p className="text-xs text-[#6B6B6B] leading-relaxed">{videoEjModal.consejos_tecnica}</p>
+                  <div className="px-5 py-4" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-xs font-semibold mb-1.5" style={{ color: '#FFFFFF' }}>💡 Técnica</p>
+                    <p className="text-xs leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>{videoEjModal.consejos_tecnica}</p>
                   </div>
                 )}
                 <div className="pb-5" />
@@ -3614,9 +3623,9 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
             const tieneVideo = !!ytEmbed(bibEntry?.youtube_url) // enlace válido, si no no hay botón ▶
 
             return (
-              <div key={ei} className="border-b border-black/4 last:border-0 px-5 py-4">
+              <div key={ei} className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                 <div className="flex items-center gap-2 mb-2">
-                  <p className="text-sm font-bold text-[#0A0A0A] flex-1">{ej.nombre}</p>
+                  <p className="text-sm font-bold flex-1" style={{ color: '#FFFFFF' }}>{ej.nombre}</p>
                   {tieneVideo && (
                     <button onClick={() => setVideoEjModal(bibEntry)}
                       className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-all"
@@ -3624,37 +3633,37 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
                       <span className="text-[10px]" style={{ color }}>▶</span>
                     </button>
                   )}
-                  {setsEj && compEj === n && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">✓</span>}
+                  {setsEj && compEj === n && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(16,185,129,0.15)', color: '#34d399' }}>✓</span>}
                 </div>
                 <div className="flex items-center gap-3 mb-3">
-                  <p className="text-xs text-[#9B9B9B]">{ej.series} × {ej.reps}{ej.peso ? ` · ${ej.peso}` : ''}</p>
+                  <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>{ej.series} × {ej.reps}{ej.peso ? ` · ${ej.peso}` : ''}</p>
                   {hist && <p className="text-xs font-bold ml-auto" style={{ color }}>Última vez: {hist.maxPeso} kg</p>}
                 </div>
                 {!setsEj
-                  ? <button onClick={() => iniciarEj(ei)} className="w-full py-2 rounded-xl text-xs font-bold border border-black/10 text-[#6B6B6B] active:scale-95">+ Registrar sets</button>
+                  ? <button onClick={() => iniciarEj(ei)} className="w-full py-2 rounded-xl text-xs font-bold active:scale-95" style={{ border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.45)' }}>+ Registrar sets</button>
                   : (
                     <div className="space-y-2">
                       <div className="grid grid-cols-[1fr,72px,72px,36px] gap-2 px-0.5">
-                        <p className="text-[10px] text-[#9B9B9B]">Serie</p>
-                        <p className="text-[10px] text-[#9B9B9B] text-center">kg</p>
-                        <p className="text-[10px] text-[#9B9B9B] text-center">Reps</p>
-                        <p className="text-[10px] text-[#9B9B9B] text-center">✓</p>
+                        <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>Serie</p>
+                        <p className="text-[10px] text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>kg</p>
+                        <p className="text-[10px] text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>Reps</p>
+                        <p className="text-[10px] text-center" style={{ color: 'rgba(255,255,255,0.3)' }}>✓</p>
                       </div>
                       {setsEj.map((s, si) => (
                         <div key={si} className="grid grid-cols-[1fr,72px,72px,36px] gap-2 items-center py-0.5 rounded-xl px-0.5"
-                          style={s.completada ? { background: `${color}08` } : {}}>
-                          <p className="text-xs font-bold" style={{ color: s.completada ? color : '#9B9B9B' }}>S{si+1}</p>
+                          style={s.completada ? { background: `${color}12` } : {}}>
+                          <p className="text-xs font-bold" style={{ color: s.completada ? color : 'rgba(255,255,255,0.3)' }}>S{si+1}</p>
                           <input type="number" step="0.5" value={s.peso} placeholder="—"
                             onChange={e => updSet(ei, si, 'peso', e.target.value)}
-                            className="w-full border border-black/10 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none font-bold"
-                            style={s.completada ? { borderColor: `${color}40` } : {}} />
+                            className="w-full rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none font-bold"
+                            style={s.completada ? { background: 'rgba(255,255,255,0.06)', border: `1px solid ${color}40`, color: '#FFFFFF' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFFFFF' }} />
                           <input type="number" value={s.reps} placeholder="—"
                             onChange={e => updSet(ei, si, 'reps', e.target.value)}
-                            className="w-full border border-black/10 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none font-bold"
-                            style={s.completada ? { borderColor: `${color}40` } : {}} />
+                            className="w-full rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none font-bold"
+                            style={s.completada ? { background: 'rgba(255,255,255,0.06)', border: `1px solid ${color}40`, color: '#FFFFFF' } : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#FFFFFF' }} />
                           <button onClick={() => toggleSet(ei, si)}
                             className="w-9 h-9 rounded-xl flex items-center justify-center text-sm border transition-all"
-                            style={s.completada ? { background: color, borderColor: color, color: 'white' } : { background: 'white', borderColor: '#E0E0E0', color: '#C0C0C0' }}>✓</button>
+                            style={s.completada ? { background: color, borderColor: color, color: 'white' } : { background: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.2)' }}>✓</button>
                         </div>
                       ))}
                     </div>
@@ -3665,7 +3674,7 @@ function ModalRegistroSesion({ dia, color, registroSets, setRegistroSets, ejerci
           })}
         </div>
 
-        <div className="px-5 py-4 border-t border-black/5 flex-shrink-0">
+        <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <button onClick={guardarRegistroSesion} disabled={guardandoRegistro || Object.keys(registroSets).length === 0}
             className="w-full py-4 rounded-2xl text-white font-bold text-sm disabled:opacity-40 active:scale-95"
             style={{ background: color }}>
