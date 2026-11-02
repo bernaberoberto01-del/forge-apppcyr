@@ -1533,11 +1533,25 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
   const [diaAbierto, setDiaAbierto] = useState(null) // null = todos cerrados
   const [videoEj, setVideoEj] = useState(null) // { nombre, youtube_url, consejos_tecnica }
 
+  const C = {
+    bg: '#0F0F0D',
+    card: 'rgba(255,255,255,0.04)',
+    border: 'rgba(255,255,255,0.07)',
+    borderSubtle: 'rgba(255,255,255,0.04)',
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(255,255,255,0.45)',
+    textMuted: 'rgba(255,255,255,0.2)',
+    textDisabled: 'rgba(255,255,255,0.12)',
+  }
+
   if (!rutina) return (
-    <div className="text-center py-16">
+    <div className="rounded-3xl overflow-hidden py-16 text-center"
+      style={{ background: C.bg, border: `1px solid ${C.border}` }}>
       <div className="text-5xl mb-4">💪</div>
-      <p className="text-lg font-bold text-[#0A0A0A]">Rutina en preparación</p>
-      <p className="text-sm text-[#9B9B9B] mt-2 leading-relaxed max-w-xs mx-auto">Tu entrenador está diseñando tu plan personalizado.</p>
+      <p className="text-lg font-black text-white">Rutina en preparación</p>
+      <p className="text-sm mt-2 leading-relaxed max-w-xs mx-auto px-6" style={{ color: C.textSecondary }}>
+        Tu entrenador está diseñando tu plan personalizado.
+      </p>
     </div>
   )
 
@@ -1556,18 +1570,20 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
   }
 
   return (
-    <div className="space-y-3">
-      {/* Modal vídeo ejercicio */}
+    <div className="space-y-2.5 pb-2">
+      {/* Modal vídeo ejercicio — fondo oscuro, panel Carbono */}
       {videoEj && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-          style={{ background: 'rgba(0,0,0,0.7)' }}
+          style={{ background: 'rgba(0,0,0,0.85)' }}
           onClick={() => setVideoEj(null)}>
-          <div className="bg-white w-full md:max-w-lg rounded-t-3xl md:rounded-2xl overflow-hidden"
+          <div className="w-full md:max-w-lg rounded-t-3xl md:rounded-3xl overflow-hidden"
+            style={{ background: '#1A1A17', border: `1px solid ${C.border}` }}
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-5 pb-3">
-              <p className="font-bold text-[#0A0A0A] text-base leading-tight pr-4">{videoEj.nombre}</p>
+              <p className="font-black text-white text-base leading-tight pr-4">{videoEj.nombre}</p>
               <button onClick={() => setVideoEj(null)}
-                className="w-8 h-8 rounded-full bg-[#F2F1EE] flex items-center justify-center text-[#9B9B9B] text-lg flex-shrink-0 active:scale-95">✕</button>
+                className="w-8 h-8 rounded-full flex items-center justify-center text-lg flex-shrink-0 active:scale-95"
+                style={{ background: C.card, border: `1px solid ${C.border}`, color: C.textSecondary }}>✕</button>
             </div>
             <div className="aspect-video w-full bg-black">
               <iframe
@@ -1579,9 +1595,9 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
               />
             </div>
             {videoEj.consejos_tecnica && (
-              <div className="px-5 py-4 border-t border-black/5">
-                <p className="text-xs font-semibold text-[#0A0A0A] mb-1.5">💡 Técnica</p>
-                <p className="text-xs text-[#6B6B6B] leading-relaxed">{videoEj.consejos_tecnica}</p>
+              <div className="px-5 py-4" style={{ borderTop: `1px solid ${C.border}` }}>
+                <p className="text-xs font-black mb-1.5" style={{ color }}>💡 Técnica</p>
+                <p className="text-xs leading-relaxed" style={{ color: C.textSecondary }}>{videoEj.consejos_tecnica}</p>
               </div>
             )}
             <div className="h-safe-area-bottom pb-5" />
@@ -1589,93 +1605,121 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
         </div>
       )}
 
-      <div className="pb-1 flex items-end justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">{limpiarNombreRutina(rutina.nombre)}</h2>
-          <p className="text-xs text-[#9B9B9B] mt-0.5">{dias.length} días · {rutina.semanas || 4} semanas</p>
+      {/* ── HEADER rutina — hero oscuro ── */}
+      <div className="rounded-3xl overflow-hidden px-5 py-4"
+        style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-1" style={{ color: C.textMuted }}>Plan activo</p>
+            <h2 className="text-2xl font-black text-white tracking-tight leading-none"
+              style={{ fontFamily: "'Syne', 'Inter', sans-serif" }}>
+              {limpiarNombreRutina(rutina.nombre)}
+            </h2>
+            <p className="text-xs mt-1.5" style={{ color: C.textSecondary }}>
+              {dias.length} días · {rutina.semanas || 4} semanas
+            </p>
+          </div>
+          {diaAbierto !== null && (
+            <button onClick={() => setDiaAbierto(null)}
+              className="text-[10px] font-bold px-3 py-1.5 rounded-full active:scale-95"
+              style={{ background: C.card, border: `1px solid ${C.border}`, color: C.textSecondary }}>
+              Cerrar
+            </button>
+          )}
         </div>
-        {diaAbierto !== null && (
-          <button onClick={() => setDiaAbierto(null)}
-            className="text-xs text-[#9B9B9B] active:scale-95">Cerrar todo</button>
-        )}
       </div>
 
+      {/* ── DÍAS — acordeón oscuro ── */}
       {dias.map((dia, di) => {
         const abierto = diaAbierto === di
         const ejercicios = dia.ejercicios || []
         const conHistorico = ejercicios.filter(ej => histPorEj[ej.nombre]).length
 
         return (
-          <div key={di} className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-            {/* Header del día — siempre visible, clickable */}
+          <div key={di} className="rounded-2xl overflow-hidden"
+            style={{ background: C.bg, border: abierto ? `1px solid ${color}30` : `1px solid ${C.border}` }}>
+            {/* Header del día */}
             <button
-              className="w-full px-4 py-3.5 flex items-center gap-3 text-left transition-colors active:bg-black/2"
+              className="w-full px-4 py-3.5 flex items-center gap-3 text-left transition-all active:opacity-70"
               onClick={() => setDiaAbierto(abierto ? null : di)}>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                style={{ background: color }}>{di + 1}</div>
+              {/* Badge número */}
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0"
+                style={{
+                  background: abierto ? color : C.card,
+                  border: abierto ? 'none' : `1px solid ${C.border}`,
+                  color: abierto ? '#FFF' : C.textSecondary
+                }}>
+                {di + 1}
+              </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-[#0A0A0A] truncate">{dia.nombre || `Día ${di + 1}`}</p>
-                <p className="text-[10px] text-[#9B9B9B] mt-0.5">
+                <p className="text-sm font-black text-white truncate">{dia.nombre || `Día ${di + 1}`}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>
                   {ejercicios.length} ejercicios
                   {conHistorico > 0 && <span style={{ color }}> · {conHistorico} con historial</span>}
                 </p>
               </div>
-              <span className="text-[#C0C0C0] text-sm transition-transform duration-200 flex-shrink-0"
-                style={{ transform: abierto ? 'rotate(180deg)' : 'none' }}>▾</span>
+              <span className="text-sm transition-transform duration-200 flex-shrink-0"
+                style={{ color: abierto ? color : C.textDisabled, transform: abierto ? 'rotate(180deg)' : 'none' }}>▾</span>
             </button>
 
             {/* Contenido colapsable */}
             {abierto && (
               <>
-                <div className="divide-y divide-black/4 border-t border-black/5">
+                <div style={{ borderTop: `1px solid ${C.border}` }}>
                   {ejercicios.map((ej, ei) => {
                     const hist = histPorEj[ej.nombre]
                     const bibEntry = biblioteca[(ej.nombre || '').toLowerCase()]
-                    const tieneVideo = !!ytEmbed(bibEntry?.youtube_url) // enlace válido, si no no hay botón ▶
+                    const tieneVideo = !!ytEmbed(bibEntry?.youtube_url)
                     return (
-                      <div key={ei} className="px-4 py-3.5">
+                      <div key={ei} className="px-4 py-3.5"
+                        style={{ borderBottom: ei < ejercicios.length - 1 ? `1px solid ${C.borderSubtle}` : 'none' }}>
                         <div className="flex items-start gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-[#0A0A0A] flex-1">{ej.nombre}</p>
+                              <p className="text-sm font-black text-white flex-1">{ej.nombre}</p>
                               {tieneVideo && (
                                 <button
                                   onClick={() => setVideoEj(bibEntry)}
                                   className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 active:scale-95 transition-all"
-                                  style={{ background: `${color}15` }}
+                                  style={{ background: `${color}20`, border: `1px solid ${color}40` }}
                                   title="Ver vídeo">
                                   <span className="text-[10px]" style={{ color }}>▶</span>
                                 </button>
                               )}
                             </div>
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
-                              {ej.series && <span className="text-xs text-[#9B9B9B]">{ej.series} series</span>}
-                              {ej.reps && <span className="text-xs text-[#9B9B9B]">· {ej.reps} reps</span>}
-                              {ej.peso && <span className="text-xs text-[#9B9B9B]">· {ej.peso}</span>}
+                              {ej.series && <span className="text-xs" style={{ color: C.textSecondary }}>{ej.series} series</span>}
+                              {ej.reps && <span className="text-xs" style={{ color: C.textSecondary }}>· {ej.reps} reps</span>}
+                              {ej.peso && <span className="text-xs" style={{ color: C.textSecondary }}>· {ej.peso}</span>}
                               {ej.descanso && ej.descanso !== '-' && (
                                 <>
-                                  <span className="text-xs text-[#9B9B9B]">·</span>
+                                  <span className="text-xs" style={{ color: C.textMuted }}>·</span>
                                   <BotonTemporizador segundos={parseDescansoSegundos(ej.descanso)} label={ej.descanso} color={color} />
                                 </>
                               )}
                             </div>
                             {ej.notas && (
-                              <p className="text-[10px] text-[#9B9B9B] mt-1.5 italic leading-relaxed border-l-2 pl-2"
-                                style={{ borderColor: `${color}40` }}>{ej.notas}</p>
+                              <p className="text-[10px] mt-1.5 italic leading-relaxed border-l-2 pl-2"
+                                style={{ color: C.textMuted, borderColor: `${color}40` }}>{ej.notas}</p>
                             )}
                           </div>
                           {/* Histórico de cargas */}
                           {hist ? (
                             <div className="text-right flex-shrink-0 ml-1">
-                              <p className="text-base font-bold tracking-tight" style={{ color }}>{hist.maxPeso}<span className="text-[10px] font-normal text-[#9B9B9B] ml-0.5">kg</span></p>
+                              <p className="text-base font-black tracking-tight" style={{ color }}>
+                                {hist.maxPeso}<span className="text-[10px] font-normal ml-0.5" style={{ color: C.textMuted }}>kg</span>
+                              </p>
                               {hist.rmMax > hist.maxPeso && (
-                                <p className="text-[9px] text-[#9B9B9B]">RM ~{hist.rmMax}kg</p>
+                                <p className="text-[9px]" style={{ color: C.textMuted }}>RM ~{hist.rmMax}kg</p>
                               )}
-                              <p className="text-[9px] text-[#C0C0C0]">última vez</p>
+                              <p className="text-[9px]" style={{ color: C.textDisabled }}>última vez</p>
                             </div>
                           ) : (
                             ej.patron && (
-                              <span className="text-[9px] bg-[#F2F1EE] text-[#9B9B9B] px-1.5 py-0.5 rounded-md font-medium mt-0.5 flex-shrink-0">{ej.patron}</span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold mt-0.5 flex-shrink-0"
+                                style={{ background: C.card, border: `1px solid ${C.border}`, color: C.textMuted }}>
+                                {ej.patron}
+                              </span>
                             )
                           )}
                         </div>
@@ -1686,10 +1730,10 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
 
                 {/* Botón registrar (solo online) */}
                 {esOnline && (
-                  <div className="px-4 py-3 border-t border-black/5" style={{ background: `${color}04` }}>
+                  <div className="px-4 py-3" style={{ borderTop: `1px solid ${C.border}` }}>
                     <button onClick={() => setModalRegistro(dia)}
-                      className="w-full py-3 rounded-xl text-sm font-bold text-white active:scale-95 transition-all"
-                      style={{ background: color }}>
+                      className="w-full py-3 rounded-xl text-sm font-black text-white active:scale-95 transition-all"
+                      style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
                       ✓ Registrar esta sesión
                     </button>
                   </div>
