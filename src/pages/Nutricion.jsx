@@ -383,8 +383,11 @@ export default function Nutricion({ session }) {
                     : <button
                         onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
                         title={activo ? 'Desactivar: el cliente dejará de ver el plan nutricional en su portal' : 'Activar: el cliente podrá ver su plan nutricional en el portal'}
-                        className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
-                        <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                        className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className={`w-11 h-6 rounded-full transition-all relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
+                          <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                        </div>
+                        <span className={`text-xs font-medium ${activo ? 'text-acento' : 'text-[#9B9B9B]'}`}>{activo ? 'Activo' : 'Inactivo'}</span>
                       </button>
                   }
                 </div>
@@ -433,8 +436,11 @@ export default function Nutricion({ session }) {
                   : <button
                       onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
                       title={activo ? 'Desactivar: el cliente dejará de ver el plan nutricional en su portal' : 'Activar: el cliente podrá ver su plan nutricional en el portal'}
-                      className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                      className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className={`w-11 h-6 rounded-full transition-all relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
+                        <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                      </div>
+                      <span className={`text-xs font-medium ${activo ? 'text-acento' : 'text-[#9B9B9B]'}`}>{activo ? 'Activo' : 'Inactivo'}</span>
                     </button>
                 }
               </div>
