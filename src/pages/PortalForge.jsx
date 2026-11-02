@@ -1032,122 +1032,211 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
   const hayAgenda = esOnline ? (sesionesEstaSemana||[]).length>0 : (sesiones||[]).filter(s=>s.fecha>=lunesEsta.toISOString().split('T')[0]).length>0
   const esNuevo = !rutina && !nutricion && !checkins?.length && !hayAgenda
 
+  // Carbono design tokens
+  const C = {
+    bg: '#0F0F0D',
+    card: 'rgba(255,255,255,0.04)',
+    border: 'rgba(255,255,255,0.07)',
+    borderSubtle: 'rgba(255,255,255,0.04)',
+    textPrimary: '#FFFFFF',
+    textSecondary: 'rgba(255,255,255,0.45)',
+    textMuted: 'rgba(255,255,255,0.2)',
+    textDisabled: 'rgba(255,255,255,0.12)',
+  }
+
   return (
-    <div className="space-y-3 pb-2">
-      {/* Hero — negro, nombre grande, datos de un vistazo */}
-      <div className="rounded-3xl overflow-hidden -mx-0" style={{ background: '#0A0A0A' }}>
+    <div className="space-y-2.5 pb-2" style={{ fontFamily: "'Inter', sans-serif" }}>
+
+      {/* ── HERO CARBONO ── fecha chip + nombre giant + streak */}
+      <div className="rounded-3xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
         <div className="px-5 pt-5 pb-4">
-          <p className="text-[10px] font-bold tracking-[0.15em] uppercase mb-2" style={{ color: 'rgba(255,255,255,0.35)' }}>
-            {DIAS[ahora.getDay()].toUpperCase()} · {ahora.getDate()} {MESES[ahora.getMonth()].toUpperCase()}
-          </p>
-          <h1 className="text-4xl font-black text-white tracking-tight leading-none">{nombre}</h1>
+          {/* Fecha chip */}
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full mb-3"
+            style={{ background: C.card, border: `1px solid ${C.border}` }}>
+            <span className="text-[10px] font-bold tracking-[0.12em] uppercase" style={{ color: C.textSecondary }}>
+              {DIAS[ahora.getDay()]} · {ahora.getDate()} {MESES[ahora.getMonth()]}
+            </span>
+            {semanasActivas > 0 && (
+              <>
+                <span style={{ color: C.textDisabled }}>·</span>
+                <span className="text-[10px] font-black tracking-wide" style={{ color }}>
+                  {semanasActivas} SEM 🔥
+                </span>
+              </>
+            )}
+          </div>
+          {/* Nombre grande */}
+          <h1 className="text-[42px] font-black text-white leading-none tracking-tight"
+            style={{ fontFamily: "'Syne', 'Inter', sans-serif", letterSpacing: '-0.02em' }}>
+            {saludo},<br />{nombre}.
+          </h1>
+          {/* Barra de progreso racha */}
           {semanasActivas > 0 && (
-            <div className="flex items-center gap-2 mt-3">
-              <div className="h-1.5 rounded-full flex-1 overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
-                <div className="h-full rounded-full" style={{ width: `${Math.min(semanasActivas * 10, 100)}%`, background: color }} />
+            <div className="mt-4 flex items-center gap-2">
+              <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: C.textDisabled }}>
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(semanasActivas * 8, 100)}%`, background: `linear-gradient(90deg, ${color}, ${color}99)` }} />
               </div>
-              <p className="text-[11px] font-black tracking-wide flex-shrink-0" style={{ color }}>
-                {semanasActivas} SEM
-              </p>
+              <span className="text-[10px] font-black tracking-widest" style={{ color }}>{semanasActivas} sem activas</span>
             </div>
           )}
         </div>
-        {/* Stats rápidos dentro del hero */}
-        {(pesos.length >= 1 || checkins.length > 0) && (
-          <div className="grid border-t" style={{ gridTemplateColumns: `repeat(${[pesos.length>=2, checkins.length>0, semanasActivas>0].filter(Boolean).length}, 1fr)`, borderColor: 'rgba(255,255,255,0.06)' }}>
-            {pesos.length >= 2 && diffPeso !== null && (
-              <div className="px-4 py-3 border-r" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                <p className="text-2xl font-black leading-none" style={{ color: diffPeso < 0 ? '#10b981' : diffPeso > 0 ? '#818cf8' : 'white' }}>
-                  {diffPeso > 0 ? '+' : ''}{diffPeso}
-                </p>
-                <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>kg total</p>
-              </div>
-            )}
-            {checkins.length > 0 && (
-              <div className="px-4 py-3 border-r" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                <p className="text-2xl font-black text-white leading-none">{checkins.length}</p>
-                <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>check-ins</p>
-              </div>
-            )}
-            {semanasActivas > 0 && (
-              <div className="px-4 py-3">
-                <p className="text-2xl font-black leading-none" style={{ color }}>{semanasActivas}</p>
-                <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>semanas</p>
-              </div>
-            )}
-          </div>
-        )}
+
+        {/* Stats rápidos — grid oscuro dentro del hero */}
+        {(pesos.length >= 2 || checkins.length > 0 || semanasActivas > 0) && (() => {
+          const cols = [pesos.length>=2 && diffPeso!==null, checkins.length>0, semanasActivas>0].filter(Boolean).length
+          return cols > 0 ? (
+            <div className="grid border-t" style={{ gridTemplateColumns: `repeat(${cols},1fr)`, borderColor: C.border }}>
+              {pesos.length>=2 && diffPeso!==null && (
+                <div className="px-4 py-3.5 border-r" style={{ borderColor: C.border }}>
+                  <p className="text-2xl font-black leading-none"
+                    style={{ color: diffPeso<0?'#10b981':diffPeso>0?'#818cf8':'white' }}>
+                    {diffPeso>0?'+':''}{diffPeso}
+                  </p>
+                  <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: C.textMuted }}>kg total</p>
+                </div>
+              )}
+              {checkins.length>0 && (
+                <div className="px-4 py-3.5 border-r" style={{ borderColor: C.border }}>
+                  <p className="text-2xl font-black text-white leading-none">{checkins.length}</p>
+                  <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: C.textMuted }}>check-ins</p>
+                </div>
+              )}
+              {semanasActivas>0 && (
+                <div className="px-4 py-3.5">
+                  <p className="text-2xl font-black leading-none" style={{ color }}>{semanasActivas}</p>
+                  <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: C.textMuted }}>semanas</p>
+                </div>
+              )}
+            </div>
+          ) : null
+        })()}
       </div>
 
-      {/* Último check-in — editable si es de hoy o ayer */}
-      {checkins?.[0] && (
-        <div className="bg-white rounded-2xl border border-black/5 p-4">
-          <div className="flex items-center justify-between mb-2.5">
-            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Último check-in</p>
-            {diasSinCI <= 1 && (
-              <button onClick={() => editarCheckin(checkins[0])} className="text-[10px] font-bold" style={{ color }}>✏️ Editar</button>
+      {/* ── SESIÓN DE HOY — hero naranja dominante ── */}
+      {sesionHoy && (
+        <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg,${color},${color}cc)` }}>
+          <div className="px-5 py-5">
+            <p className="text-[10px] font-black tracking-[0.2em] uppercase mb-2" style={{ color: 'rgba(255,255,255,0.6)' }}>HOY TOCA</p>
+            <p className="text-2xl font-black text-white leading-tight"
+              style={{ fontFamily: "'Syne','Inter',sans-serif" }}>
+              {sesionHoy.tipo==='online'?'Entrenamiento online':sesionHoy.tipo==='grupo'?'Sesión en grupo':'Entrenamiento personal'}
+            </p>
+            {sesionHoy.hora && (
+              <p className="text-sm mt-2" style={{ color: 'rgba(255,255,255,0.7)' }}>
+                🕐 {sesionHoy.hora.slice(0,5)}{sesionHoy.duracion_minutos?` · ${sesionHoy.duracion_minutos} min`:''}
+              </p>
+            )}
+            {diaHoy && (
+              <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {diaHoy.nombre} · {(diaHoy.ejercicios||[]).length} ejercicios
+              </p>
             )}
           </div>
-          <div className="flex gap-2.5 flex-wrap">
-            {checkins[0].energia != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ {checkins[0].energia}/5</span>}
-            {checkins[0].sueno != null && <span className="text-[10px] font-bold text-[#9B9B9B]">😴 {checkins[0].sueno}/5</span>}
-            {checkins[0].fatiga != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ {checkins[0].fatiga}/5</span>}
-            {checkins[0].estres != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 {checkins[0].estres}/5</span>}
-            {checkins[0].peso != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚖️ {checkins[0].peso}kg</span>}
+          <div className="px-4 py-3 grid grid-cols-2 gap-2" style={{ background: 'rgba(0,0,0,0.18)' }}>
+            <button onClick={() => setTab('entrena')}
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-white text-xs font-bold active:scale-95 transition-all"
+              style={{ background: 'rgba(255,255,255,0.15)' }}>
+              💪 Ver rutina
+            </button>
+            <button onClick={() => diaHoy && setModalRegistro(diaHoy)}
+              className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-white text-xs font-bold active:scale-95 transition-all"
+              style={{ background: 'rgba(255,255,255,0.28)' }}>
+              ✓ Registrar
+            </button>
           </div>
         </div>
       )}
 
-      {/* Bienvenida nuevo */}
+      {/* ── HOY TOCA (online sin sesión programada) ── */}
+      {!sesionHoy && diaHoy && esOnline && (
+        <div className="rounded-2xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+          <div className="px-4 py-3.5 flex items-center gap-3" style={{ borderBottom: `1px solid ${C.borderSubtle}`, background: `${color}10` }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white flex-shrink-0"
+              style={{ background: color }}>{sesCompletadas%diasRutina.length+1}</div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-white">{diaHoy.nombre}</p>
+              <p className="text-[10px]" style={{ color: C.textSecondary }}>{(diaHoy.ejercicios||[]).length} ejercicios · {rutina ? limpiarNombreRutina(rutina.nombre) : ''}</p>
+            </div>
+          </div>
+          <div className="px-4 py-3 flex gap-2">
+            <button onClick={() => setTab('entrena')}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold active:scale-95 transition-all"
+              style={{ background: C.card, border: `1px solid ${C.border}`, color: C.textSecondary }}>
+              Ver ejercicios
+            </button>
+            <button onClick={() => setModalRegistro(diaHoy)}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white active:scale-95 transition-all"
+              style={{ background: color }}>
+              ✓ Registrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── BIENVENIDA NUEVO CLIENTE ── */}
       {esNuevo && (
-        <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
+        <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg,${color},${color}bb)` }}>
           <div className="px-5 py-6">
-            <p className="text-white/60 text-xs font-semibold mb-1.5">{`Bienvenido a ${BRAND.nombre}`}</p>
-            <p className="text-white font-bold text-xl leading-snug">{config?.nombre_entrenador||'Tu entrenador'} está preparando tu plan</p>
-            <p className="text-white/60 text-sm mt-2">En breve tendrás tu rutina, plan de nutrición y progreso.</p>
+            <p className="text-xs font-semibold mb-1.5" style={{ color: 'rgba(255,255,255,0.6)' }}>{`Bienvenido a ${BRAND.nombre}`}</p>
+            <p className="text-xl font-black text-white leading-snug"
+              style={{ fontFamily: "'Syne','Inter',sans-serif" }}>
+              {config?.nombre_entrenador||'Tu entrenador'} está preparando tu plan
+            </p>
+            <p className="text-sm mt-2" style={{ color: 'rgba(255,255,255,0.6)' }}>En breve tendrás tu rutina, plan de nutrición y progreso.</p>
             {verNutricion && !cuest && (
               <a href={`${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
                 className="mt-4 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-white font-black text-sm active:scale-95 transition-all"
                 style={{ color }}>
-                🥗 Rellenar cuestionario de nutrición →
+                🥗 Rellenar cuestionario →
               </a>
             )}
           </div>
           {VER_MENSAJES && (
-          <div className="px-5 py-3.5 bg-black/15 flex items-center justify-between">
-            <p className="text-white/60 text-xs">¿Alguna duda?</p>
-            <button onClick={() => setTab('mensajes')} className="text-xs font-bold px-3 py-1.5 rounded-lg bg-white/20 text-white active:scale-95">Escribir →</button>
-          </div>
+            <div className="px-5 py-3.5 flex items-center justify-between" style={{ background: 'rgba(0,0,0,0.15)' }}>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.55)' }}>¿Alguna duda?</p>
+              <button onClick={() => setTab('mensajes')}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg text-white active:scale-95"
+                style={{ background: 'rgba(255,255,255,0.2)' }}>
+                Escribir →
+              </button>
+            </div>
           )}
         </div>
       )}
 
-      {/* Cuestionario nutrición */}
+      {/* ── CUESTIONARIO NUTRICIÓN ── */}
       {verNutricion && !nutricion && !cuest && !esNuevo && (
         <a href={`${window.location.origin}/nutricion-cuest?e=${cliente.entrenador_id}&c=${cliente.id}`}
           className="flex items-center gap-4 rounded-2xl p-4 active:scale-95 transition-all"
           style={{ background: 'linear-gradient(135deg,#10b981,#059669)' }}>
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><span className="text-xl">🥗</span></div>
-          <div className="flex-1"><p className="text-sm font-bold text-white">Cuestionario de nutrición</p><p className="text-xs text-white/70 mt-0.5">Necesario para crear tu plan personalizado</p></div>
-          <span className="text-white/70 text-xl flex-shrink-0">→</span>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(255,255,255,0.2)' }}>
+            <span className="text-xl">🥗</span>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-white">Cuestionario de nutrición</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.7)' }}>Necesario para crear tu plan personalizado</p>
+          </div>
+          <span className="text-xl flex-shrink-0" style={{ color: 'rgba(255,255,255,0.7)' }}>→</span>
         </a>
       )}
 
-      {/* Sesiones presenciales pendientes de valorar */}
+      {/* ── SESIONES PENDIENTES DE VALORAR ── */}
       {sesionesPendientesValorar?.length > 0 && (
-        <div className="rounded-2xl p-4 border-2 space-y-3" style={{ borderColor: color, background: `${color}06` }}>
-          <p className="text-sm font-bold text-[#0A0A0A]">
-            Tienes {sesionesPendientesValorar.length} sesión{sesionesPendientesValorar.length > 1 ? 'es' : ''} pendiente{sesionesPendientesValorar.length > 1 ? 's' : ''} de valorar
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: C.bg, border: `2px solid ${color}60` }}>
+          <p className="text-sm font-bold text-white">
+            {sesionesPendientesValorar.length} sesión{sesionesPendientesValorar.length>1?'es':''} pendiente{sesionesPendientesValorar.length>1?'s':''} de valorar
           </p>
           <div className="space-y-2">
             {sesionesPendientesValorar.map(s => (
-              <div key={s.id} className="bg-white rounded-xl p-3 flex items-center justify-between gap-2">
+              <div key={s.id} className="rounded-xl p-3 flex items-center justify-between gap-2"
+                style={{ background: C.card, border: `1px solid ${C.border}` }}>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#0A0A0A]">{new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}</p>
-                  {s.hora && <p className="text-xs text-[#6B6B6B]">{s.hora.slice(0,5)}</p>}
+                  <p className="text-sm font-semibold text-white">{new Date(s.fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}</p>
+                  {s.hora && <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>{s.hora.slice(0,5)}</p>}
                 </div>
                 <button onClick={() => setValorando(s)}
-                  className="text-white text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0 active:scale-95 transition-all" style={{ background: color }}>
+                  className="text-white text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0 active:scale-95 transition-all"
+                  style={{ background: color }}>
                   Valorar
                 </button>
               </div>
@@ -1156,87 +1245,124 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
         </div>
       )}
 
-      {/* Valoración pendiente */}
+      {/* ── VALORACIÓN PENDIENTE ── */}
       {pendientes?.[0] && (
         <button onClick={() => setValorando(pendientes[0])}
-          className="w-full flex items-center gap-4 rounded-2xl p-4 border-2 text-left active:scale-95 transition-all"
-          style={{ borderColor: color, background: `${color}06` }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}><span className="text-xl">⭐</span></div>
+          className="w-full flex items-center gap-4 rounded-2xl p-4 text-left active:scale-95 transition-all"
+          style={{ background: C.bg, border: `2px solid ${color}60` }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: `${color}20` }}>
+            <span className="text-xl">⭐</span>
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-[#0A0A0A]">¿Cómo fue el {new Date(pendientes[0].fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long'})}?</p>
-            <p className="text-xs text-[#6B6B6B] mt-0.5">30 seg · ayuda a ajustar la carga</p>
+            <p className="text-sm font-bold text-white">¿Cómo fue el {new Date(pendientes[0].fecha+'T12:00').toLocaleDateString('es-ES',{weekday:'long'})}?</p>
+            <p className="text-xs mt-0.5" style={{ color: C.textSecondary }}>30 seg · ayuda a ajustar la carga</p>
           </div>
           <span className="text-sm font-bold" style={{ color }}>Valorar →</span>
         </button>
       )}
 
-      {/* Sesión de hoy */}
-      {sesionHoy && (
-        <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg,${color},${color}e0)` }}>
-          <div className="px-5 py-5">
-            <p className="text-white/60 text-[10px] font-bold tracking-widest mb-1.5">HOY TOCA</p>
-            <p className="text-white font-bold text-xl">{sesionHoy.tipo==='online'?'Entrenamiento online':sesionHoy.tipo==='grupo'?'Sesión en grupo':'Entrenamiento personal'}</p>
-            {sesionHoy.hora && <p className="text-white/70 text-sm mt-1.5">🕐 {sesionHoy.hora.slice(0,5)}{sesionHoy.duracion_minutos?` · ${sesionHoy.duracion_minutos} min`:''}</p>}
-            {diaHoy && <p className="text-white/50 text-xs mt-1">{diaHoy.nombre} · {(diaHoy.ejercicios||[]).length} ejercicios</p>}
-          </div>
-          <div className="px-4 py-3 bg-black/15 grid grid-cols-2 gap-2">
-            <button onClick={() => setTab('entrena')} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/15 text-white text-xs font-bold active:scale-95">💪 Ver rutina</button>
-            <button onClick={() => diaHoy && setModalRegistro(diaHoy)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/25 text-white text-xs font-bold active:scale-95">✓ Registrar sesión</button>
-          </div>
-        </div>
-      )}
-
-      {/* Hoy toca (online sin sesión programada) */}
-      {!sesionHoy && diaHoy && esOnline && (
-        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-          <div className="px-4 py-3.5 flex items-center gap-3 border-b border-black/4" style={{ background: `${color}06` }}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: color }}>{sesCompletadas%diasRutina.length+1}</div>
-            <div className="flex-1"><p className="text-xs font-bold text-[#0A0A0A]">{diaHoy.nombre}</p><p className="text-[10px] text-[#9B9B9B]">{(diaHoy.ejercicios||[]).length} ejercicios · {rutina ? limpiarNombreRutina(rutina.nombre) : ''}</p></div>
-          </div>
-          <div className="px-4 py-3 flex gap-2">
-            <button onClick={() => setTab('entrena')} className="flex-1 py-2.5 rounded-xl text-xs font-bold border border-black/10 text-[#0A0A0A] active:scale-95">Ver ejercicios</button>
-            <button onClick={() => setModalRegistro(diaHoy)} className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white active:scale-95" style={{ background: color }}>✓ Registrar</button>
-          </div>
-        </div>
-      )}
-
-      {/* Check-in urgente */}
+      {/* ── CHECK-IN URGENTE ── */}
       {ciUrgente && (
         <button onClick={() => setModalCI(true)}
           className="w-full flex items-center gap-4 rounded-2xl p-4 active:scale-95 text-left animate-pulse"
           style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)' }}>
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0"><span className="text-xl">⏰</span></div>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(255,255,255,0.2)' }}>
+            <span className="text-xl">⏰</span>
+          </div>
           <div className="flex-1">
             <p className="text-sm font-bold text-white">{diasSinCI>900?'Haz tu primer check-in':`${diasSinCI} días sin check-in`}</p>
-            <p className="text-xs text-white/70 mt-0.5">Tu entrenador necesita saber cómo estás</p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.7)' }}>Tu entrenador necesita saber cómo estás</p>
           </div>
-          <span className="text-white/80 text-xl">→</span>
+          <span className="text-xl" style={{ color: 'rgba(255,255,255,0.8)' }}>→</span>
         </button>
       )}
 
+      {/* ── AGENDA SEMANAL — grid compacto oscuro ── */}
+      {hayAgenda && (
+        <div className="rounded-2xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+          {/* Header */}
+          <div className="px-4 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${C.border}` }}>
+            <p className="text-xs font-black tracking-wide text-white">ESTA SEMANA</p>
+            <p className="text-[10px]" style={{ color: C.textSecondary }}>{esOnline?'registradas':'programadas'}</p>
+          </div>
+          {/* Grid 6 columnas lun-sáb */}
+          <div className="grid grid-cols-6 gap-px p-3" style={{ background: C.borderSubtle }}>
+            {diasAgenda.map((dia,i) => {
+              const tieneSesion = dia.sesiones.length > 0
+              const completada = dia.sesiones.some(s=>s.completada)
+              return (
+                <div key={i} className="flex flex-col items-center gap-1 py-2.5 rounded-xl"
+                  style={{
+                    background: dia.esHoy ? `${color}18` : C.card,
+                    border: dia.esHoy ? `1px solid ${color}50` : `1px solid transparent`
+                  }}>
+                  <span className="text-[9px] font-bold tracking-wide uppercase"
+                    style={{ color: dia.esHoy ? color : C.textMuted }}>
+                    {['D','L','M','X','J','V'][i]}
+                  </span>
+                  <span className="text-sm font-black"
+                    style={{ color: dia.esHoy ? 'white' : dia.esPasado ? C.textMuted : C.textSecondary }}>
+                    {dia.d.getDate()}
+                  </span>
+                  {/* Indicador sesión */}
+                  {tieneSesion ? (
+                    <div className="w-1.5 h-1.5 rounded-full"
+                      style={{ background: completada ? '#10b981' : color, boxShadow: dia.esHoy ? `0 0 6px ${color}` : 'none' }} />
+                  ) : (
+                    <div className="w-1.5 h-1.5" />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+          {/* Detalle sesiones de hoy si hay */}
+          {diasAgenda.find(d=>d.esHoy)?.sesiones?.length > 0 && (
+            <div className="px-4 pb-3">
+              {diasAgenda.find(d=>d.esHoy).sesiones.map((s,si)=>(
+                <div key={si} className="flex items-center gap-2 py-1.5">
+                  <span style={{ color }}>{s.tipo==='online'?'🖥':s.tipo==='libre'?'🏃':'🏋️'}</span>
+                  <span className="text-xs font-semibold text-white">
+                    {s.hora?s.hora.slice(0,5):''}{s.duracion_minutos?` · ${s.duracion_minutos}min`:''}{s.completada?' ✓':''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Botón registrar (online) */}
+          {esOnline && (
+            <div className="px-4 py-3" style={{ borderTop: `1px solid ${C.border}` }}>
+              <button onClick={() => setModalActividad(true)}
+                className="w-full py-2.5 rounded-xl text-xs font-bold text-white active:scale-95 transition-all"
+                style={{ background: color }}>
+                + Registrar actividad
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
-
-      {/* Gráfica de progreso */}
-      {pesos.length>=2&&(
+      {/* ── GRÁFICA DE PROGRESO ── */}
+      {pesos.length>=2 && (
         <button onClick={() => setTab('progreso')}
           className="w-full rounded-2xl overflow-hidden text-left active:scale-[0.99] transition-all"
-          style={{ background: '#0A0A0A' }}>
+          style={{ background: C.bg, border: `1px solid ${C.border}` }}>
           <div className="px-5 pt-4 pb-3 flex items-start justify-between">
             <div>
-              <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Peso</p>
+              <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textMuted }}>Progreso · Peso</p>
               <p className="text-3xl font-black text-white tracking-tight leading-none mt-1">
-                {pesos[pesos.length-1].peso}<span className="text-sm font-normal ml-1" style={{ color: 'rgba(255,255,255,0.4)' }}>kg</span>
+                {pesos[pesos.length-1].peso}
+                <span className="text-sm font-normal ml-1" style={{ color: C.textSecondary }}>kg</span>
               </p>
             </div>
             {diffPeso !== null && (
               <div className="text-right">
                 <p className="text-xl font-black tracking-tight leading-none"
-                  style={{ color: diffPeso<0?'#10b981':diffPeso>0?'#818cf8':'rgba(255,255,255,0.4)' }}>
+                  style={{ color: diffPeso<0?'#10b981':diffPeso>0?'#818cf8':C.textSecondary }}>
                   {diffPeso>0?'+':''}{diffPeso}
                 </p>
-                <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                  desde inicio
-                </p>
+                <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: C.textMuted }}>desde inicio</p>
               </div>
             )}
           </div>
@@ -1248,7 +1374,7 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
               return (
                 <div key={i} className="flex-1 rounded-sm"
                   style={{ height:`${h}%`, minHeight:4,
-                    background: isLast ? color : 'rgba(255,255,255,0.12)',
+                    background: isLast ? color : C.textDisabled,
                     boxShadow: isLast ? `0 0 12px ${color}60` : undefined }} />
               )
             })}
@@ -1256,53 +1382,58 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
         </button>
       )}
 
-      {/* Agenda semanal */}
-      {hayAgenda&&(
-        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-          <div className="px-4 py-3 border-b border-black/4 flex items-center justify-between">
-            <p className="text-xs font-bold text-[#0A0A0A]">Esta semana</p>
-            <p className="text-[10px] text-[#9B9B9B]">{esOnline?'registradas':'programadas'}</p>
+      {/* ── ÚLTIMO CHECK-IN — tarjeta oscura compacta ── */}
+      {checkins?.[0] && (
+        <div className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textMuted }}>Último check-in</p>
+            {diasSinCI <= 1 && (
+              <button onClick={() => editarCheckin(checkins[0])} className="text-[10px] font-bold" style={{ color }}>✏️ Editar</button>
+            )}
           </div>
-          <div className="divide-y divide-black/4">
-            {diasAgenda.map((dia,i)=>(
-              <div key={i} className="px-4 py-2.5 flex items-center gap-3" style={dia.esHoy?{background:`${color}06`}:{}}>
-                <div className="w-8 h-8 rounded-lg flex flex-col items-center justify-center flex-shrink-0"
-                  style={dia.esHoy?{background:color}:{background:'#F2F1EE'}}>
-                  <span className="text-[9px] font-bold" style={{ color:dia.esHoy?'rgba(255,255,255,0.7)':'#9B9B9B' }}>
-                    {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][dia.d.getDay()]}
-                  </span>
-                  <span className="text-sm font-bold" style={{ color:dia.esHoy?'white':dia.esPasado?'#C0C0C0':'#0A0A0A' }}>{dia.d.getDate()}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  {dia.sesiones.length>0
-                    ? dia.sesiones.map((s,si)=>(
-                      <p key={si} className="text-xs font-semibold text-[#0A0A0A]">
-                        {s.tipo==='online'?'🖥':s.tipo==='libre'?'🏃':'🏋️'}
-                        {s.hora?` ${s.hora.slice(0,5)}`:''}{s.duracion_minutos?` · ${s.duracion_minutos}min`:''}{s.completada?' ✓':''}
-                      </p>
-                    ))
-                    : <p className="text-xs text-[#D0D0D0]">{dia.esPasado?'Descanso':'—'}</p>
-                  }
-                </div>
-                {dia.esHoy&&dia.sesiones.length>0&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background:color }}>HOY</span>}
+          <div className="flex gap-3 flex-wrap">
+            {checkins[0].energia != null && (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-sm">⚡</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].energia}/5</span>
               </div>
-            ))}
+            )}
+            {checkins[0].sueno != null && (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-sm">😴</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].sueno}/5</span>
+              </div>
+            )}
+            {checkins[0].fatiga != null && (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-sm">🏋️</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].fatiga}/5</span>
+              </div>
+            )}
+            {checkins[0].estres != null && (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-sm">🧠</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].estres}/5</span>
+              </div>
+            )}
+            {checkins[0].peso != null && (
+              <div className="flex flex-col items-center gap-0.5">
+                <span className="text-sm">⚖️</span>
+                <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>{checkins[0].peso}kg</span>
+              </div>
+            )}
           </div>
-          {esOnline&&(
-            <div className="px-4 py-3 border-t border-black/4">
-              <button onClick={() => setModalActividad(true)} className="w-full py-2.5 rounded-xl text-xs font-bold text-white active:scale-95" style={{ background:color }}>+ Registrar actividad</button>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Accesos rápidos — grid 2x2 limpio */}
+      {/* ── ACCESOS RÁPIDOS — grid 2×2 tarjetas oscuras ── */}
       <div className="grid grid-cols-2 gap-2">
-        {verRutina&&(
+        {verRutina && (
           <button onClick={() => setTab('entrena')}
-            className="bg-white rounded-2xl p-4 text-left active:scale-[0.98] transition-all">
-            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Rutina</p>
-            <p className="text-sm font-black text-[#0A0A0A] leading-tight line-clamp-2">
+            className="rounded-2xl p-4 text-left active:scale-[0.98] transition-all"
+            style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-2" style={{ color: C.textMuted }}>Rutina</p>
+            <p className="text-sm font-black text-white leading-tight line-clamp-2">
               {rutina ? limpiarNombreRutina(rutina.nombre) : 'En preparación'}
             </p>
             <p className="text-[10px] font-bold mt-2" style={{ color }}>
@@ -1310,11 +1441,12 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             </p>
           </button>
         )}
-        {verNutricion&&(
+        {verNutricion && (
           <button onClick={() => setTab('nutricion')}
-            className="bg-white rounded-2xl p-4 text-left active:scale-[0.98] transition-all">
-            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Nutrición</p>
-            <p className="text-sm font-black text-[#0A0A0A] leading-tight line-clamp-2">
+            className="rounded-2xl p-4 text-left active:scale-[0.98] transition-all"
+            style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-2" style={{ color: C.textMuted }}>Nutrición</p>
+            <p className="text-sm font-black text-white leading-tight line-clamp-2">
               {nutricion ? nutricion.nombre : 'En preparación'}
             </p>
             <p className="text-[10px] font-bold mt-2" style={{ color }}>
@@ -1322,22 +1454,23 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
             </p>
           </button>
         )}
-        {/* Con check-in atrasado ya sale el aviso rojo arriba: aquí no se repite.
-            Sin módulo Seguimiento en el centro, no hay check-in. */}
+        {/* Check-in: no se muestra si ya está el aviso urgente rojo */}
         {VER_CHECKIN && !ciUrgente && (
           <button onClick={() => setModalCI(true)}
-            className="rounded-2xl p-4 text-left active:scale-[0.98] transition-all bg-white">
-            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Check-in</p>
-            <p className="text-sm font-black text-[#0A0A0A] leading-tight">
+            className="rounded-2xl p-4 text-left active:scale-[0.98] transition-all"
+            style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-2" style={{ color: C.textMuted }}>Check-in</p>
+            <p className="text-sm font-black text-white leading-tight">
               {`Hace ${diasSinCI === 0 ? 'hoy' : diasSinCI + 'd'}`}
             </p>
             <p className="text-[10px] font-bold mt-2" style={{ color }}>Nuevo →</p>
           </button>
         )}
         <button onClick={() => setModalActividad(true)}
-          className="bg-white rounded-2xl p-4 text-left active:scale-[0.98] transition-all">
-          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-2">Actividad</p>
-          <p className="text-sm font-black text-[#0A0A0A] leading-tight">Registrar</p>
+          className="rounded-2xl p-4 text-left active:scale-[0.98] transition-all"
+          style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-2" style={{ color: C.textMuted }}>Actividad</p>
+          <p className="text-sm font-black text-white leading-tight">Registrar</p>
           <p className="text-[10px] font-bold mt-2" style={{ color }}>Footing, padel… →</p>
         </button>
       </div>
