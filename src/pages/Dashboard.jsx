@@ -8,6 +8,7 @@ import { useEquipo } from '../hooks/useCentro'
 import { moduloVisible } from '../lib/modulos'
 import { diaLocal, mesLocal } from '../lib/dateUtils'
 import { estadoCobro, diasHasta, cuentaParaCuotas } from '../lib/cobros'
+import { ini } from '../lib/avatar'
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
@@ -55,6 +56,16 @@ function BarChart({ datos, max }) {
   )
 }
 
+function Toast({ msg, tipo, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  const bg = tipo === 'error' ? 'bg-red-500' : 'bg-acento'
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl ${bg} whitespace-nowrap`}>
+      {msg}
+    </div>
+  )
+}
+
 export default function Dashboard({ session }) {
   const [datos, setDatos] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -62,7 +73,7 @@ export default function Dashboard({ session }) {
   const [sesionesManana, setSesionesManana] = useState([])
   const [cuestPendientes, setCuestPendientes] = useState([])
   const [clientesIAPendiente, setClientesIAPendiente] = useState([])
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState(null)
   const [mostrarWizard, setMostrarWizard] = useState(false)
   const [expandirCriticos, setExpandirCriticos] = useState(false)
   const [incidencias, setIncidencias] = useState([])
@@ -72,7 +83,7 @@ export default function Dashboard({ session }) {
   const equipo = useEquipo(uid)
   const { completar, completado, porcentaje, cargado } = useOnboarding(uid)
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
+  function showToast(msg, tipo = 'ok') { setToast({ msg, tipo }) }
 
   function descartarGrupo(clienteIds, tipo, campo) {
     descartarAlertas(clienteIds, tipo)
@@ -157,7 +168,7 @@ export default function Dashboard({ session }) {
       }
       generarMensajeBienvenida(lead, huboModalAcceso)
     } catch (e) {
-      showToast('Error al aceptar el lead')
+      showToast('Error al aceptar el lead', 'error')
     } finally {
       setProcesandoLead(null)
     }
@@ -170,7 +181,7 @@ export default function Dashboard({ session }) {
       if (error) throw error
       setDatos(d => ({ ...d, leadsPendientes: (d.leadsPendientes||[]).filter(l => l.id !== lead.id) }))
     } catch (e) {
-      showToast('Error al rechazar el lead')
+      showToast('Error al rechazar el lead', 'error')
     } finally {
       setProcesandoLead(null)
     }
@@ -438,11 +449,7 @@ export default function Dashboard({ session }) {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl bg-acento whitespace-nowrap">
-          {toast}
-        </div>
-      )}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
 
       {/* Modal acceso manual — email no configurado, hay que copiar el link */}
       {modalAccesoManual && (
@@ -873,7 +880,7 @@ export default function Dashboard({ session }) {
                             const r = await supabase.functions.invoke('checkin-semanal', { body: { dias_umbral: 7 } })
                             const enviados = r.data?.enviados || 0
                             showToast(`✓ Recordatorio enviado a ${enviados} cliente${enviados!==1?'s':''}`)
-                          } catch(e) { showToast('Error al enviar') }
+                          } catch(e) { showToast('Error al enviar', 'error') }
                         }} className={`text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 text-white ${criticos.length > 0 ? 'bg-red-500' : 'bg-amber-500'}`}>
                           Recordar →
                         </button>
@@ -1118,7 +1125,6 @@ export default function Dashboard({ session }) {
               ) : (
                 <div className="divide-y divide-black/4">
                   {sesionesHoy.map(s => {
-                    const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                     return (
                       <div key={s.id} className={`flex items-center gap-3 px-5 py-3 ${s.completada?'bg-emerald-50':''}`}>
                         <div className="w-8 h-8 bg-acento/10 rounded-xl flex items-center justify-center text-acento font-bold text-xs flex-shrink-0">
@@ -1143,7 +1149,6 @@ export default function Dashboard({ session }) {
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     {sesionesManana.map(s => {
-                      const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
                       return (
                         <div key={s.id} className="flex items-center gap-2 bg-white border border-black/8 px-3 py-1.5 rounded-xl">
                           <span className="text-xs font-bold text-[#6366f1]">{ini(s.clientes?.nombre)}</span>

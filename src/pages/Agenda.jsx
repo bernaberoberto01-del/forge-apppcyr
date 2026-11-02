@@ -8,6 +8,7 @@ import { useCentro, useEquipo } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
 import { SERVICIOS_EXTRA, ICONO_SERVICIO, NOMBRE_SERVICIO, esServicioExtra, hayAreas, areasDe } from '../lib/servicios'
 import { funcionActiva } from '../lib/modulos'
+import { ini } from '../lib/avatar'
 
 const HORAS = Array.from({ length: 17 }, (_, i) => i + 6) // 6:00 a 22:00
 const DIAS_LABEL = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
@@ -822,8 +823,6 @@ export default function Agenda({ session }) {
     setForm(f => ({ ...f, hora: hora || '09:00' }))
     setModal(true)
   }
-
-  const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">

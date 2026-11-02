@@ -4,6 +4,8 @@ import ClienteQuickView from '../components/ClienteQuickView'
 import { supabase } from '../lib/supabase'
 import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
+import { useConfirm } from '../components/ConfirmModal'
+import { ini } from '../lib/avatar'
 
 const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo']
 
@@ -47,6 +49,7 @@ export default function Nutricion({ session }) {
   const [generandoSup, setGenerandoSup] = useState(false)
   const uid = session.user.id
   const equipo = useEquipo(uid)
+  const { confirm: askConfirm, ConfirmUI } = useConfirm()
 
   useEffect(() => { cargar() }, [uid, equipo])
 
@@ -159,14 +162,13 @@ export default function Nutricion({ session }) {
 
   const cuestUrl = (entrenadorId, clienteId) => `${window.location.origin}/nutricion-cuest?e=${entrenadorId}&c=${clienteId}`
 
-  const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-
   const OBJETIVO_LABEL = { perdida_grasa:'Pérdida de grasa', ganancia_muscular:'Ganancia muscular', tonificacion:'Tonificación', fuerza:'Fuerza', rendimiento:'Rendimiento', salud_general:'Salud general', cambio_rapido_30dias:'Cambio 30 días' }
   const OBJETIVO_COLOR = { perdida_grasa:'#f59e0b', ganancia_muscular:'#6366f1', tonificacion:'#10b981', fuerza:'#ef4444', rendimiento:'#0ea5e9', salud_general:'#10b981', cambio_rapido_30dias:BRAND.color }
 
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
+      {ConfirmUI}
 
       {/* Cabecera */}
       <div className="flex items-start justify-between mb-4">
@@ -345,7 +347,8 @@ export default function Nutricion({ session }) {
               </button>
               {p.estado==='borrador' && (
                 <button onClick={async () => {
-                  if (!confirm(`¿Eliminar el borrador de ${p.clientes?.nombre?.split(' ')[0] || 'este cliente'}?`)) return
+                  const ok = await askConfirm({ title: '¿Eliminar borrador?', message: `Se eliminará el borrador de ${p.clientes?.nombre?.split(' ')[0] || 'este cliente'}.`, danger: true, confirmText: 'Eliminar' })
+                  if (!ok) return
                   const { error } = await supabase.from('planes_nutricion').delete().eq('id', p.id)
                   if (error) { setToast({ msg: 'Error al eliminar el borrador', tipo: 'error' }); return }
                   cargar()
@@ -383,8 +386,11 @@ export default function Nutricion({ session }) {
                     : <button
                         onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
                         title={activo ? 'Desactivar: el cliente dejará de ver el plan nutricional en su portal' : 'Activar: el cliente podrá ver su plan nutricional en el portal'}
-                        className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
-                        <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                        className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className={`w-11 h-6 rounded-full transition-all relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
+                          <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                        </div>
+                        <span className={`text-xs font-medium ${activo ? 'text-acento' : 'text-[#9B9B9B]'}`}>{activo ? 'Activo' : 'Inactivo'}</span>
                       </button>
                   }
                 </div>
@@ -433,8 +439,11 @@ export default function Nutricion({ session }) {
                   : <button
                       onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
                       title={activo ? 'Desactivar: el cliente dejará de ver el plan nutricional en su portal' : 'Activar: el cliente podrá ver su plan nutricional en el portal'}
-                      className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                      className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className={`w-11 h-6 rounded-full transition-all relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
+                        <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
+                      </div>
+                      <span className={`text-xs font-medium ${activo ? 'text-acento' : 'text-[#9B9B9B]'}`}>{activo ? 'Activo' : 'Inactivo'}</span>
                     </button>
                 }
               </div>

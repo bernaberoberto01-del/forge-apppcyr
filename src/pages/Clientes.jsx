@@ -378,7 +378,7 @@ export default function Clientes({ session }) {
       }, (payload) => {
         setCuestionarios(prev => [payload.new, ...prev])
         setModalRegistros(true) // abre el modal automáticamente
-        setToast('📋 Nuevo diagnóstico recibido')
+        showToast('Nuevo diagnóstico recibido', 'ok')
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -934,7 +934,7 @@ export default function Clientes({ session }) {
       ) : (
         <>
           {/* Header tabla — solo desktop */}
-          <div className="hidden md:grid grid-cols-[2fr_1fr_1.2fr_1fr_80px] gap-3 px-4 mb-2 sticky top-0 bg-[#F7F6F3] z-10 py-2 -mt-2">
+          <div className="hidden md:grid grid-cols-[2fr_1fr_1.2fr_1fr_80px] gap-3 px-4 mb-2 sticky top-0 bg-[#F7F6F3] z-10 py-2 -mt-2 border-b border-black/5">
             {['Cliente','Modalidad','Objetivo','Estado','Importe'].map(h => (
               <p key={h} className="text-xs font-semibold text-[#6B6B6B] uppercase tracking-wide">{h}</p>
             ))}
@@ -2334,7 +2334,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
   const [añadiendo,  setAñadiendo]  = useState(false)
   const [precioPP,   setPrecioPP]   = useState('')   // precio/persona editable
   const [vistaMovil, setVistaMovil] = useState('lista') // lista | detalle
-  const [toast,      setToast]      = useState('')     // '✓ …' o '❌ …'
+  const [toast,      setToast]      = useState(null)
   const [confirm, ConfirmUI] = useConfirm()
 
   // Refrescar sel cuando cambian grupos
@@ -2395,7 +2395,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
     if (!cliAdd || !sel) return
     const miembros = sel.grupo_clientes?.filter(m=>m.activo)||[]
     const max = sel.tipo==='pareja'?2:6
-    if (miembros.length>=max) { setToast(`❌ Máximo ${max} miembros`); return }
+    if (miembros.length>=max) { setToast({ msg: `Máximo ${max} miembros`, tipo: 'error' }); return }
     setAñadiendo(true)
     const precioFinal = Number(precioPP) || getTarifaG(sel.tipo, sel.dias_semana?.length||0)?.pp || 0
     await supabase.from('grupo_clientes').upsert(
@@ -2417,7 +2417,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
 
   async function crearSesiones() {
     const miembros = sel?.grupo_clientes?.filter(m=>m.activo)||[]
-    if (!miembros.length) { setToast('❌ Añade clientes primero'); return }
+    if (!miembros.length) { setToast({ msg: 'Añade clientes primero', tipo: 'error' }); return }
     const ok = await confirm({ title: `¿Crear sesiones recurrentes?`, message: `Se crearán sesiones recurrentes para ${miembros.length} miembro${miembros.length !== 1 ? 's' : ''} en la Agenda.`, confirmText: 'Crear sesiones' })
     if (!ok) return
     await supabase.from('sesiones_recurrentes').insert(
@@ -2425,7 +2425,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
         hora:sel.hora, duracion_minutos:sel.duracion_minutos,
         dias_semana:sel.dias_semana, tipo:'presencial', activa:true, grupo_id:sel.id }))
     )
-    setToast('✓ Sesiones creadas en la Agenda')
+    setToast({ msg: 'Sesiones creadas en la Agenda', tipo: 'ok' })
   }
 
   const miembros = sel?.grupo_clientes?.filter(m=>m.activo)||[]
@@ -2665,7 +2665,7 @@ function PanelGrupos({ grupos, clientes, uid, onActualizar }) {
         </div>
       )}
       {ConfirmUI}
-      {toast && <Toast msg={toast.replace(/^(✓|❌)\s*/, '')} tipo={toast.startsWith('❌') ? 'error' : 'ok'} onClose={() => setToast('')} />}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
     </div>
   )
 }

@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import ClienteQuickView from '../components/ClienteQuickView'
 import { BRAND } from '../lib/brand'
 import { useEquipo } from '../hooks/useCentro'
+import { useConfirm } from '../components/ConfirmModal'
+import { ini } from '../lib/avatar'
 
 const ESCALAS = [
   { label: 'Energía', field: 'energia', min: 1, max: 5, suffix: '/5', color: 'blue' },
@@ -53,6 +55,15 @@ function renderTextoOLista(texto) {
   return <span className="whitespace-pre-line">{texto}</span>
 }
 
+function Toast({ msg, tipo='ok', onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t) }, [])
+  return (
+    <div className={`fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[100] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2 whitespace-nowrap ${tipo==='error'?'bg-red-600':'bg-[#111]'}`}>
+      <span>{tipo==='error'?'⚠':'✓'}</span> {msg}
+    </div>
+  )
+}
+
 export default function Seguimiento({ session }) {
   const [checkins, setCheckins] = useState([])
   const [clientes, setClientes] = useState([])
@@ -90,7 +101,8 @@ export default function Seguimiento({ session }) {
   const [detalleSesion, setDetalleSesion] = useState(null)
   const [busquedaSes, setBusquedaSes] = useState('')
   const [enviando, setEnviando] = useState(false)
-  const [toast, setToast] = useState('')
+  const [toast, setToast] = useState(null)
+  const { confirm: askConfirm, ConfirmUI } = useConfirm()
   const [editandoMensajeAnalisis, setEditandoMensajeAnalisis] = useState(null)
   const [borradorMensajeAnalisis, setBorradorMensajeAnalisis] = useState('')
   const [enviandoAnalisisId, setEnviandoAnalisisId] = useState(null)
@@ -117,8 +129,7 @@ export default function Seguimiento({ session }) {
       supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', false).order('created_at', { ascending: false }).limit(20),
     ])
     if (resultados.some(r => r.error)) {
-      setToast('Error al cargar datos')
-      setTimeout(() => setToast(''), 3000)
+      setToast({ msg: 'Error al cargar datos', tipo: 'error' })
     }
     const [{ data: ci }, { data: cl }, { data: se }, { data: bors }, { data: an }] = resultados
     setCheckins(ci || [])
@@ -133,8 +144,7 @@ export default function Seguimiento({ session }) {
     const { data, error } = await supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(50)
     setCargandoHistorial(false)
     if (error) {
-      setToast('Error al cargar datos')
-      setTimeout(() => setToast(''), 3000)
+      setToast({ msg: 'Error al cargar datos', tipo: 'error' })
       return
     }
     setHistorialAnalisis(data || [])
@@ -152,16 +162,15 @@ export default function Seguimiento({ session }) {
     try {
       const { data, error } = await supabase.functions.invoke('analizar-cliente-mensual', { body: {} })
       if (!error && data?.ok) {
-        setToast(`✓ ${data.procesados} rutinas generadas para revisión`)
+        setToast({ msg: `${data.procesados} rutinas generadas para revisión`, tipo: 'ok' })
         cargar()
       } else {
-        setToast('Error: ' + (data?.error || error?.message || 'inténtalo de nuevo'))
+        setToast({ msg: 'Error: ' + (data?.error || error?.message || 'inténtalo de nuevo'), tipo: 'error' })
       }
     } catch (e) {
-      setToast('Error de conexión')
+      setToast({ msg: 'Error de conexión', tipo: 'error' })
     }
     setLanzandoMensual(false)
-    setTimeout(() => setToast(''), 4000)
   }
 
   async function generarAjustePlan(a) {
@@ -180,20 +189,19 @@ export default function Seguimiento({ session }) {
           } catch { /* el body no era JSON, nos quedamos con error.message */ }
         }
         console.error('generarAjustePlan error:', error)
-        setToast('Error al generar: ' + mensaje)
+        setToast({ msg: 'Error al generar: ' + mensaje, tipo: 'error' })
       } else if (data?.ok && data?.rutina_id) {
         await supabase.from('analisis_mensual').update({ rutina_generada_id: data.rutina_id }).eq('id', a.id)
         setAnalisisMensual(prev => prev.map(x => x.id === a.id ? { ...x, rutina_generada_id: data.rutina_id } : x))
-        setToast('✓ Plan ajustado generado — revísalo en Rutinas')
+        setToast({ msg: 'Plan ajustado generado — revísalo en Rutinas', tipo: 'ok' })
       } else {
         console.error('generarAjustePlan respuesta inesperada:', data)
-        setToast('Error al generar: ' + (data?.razon || data?.error || 'la función no devolvió rutina_id'))
+        setToast({ msg: 'Error al generar: ' + (data?.razon || data?.error || 'la función no devolvió rutina_id'), tipo: 'error' })
       }
     } catch (e) {
       console.error('generarAjustePlan excepción:', e)
-      setToast('Error al generar: ' + (e?.message || 'inténtalo de nuevo'))
+      setToast({ msg: 'Error al generar: ' + (e?.message || 'inténtalo de nuevo'), tipo: 'error' })
     }
-    setTimeout(() => setToast(''), 4000)
     setGenerandoAjusteId(null)
   }
 
@@ -202,17 +210,15 @@ export default function Seguimiento({ session }) {
     try {
       const { error } = await supabase.functions.invoke('checkin-semanal', { body: {} })
       if (error) throw error
-      setToast('Check-in enviado a todos los clientes activos ✓')
-    } catch { setToast('Error al enviar') }
+      setToast({ msg: 'Check-in enviado a todos los clientes activos', tipo: 'ok' })
+    } catch { setToast({ msg: 'Error al enviar', tipo: 'error' }) }
     setEnviando(false)
-    setTimeout(() => setToast(''), 3000)
   }
 
   async function copiarEnlaceCheckin(clienteId) {
     const url = `${window.location.origin}/seguimiento/${clienteId}`
     await navigator.clipboard.writeText(url)
-    setToast('Enlace de seguimiento copiado ✓')
-    setTimeout(() => setToast(''), 3000)
+    setToast({ msg: 'Enlace de seguimiento copiado', tipo: 'ok' })
   }
 
   async function guardar() {
@@ -225,8 +231,7 @@ export default function Seguimiento({ session }) {
     })
     setLoading(false)
     if (error) {
-      setToast('Error al guardar check-in')
-      setTimeout(() => setToast(''), 3000)
+      setToast({ msg: 'Error al guardar check-in', tipo: 'error' })
       return
     }
     setModal(false)
@@ -262,15 +267,10 @@ export default function Seguimiento({ session }) {
     }
     return escalas[campo]?.[valor] || `${valor}`
   }
-  const ini = n => (n || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-
   return (
     <div className="p-4 md:p-6 pb-20 md:pb-6 max-w-screen-xl mx-auto">
-      {toast && (
-        <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#111] text-white text-sm font-medium px-5 py-3 rounded-2xl shadow-lg flex items-center gap-2">
-          <span className="text-emerald-400">✓</span> {toast}
-        </div>
-      )}
+      {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
+      {ConfirmUI}
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-[#0A0A0A]">Seguimiento</h1>
@@ -443,7 +443,7 @@ export default function Seguimiento({ session }) {
                     setDetalleCI(ci)
                     const { data } = await supabase.functions.invoke('analizar-checkin', { body: { cliente_id: ci.cliente_id, checkin_id: ci.id } })
                     if (data?.mensaje_sugerido) setMensajeSugerido({ texto: data.mensaje_sugerido, borrador_id: data.borrador_id })
-                    else { setToast('Error al analizar'); setTimeout(() => setToast(''), 3000) }
+                    else { setToast({ msg: 'Error al analizar', tipo: 'error' });  }
                     setAnalizando(false)
                   }} className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white flex items-center gap-1.5"
                     style={{background:'#6366f1'}}>
@@ -637,8 +637,7 @@ export default function Seguimiento({ session }) {
                         .eq('id', mensajeSugerido.borrador_id)
                       setMensajeSugerido(null)
                       setEnviandoMensaje(false)
-                      setToast('✓ Mensaje enviado al cliente')
-                      setTimeout(() => setToast(''), 3000)
+                      setToast({ msg: 'Mensaje enviado al cliente', tipo: 'ok' })
                     }} disabled={enviandoMensaje}
                       className="flex-1 bg-amber-600 text-white text-sm font-semibold py-2.5 rounded-xl disabled:opacity-50">
                       {enviandoMensaje ? 'Enviando...' : '✉️ Enviar al cliente'}
@@ -662,8 +661,7 @@ export default function Seguimiento({ session }) {
                   if (!error && data?.mensaje_sugerido) {
                     setMensajeSugerido({ texto: data.mensaje_sugerido, borrador_id: data.borrador_id })
                   } else {
-                    setToast('Error al analizar — ' + (data?.error || error?.message || 'inténtalo de nuevo'))
-                    setTimeout(() => setToast(''), 3000)
+                    setToast({ msg: 'Error al analizar — ' + (data?.error || error?.message || 'inténtalo de nuevo'), tipo: 'error' })
                   }
                   setAnalizando(false)
                 }} disabled={analizando}
@@ -968,8 +966,7 @@ export default function Seguimiento({ session }) {
                 await supabase.functions.invoke('analizar-cliente-mensual', { body: {} })
                 await cargar()
                 setLanzandoMensual(false)
-                setToast('✓ Análisis completado')
-                setTimeout(() => setToast(''), 3000)
+                setToast({ msg: 'Análisis completado', tipo: 'ok' })
               }} disabled={lanzandoMensual}
                 className="text-xs border border-black/10 text-[#6B6B6B] px-4 py-2 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40 flex items-center gap-1.5 mx-auto">
                 {lanzandoMensual ? <><span className="w-3 h-3 border-2 border-[#6B6B6B] border-t-transparent rounded-full animate-spin"/>Analizando...</> : '↻ Forzar análisis ahora'}
@@ -1110,11 +1107,10 @@ export default function Seguimiento({ session }) {
                                 setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
                                 setHistorialAnalisis(prev => [{ ...a, enviado_cliente: true, revisado: true, mensaje_cliente: texto, accion_tomada: 'mensaje_enviado' }, ...prev])
                                 setEditandoMensajeAnalisis(null)
-                                setToast('✓ Mensaje enviado al cliente')
+                                setToast({ msg: 'Mensaje enviado al cliente', tipo: 'ok' })
                               } else {
-                                setToast('Error al enviar el mensaje')
+                                setToast({ msg: 'Error al enviar el mensaje', tipo: 'error' })
                               }
-                              setTimeout(() => setToast(''), 3000)
                               setEnviandoAnalisisId(null)
                             } else {
                               // Ya hay mensaje_cliente listo: envío directo
@@ -1126,11 +1122,10 @@ export default function Seguimiento({ session }) {
                                 await supabase.from('analisis_mensual').update({ enviado_cliente: true, revisado: true, accion_tomada: 'mensaje_enviado' }).eq('id', a.id)
                                 setAnalisisMensual(prev => prev.filter(x => x.id !== a.id))
                                 setHistorialAnalisis(prev => [{ ...a, enviado_cliente: true, revisado: true, accion_tomada: 'mensaje_enviado' }, ...prev])
-                                setToast('✓ Mensaje enviado al cliente')
+                                setToast({ msg: 'Mensaje enviado al cliente', tipo: 'ok' })
                               } else {
-                                setToast('Error al enviar el mensaje')
+                                setToast({ msg: 'Error al enviar el mensaje', tipo: 'error' })
                               }
-                              setTimeout(() => setToast(''), 3000)
                               setEnviandoAnalisisId(null)
                             }
                           }}
@@ -1288,8 +1283,7 @@ export default function Seguimiento({ session }) {
                       await supabase.from('rutinas').update({ estado: 'archivada' })
                         .eq('cliente_id', b.cliente_id).eq('estado', 'publicada')
                       await supabase.from('rutinas').update({ estado: 'publicada' }).eq('id', b.id)
-                      setToast(`✓ Rutina de ${b.clientes?.nombre} publicada`)
-                      setTimeout(() => setToast(''), 3000)
+                      setToast({ msg: `Rutina de ${b.clientes?.nombre} publicada`, tipo: 'ok' })
                       cargar()
                       setPublicandoBorrador(null)
                     }} disabled={publicandoBorrador === b.id}
@@ -1298,7 +1292,8 @@ export default function Seguimiento({ session }) {
                       {publicandoBorrador === b.id ? 'Publicando...' : '▶ Publicar rutina'}
                     </button>
                     <button onClick={async () => {
-                      if (!confirm(`¿Descartar la rutina borrador de ${b.clientes?.nombre}?`)) return
+                      const ok = await askConfirm({ title: `¿Descartar borrador?`, message: `Se eliminará la rutina borrador de ${b.clientes?.nombre}.`, danger: true, confirmText: 'Descartar' })
+                      if (!ok) return
                       await supabase.from('rutinas').delete().eq('id', b.id)
                       cargar()
                     }} className="border border-red-100 text-red-400 text-sm px-3 py-2.5 rounded-xl hover:bg-red-50">
@@ -1318,7 +1313,6 @@ export default function Seguimiento({ session }) {
 
 // ─── Tarjeta cliente semana ────────────────────────────────────────────────────
 function TarjetaClienteSemana({ c, color, navigate, setQuickView }) {
-  const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
   const alDia = c.diasSinCI < 7
   const texto = alDia ? '✓ Esta semana' : c.diasSinCI === 999 ? 'Sin check-in nunca' : `${c.diasSinCI} días sin check-in`
 
