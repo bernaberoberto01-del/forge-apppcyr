@@ -280,10 +280,18 @@ export default function Pagos({ session }) {
     return pagos.filter(p => p.fecha_pago?.startsWith(mes)).reduce((s,p) => s+Number(p.importe||0), 0)
   }, [pagos])
 
-  const pendientesMes = useMemo(() => planes.filter(p => {
+  const cobrosVencidos = useMemo(() => planes.filter(p => {
     const d = diasRestantes(p)
-    return d !== null && d <= 7
+    return d !== null && d < 0
   }), [planes])
+
+  const cobrosProximos = useMemo(() => planes.filter(p => {
+    const d = diasRestantes(p)
+    return d !== null && d >= 0 && d <= 7
+  }), [planes])
+
+  // pendientesMes mantiene compatibilidad con el stat del contador
+  const pendientesMes = useMemo(() => [...cobrosVencidos, ...cobrosProximos], [cobrosVencidos, cobrosProximos])
 
   const pagosFiltrados = useMemo(() => {
     let r = [...pagos]
@@ -333,36 +341,71 @@ export default function Pagos({ session }) {
             <p className="text-white/40 text-xs mt-0.5">Planes activos</p>
           </div>
           <div>
-            <p className={`text-2xl font-bold ${pendientesMes.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{pendientesMes.length}</p>
-            <p className="text-white/40 text-xs mt-0.5">Vencen en 7 días</p>
+            <p className={`text-2xl font-bold ${cobrosVencidos.length > 0 ? 'text-red-400' : cobrosProximos.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              {cobrosVencidos.length > 0 ? cobrosVencidos.length : cobrosProximos.length}
+            </p>
+            <p className="text-white/40 text-xs mt-0.5">{cobrosVencidos.length > 0 ? 'Vencidos' : 'Esta semana'}</p>
           </div>
         </div>
       </div>
 
-      {/* Alertas cobros próximos */}
-      {pendientesMes.length > 0 && (
-        <div className="border border-amber-200 rounded-2xl overflow-hidden mb-4">
+      {/* Alertas cobros vencidos */}
+      {cobrosVencidos.length > 0 && (
+        <div className="border border-red-200 rounded-2xl overflow-hidden mb-3">
           <button onClick={() => setMostrarPendientes(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-all">
+            className="w-full flex items-center justify-between px-4 py-3 bg-red-50 hover:bg-red-100 transition-all">
             <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">{pendientesMes.length}</span>
-              <p className="text-xs font-semibold text-amber-800">⏰ Cobros próximos esta semana</p>
+              <span className="w-5 h-5 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center animate-pulse">{cobrosVencidos.length}</span>
+              <p className="text-xs font-semibold text-red-800">🔴 Cobros vencidos — pendientes de registrar</p>
             </div>
-            <span className="text-amber-600 text-sm">{mostrarPendientes ? '▲' : '▼'}</span>
+            <span className="text-red-600 text-sm">{mostrarPendientes ? '▲' : '▼'}</span>
           </button>
           {mostrarPendientes && (
             <div className="bg-white p-3 space-y-2">
-              {pendientesMes.map(p => {
+              {cobrosVencidos.map(p => {
                 const dias = diasRestantes(p)
                 return (
                   <div key={p.id} className="flex items-center gap-3 py-1">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-[#0A0A0A] truncate">{p.clientes?.nombre}</p>
-                      <p className="text-xs text-[#6B6B6B]">{p.importe}€ · {dias === 0 ? 'Hoy' : dias < 0 ? `Vencido hace ${Math.abs(dias)} días` : `En ${dias} días`}</p>
+                      <p className="text-xs text-red-600 font-medium">{p.importe}€ · Vencido hace {Math.abs(dias)} {Math.abs(dias) === 1 ? 'día' : 'días'}</p>
                     </div>
                     <button onClick={() => marcarCobrado(p)}
-                      className="bg-emerald-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0">
-                      ✓ Cobrado
+                      className="bg-[#111] text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 active:scale-95 transition-all">
+                      Marcar cobrado
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Alertas cobros próximos */}
+      {cobrosProximos.length > 0 && (
+        <div className="border border-amber-200 rounded-2xl overflow-hidden mb-4">
+          <button onClick={() => setMostrarPendientes(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 transition-all">
+            <div className="flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">{cobrosProximos.length}</span>
+              <p className="text-xs font-semibold text-amber-800">⏰ Cobros esta semana</p>
+            </div>
+            <span className="text-amber-600 text-sm">{mostrarPendientes ? '▲' : '▼'}</span>
+          </button>
+          {mostrarPendientes && (
+            <div className="bg-white p-3 space-y-2">
+              {cobrosProximos.map(p => {
+                const dias = diasRestantes(p)
+                return (
+                  <div key={p.id} className="flex items-center gap-3 py-1">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0A0A0A] truncate">{p.clientes?.nombre}</p>
+                      <p className="text-xs text-[#6B6B6B]">{p.importe}€ · {dias === 0 ? 'Hoy' : `En ${dias} ${dias === 1 ? 'día' : 'días'}`}</p>
+                    </div>
+                    <button onClick={() => marcarCobrado(p)}
+                      className="bg-[#111] text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex-shrink-0 active:scale-95 transition-all">
+                      Marcar cobrado
                     </button>
                   </div>
                 )
