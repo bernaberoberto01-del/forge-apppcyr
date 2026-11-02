@@ -2732,8 +2732,8 @@ function SubPeso({ checkins, color }) {
         const linePath = pts.map((p, i) => `${i===0?'M':'L'} ${p.x},${p.y}`).join(' ')
         const areaPath = `M ${pts[0].x},${H-20} ` + pts.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${pts[pts.length-1].x},${H-20} Z`
         return (
-          <div className="bg-white rounded-2xl p-4">
-            <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B] mb-3">Evolución del peso</p>
+          <div className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-3" style={{ color: C.textSecondary }}>Evolución del peso</p>
             <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible' }}>
               <defs>
                 <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
@@ -2744,7 +2744,7 @@ function SubPeso({ checkins, color }) {
               {/* Grid lines */}
               {[0,0.5,1].map(t => (
                 <line key={t} x1={pad} y1={pad + t*iH} x2={W-pad} y2={pad + t*iH}
-                  stroke="rgba(0,0,0,0.06)" strokeWidth="1" strokeDasharray="4 4" />
+                  stroke="rgba(255,255,255,0.06)" strokeWidth="1" strokeDasharray="4 4" />
               ))}
               {/* Área */}
               <path d={areaPath} fill="url(#pg)" />
@@ -2754,11 +2754,11 @@ function SubPeso({ checkins, color }) {
               {pts.map((p, i) => (
                 <g key={i}>
                   <circle cx={p.x} cy={p.y} r={i === pts.length-1 ? 6 : 4}
-                    fill={i === pts.length-1 ? color : 'white'}
+                    fill={i === pts.length-1 ? color : '#0F0F0D'}
                     stroke={color} strokeWidth="2.5" />
                   {/* Label peso */}
                   <text x={p.x} y={H-4} textAnchor="middle"
-                    fontSize="9" fontWeight="700" fill={i === pts.length-1 ? color : '#C0C0C0'}>
+                    fontSize="9" fontWeight="700" fill={i === pts.length-1 ? color : 'rgba(255,255,255,0.3)'}>
                     {p.peso}
                   </text>
                 </g>
@@ -2780,30 +2780,30 @@ function SubPeso({ checkins, color }) {
       })()}
 
       {/* Historial — limpio, tipografía fuerte */}
-      <div className="bg-white rounded-2xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-black/5 flex items-center justify-between">
-          <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Historial</p>
-          <p className="text-[10px] font-black text-[#9B9B9B]">{checkins.length} entradas</p>
+      <div className="rounded-2xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+        <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: `1px solid ${C.border}` }}>
+          <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>Historial</p>
+          <p className="text-[10px] font-black" style={{ color: C.textSecondary }}>{checkins.length} entradas</p>
         </div>
-        <div className="divide-y divide-black/4">
+        <div>
           {checkins.slice(0, 15).map((c, i) => (
-            <div key={i} className="px-5 py-3.5 flex items-start gap-3">
+            <div key={i} className="px-5 py-3.5 flex items-start gap-3" style={{ borderBottom: i < Math.min(checkins.length, 15) - 1 ? `1px solid ${C.borderSubtle}` : 'none' }}>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-[#0A0A0A]">
+                <p className="text-xs font-black" style={{ color: C.textPrimary }}>
                   {formatearFecha(c.fecha, {weekday:'short',day:'numeric',month:'short'})}
                 </p>
                 <div className="flex gap-2.5 mt-1.5 flex-wrap">
-                  {c.energia  != null && <span className="text-[10px] font-bold text-[#9B9B9B]">⚡ {c.energia}/5</span>}
-                  {c.fatiga   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🏋️ {c.fatiga}/5</span>}
-                  {c.sueno    != null && <span className="text-[10px] font-bold text-[#9B9B9B]">😴 {c.sueno}/5</span>}
-                  {c.estres   != null && <span className="text-[10px] font-bold text-[#9B9B9B]">🧠 {c.estres}/5</span>}
+                  {c.energia  != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>⚡ {c.energia}/5</span>}
+                  {c.fatiga   != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>🏋️ {c.fatiga}/5</span>}
+                  {c.sueno    != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>😴 {c.sueno}/5</span>}
+                  {c.estres   != null && <span className="text-[10px] font-bold" style={{ color: C.textSecondary }}>🧠 {c.estres}/5</span>}
                 </div>
                 {c.comentario && (
-                  <p className="text-[10px] text-[#9B9B9B] mt-1.5 italic leading-relaxed">"{c.comentario}"</p>
+                  <p className="text-[10px] mt-1.5 italic leading-relaxed" style={{ color: C.textSecondary }}>"{c.comentario}"</p>
                 )}
               </div>
               {c.peso && (
-                <p className="text-base font-black text-[#0A0A0A] flex-shrink-0">{c.peso}<span className="text-xs font-normal text-[#9B9B9B] ml-0.5">kg</span></p>
+                <p className="text-base font-black flex-shrink-0" style={{ color: C.textPrimary }}>{c.peso}<span className="text-xs font-normal ml-0.5" style={{ color: C.textSecondary }}>kg</span></p>
               )}
             </div>
           ))}
@@ -2889,7 +2889,7 @@ function SubMedidas({ medidas, color, cliente, cargarTodo, modoPreview }) {
     <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">
+        <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>
           {hayMedidas ? `${medidas.length} medición${medidas.length>1?'es':''}` : 'Sin medidas'}
         </p>
         <button onClick={() => setMostrando('form')} disabled={modoPreview}
@@ -2938,20 +2938,20 @@ function SubMedidas({ medidas, color, cliente, cargarTodo, modoPreview }) {
           )}
 
           {/* Historial */}
-          <div className="bg-white rounded-2xl overflow-hidden">
-            <div className="px-5 py-3 border-b border-black/5">
-              <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Historial</p>
+          <div className="rounded-2xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+            <div className="px-5 py-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+              <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>Historial</p>
             </div>
-            <div className="divide-y divide-black/4">
+            <div>
               {medidas.slice(0,8).map((m,i) => (
-                <div key={i} className="px-5 py-3.5">
-                  <p className="text-[10px] font-black text-[#9B9B9B] mb-2">
+                <div key={i} className="px-5 py-3.5" style={{ borderBottom: i < Math.min(medidas.length, 8) - 1 ? `1px solid ${C.borderSubtle}` : 'none' }}>
+                  <p className="text-[10px] font-black mb-2" style={{ color: C.textSecondary }}>
                     {new Date(m.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}
                   </p>
                   <div className="flex flex-wrap gap-x-4 gap-y-1">
                     {CAMPOS.filter(c => m[c.key]).map(campo => (
-                      <span key={campo.key} className="text-xs font-bold text-[#0A0A0A]">
-                        {campo.label}: <span style={{ color }}>{m[campo.key]}<span className="text-[#9B9B9B] font-normal">cm</span></span>
+                      <span key={campo.key} className="text-xs font-bold" style={{ color: C.textPrimary }}>
+                        {campo.label}: <span style={{ color }}>{m[campo.key]}<span className="text-[9px] font-normal ml-0.5" style={{ color: C.textSecondary }}>cm</span></span>
                       </span>
                     ))}
                   </div>
@@ -3043,16 +3043,16 @@ function SubFotos({ fotos, color, cliente, cargarTodo, modoPreview }) {
       {fechas.length === 0 ? (
         <div className="text-center py-10">
           <p className="text-4xl mb-3">📸</p>
-          <p className="text-base font-black text-[#0A0A0A]">Sin fotos aún</p>
-          <p className="text-xs text-[#9B9B9B] mt-1">Sube tu primera foto de progreso</p>
+          <p className="text-base font-black" style={{ color: C.textPrimary }}>Sin fotos aún</p>
+          <p className="text-xs mt-1" style={{ color: C.textSecondary }}>Sube tu primera foto de progreso</p>
         </div>
       ) : (
         <>
           {/* Comparativa inicio vs ahora */}
           {fechas.length >= 2 && (
-            <div className="bg-white rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-black/5">
-                <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Inicio vs Ahora</p>
+            <div className="rounded-2xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+              <div className="px-4 py-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>Inicio vs Ahora</p>
               </div>
               <div className="grid grid-cols-2 gap-0.5">
                 {[grupos[fechas[fechas.length-1]]?.[0], grupos[fechas[0]]?.[0]].filter(Boolean).map((f,i) => (
@@ -3072,9 +3072,9 @@ function SubFotos({ fotos, color, cliente, cargarTodo, modoPreview }) {
 
           {/* Galería por fecha */}
           {fechas.map(fecha => (
-            <div key={fecha} className="bg-white rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-black/5">
-                <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">
+            <div key={fecha} className="rounded-2xl overflow-hidden" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+              <div className="px-4 py-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: C.textSecondary }}>
                   {new Date(fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
                 </p>
               </div>
@@ -3129,8 +3129,8 @@ function SubFuerza({ ejerciciosHist, color }) {
   if (!lista.length) return (
     <div className="text-center py-12">
       <div className="text-4xl mb-3">💪</div>
-      <p className="text-base font-bold text-[#0A0A0A]">Sin registros de fuerza</p>
-      <p className="text-sm text-[#9B9B9B] mt-2 max-w-xs mx-auto leading-relaxed">Registra tus sesiones con pesos y repeticiones para ver tu evolución.</p>
+      <p className="text-base font-bold" style={{ color: C.textPrimary }}>Sin registros de fuerza</p>
+      <p className="text-sm mt-2 max-w-xs mx-auto leading-relaxed" style={{ color: C.textSecondary }}>Registra tus sesiones con pesos y repeticiones para ver tu evolución.</p>
     </div>
   )
 
@@ -3138,16 +3138,16 @@ function SubFuerza({ ejerciciosHist, color }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-[10px] text-[#9B9B9B]">RM estimada = peso máximo en 1 rep (fórmula Epley). Toca un ejercicio para ver su evolución.</p>
+      <p className="text-[10px]" style={{ color: C.textSecondary }}>RM estimada = peso máximo en 1 rep (fórmula Epley). Toca un ejercicio para ver su evolución.</p>
       {sel ? (
         <div>
           <button onClick={() => setEjSel(null)} className="text-xs font-bold mb-3 flex items-center gap-1" style={{ color }}>← Todos</button>
-          <div className="bg-white rounded-2xl border border-black/5 p-4">
+          <div className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
             <div className="flex items-start justify-between mb-4">
-              <p className="text-sm font-bold text-[#0A0A0A] flex-1 mr-3">{sel.nombre}</p>
+              <p className="text-sm font-bold flex-1 mr-3" style={{ color: C.textPrimary }}>{sel.nombre}</p>
               <div className="text-right">
-                <p className="text-2xl font-bold" style={{ color }}>{sel.rmActual}<span className="text-sm font-normal text-[#9B9B9B] ml-1">kg RM</span></p>
-                {sel.rmActual > sel.rmInicial && <p className="text-xs font-bold text-emerald-600">+{(sel.rmActual - sel.rmInicial).toFixed(1)} kg desde inicio</p>}
+                <p className="text-2xl font-bold" style={{ color }}>{sel.rmActual}<span className="text-sm font-normal ml-1" style={{ color: C.textSecondary }}>kg RM</span></p>
+                {sel.rmActual > sel.rmInicial && <p className="text-xs font-bold text-emerald-400">+{(sel.rmActual - sel.rmInicial).toFixed(1)} kg desde inicio</p>}
               </div>
             </div>
             {sel.registros.length > 1 && (
@@ -3159,7 +3159,7 @@ function SubFuerza({ ejerciciosHist, color }) {
                   return (
                     <div key={i} className="flex-1 flex flex-col items-center gap-1">
                       <div className="w-full rounded-md" style={{ height: `${h}%`, background: i === arr.length - 1 ? color : `${color}30`, minHeight: 5 }} />
-                      <p className="text-[8px] text-[#C0C0C0]">{r.maxRM}</p>
+                      <p className="text-[8px]" style={{ color: C.textMuted }}>{r.maxRM}</p>
                     </div>
                   )
                 })}
@@ -3173,16 +3173,17 @@ function SubFuerza({ ejerciciosHist, color }) {
             const mejora = ej.rmActual > ej.rmInicial ? +(ej.rmActual - ej.rmInicial).toFixed(1) : null
             return (
               <button key={ej.nombre} onClick={() => setEjSel(ej.nombre)}
-                className="w-full bg-white rounded-2xl border border-black/5 p-4 flex items-center gap-3 text-left active:scale-95">
+                className="w-full rounded-2xl p-4 flex items-center gap-3 text-left active:scale-95 transition-all"
+                style={{ background: C.bg, border: `1px solid ${C.border}` }}>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-[#0A0A0A] truncate">{ej.nombre}</p>
-                  <p className="text-[10px] text-[#9B9B9B] mt-0.5">{ej.registros.length} sesión{ej.registros.length !== 1 ? 'es' : ''}</p>
+                  <p className="text-sm font-semibold truncate" style={{ color: C.textPrimary }}>{ej.nombre}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: C.textSecondary }}>{ej.registros.length} sesión{ej.registros.length !== 1 ? 'es' : ''}</p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="text-lg font-bold" style={{ color }}>{ej.rmActual}<span className="text-xs font-normal text-[#9B9B9B] ml-0.5">kg</span></p>
-                  {mejora && <p className="text-[10px] font-bold text-emerald-600">+{mejora} kg</p>}
+                  <p className="text-lg font-bold" style={{ color }}>{ej.rmActual}<span className="text-xs font-normal ml-0.5" style={{ color: C.textSecondary }}>kg</span></p>
+                  {mejora && <p className="text-[10px] font-bold text-emerald-400">+{mejora} kg</p>}
                 </div>
-                <span className="text-[#C0C0C0] flex-shrink-0">›</span>
+                <span className="flex-shrink-0" style={{ color: C.textMuted }}>›</span>
               </button>
             )
           })}
