@@ -13,6 +13,9 @@ import { ini } from '../lib/avatar'
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 
 const DESCARTE_KEY = 'forge-alertas-descartadas'
+// Errores técnicos: van al registro de incidencias y solo se marcan leídos al resolverlos
+const TIPOS_INCIDENCIA = ['error_smtp_config', 'error_smtp_cliente', 'error_ia', 'error_bienvenida']
+const FILTRO_NO_INCIDENCIA = `(${TIPOS_INCIDENCIA.join(',')})`
 const DESCARTE_DIAS = 30
 
 function leerDescartadas() {
@@ -93,22 +96,16 @@ export default function Dashboard({ session }) {
     }) }))
   }
 
-  async function resolverIncidencia(id) {
-    try {
-      await supabase.from('alertas').update({ leida: true }).eq('id', id)
-      setIncidencias(prev => prev.filter(i => i.id !== id))
-      showToast('✓ Incidencia marcada como resuelta')
-    } catch { showToast('Error al resolver la incidencia') }
+  async function marcarIncidenciasResueltas(ids, aviso) {
+    const { error } = await supabase.from('alertas').update({ leida: true }).in('id', ids)
+    if (error) { showToast('Error al resolver la incidencia', 'error'); return }
+    setIncidencias(prev => prev.map(i => ids.includes(i.id) ? { ...i, leida: true } : i))
+    window.dispatchEvent(new Event('alertas-leidas'))
+    showToast(aviso)
   }
 
-  async function resolverTodasIncidencias() {
-    try {
-      const ids = incidencias.map(i => i.id)
-      await supabase.from('alertas').update({ leida: true }).in('id', ids)
-      setIncidencias([])
-      showToast('✓ Todas las incidencias resueltas')
-    } catch { showToast('Error al resolver las incidencias') }
-  }
+  const resolverIncidencia = id => marcarIncidenciasResueltas([id], 'Incidencia marcada como resuelta')
+  const resolverTodasIncidencias = () => marcarIncidenciasResueltas(incidencias.filter(i => !i.leida).map(i => i.id), 'Todas las incidencias resueltas')
 
   const [procesandoLead, setProcesandoLead] = useState(null)
   const [leadExpandido, setLeadExpandido] = useState(null)
@@ -262,7 +259,7 @@ export default function Dashboard({ session }) {
       supabase.from('planes_cobro').select('cliente_id,importe,concepto,proximo_cobro').in('entrenador_id', equipo).eq('activo', true),
       supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').in('entrenador_id', equipo).gte('fecha', inicioSemana),
       supabase.from('checkins').select('cliente_id,fecha,adherencia_entreno,energia,fatiga').in('entrenador_id', equipo).gte('fecha', hace6m).order('fecha', {ascending:false}),
-      supabase.from('alertas').select('*').in('entrenador_id', equipo).eq('leida', false).order('created_at',{ascending:false}).limit(20),
+      supabase.from('alertas').select('*').in('entrenador_id', equipo).eq('leida', false).not('tipo', 'in', FILTRO_NO_INCIDENCIA).order('created_at',{ascending:false}).limit(20),
       supabase.from('mensajes_cliente').select('id,cliente_id,contenido,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('leido_entrenador', false).eq('tipo','cliente').order('created_at',{ascending:false}).limit(10),
       supabase.from('rutinas').select('id,cliente_id,estado,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('estado','borrador').order('created_at',{ascending:false}).limit(10),
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).eq('fecha', hoyStr).eq('cancelada', false).order('hora'),
@@ -282,7 +279,7 @@ export default function Dashboard({ session }) {
     ])
 
     if (alertas?.length > 0) {
-      await supabase.from('alertas').update({ leida:true }).in('entrenador_id', equipo).eq('leida', false)
+      await supabase.from('alertas').update({ leida:true }).in('entrenador_id', equipo).eq('leida', false).not('tipo', 'in', FILTRO_NO_INCIDENCIA)
       window.dispatchEvent(new Event('alertas-leidas'))
     }
 
@@ -295,7 +292,7 @@ export default function Dashboard({ session }) {
           .from('alertas')
           .select('id, tipo, mensaje, cliente_id, created_at, leida, clientes(nombre)')
           .in('entrenador_id', equipo)
-          .in('tipo', ['error_smtp_config', 'error_smtp_cliente', 'error_ia', 'error_bienvenida'])
+          .in('tipo', TIPOS_INCIDENCIA)
           .gte('created_at', hace30d)
           .order('created_at', { ascending: false })
           .limit(50)
