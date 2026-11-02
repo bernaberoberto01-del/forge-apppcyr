@@ -14,6 +14,22 @@ function safeColor(c: string | null | undefined): string {
   return c && /^#[0-9A-Fa-f]{3,8}$/.test(c) ? c : '#FF5C00'
 }
 
+// Tras este número de fallos seguidos sin ningún envío correcto se da el correo por caído
+const MAX_FALLOS_SEGUIDOS = 3
+const VENTANA_DEDUP_MS = 2 * 864e5
+
+// Alerta visible en el panel (Dashboard → incidencias), sin repetirla en 48 h.
+// Nunca propaga: un fallo al avisar no debe parar el envío a los demás clientes.
+async function avisarIncidencia(entrenadorId: string, clienteId: string, tipo: string, mensaje: string) {
+  const desde = new Date(Date.now() - VENTANA_DEDUP_MS).toISOString()
+  let consulta = sb.from('alertas').select('id').eq('entrenador_id', entrenadorId).eq('tipo', tipo).gte('created_at', desde).limit(1)
+  if (tipo === 'error_smtp_cliente') consulta = consulta.eq('cliente_id', clienteId)
+  const { data: existente } = await consulta
+  if (existente?.length) return
+  const { error } = await sb.from('alertas').insert({ entrenador_id: entrenadorId, cliente_id: clienteId, tipo, mensaje, leida: false })
+  if (error) console.error('checkin-semanal: no se pudo guardar la alerta', tipo, error.message)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -72,6 +88,9 @@ Deno.serve(async (req) => {
         return !ultimo || ultimo < fechaCorte
       })
 
+      let enviadosEntrenador = 0
+      const fallos: { cliente: any; nombre: string; error: string }[] = []
+
       for (const cliente of clientesConNecesidad) {
         const nombre = cliente.nombre.split(' ')[0]
         const eNombre = escapeHtml(nombre)
@@ -101,13 +120,28 @@ Deno.serve(async (req) => {
           await smtp.close()
           await sb.from('mensajes_cliente').insert({ cliente_id: cliente.id, entrenador_id: cliente.entrenador_id, contenido: `📋 Recordatorio de check-in enviado. ${diasSin ? `Llevas ${diasSin} días sin check-in.` : '¡Es tu primer check-in!'} ¡Cuéntame cómo estás!`, tipo: 'sistema', leido: false, leido_entrenador: true })
           resumen.push({ cliente: nombre, ok: true, diasSin })
+          enviadosEntrenador++
         } catch(e: any) {
-          resumen.push({ cliente: nombre, ok: false, error: e.message })
+          const errorMsg = e.message || 'Error desconocido al enviar email'
+          resumen.push({ cliente: nombre, ok: false, error: errorMsg })
+          fallos.push({ cliente, nombre, error: errorMsg })
+          if (enviadosEntrenador === 0 && fallos.length >= MAX_FALLOS_SEGUIDOS) break
+        }
+      }
+
+      if (fallos.length && enviadosEntrenador === 0) {
+        // Ni un envío correcto: es el correo, no los clientes. Un solo aviso.
+        await avisarIncidencia(eid, fallos[0].cliente.id, 'error_smtp_config',
+          `Los recordatorios de check-in no se están enviando: no se ha podido enviar ningún email. Puede que la contraseña de aplicación de Gmail haya caducado. Error: ${fallos[0].error}`)
+      } else {
+        for (const f of fallos) {
+          await avisarIncidencia(eid, f.cliente.id, 'error_smtp_cliente',
+            `No se pudo enviar el recordatorio de check-in a ${f.nombre} (${f.cliente.email}). Error: ${f.error}`)
         }
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, enviados: resumen.filter(r=>r.ok).length, fallidos: resumen.filter(r=>!r.ok).length, detalle: resumen }), { headers: CORS })
+    return new Response(JSON.stringify({ ok: true, enviados: resumen.filter(r=>r.ok).length, fallidos: resumen.filter(r=>!r.ok && r.error !== 'Recordatorio ya enviado en últimas 48h (deduplicado)').length, deduplicados: resumen.filter(r=>r.error === 'Recordatorio ya enviado en últimas 48h (deduplicado)').length, detalle: resumen }), { headers: CORS })
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: CORS })
   }
