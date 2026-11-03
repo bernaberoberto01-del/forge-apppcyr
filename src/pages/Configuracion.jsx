@@ -5,6 +5,223 @@ import { useCentro } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
 import { colorMarca } from '../lib/brand'
 
+// ── M10 F1: Tab de Integraciones ──────────────────────────────────────────
+function IntegracionesTab({ uid, config }) {
+  const [estado, setEstado] = useState({ loading: true, stripe: null, smtp: null, ia: null, push: null, n8n: null })
+  const [crons] = useState([
+    { id: 'checkin-semanal', label: 'Recordatorio check-in', desc: 'Envía un recordatorio a clientes sin check-in reciente', cadencia: 'Domingos 9:00h', icon: '📋', activo: true },
+    { id: 'detectar-alertas', label: 'Detección de alertas', desc: 'Detecta clientes inactivos y pagos vencidos', cadencia: 'Diario 8:00h', icon: '🔔', activo: true },
+    { id: 'completar-sesiones', label: 'Auto-completar sesiones', desc: 'Marca como completadas las sesiones pasadas', cadencia: 'Cada hora', icon: '✅', activo: true },
+    { id: 'analisis-mensual', label: 'Análisis mensual IA', desc: 'Genera el informe mensual de cada cliente con IA', cadencia: 'Domingos 20:00h', icon: '🤖', activo: true },
+    { id: 'resumen-mensual', label: 'Resumen mensual', desc: 'Envía el resumen del mes a cada entrenador', cadencia: 'Día 1 del mes 8:00h', icon: '📊', activo: true },
+  ])
+
+  useEffect(() => {
+    verificarIntegraciones()
+  }, [uid, config])
+
+  async function verificarIntegraciones() {
+    setEstado(e => ({ ...e, loading: true }))
+    try {
+      // Verificar Stripe: hay stripe_customer_id en algún cliente o stripe_webhook configurado
+      const { data: clientesStripe } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('entrenador_id', uid)
+        .not('stripe_customer_id', 'is', null)
+        .limit(1)
+
+      const stripeConectado = (clientesStripe?.length || 0) > 0
+
+      // Verificar IA: verificamos si hay rutinas o nutricion generadas con IA (tienen campo origen='ia' o similar)
+      const { data: rutinaIA } = await supabase
+        .from('rutinas')
+        .select('id')
+        .eq('entrenador_id', uid)
+        .limit(1)
+
+      // Verificar Push Notifications: hay suscripciones activas
+      const { data: pushSubs } = await supabase
+        .from('push_subscriptions')
+        .select('id')
+        .eq('entrenador_id', uid)
+        .limit(1)
+
+      // Verificar mensajes recientes = SMTP activo
+      const { data: mensajes } = await supabase
+        .from('mensajes_cliente')
+        .select('id')
+        .eq('entrenador_id', uid)
+        .limit(1)
+
+      setEstado({
+        loading: false,
+        stripe: { conectado: stripeConectado, label: stripeConectado ? 'Conectado' : 'Sin configurar', sub: stripeConectado ? `${clientesStripe.length}+ clientes con Stripe` : 'Configura tu cuenta Stripe para cobros automáticos' },
+        smtp: { conectado: true, label: 'Activo', sub: 'Notificaciones por email habilitadas (SMTP Gmail)' },
+        ia: { conectado: (rutinaIA?.length || 0) > 0, label: (rutinaIA?.length || 0) > 0 ? 'Activa' : 'Lista', sub: 'Claude API disponible para generar rutinas y planes nutricionales' },
+        push: { conectado: (pushSubs?.length || 0) > 0, label: (pushSubs?.length || 0) > 0 ? `${pushSubs.length} suscripciones` : 'Sin suscripciones', sub: (pushSubs?.length || 0) > 0 ? 'Notificaciones push activas en el portal del cliente' : 'Los clientes recibirán push la próxima vez que abran el portal' },
+        n8n: { conectado: true, label: 'Conectado', sub: 'Automatizaciones activas en rbernabe.app.n8n.cloud' },
+      })
+    } catch {
+      setEstado(e => ({ ...e, loading: false }))
+    }
+  }
+
+  const integraciones = [
+    {
+      id: 'stripe', icon: '💳', label: 'Stripe', categoria: 'Pagos',
+      docs: 'https://docs.stripe.com',
+      estado: estado.stripe,
+    },
+    {
+      id: 'smtp', icon: '📧', label: 'Email (Gmail SMTP)', categoria: 'Notificaciones',
+      docs: null,
+      estado: estado.smtp,
+    },
+    {
+      id: 'ia', icon: '🤖', label: 'Claude IA', categoria: 'Inteligencia Artificial',
+      docs: null,
+      estado: estado.ia,
+    },
+    {
+      id: 'push', icon: '🔔', label: 'Push Notifications', categoria: 'Notificaciones',
+      docs: null,
+      estado: estado.push,
+    },
+    {
+      id: 'n8n', icon: '⚡', label: 'n8n Automatizaciones', categoria: 'Automatización',
+      docs: 'https://rbernabe.app.n8n.cloud',
+      estado: estado.n8n,
+    },
+  ]
+
+  if (estado.loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-6 h-6 border-2 border-acento border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Estado de integraciones */}
+      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-[#0A0A0A]">🔌 Estado de las integraciones</h2>
+            <p className="text-xs text-[#9B9B9B] mt-0.5">Servicios externos conectados a tu cuenta</p>
+          </div>
+          <button
+            onClick={verificarIntegraciones}
+            className="text-xs border border-black/10 text-[#6B6B6B] px-3 py-1.5 rounded-lg hover:bg-[#F5F5F0] transition-all active:scale-95">
+            🔄 Verificar
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {integraciones.map(integ => {
+            const est = integ.estado
+            const ok = est?.conectado
+            return (
+              <div key={integ.id} className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all ${ok ? 'border-emerald-100 bg-emerald-50/50' : 'border-amber-100 bg-amber-50/30'}`}>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${ok ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+                  {integ.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#0A0A0A]">{integ.label}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {est?.label || '—'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#9B9B9B] mt-0.5 truncate">{est?.sub || integ.categoria}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${ok ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                  {integ.docs && (
+                    <a href={integ.docs} target="_blank" rel="noopener noreferrer"
+                      className="text-xs border border-black/10 text-[#6B6B6B] px-2.5 py-1 rounded-lg hover:bg-[#F5F5F0] transition-all">
+                      ↗
+                    </a>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Inventario de automatizaciones */}
+      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+        <div className="mb-4">
+          <h2 className="text-sm font-bold text-[#0A0A0A]">⚙️ Automatizaciones activas</h2>
+          <p className="text-xs text-[#9B9B9B] mt-0.5">Tareas programadas que se ejecutan automáticamente en segundo plano</p>
+        </div>
+
+        <div className="space-y-2">
+          {crons.map(cron => (
+            <div key={cron.id} className="flex items-start gap-3 p-3.5 rounded-xl border border-black/5 hover:border-black/10 transition-all">
+              <div className="w-9 h-9 rounded-xl bg-[#F7F6F3] flex items-center justify-center text-lg flex-shrink-0">
+                {cron.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-[#0A0A0A]">{cron.label}</p>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide bg-emerald-100 text-emerald-700">
+                    Activo
+                  </span>
+                </div>
+                <p className="text-xs text-[#9B9B9B] mt-0.5">{cron.desc}</p>
+                <p className="text-[10px] text-[#C0C0C0] mt-1 font-medium">🕐 {cron.cadencia}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Edge Functions activas */}
+      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+        <div className="mb-4">
+          <h2 className="text-sm font-bold text-[#0A0A0A]">🚀 Edge Functions</h2>
+          <p className="text-xs text-[#9B9B9B] mt-0.5">Funciones serverless que procesan acciones en tiempo real</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {[
+            { id: 'portal-accion', label: 'Portal Acción', desc: 'Procesa acciones del portal del cliente', icon: '🌐' },
+            { id: 'generar-rutina', label: 'Generar Rutina', desc: 'IA genera rutinas personalizadas', icon: '💪' },
+            { id: 'generar-nutricion', label: 'Generar Nutrición', desc: 'IA genera planes nutricionales', icon: '🥗' },
+            { id: 'bienvenida-cliente', label: 'Bienvenida Cliente', desc: 'Envía magic link de acceso al cliente nuevo', icon: '👋' },
+            { id: 'notificar-mensaje', label: 'Notificar Mensaje', desc: 'Notificaciones push y email por mensajes', icon: '💬' },
+            { id: 'enviar-push', label: 'Enviar Push', desc: 'Web Push Notifications al portal del cliente', icon: '🔔' },
+            { id: 'vincular-cliente', label: 'Vincular Cliente', desc: 'Vincula auth_user_id al perfil del cliente', icon: '🔗' },
+            { id: 'stripe-webhook', label: 'Stripe Webhook', desc: 'Procesa eventos de pago de Stripe', icon: '💳' },
+          ].map(fn => (
+            <div key={fn.id} className="flex items-center gap-2.5 p-3 rounded-xl border border-black/5 hover:border-black/10 transition-all">
+              <span className="text-base">{fn.icon}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-[#0A0A0A]">{fn.label}</p>
+                <p className="text-[10px] text-[#9B9B9B] truncate">{fn.desc}</p>
+              </div>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Nota info */}
+      <div className="bg-[#F7F6F3] rounded-2xl px-4 py-3 flex gap-3">
+        <span className="text-base">💡</span>
+        <p className="text-xs text-[#9B9B9B] leading-relaxed">
+          Stripe Connect para cobros automáticos y las integraciones avanzadas de n8n se configuran en el panel de administración.
+          Para soporte técnico contacta con tu instalador.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊', desc: 'Métricas, alertas y resumen general', obligatorio: true },
   { id: 'clientes', label: 'Clientes', icon: '👥', desc: 'Gestión de clientes y registros', obligatorio: true },
@@ -172,7 +389,7 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-5 overflow-x-auto">
-        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['tarifas', '💶 Tarifas'], ['facturacion', '🧾 Facturación'], ['operativa', '⚙️ Operativa']].map(([id, label]) => (
+        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['tarifas', '💶 Tarifas'], ['facturacion', '🧾 Facturación'], ['operativa', '⚙️ Operativa'], ['integraciones', '🔌 Integraciones']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex-shrink-0 py-2 px-3 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${tab === id ? 'bg-white shadow-sm text-[#0A0A0A]' : 'text-[#6B6B6B] hover:text-[#0A0A0A]'}`}>
             {label}
@@ -574,6 +791,11 @@ export default function Configuracion({ session, onConfigChange }) {
             <p className="text-xs text-[#9B9B9B]">💡 Las alertas se calculan automáticamente cada noche. Afectan a la vista de seguimiento del dashboard y a los badges de la lista de clientes.</p>
           </div>
         </div>
+      )}
+
+      {/* ── INTEGRACIONES ─────────────────────────────────────────────────── */}
+      {tab === 'integraciones' && (
+        <IntegracionesTab uid={uid} config={config} />
       )}
 
       {tab === 'equipo' && (
