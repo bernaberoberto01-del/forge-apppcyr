@@ -764,7 +764,7 @@ export default function PortalForge() {
           {tab === 'nutricion' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoNutricion) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
-                <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} suplementacion={suplementacion} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} config={config} setTab={setTab} />
+                <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} suplementacion={suplementacion} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} config={config} setTab={setTab} checkins={checkins} />
               </div>
               {pagoVencido ? (
                 <BloqueoOverlay mensaje="Tu plan está pausado. Renueva para seguir." boton="Renovar ahora" onClick={irAPagos} color={color} />
@@ -2883,10 +2883,12 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
 }
 
 // ─── Tab Nutrición ────────────────────────────────────────────────────────────
-function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [], suplementacion, cargarTodo, acceso, irAPagos, modoPreview, config, setTab }) {
+function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [], suplementacion, cargarTodo, acceso, irAPagos, modoPreview, config, setTab, checkins = [] }) {
   const [diaAbierto, setDiaAbierto] = useState(null)
   const [guardandoDia, setGuardandoDia] = useState(null)
   const [registrosLocales, setRegistrosLocales] = useState(nutricionRegistros)
+  const [guardandoAdherencia, setGuardandoAdherencia] = useState(false)
+  const [adherenciaLocal, setAdherenciaLocal] = useState(null)
 
   if (!nutricion) {
     const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
@@ -2995,6 +2997,43 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
   // Semanas: últimas 4 semanas de registros por día de semana
   const totalRegistros = registrosLocales.length
 
+  // Check-in nutricional semanal
+  const inicioSemana = (() => {
+    const d = new Date(); const dia = d.getDay(); const diff = dia === 0 ? -6 : 1 - dia
+    d.setDate(d.getDate() + diff); return d.toISOString().split('T')[0]
+  })()
+  const checkinNutSemana = checkins.find(c => c.fecha >= inicioSemana && c.adherencia_nutricion)
+  const adherenciaEfectiva = adherenciaLocal || checkinNutSemana?.adherencia_nutricion || null
+  const ultimas4Semanas = (() => {
+    const semanas = []
+    for (let i = 3; i >= 0; i--) {
+      const ini = new Date(); const diaIni = ini.getDay(); const diffIni = diaIni === 0 ? -6 : 1 - diaIni
+      ini.setDate(ini.getDate() + diffIni - i * 7)
+      const fin = new Date(ini); fin.setDate(fin.getDate() + 6)
+      const iniStr = ini.toISOString().split('T')[0]
+      const finStr = fin.toISOString().split('T')[0]
+      const ci = checkins.find(c => c.fecha >= iniStr && c.fecha <= finStr && c.adherencia_nutricion)
+      semanas.push({ semana: i, adherencia: ci?.adherencia_nutricion || null })
+    }
+    return semanas
+  })()
+
+  async function guardarAdherenciaNutricion(valor) {
+    if (modoPreview || guardandoAdherencia) return
+    setGuardandoAdherencia(true)
+    setAdherenciaLocal(valor)
+    // Si ya hay checkin esta semana, actualizar; si no, crear
+    if (checkinNutSemana?.id) {
+      await supabase.from('checkins').update({ adherencia_nutricion: valor }).eq('id', checkinNutSemana.id).then(() => {}).catch(() => {})
+    } else {
+      await supabase.from('checkins').insert({
+        cliente_id: cliente.id, entrenador_id: cliente.entrenador_id,
+        fecha: hoy, adherencia_nutricion: valor
+      }).then(() => {}).catch(() => {})
+    }
+    setGuardandoAdherencia(false)
+  }
+
   return (
     <div className="space-y-3">
       {/* Header */}
@@ -3085,6 +3124,64 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* Check-in nutricional semanal — M6F2 */}
+      {tieneMenu && (
+        <div className="bg-white rounded-2xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🥗</span>
+              <span className="font-semibold text-[#0A0A0A] text-sm">¿Seguiste el plan esta semana?</span>
+            </div>
+            <div className="flex gap-1">
+              {ultimas4Semanas.map((s, i) => (
+                <div key={i} title={s.semana === 0 ? 'Esta semana' : `Hace ${s.semana} semana${s.semana > 1 ? 's' : ''}`}
+                  className={`w-2 h-2 rounded-full ${
+                    s.adherencia === 'si' ? 'bg-emerald-500' :
+                    s.adherencia === 'mas_o_menos' ? 'bg-amber-400' :
+                    s.adherencia === 'no' ? 'bg-red-400' : 'bg-black/10'
+                  }`} />
+              ))}
+            </div>
+          </div>
+          {adherenciaEfectiva ? (
+            <div className="flex items-center gap-3 p-3 rounded-xl"
+              style={{ background: adherenciaEfectiva === 'si' ? '#ecfdf5' : adherenciaEfectiva === 'mas_o_menos' ? '#fffbeb' : '#fef2f2' }}>
+              <span className="text-2xl">
+                {adherenciaEfectiva === 'si' ? '💯' : adherenciaEfectiva === 'mas_o_menos' ? '👌' : '😕'}
+              </span>
+              <div>
+                <p className="text-sm font-medium text-[#0A0A0A]">
+                  {adherenciaEfectiva === 'si' ? '¡Semana perfecta!' : adherenciaEfectiva === 'mas_o_menos' ? 'Más o menos' : 'No esta semana'}
+                </p>
+                <p className="text-xs text-[#9B9B9B]">Registrado esta semana</p>
+              </div>
+              {!modoPreview && (
+                <button onClick={() => { setAdherenciaLocal(null); guardarAdherenciaNutricion(null) }}
+                  className="ml-auto text-xs text-[#9B9B9B] hover:text-[#0A0A0A] transition-colors">
+                  Cambiar
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { valor: 'si', emoji: '💯', label: 'Sí' },
+                { valor: 'mas_o_menos', emoji: '👌', label: 'Más o menos' },
+                { valor: 'no', emoji: '😕', label: 'No' }
+              ].map(({ valor, emoji, label }) => (
+                <button key={valor}
+                  onClick={() => guardarAdherenciaNutricion(valor)}
+                  disabled={guardandoAdherencia || modoPreview}
+                  className="flex flex-col items-center gap-1 p-3 rounded-xl border border-black/5 hover:border-black/10 active:scale-95 transition-all disabled:opacity-50 bg-[#F7F6F3]">
+                  <span className="text-xl">{emoji}</span>
+                  <span className="text-xs text-[#0A0A0A] font-medium">{label}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -3379,7 +3476,7 @@ function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, 
           </button>
         ))}
       </div>
-      {subTab === 'peso'    && <SubPeso checkins={checkins} color={color} />}
+      {subTab === 'peso'    && <SubPeso checkins={checkins} color={color} cliente={cliente} />}
       {subTab === 'fuerza'  && <SubFuerza ejerciciosHist={ejerciciosHist} color={color} />}
       {subTab === 'medidas' && <SubMedidas medidas={medidas} color={color} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
       {subTab === 'fotos'   && <SubFotos fotos={fotos} color={color} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
@@ -3388,11 +3485,34 @@ function TabProgreso({ checkins, marcas, medidas, fotos, ejerciciosHist, color, 
 }
 
 // ─── SubPeso ─────────────────────────────────────────────────────────────────
-function SubPeso({ checkins, color }) {
+function SubPeso({ checkins, color, cliente }) {
   const pesos = (checkins || []).filter(c => c.peso).slice().reverse()
   const pesoActual = pesos[pesos.length - 1]?.peso
   const pesoInicial = pesos[0]?.peso
   const diff = pesoActual && pesoInicial ? +(pesoActual - pesoInicial).toFixed(1) : null
+
+  // Proyección objetivo — M7F2
+  const proyeccion = (() => {
+    const objetivo = parseFloat(cliente?.peso_objetivo)
+    if (!objetivo || !pesoActual || pesos.length < 3) return null
+    const hayTendencia = (objetivo < pesoActual && diff < 0) || (objetivo > pesoActual && diff > 0)
+    if (!hayTendencia) return null
+    const recientes = pesos.slice(-8)
+    if (recientes.length < 2) return null
+    const diasEntrePrimeroYUltimo = (() => {
+      try {
+        const d1 = new Date(recientes[0].fecha); const d2 = new Date(recientes[recientes.length - 1].fecha)
+        return Math.abs((d2 - d1) / (1000 * 60 * 60 * 24)) || 1
+      } catch { return 7 }
+    })()
+    const kgTotal = Math.abs(recientes[recientes.length - 1].peso - recientes[0].peso)
+    const kgSemana = kgTotal / (diasEntrePrimeroYUltimo / 7)
+    if (kgSemana < 0.01) return null
+    const kgRestantes = Math.abs(pesoActual - objetivo)
+    const semanas = Math.round(kgRestantes / kgSemana)
+    if (semanas > 104) return null // más de 2 años → no mostrar
+    return { semanas, kgSemana: kgSemana.toFixed(2), objetivo }
+  })()
   const energiaMedia = checkins?.filter(c => c.energia).length
     ? (checkins.filter(c => c.energia).reduce((s, c) => s + c.energia, 0) / checkins.filter(c => c.energia).length).toFixed(1)
     : null
@@ -3497,6 +3617,29 @@ function SubPeso({ checkins, color }) {
           </div>
         )
       })()}
+
+      {/* Proyección objetivo — M7F2 */}
+      {proyeccion && (
+        <div className="bg-white rounded-2xl p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}15` }}>
+              <span className="text-xl">🎯</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-black text-[#0A0A0A]">
+                Llegas a tu objetivo en <span style={{ color }}>~{proyeccion.semanas} semana{proyeccion.semanas !== 1 ? 's' : ''}</span>
+              </p>
+              <p className="text-[10px] text-[#9B9B9B] mt-0.5">
+                Al ritmo actual de {proyeccion.kgSemana} kg/semana · Objetivo: {proyeccion.objetivo} kg
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 h-1.5 rounded-full overflow-hidden bg-black/5">
+            <div className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${Math.min(100, Math.round(Math.abs((pesoActual - pesoInicial) / ((pesoActual - proyeccion.objetivo) + Math.abs(pesoActual - pesoInicial))) * 100))}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)` }} />
+          </div>
+        </div>
+      )}
 
       {/* Historial — limpio, tipografía fuerte */}
       <div className="bg-white rounded-2xl overflow-hidden">
