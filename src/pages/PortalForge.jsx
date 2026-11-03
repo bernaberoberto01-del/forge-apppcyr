@@ -1022,6 +1022,33 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
   const sesCompletadas = (sesionesEstaSemana || []).filter(s => s.completada && s.fecha >= lunesStr && s.fecha <= hoy).length
   const diaHoy = diasRutina.length > 0 ? diasRutina[sesCompletadas % diasRutina.length] : null
 
+  // Récord personal reciente: el último ejercicio registrado esta semana con nuevo máximo histórico
+  const recordReciente = (() => {
+    if (!ejerciciosHist?.length) return null
+    const haceDosDias = new Date(ahora); haceDosDias.setDate(ahora.getDate() - 2)
+    const haceDosDiasStr = haceDosDias.toLocaleDateString('sv-SE')
+    // Registros de los últimos 2 días (sesion_ejercicios con su sesion)
+    const recientes = ejerciciosHist.filter(r => r.sesiones?.fecha >= haceDosDiasStr)
+    if (!recientes.length) return null
+    // Por cada ejercicio reciente, ver si superó su máximo anterior
+    for (const reg of recientes) {
+      const nombre = reg.ejercicio_nombre
+      const setsReciente = (reg.sets || []).filter(s => s.peso && !isNaN(+s.peso) && s.completada)
+      if (!setsReciente.length) continue
+      const maxReciente = Math.max(...setsReciente.map(s => +s.peso))
+      // Buscar el máximo histórico anterior (registros más antiguos del mismo ejercicio)
+      const anteriores = ejerciciosHist.filter(r => r.ejercicio_nombre === nombre && r.sesiones?.fecha < reg.sesiones?.fecha)
+      if (!anteriores.length) continue // sin historial previo no podemos comparar
+      const maxAnterior = Math.max(...anteriores.flatMap(r =>
+        (r.sets || []).filter(s => s.peso && !isNaN(+s.peso)).map(s => +s.peso)
+      ))
+      if (maxReciente > maxAnterior) {
+        return { nombre, peso: maxReciente, anterior: maxAnterior, fecha: reg.sesiones?.fecha }
+      }
+    }
+    return null
+  })()
+
   // Agenda semana
   const lunesEsta = new Date(ahora); lunesEsta.setDate(ahora.getDate() - (ahora.getDay()||7) + 1)
   const diasAgenda = Array.from({length:6}, (_,i) => {
@@ -1079,6 +1106,70 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
           </div>
         )}
       </div>
+
+      {/* Resumen semanal de progreso */}
+      {(sesCompletadas > 0 || (pesos.length >= 2)) && !esNuevo && (() => {
+        // Diff de peso esta semana (último check-in de la semana vs el anterior)
+        const pesosEstaSemana = (checkins || []).filter(c => c.peso && c.fecha >= lunesStr)
+        const pesoUltimo = pesosEstaSemana[0]?.peso ?? null
+        const pesoAnteriorSemana = (checkins || []).filter(c => c.peso && c.fecha < lunesStr)[0]?.peso ?? null
+        const diffPesoSemana = pesoUltimo !== null && pesoAnteriorSemana !== null ? +(pesoUltimo - pesoAnteriorSemana).toFixed(1) : null
+        const meta = cliente?.peso_objetivo || null
+        const faltaParaMeta = meta && pesoUltimo ? +(pesoUltimo - meta).toFixed(1) : null
+        return (
+          <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+            <div className="px-4 pt-3.5 pb-1.5">
+              <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Esta semana</p>
+            </div>
+            <div className="grid" style={{ gridTemplateColumns: `repeat(${[sesCompletadas > 0, diffPesoSemana !== null, faltaParaMeta !== null].filter(Boolean).length || 1}, 1fr)` }}>
+              {sesCompletadas > 0 && (
+                <div className="px-4 pb-4 pt-1 border-r" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <p className="text-3xl font-black text-white leading-none">{sesCompletadas}</p>
+                  <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>sesion{sesCompletadas !== 1 ? 'es' : ''}</p>
+                </div>
+              )}
+              {diffPesoSemana !== null && (
+                <div className="px-4 pb-4 pt-1 border-r" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                  <p className="text-3xl font-black leading-none" style={{ color: diffPesoSemana < 0 ? '#10b981' : diffPesoSemana > 0 ? '#818cf8' : 'rgba(255,255,255,0.5)' }}>
+                    {diffPesoSemana > 0 ? '+' : ''}{diffPesoSemana}
+                  </p>
+                  <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>kg sem</p>
+                </div>
+              )}
+              {faltaParaMeta !== null && (
+                <div className="px-4 pb-4 pt-1">
+                  <p className="text-3xl font-black leading-none" style={{ color: faltaParaMeta <= 0 ? '#10b981' : color }}>
+                    {faltaParaMeta <= 0 ? '✓' : `${faltaParaMeta > 0 ? '+' : ''}${faltaParaMeta}`}
+                  </p>
+                  <p className="text-[9px] font-bold tracking-widest uppercase mt-1" style={{ color: 'rgba(255,255,255,0.3)' }}>para meta</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Récord personal reciente */}
+      {recordReciente && (
+        <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+          <div className="px-4 py-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg" style={{ background: `${color}25` }}>
+              🏆
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-0.5" style={{ color }}>Nuevo récord personal</p>
+              <p className="text-white font-black text-base leading-tight truncate">{recordReciente.nombre}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                {recordReciente.peso}kg <span style={{ color: 'rgba(255,255,255,0.25)' }}>·</span> antes {recordReciente.anterior}kg
+              </p>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <p className="text-2xl font-black" style={{ color }}>+{(recordReciente.peso - recordReciente.anterior).toFixed(1)}</p>
+              <p className="text-[9px] font-bold" style={{ color: 'rgba(255,255,255,0.3)' }}>kg</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Último check-in — editable si es de hoy o ayer */}
       {checkins?.[0] && (
@@ -1404,10 +1495,31 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
   const [videoEj, setVideoEj] = useState(null) // { nombre, youtube_url, consejos_tecnica }
 
   if (!rutina) return (
-    <div className="text-center py-16">
-      <div className="text-5xl mb-4">💪</div>
-      <p className="text-lg font-bold text-[#0A0A0A]">Rutina en preparación</p>
-      <p className="text-sm text-[#9B9B9B] mt-2 leading-relaxed max-w-xs mx-auto">Tu entrenador está diseñando tu plan personalizado.</p>
+    <div className="space-y-3 pb-4">
+      <div className="rounded-3xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+        <div className="px-5 pt-6 pb-5">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-4" style={{ background: `${color}20` }}>💪</div>
+          <p className="text-white font-black text-2xl leading-tight mb-2">Rutina en<br/>preparación</p>
+          <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.45)' }}>Tu entrenador está diseñando tu plan personalizado. Te avisaremos cuando esté lista.</p>
+        </div>
+        <div className="px-5 pb-5">
+          <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <p className="text-[9px] font-black tracking-widest uppercase mb-3" style={{ color: 'rgba(255,255,255,0.25)' }}>Mientras tanto</p>
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-3">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0" style={{ background: `${color}20` }}>📊</div>
+                <p className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.65)' }}>Completa tu check-in semanal</p>
+              </div>
+              {VER_MENSAJES && (
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0" style={{ background: `${color}20` }}>💬</div>
+                  <p className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.65)' }}>Consulta dudas con tu entrenador</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 
@@ -2042,19 +2154,27 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
   const [registrosLocales, setRegistrosLocales] = useState(nutricionRegistros)
 
   if (!nutricion) return (
-    <div className="space-y-3">
-      <div className="text-center py-16">
-        <div className="text-4xl mb-3">🥗</div>
-        <p className="text-lg font-black text-[#0A0A0A]">Plan en preparación</p>
-        {!cuest
-          ? <div className="mt-5">
-              <p className="text-sm text-[#6B6B6B] mb-4 leading-relaxed max-w-xs mx-auto">Tu entrenador necesita tu cuestionario para crear tu plan.</p>
+    <div className="space-y-3 pb-4">
+      <div className="rounded-3xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+        <div className="px-5 pt-6 pb-5">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-4" style={{ background: `${color}20` }}>🥗</div>
+          <p className="text-white font-black text-2xl leading-tight mb-2">Plan en<br/>preparación</p>
+          {!cuest ? (
+            <>
+              <p className="text-sm leading-relaxed mb-5" style={{ color: 'rgba(255,255,255,0.45)' }}>Tu entrenador necesita tu cuestionario de nutrición para diseñar tu plan personalizado.</p>
               <a href={`${window.location.origin}/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
-                className="inline-block text-white text-sm font-black px-6 py-3 rounded-xl"
-                style={{ background: color }}>Rellenar cuestionario →</a>
+                className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm active:scale-95 transition-all text-white"
+                style={{ background: color }}>
+                📋 Rellenar cuestionario →
+              </a>
+            </>
+          ) : (
+            <div className="flex items-center gap-3 mt-2">
+              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#10b981' }} />
+              <p className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>Cuestionario enviado · Tu entrenador lo revisará pronto</p>
             </div>
-          : <p className="text-sm text-[#9B9B9B] mt-3">Cuestionario enviado · Pendiente</p>
-        }
+          )}
+        </div>
       </div>
       {cuest && <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />}
     </div>
