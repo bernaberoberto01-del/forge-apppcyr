@@ -61,7 +61,8 @@ export default function Pagos({ session }) {
   const [planExpandido, setPlanExpandido] = useState(null)
   const [mostrarPendientes, setMostrarPendientes] = useState(true)
   const [toast, setToast] = useState('')
-  const [form, setForm] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()) })
+  const [form, setForm] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()), canal_cobro:'' })
+  const [mostrarTrimestral, setMostrarTrimestral] = useState(false)
   const [formPlan, setFormPlan] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', frecuencia:'mensual', dia_cobro:1 })
   const [loading, setLoading] = useState(false)
   const [generandoStripe, setGenerandoStripe] = useState(null)
@@ -318,7 +319,8 @@ export default function Pagos({ session }) {
       entrenador_id: uid, cliente_id: form.cliente_id,
       importe: Number(form.importe), concepto: form.concepto,
       fecha_pago: form.fecha_pago,
-      valido_hasta: unMesDespues(form.fecha_pago)
+      valido_hasta: unMesDespues(form.fecha_pago),
+      canal_cobro: form.canal_cobro || null
     })
     if (error) { setToast('Error al registrar'); setLoading(false); return }
     // Un pago manual también cuenta como cobro del plan del cliente (igual que
@@ -334,7 +336,7 @@ export default function Pagos({ session }) {
         .update({ ultimo_cobro: form.fecha_pago, proximo_cobro: diaLocal(siguiente) })
         .eq('id', plan.id)
     }
-    setToast('Pago registrado'); setModal(false); setForm({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()) })
+    setToast('Pago registrado'); setModal(false); setForm({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', fecha_pago: diaLocal(new Date()), canal_cobro:'' })
     await cargar()
     setLoading(false)
   }
@@ -500,6 +502,91 @@ export default function Pagos({ session }) {
           </div>
         </div>
       </div>
+
+      {/* Resumen trimestral */}
+      {(() => {
+        const hoy = new Date()
+        const mes = hoy.getMonth() // 0-11
+        const año = hoy.getFullYear()
+        // Trimestres: T1 ene-mar, T2 abr-jun, T3 jul-sep, T4 oct-dic
+        const trimActual = Math.floor(mes / 3) + 1
+        const inicioTrim = new Date(año, (trimActual-1)*3, 1)
+        const finTrim = new Date(año, trimActual*3, 0) // último día del trimestre
+        // Cierre fiscal: 20 del mes siguiente al fin del trimestre
+        const cierreFiscal = new Date(año, trimActual*3, 20)
+        const diasParaCierre = Math.ceil((cierreFiscal - hoy) / 864e5)
+        const alertaCierre = diasParaCierre <= 15 && diasParaCierre > 0
+
+        const inicioStr = `${año}-${String((trimActual-1)*3+1).padStart(2,'0')}-01`
+        const finStr = `${año}-${String(trimActual*3).padStart(2,'0')}-${finTrim.getDate().toString().padStart(2,'0')}`
+        const pagosTrim = pagos.filter(p => p.fecha_pago >= inicioStr && p.fecha_pago <= finStr)
+        const totalTrim = pagosTrim.reduce((s,p) => s+Number(p.importe||0), 0)
+
+        // Por canal
+        const porCanal = pagosTrim.reduce((acc,p) => {
+          const c = p.canal_cobro || 'Sin especificar'
+          acc[c] = (acc[c]||0) + Number(p.importe||0)
+          return acc
+        }, {})
+
+        const nombresTrim = ['','T1 (Ene–Mar)','T2 (Abr–Jun)','T3 (Jul–Sep)','T4 (Oct–Dic)']
+
+        return (
+          <div className={`rounded-2xl overflow-hidden mb-4 border ${alertaCierre ? 'border-amber-300' : 'border-black/5'}`}>
+            <button onClick={() => setMostrarTrimestral(v => !v)}
+              className={`w-full flex items-center justify-between px-4 py-3 ${alertaCierre ? 'bg-amber-50' : 'bg-[#F7F6F3]'} hover:opacity-90 transition-all`}>
+              <div className="flex items-center gap-2">
+                {alertaCierre && <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center animate-pulse">!</span>}
+                <p className={`text-xs font-semibold ${alertaCierre ? 'text-amber-800' : 'text-[#6B6B6B]'}`}>
+                  📊 {nombresTrim[trimActual]} · {totalTrim.toFixed(0)}€ cobrados
+                  {alertaCierre && <span className="ml-2 text-amber-700">⚠️ Cierre fiscal en {diasParaCierre}d</span>}
+                </p>
+              </div>
+              <span className="text-[#9B9B9B] text-sm">{mostrarTrimestral ? '▲' : '▼'}</span>
+            </button>
+            {mostrarTrimestral && (
+              <div className="bg-white px-4 py-3 space-y-3">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                    <p className="text-lg font-bold text-[#0A0A0A]">{totalTrim.toFixed(0)}€</p>
+                    <p className="text-[10px] text-[#9B9B9B]">Total {nombresTrim[trimActual]}</p>
+                  </div>
+                  <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                    <p className="text-lg font-bold text-[#0A0A0A]">{pagosTrim.length}</p>
+                    <p className="text-[10px] text-[#9B9B9B]">Cobros</p>
+                  </div>
+                  <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                    <p className="text-lg font-bold text-[#0A0A0A]">{cierreFiscal.toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</p>
+                    <p className="text-[10px] text-[#9B9B9B]">Cierre fiscal</p>
+                  </div>
+                </div>
+                {Object.entries(porCanal).length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide">Por canal</p>
+                    {Object.entries(porCanal).map(([canal, total]) => (
+                      <div key={canal} className="flex items-center justify-between py-1 border-b border-black/4 last:border-0">
+                        <span className="text-xs text-[#6B6B6B]">
+                          {canal === 'Stripe' ? '💳 Stripe' : canal === 'Datáfono' ? '🏧 Datáfono' : canal === 'Efectivo' ? '💵 Efectivo' : canal === 'Transferencia' ? '🏦 Transferencia' : '❓ '+canal}
+                        </span>
+                        <span className="text-xs font-semibold text-[#0A0A0A]">{total.toFixed(0)}€</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    const rows = [['Fecha','Cliente','Concepto','Canal','Importe'],...pagosTrim.map(p => [p.fecha_pago,p.clientes?.nombre||'',p.concepto||'',p.canal_cobro||'','€'+Number(p.importe).toFixed(2)])]
+                    const csv = rows.map(r => r.join(',')).join('\n')
+                    const a = document.createElement('a'); a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv); a.download=`pagos-${nombresTrim[trimActual].replace(/[^a-z0-9]/gi,'-')}-${año}.csv`; a.click()
+                  }}
+                  className="w-full text-xs font-semibold text-[#6B6B6B] border border-black/10 rounded-xl py-2 hover:bg-[#F5F5F0] active:scale-95 transition-all">
+                  ⬇ Exportar CSV para asesoría
+                </button>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Alertas cobros próximos */}
       {pendientesMes.length > 0 && (
@@ -696,7 +783,14 @@ export default function Pagos({ session }) {
                 <div className="w-8 h-8 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold text-xs flex-shrink-0">{ini(p.clientes?.nombre)}</div>
                 <div className="flex-1 min-w-0">
                   <button onClick={() => setQuickView(p.cliente_id)} className="text-sm font-semibold text-[#0A0A0A] hover:text-acento truncate block text-left">{p.clientes?.nombre}</button>
-                  <p className="text-xs text-[#6B6B6B]">{p.concepto} · {new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-xs text-[#6B6B6B]">{p.concepto} · {new Date(p.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
+                    {p.canal_cobro && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-black/5 text-[#6B6B6B]">
+                        {p.canal_cobro === 'Stripe' ? '💳' : p.canal_cobro === 'Datáfono' ? '🔷' : p.canal_cobro === 'Efectivo' ? '💵' : '🏦'} {p.canal_cobro}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <p className="text-sm font-bold text-emerald-600">+{Number(p.importe).toFixed(0)}€</p>
@@ -775,6 +869,17 @@ export default function Pagos({ session }) {
                 <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Concepto</label>
                 <input value={form.concepto} onChange={e=>setForm(f=>({...f,concepto:e.target.value}))}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Canal de cobro</label>
+                <select value={form.canal_cobro} onChange={e=>setForm(f=>({...f,canal_cobro:e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
+                  <option value="">Sin especificar</option>
+                  <option value="Stripe">💳 Stripe</option>
+                  <option value="Datáfono">🔷 Datáfono</option>
+                  <option value="Efectivo">💵 Efectivo</option>
+                  <option value="Transferencia">🏦 Transferencia</option>
+                </select>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
