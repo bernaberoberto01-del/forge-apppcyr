@@ -1301,6 +1301,40 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
         </div>
       )}
 
+      {/* Próxima sesión — presencial sin sesión programada hoy */}
+      {!sesionHoy && !esOnline && (() => {
+        const proxima = (sesiones || []).find(s => s.fecha > hoy)
+        if (!proxima) return null
+        const fechaProxima = new Date(proxima.fecha + 'T12:00:00')
+        const hoyDate = new Date()
+        hoyDate.setHours(0,0,0,0)
+        const diasHasta = Math.round((fechaProxima - hoyDate) / 86400000)
+        const DIAS_L = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
+        const MESES_L = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+        const labelDias = diasHasta === 0 ? 'Hoy' : diasHasta === 1 ? 'Mañana' : `En ${diasHasta} días`
+        return (
+          <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
+            <div className="px-4 py-3 flex items-center justify-between border-b border-black/4">
+              <p className="text-[10px] font-black tracking-[0.12em] uppercase" style={{ color }}>Próxima sesión</p>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${color}15`, color }}>{labelDias}</span>
+            </div>
+            <div className="px-4 py-4 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl flex flex-col items-center justify-center flex-shrink-0" style={{ background: `${color}12` }}>
+                <span className="text-[9px] font-black uppercase leading-none" style={{ color }}>{DIAS_L[fechaProxima.getDay()]}</span>
+                <span className="text-xl font-black text-[#0A0A0A] leading-tight">{fechaProxima.getDate()}</span>
+                <span className="text-[8px] font-bold text-[#9B9B9B] leading-none">{MESES_L[fechaProxima.getMonth()]}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-[#0A0A0A]">{DIAS_L[fechaProxima.getDay()]} {fechaProxima.getDate()} {MESES_L[fechaProxima.getMonth()]}</p>
+                {proxima.hora && <p className="text-xs text-[#6B6B6B] mt-0.5">🕐 {proxima.hora.slice(0,5)}{proxima.duracion_minutos ? ` · ${proxima.duracion_minutos} min` : ''}</p>}
+                {diaHoy && <p className="text-[10px] text-[#9B9B9B] mt-0.5">{diaHoy.nombre} · {(diaHoy.ejercicios||[]).length} ejercicios</p>}
+              </div>
+              <button onClick={() => setTab('entrena')} className="text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0 active:scale-95 transition-all text-white" style={{ background: color }}>Ver →</button>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Hoy toca (online sin sesión programada) */}
       {!sesionHoy && diaHoy && esOnline && (
         <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
