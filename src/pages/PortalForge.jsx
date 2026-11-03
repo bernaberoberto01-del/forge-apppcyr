@@ -111,6 +111,12 @@ export default function PortalForge() {
   const [pushSuscrito, setPushSuscrito] = useState(() => pushPermissionState() === 'granted')
   const mensajesEndRef = useRef(null)
 
+  // Onboarding overlay — 3 pasos descartable
+  const [onbStep, setOnbStep] = useState(0)
+  const [onbCerrado, setOnbCerrado] = useState(() => {
+    try { return !!localStorage.getItem('portal_onboarding_v1') } catch { return false }
+  })
+
   function bloqueadoPreview() {
     showToast('👁 Modo vista previa — solo lectura')
   }
@@ -843,6 +849,99 @@ export default function PortalForge() {
             })}
           </div>
         </nav>
+
+        {/* Onboarding overlay — 3 pasos, solo clientes online nuevos, descartable */}
+        {mostrarOnboarding && !onbCerrado && (() => {
+          const cerrar = () => {
+            try { localStorage.setItem('portal_onboarding_v1', '1') } catch {}
+            setOnbCerrado(true)
+          }
+          const pasos = [
+            {
+              emoji: '💪',
+              titulo: 'Tu plan de entreno',
+              desc: 'Aquí encontrarás tu rutina semanal. Puedes registrar cada sesión y ver tu progreso en tiempo real.',
+              tab: 'entrena',
+              tabLabel: 'Ir a Entrena',
+              ocultarSiNoAcceso: !verRutina,
+            },
+            {
+              emoji: '📊',
+              titulo: 'Tu progreso',
+              desc: 'Registra tu peso, medidas y fotos. Verás cómo avanzas semana a semana hacia tu objetivo.',
+              tab: 'progreso',
+              tabLabel: 'Ver Progreso',
+              ocultarSiNoAcceso: false,
+            },
+            {
+              emoji: '💬',
+              titulo: 'Habla con tu entrenador',
+              desc: 'Tienes acceso directo a tu entrenador. Escríbele cuando quieras, te responde en 24h.',
+              tab: 'mas',
+              tabLabel: 'Ir a Mensajes',
+              ocultarSiNoAcceso: !VER_MENSAJES,
+            },
+          ].filter(p => !p.ocultarSiNoAcceso)
+          if (!pasos.length) return null
+          const paso = pasos[Math.min(onbStep, pasos.length - 1)]
+          const esUltimo = onbStep >= pasos.length - 1
+          return (
+            <div className="fixed inset-0 z-40 flex items-end justify-center md:items-center"
+              style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)' }}
+              onClick={cerrar}>
+              <div className="w-full max-w-sm mx-4 mb-[calc(72px+max(env(safe-area-inset-bottom,0px),8px)+12px)] md:mb-0 md:mx-auto"
+                style={{ borderRadius: 28, background: '#0A0A0A', overflow: 'hidden' }}
+                onClick={e => e.stopPropagation()}>
+                {/* Header con X */}
+                <div className="flex items-center justify-between px-5 pt-5 pb-0">
+                  <div className="flex gap-1.5">
+                    {pasos.map((_, i) => (
+                      <div key={i} className="h-1 rounded-full transition-all duration-300"
+                        style={{ width: i === onbStep ? 20 : 8, background: i <= onbStep ? color : 'rgba(255,255,255,0.15)' }} />
+                    ))}
+                  </div>
+                  <button onClick={cerrar}
+                    className="w-7 h-7 flex items-center justify-center rounded-full active:opacity-60 transition-opacity"
+                    style={{ background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.6)', fontSize: 16, lineHeight: 1 }}>
+                    ×
+                  </button>
+                </div>
+                {/* Contenido del paso */}
+                <div className="px-5 pt-5 pb-6">
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl mb-4"
+                    style={{ background: `${color}20` }}>
+                    {paso.emoji}
+                  </div>
+                  <p className="text-white font-black text-xl mb-2 leading-tight">{paso.titulo}</p>
+                  <p className="text-sm leading-relaxed mb-6" style={{ color: 'rgba(255,255,255,0.55)' }}>{paso.desc}</p>
+                  {/* Botones */}
+                  <div className="flex gap-3">
+                    {!esUltimo && (
+                      <button onClick={cerrar}
+                        className="flex-1 py-3 rounded-xl text-sm font-bold active:opacity-70 transition-opacity"
+                        style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>
+                        Saltar
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (esUltimo) {
+                          cerrar()
+                          setTab(paso.tab)
+                        } else {
+                          setOnbStep(s => s + 1)
+                        }
+                      }}
+                      className="flex-1 py-3 rounded-xl text-sm font-black active:scale-95 transition-all duration-150"
+                      style={{ background: color, color: 'white' }}>
+                      {esUltimo ? paso.tabLabel : 'Siguiente →'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Toast */}
         {toast && <div className="fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl whitespace-nowrap" style={{ background: color }}>{toast}</div>}
