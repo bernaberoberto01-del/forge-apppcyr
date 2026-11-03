@@ -636,7 +636,7 @@ export default function Clientes({ session }) {
 
   async function abrirDetalle(c) {
     setDetalle(c); setDTab('resumen'); setLesionExpandida(null); setMostrarLesiones(false)
-    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }, { data: cn }, { data: scp }, { data: cr }] = await Promise.all([
+    const [{ data: ci }, { data: pg }, { data: se }, { data: ft }, { data: te }, { data: le }, { data: pc }, { data: cn }, { data: scp }, { data: cr }, { data: mc }] = await Promise.all([
       supabase.from('checkins').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
       supabase.from('pagos').select('*').eq('cliente_id', c.id).order('fecha_pago', { ascending: false }),
       supabase.from('sesiones').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
@@ -647,8 +647,9 @@ export default function Clientes({ session }) {
       supabase.from('cuestionarios_nutricion').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('solicitudes_cambio_plan').select('*').eq('cliente_id', c.id).eq('estado', 'pendiente').order('created_at', { ascending: false }).limit(1).maybeSingle(),
       supabase.from('cuestionarios').select('*').eq('cliente_id', c.id).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('marcas_cliente').select('*').eq('cliente_id', c.id).order('fecha', { ascending: false }),
     ])
-    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null, cuestRegistro: cr||null })
+    setDData({ checkins: ci||[], pagos: pg||[], sesiones: se||[], fotos: ft||[], lesiones: le||[], planCobro: pc||null, cuestNutricion: cn||null, solicitudCambioPlan: scp||null, cuestRegistro: cr||null, marcas: mc||[] })
     setPlanSeleccionado((pc?.estado === 'activo' ? pc.plan : null) || c.plan_online || 'nutricion')
     setTareasExtra(te||[])
   }
@@ -1704,8 +1705,74 @@ export default function Clientes({ session }) {
                 const ses30 = dData.sesiones?.filter(s=>new Date(s.fecha)>new Date(Date.now()-30*864e5)).length||0
                 const ingresosTotal = dData.pagos?.filter(p=>p.estado==='pagado').reduce((s,p)=>s+Number(p.importe||0),0)||0
                 const precioActivo = dData.planCobro?.estado === 'activo' ? dData.planCobro.importe : (detalle.precio_mensual || 0)
+                // M7F1 — Vista progreso unificada
+                const energiaMedia = dData.checkins?.length ? (dData.checkins.slice(0,4).reduce((s,c)=>s+(c.energia||0),0)/Math.min(dData.checkins.length,4)).toFixed(1) : null
+                const diasDesdeCI = ci0?.fecha ? Math.floor((Date.now()-new Date(ci0.fecha))/864e5) : null
+                const ultimoPR = dData.marcas?.[0]
+                const rpeMedia = (() => { const vals = dData.sesiones?.filter(s=>s.rpe&&s.completada).slice(0,8).map(s=>s.rpe)||[]; return vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : null })()
+                // Tendencia de peso (últimos 4 checkins con peso)
+                const pesosRecientes = dData.checkins?.filter(c=>c.peso).slice(0,4).map(c=>c.peso)||[]
+                const tendenciaPeso = pesosRecientes.length >= 2 ? (pesosRecientes[0] - pesosRecientes[pesosRecientes.length-1]) : null
                 return (
                 <div className="space-y-3">
+                  {/* Vista de progreso unificada — M7F1 */}
+                  <div className="bg-white border border-black/5 rounded-2xl p-3">
+                    <div className="flex items-center justify-between mb-2.5">
+                      <p className="text-xs font-bold text-[#0A0A0A]">Progreso</p>
+                      {ci0?.fecha && <p className="text-[10px] text-[#9B9B9B]">{diasDesdeCI === 0 ? 'CI hoy' : diasDesdeCI === 1 ? 'CI ayer' : `CI hace ${diasDesdeCI}d`}</p>}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mb-2.5">
+                      {/* Peso + tendencia */}
+                      <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                        <p className="text-[10px] text-[#9B9B9B] mb-0.5">Peso</p>
+                        <p className="text-sm font-bold text-[#0A0A0A]">{pesoActual ? `${pesoActual}kg` : '—'}</p>
+                        {tendenciaPeso !== null && (
+                          <p className={`text-[10px] font-semibold mt-0.5 ${tendenciaPeso < 0 ? 'text-emerald-600' : tendenciaPeso > 0 ? 'text-red-500' : 'text-[#9B9B9B]'}`}>
+                            {tendenciaPeso > 0 ? '▲' : tendenciaPeso < 0 ? '▼' : '—'} {Math.abs(tendenciaPeso).toFixed(1)}kg
+                          </p>
+                        )}
+                      </div>
+                      {/* Objetivo */}
+                      <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                        <p className="text-[10px] text-[#9B9B9B] mb-0.5">Objetivo</p>
+                        <p className="text-sm font-bold text-[#0A0A0A]">{detalle.peso_objetivo ? `${detalle.peso_objetivo}kg` : '—'}</p>
+                        {detalle.peso_objetivo && pesoActual && (
+                          <p className="text-[10px] text-[#9B9B9B] mt-0.5">{Math.abs(pesoActual - detalle.peso_objetivo).toFixed(1)}kg rest.</p>
+                        )}
+                      </div>
+                      {/* Energía media */}
+                      <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                        <p className="text-[10px] text-[#9B9B9B] mb-0.5">Energía</p>
+                        <p className="text-sm font-bold" style={{color: energiaMedia >= 4 ? '#10b981' : energiaMedia >= 3 ? '#f59e0b' : '#ef4444'}}>{energiaMedia ? `${energiaMedia}/5` : '—'}</p>
+                        <p className="text-[10px] text-[#9B9B9B] mt-0.5">últ. 4 CIs</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {/* Adherencia */}
+                      <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                        <p className="text-[10px] text-[#9B9B9B] mb-0.5">Adherencia</p>
+                        <p className="text-sm font-bold" style={{color: adherenciaMedia >= 7 ? '#10b981' : adherenciaMedia >= 4 ? '#f59e0b' : adherenciaMedia ? '#ef4444' : '#C0C0C0'}}>{adherenciaMedia ? `${adherenciaMedia}/10` : '—'}</p>
+                        <p className="text-[10px] text-[#9B9B9B] mt-0.5">últ. 4 CIs</p>
+                      </div>
+                      {/* RPE media */}
+                      <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                        <p className="text-[10px] text-[#9B9B9B] mb-0.5">RPE medio</p>
+                        <p className="text-sm font-bold" style={{color: rpeMedia >= 8 ? '#ef4444' : rpeMedia >= 6 ? '#f59e0b' : rpeMedia ? '#10b981' : '#C0C0C0'}}>{rpeMedia ? rpeMedia : '—'}</p>
+                        <p className="text-[10px] text-[#9B9B9B] mt-0.5">últ. 8 ses.</p>
+                      </div>
+                      {/* Último PR */}
+                      <div className="bg-[#F7F6F3] rounded-xl p-2.5">
+                        <p className="text-[10px] text-[#9B9B9B] mb-0.5">Último PR</p>
+                        {ultimoPR ? (
+                          <>
+                            <p className="text-sm font-bold text-acento">{ultimoPR.peso_kg}kg</p>
+                            <p className="text-[10px] text-[#9B9B9B] mt-0.5 truncate">{ultimoPR.ejercicio}</p>
+                          </>
+                        ) : <p className="text-sm font-bold text-[#C0C0C0]">—</p>}
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Métricas clave */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="bg-[#111] rounded-xl p-3">
