@@ -324,7 +324,7 @@ export default function Seguimiento({ session }) {
       </div>
 
       {tabPrincipal === 'semana' && (() => {
-        // Estado de cada cliente — solo check-in
+        // Estado de cada cliente — check-in + último ci data
         const estadoClientes = clientes.map(c => {
           const ciUltimo = checkins.filter(ci => ci.cliente_id === c.id && ci.fecha).sort((a,b) => b.fecha.localeCompare(a.fecha))[0]
           const _fechaCI = ciUltimo?.fecha && !isNaN(new Date(ciUltimo.fecha + 'T12:00').getTime()) ? new Date(ciUltimo.fecha + 'T12:00').getTime() : null
@@ -334,7 +334,7 @@ export default function Seguimiento({ session }) {
           if (diasSinCI >= 14) alerta = 'critical'
           else if (diasSinCI >= 7) alerta = 'warning'
 
-          return { ...c, diasSinCI, alerta }
+          return { ...c, diasSinCI, alerta, ciUltimo }
         }).sort((a,b) => {
           const orden = { critical: 0, warning: 1, ok: 2 }
           return orden[a.alerta] - orden[b.alerta] || a.diasSinCI - b.diasSinCI
@@ -343,20 +343,65 @@ export default function Seguimiento({ session }) {
         const sinCI = estadoClientes.filter(c => c.diasSinCI >= 7)
         const okClientes = estadoClientes.filter(c => c.diasSinCI < 7)
 
+        // Bloque D — Métricas agregadas del centro
+        const ahora = Date.now()
+        const hace7dias = ahora - 7 * 864e5
+        const sesionesUlt7 = sesiones.filter(s => s.completada && s.fecha && new Date(s.fecha + 'T12:00').getTime() >= hace7dias)
+        const sesionesConRpe = sesionesUlt7.filter(s => s.rpe)
+        const rpeMedia = sesionesConRpe.length > 0 ? (sesionesConRpe.reduce((a,s) => a + s.rpe, 0) / sesionesConRpe.length) : null
+
+        const ciEstaSemana = checkins.filter(ci => ci.fecha && new Date(ci.fecha + 'T12:00').getTime() >= ahora - 7 * 864e5)
+        const adherencias = ciEstaSemana.map(ci => ci.adherencia_entreno).filter(v => v != null)
+        const adherenciaMedia = adherencias.length > 0 ? (adherencias.reduce((a,v) => a + v, 0) / adherencias.length) : null
+
+        const clientesSinCI14d = estadoClientes.filter(c => c.diasSinCI >= 14)
+
         return (
           <div className="space-y-4">
-            {/* Resumen rápido */}
+            {/* Bloque D — Métricas del centro */}
             <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: 'Sin check-in', val: sinCI.length, color: '#ef4444', icon: '⏰' },
-                { label: 'Al día', val: okClientes.length, color: '#10b981', icon: '✓' },
-              ].map(k => (
-                <div key={k.label} className="bg-white rounded-2xl border border-black/5 p-3 text-center">
-                  <p className="text-2xl font-bold" style={{ color: k.color }}>{k.icon} {k.val}</p>
-                  <p className="text-[10px] text-[#9B9B9B] mt-0.5">{k.label}</p>
+              <div className="bg-white rounded-2xl border border-black/5 p-3 text-center">
+                <p className="text-2xl font-bold" style={{ color: sinCI.length === 0 ? '#10b981' : '#ef4444' }}>
+                  {sinCI.length === 0 ? '✓' : '⏰'} {sinCI.length}
+                </p>
+                <p className="text-[10px] text-[#9B9B9B] mt-0.5">Sin check-in esta semana</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-black/5 p-3 text-center">
+                <p className="text-2xl font-bold" style={{ color: '#10b981' }}>✓ {okClientes.length}</p>
+                <p className="text-[10px] text-[#9B9B9B] mt-0.5">Al día ({clientes.length} total)</p>
+              </div>
+              {rpeMedia !== null && (
+                <div className="bg-white rounded-2xl border border-black/5 p-3 text-center">
+                  <p className="text-2xl font-bold" style={{ color: rpeMedia >= 8 ? '#ef4444' : rpeMedia >= 6 ? '#f59e0b' : '#10b981' }}>
+                    🏋️ {rpeMedia.toFixed(1)}
+                  </p>
+                  <p className="text-[10px] text-[#9B9B9B] mt-0.5">RPE medio (7d)</p>
                 </div>
-              ))}
+              )}
+              {adherenciaMedia !== null && (
+                <div className="bg-white rounded-2xl border border-black/5 p-3 text-center">
+                  <p className="text-2xl font-bold" style={{ color: adherenciaMedia >= 7 ? '#10b981' : adherenciaMedia >= 5 ? '#f59e0b' : '#ef4444' }}>
+                    📊 {adherenciaMedia.toFixed(1)}
+                  </p>
+                  <p className="text-[10px] text-[#9B9B9B] mt-0.5">Adherencia media /10</p>
+                </div>
+              )}
             </div>
+
+            {/* Alerta crítica — sin CI >14d */}
+            {clientesSinCI14d.length > 0 && (
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-3">
+                <p className="text-xs font-bold text-red-700 mb-1">🚨 Sin actividad &gt;14 días ({clientesSinCI14d.length})</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {clientesSinCI14d.map(c => (
+                    <button key={c.id} onClick={() => setQuickView(c.id)}
+                      className="text-xs font-semibold bg-white border border-red-200 text-red-600 px-2.5 py-1 rounded-full hover:bg-red-100 transition-all">
+                      {c.nombre.trim().split(' ')[0]} ({c.diasSinCI}d)
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               {estadoClientes.map(c => (
@@ -750,6 +795,74 @@ export default function Seguimiento({ session }) {
               placeholder="Buscar por cliente..."
               className="w-full bg-white border border-black/10 rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-acento" />
           </div>
+
+          {/* Gráfica RPE por cliente — últimas 10 sesiones con RPE */}
+          {(() => {
+            // Sesiones con RPE agrupadas por cliente
+            const sesConRpe = sesiones.filter(s => s.rpe && s.fecha && s.completada)
+            if (sesConRpe.length === 0) return null
+            // Por cliente, últimas 10
+            const porCliente = {}
+            for (const s of sesConRpe) {
+              if (!s.cliente_id) continue
+              if (!porCliente[s.cliente_id]) porCliente[s.cliente_id] = { nombre: s.clientes?.nombre, seses: [] }
+              porCliente[s.cliente_id].seses.push(s)
+            }
+            const clientesConRpe = Object.entries(porCliente)
+              .map(([id, d]) => ({ id, nombre: d.nombre, seses: d.seses.sort((a,b) => a.fecha.localeCompare(b.fecha)).slice(-10) }))
+              .filter(c => c.seses.length >= 2)
+            if (clientesConRpe.length === 0) return null
+
+            return (
+              <div className="bg-white rounded-2xl border border-black/5 p-4 mb-3">
+                <p className="text-xs font-bold text-[#0A0A0A] mb-3">📈 Tendencia RPE</p>
+                <div className="space-y-4">
+                  {clientesConRpe.map(cl => {
+                    const maxRpe = 10
+                    const rpeMedia = cl.seses.reduce((a,s) => a + s.rpe, 0) / cl.seses.length
+                    return (
+                      <div key={cl.id}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <p className="text-xs font-semibold text-[#0A0A0A]">{cl.nombre?.split(' ')[0]}</p>
+                          <span className="text-xs text-[#9B9B9B]">media {rpeMedia.toFixed(1)}</span>
+                        </div>
+                        <div className="flex items-end gap-1 h-12">
+                          {cl.seses.map((s, i) => {
+                            const pct = (s.rpe / maxRpe) * 100
+                            const col = s.rpe >= 8 ? '#ef4444' : s.rpe >= 6 ? '#f59e0b' : '#10b981'
+                            return (
+                              <div key={s.id} className="flex-1 flex flex-col items-center gap-0.5 group relative">
+                                <div className="w-full rounded-t-md transition-all"
+                                  style={{ height: `${pct}%`, background: col, minHeight: '4px' }} />
+                                <p className="text-[8px] text-[#9B9B9B] leading-none">{s.rpe}</p>
+                                {/* Tooltip fecha */}
+                                <div className="absolute bottom-full mb-1 hidden group-hover:block bg-[#0A0A0A] text-white text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap z-10 pointer-events-none">
+                                  {new Date(s.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'})} · RPE {s.rpe}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        <div className="flex justify-between mt-0.5">
+                          <p className="text-[9px] text-[#C0C0C0]">{new Date(cl.seses[0].fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</p>
+                          <p className="text-[9px] text-[#C0C0C0]">{new Date(cl.seses[cl.seses.length-1].fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex gap-3 mt-3 pt-2 border-t border-black/5">
+                  {[['#10b981','≤5 Suave'],['#f59e0b','6-7 Moderado'],['#ef4444','≥8 Intenso']].map(([col,lbl]) => (
+                    <div key={lbl} className="flex items-center gap-1">
+                      <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{background:col}} />
+                      <p className="text-[9px] text-[#9B9B9B]">{lbl}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
           <div className="space-y-2">
             {(() => {
               // Agrupar sesiones por cliente_id + fecha para evitar duplicados visuales
@@ -1320,33 +1433,64 @@ export default function Seguimiento({ session }) {
 function TarjetaClienteSemana({ c, color, navigate, setQuickView }) {
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
   const alDia = c.diasSinCI < 7
-  const texto = alDia ? '✓ Esta semana' : c.diasSinCI === 999 ? 'Sin check-in nunca' : `${c.diasSinCI} días sin check-in`
+  const texto = alDia ? '✓ Esta semana' : c.diasSinCI === 999 ? 'Sin check-in nunca' : `${c.diasSinCI}d sin check-in`
+
+  // Datos del último CI
+  const ci = c.ciUltimo
+  const energiaColor = !ci?.energia ? '#C0C0C0'
+    : ci.energia >= 4 ? '#10b981' : ci.energia >= 3 ? '#f59e0b' : '#ef4444'
+  const fatigaColor = !ci?.fatiga ? '#C0C0C0'
+    : ci.fatiga <= 4 ? '#10b981' : ci.fatiga <= 7 ? '#f59e0b' : '#ef4444'
 
   function recordar() {
     navigate('/mensajes', { state: { clienteId: c.id, mensaje: `Hola ${c.nombre.trim().split(' ')[0]}, recuerda hacer tu check-in semanal 💪` } })
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-black/5 p-3.5 flex items-center gap-3">
-      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-        style={{ background: color }}>
-        {ini(c.nombre)}
+    <div className="bg-white rounded-2xl border border-black/5 p-3.5">
+      <div className="flex items-center gap-3">
+        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+          style={{ background: color }}>
+          {ini(c.nombre)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-[#0A0A0A] truncate">{c.nombre.trim()}</p>
+          <p className="text-xs font-medium" style={{ color }}>{texto}</p>
+        </div>
+        {alDia ? (
+          <button onClick={() => setQuickView(c.id)}
+            className="text-xs font-bold px-3 py-2 rounded-lg bg-[#F5F5F0] text-[#6B6B6B] hover:bg-[#EDEBE5] flex-shrink-0 transition-all">
+            Ver
+          </button>
+        ) : (
+          <button onClick={recordar}
+            className="text-xs font-bold px-3 py-2 rounded-lg text-white flex-shrink-0 active:scale-95 transition-all" style={{ background: color }}>
+            Recordar
+          </button>
+        )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-[#0A0A0A] truncate">{c.nombre.trim()}</p>
-        <p className="text-xs font-medium" style={{ color }}>{texto}</p>
-      </div>
-      {alDia ? (
-        <button onClick={() => setQuickView(c.id)}
-          className="text-xs font-bold px-3 py-2 rounded-lg bg-[#F5F5F0] text-[#6B6B6B] hover:bg-[#EDEBE5] flex-shrink-0 transition-all">
-          Ver detalle
-        </button>
-      ) : (
-        <button onClick={recordar}
-          className="text-xs font-bold px-3 py-2 rounded-lg text-white flex-shrink-0 active:scale-95 transition-all" style={{ background: color }}>
-          Recordar check-in
-        </button>
+      {/* Badges del último CI — solo si hay datos */}
+      {ci && (
+        <div className="flex items-center gap-2 mt-2 pl-[52px]">
+          {ci.energia != null && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: energiaColor + '18', color: energiaColor }}>
+              ⚡ {ci.energia}/5
+            </span>
+          )}
+          {ci.fatiga != null && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: fatigaColor + '18', color: fatigaColor }}>
+              😴 {ci.fatiga}/10
+            </span>
+          )}
+          {ci.peso != null && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#F7F6F3] text-[#6B6B6B]">
+              ⚖️ {ci.peso} kg
+            </span>
+          )}
+        </div>
       )}
     </div>
   )
