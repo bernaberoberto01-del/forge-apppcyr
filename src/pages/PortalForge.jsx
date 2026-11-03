@@ -737,7 +737,7 @@ export default function PortalForge() {
           {tab === 'entrena' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoRutina) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
-                <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} esOnline={esOnline} biblioteca={biblioteca} />
+                <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} esOnline={esOnline} biblioteca={biblioteca} cliente={cliente} onEntrenoGuardado={cargarTodo} />
               </div>
               {pagoVencido ? (
                 <BloqueoOverlay mensaje="Tu plan está pausado. Renueva para seguir." boton="Renovar ahora" onClick={irAPagos} color={color} />
@@ -1561,9 +1561,341 @@ function limpiarNombreRutina(nombre) {
   return sinDups.join(' - ')
 }
 
-function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline, biblioteca = {} }) {
+// ─── Modo Entreno Activo ──────────────────────────────────────────────────────
+function ModoEntrenoActivo({ dia, color, histPorEj, biblioteca, onGuardar, onCerrar, cliente }) {
+  const ejercicios = dia.ejercicios || []
+  const [ejActivo, setEjActivo] = useState(0)
+  const [setActivo, setSetActivo] = useState(0)
+  // setsLog[ejIdx] = [{peso, reps, completada}, ...]
+  const [setsLog, setSetsLog] = useState(() => {
+    const init = {}
+    ejercicios.forEach((ej, i) => {
+      const numSeries = parseInt(ej.series) || 3
+      init[i] = Array.from({ length: numSeries }, () => ({ peso: '', reps: '', completada: false }))
+    })
+    return init
+  })
+  const [descansando, setDescansando] = useState(false)
+  const [segundosRestantes, setSegundosRestantes] = useState(0)
+  const [segundosTotales, setSegundosTotales] = useState(0)
+  const [faseResumen, setFaseResumen] = useState(false)
+  const [guardando, setGuardando] = useState(false)
+  const [guardado, setGuardado] = useState(false)
+  const timerRef = useRef(null)
+  const inputPesoRef = useRef(null)
+  const inicioRef = useRef(Date.now())
+
+  const ej = ejercicios[ejActivo]
+  const totalSets = parseInt(ej?.series) || 3
+  const setsDelEj = setsLog[ejActivo] || []
+  const setActualData = setsDelEj[setActivo] || { peso: '', reps: '', completada: false }
+  const hist = histPorEj?.[ej?.nombre]
+  const bibEntry = biblioteca?.[(ej?.nombre || '').toLowerCase()]
+
+  // Iniciar timer de descanso
+  const iniciarDescanso = (segundos) => {
+    if (!segundos) return
+    clearInterval(timerRef.current)
+    setSegundosTotales(segundos)
+    setSegundosRestantes(segundos)
+    setDescansando(true)
+    timerRef.current = setInterval(() => {
+      setSegundosRestantes(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current)
+          setDescansando(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  useEffect(() => {
+    // Auto-focus en peso al cambiar ejercicio/set
+    setTimeout(() => inputPesoRef.current?.focus(), 100)
+    return () => clearInterval(timerRef.current)
+  }, [ejActivo, setActivo])
+
+  const updateSet = (campo, valor) => {
+    setSetsLog(prev => {
+      const copia = { ...prev }
+      copia[ejActivo] = copia[ejActivo].map((s, i) =>
+        i === setActivo ? { ...s, [campo]: valor } : s
+      )
+      return copia
+    })
+  }
+
+  const completarSet = () => {
+    // Marcar set como completado
+    setSetsLog(prev => {
+      const copia = { ...prev }
+      copia[ejActivo] = copia[ejActivo].map((s, i) =>
+        i === setActivo ? { ...s, completada: true } : s
+      )
+      return copia
+    })
+
+    const esUltimoSet = setActivo >= totalSets - 1
+    const esUltimoEj = ejActivo >= ejercicios.length - 1
+
+    if (!esUltimoSet) {
+      // Iniciar descanso y avanzar al siguiente set
+      const descSeg = parseDescansoSegundos(ej?.descanso)
+      if (descSeg) iniciarDescanso(descSeg)
+      setSetActivo(prev => prev + 1)
+    } else if (!esUltimoEj) {
+      // Avanzar al siguiente ejercicio
+      const descSeg = parseDescansoSegundos(ej?.descanso)
+      if (descSeg) iniciarDescanso(descSeg)
+      setEjActivo(prev => prev + 1)
+      setSetActivo(0)
+    } else {
+      // Fin del entreno — mostrar resumen
+      clearInterval(timerRef.current)
+      setDescansando(false)
+      setFaseResumen(true)
+    }
+  }
+
+  const saltarSet = () => {
+    const esUltimoSet = setActivo >= totalSets - 1
+    const esUltimoEj = ejActivo >= ejercicios.length - 1
+    if (!esUltimoSet) {
+      setSetActivo(prev => prev + 1)
+    } else if (!esUltimoEj) {
+      setEjActivo(prev => prev + 1)
+      setSetActivo(0)
+    } else {
+      setFaseResumen(true)
+    }
+  }
+
+  const guardarEntreno = async () => {
+    setGuardando(true)
+    const duracionMin = Math.round((Date.now() - inicioRef.current) / 60000)
+    try {
+      await onGuardar(setsLog, ejercicios, dia, duracionMin)
+      setGuardado(true)
+    } catch (e) {
+      console.error('Error guardando entreno:', e)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  // ── Fase resumen ──
+  if (faseResumen) {
+    const seriesRealizadas = Object.values(setsLog).flat().filter(s => s.completada && (s.peso || s.reps)).length
+    const duracionMin = Math.round((Date.now() - inicioRef.current) / 60000)
+
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0A0A0A' }}>
+        <div className="flex-1 overflow-y-auto">
+          <div className="px-5 pt-12 pb-6 text-center">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-5"
+              style={{ background: `${color}20` }}>🏁</div>
+            <p className="text-white font-black text-3xl mb-2">¡Entreno terminado!</p>
+            <p className="text-sm" style={{ color: 'rgba(255,255,255,0.45)' }}>
+              {seriesRealizadas} series · {duracionMin} min
+            </p>
+          </div>
+
+          {/* Resumen por ejercicio */}
+          <div className="px-4 pb-4 space-y-2">
+            {ejercicios.map((ej, ei) => {
+              const sets = (setsLog[ei] || []).filter(s => s.completada || s.peso || s.reps)
+              if (!sets.length) return null
+              return (
+                <div key={ei} className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                  <p className="text-sm font-bold text-white mb-2">{ej.nombre}</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {sets.map((s, si) => (
+                      <div key={si} className="rounded-lg px-2.5 py-1.5 text-xs font-semibold"
+                        style={{ background: s.completada ? `${color}25` : 'rgba(255,255,255,0.08)', color: s.completada ? color : 'rgba(255,255,255,0.4)' }}>
+                        {s.peso ? `${s.peso}kg` : '—'} × {s.reps || '—'}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="px-4 pb-8 pt-4 space-y-2.5 flex-shrink-0" style={{ background: '#0A0A0A' }}>
+          {!guardado ? (
+            <button onClick={guardarEntreno} disabled={guardando}
+              className="w-full py-4 rounded-2xl text-white font-black text-base active:scale-95 transition-all disabled:opacity-50"
+              style={{ background: color }}>
+              {guardando ? '⏳ Guardando...' : '💾 Guardar entrenamiento'}
+            </button>
+          ) : (
+            <div className="w-full py-4 rounded-2xl text-center font-black text-base"
+              style={{ background: `${color}20`, color }}>
+              ✓ Guardado correctamente
+            </div>
+          )}
+          <button onClick={onCerrar}
+            className="w-full py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.6)' }}>
+            {guardado ? 'Cerrar' : 'Cerrar sin guardar'}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Set activo — pantalla principal ──
+  const progresoPct = Math.round(((ejActivo * totalSets + setActivo) / (ejercicios.length * totalSets)) * 100)
+  const numSerieDisplay = setActivo + 1
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0A0A0A' }}>
+      {/* Barra de progreso */}
+      <div className="h-1 w-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+        <div className="h-full transition-all duration-300 rounded-full" style={{ width: `${progresoPct}%`, background: color }} />
+      </div>
+
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-2 flex-shrink-0">
+        <div>
+          <p className="text-[10px] font-black tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Ej {ejActivo + 1}/{ejercicios.length}
+          </p>
+          <p className="text-white font-black text-lg leading-tight mt-0.5">{ej?.nombre}</p>
+        </div>
+        <button onClick={onCerrar}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-lg active:scale-95"
+          style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>✕</button>
+      </div>
+
+      {/* Subtítulo del ejercicio */}
+      <div className="px-5 pb-3 flex-shrink-0">
+        <div className="flex flex-wrap gap-2">
+          {ej?.series && <span className="text-xs rounded-lg px-2.5 py-1 font-semibold" style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>{ej.series} series</span>}
+          {ej?.reps && <span className="text-xs rounded-lg px-2.5 py-1 font-semibold" style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>{ej.reps} reps</span>}
+          {ej?.peso && <span className="text-xs rounded-lg px-2.5 py-1 font-semibold" style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.5)' }}>{ej.peso}</span>}
+        </div>
+      </div>
+
+      {/* Timer de descanso */}
+      {descansando && (
+        <div className="mx-4 mb-3 rounded-2xl px-4 py-3 flex items-center gap-3 flex-shrink-0"
+          style={{ background: `${color}18`, border: `1px solid ${color}35` }}>
+          <div className="relative w-10 h-10 flex-shrink-0">
+            <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+              <circle cx="18" cy="18" r="15.9" fill="none" strokeWidth="3"
+                stroke={color}
+                strokeDasharray={`${(segundosRestantes / segundosTotales) * 100} 100`}
+                strokeLinecap="round" />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">{segundosRestantes}</span>
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-white">Descansando</p>
+            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.45)' }}>Siguiente: Serie {numSerieDisplay} — prepárate</p>
+          </div>
+          <button onClick={() => { clearInterval(timerRef.current); setDescansando(false) }}
+            className="text-xs font-bold px-3 py-1.5 rounded-xl active:scale-95"
+            style={{ background: color, color: 'white' }}>Saltar</button>
+        </div>
+      )}
+
+      {/* SERIE ACTUAL */}
+      <div className="flex-1 flex flex-col justify-center px-5">
+        <div className="rounded-3xl p-6" style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid rgba(255,255,255,0.08)` }}>
+          {/* Número de serie */}
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-[11px] font-black tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Serie</p>
+            <div className="flex gap-1.5">
+              {Array.from({ length: totalSets }).map((_, i) => (
+                <div key={i} className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all"
+                  style={i < setActivo ? { background: color, color: 'white' }
+                    : i === setActivo ? { background: `${color}30`, color, border: `2px solid ${color}` }
+                    : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.25)' }}>
+                  {i < setActivo ? '✓' : i + 1}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Referencia histórica */}
+          {hist && (
+            <div className="mb-4 p-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)' }}>
+              <p className="text-[10px] font-black tracking-widest uppercase mb-1" style={{ color: 'rgba(255,255,255,0.25)' }}>Última vez</p>
+              <p className="text-sm font-bold" style={{ color }}>
+                {hist.maxPeso}kg
+                {hist.rmMax > hist.maxPeso && <span className="text-xs font-normal text-[rgba(255,255,255,0.4)] ml-2">· RM ~{hist.rmMax}kg</span>}
+              </p>
+            </div>
+          )}
+
+          {/* Inputs peso y reps */}
+          <div className="grid grid-cols-2 gap-3 mb-5">
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Peso (kg)</p>
+              <input
+                ref={inputPesoRef}
+                type="number"
+                inputMode="decimal"
+                placeholder={hist ? `${hist.maxPeso}` : '0'}
+                value={setActualData.peso}
+                onChange={e => updateSet('peso', e.target.value)}
+                className="w-full text-3xl font-black text-white text-center rounded-2xl py-4 outline-none transition-all"
+                style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid rgba(255,255,255,0.1)`, caretColor: color }}
+              />
+            </div>
+            <div>
+              <p className="text-[10px] font-black tracking-widest uppercase mb-2" style={{ color: 'rgba(255,255,255,0.3)' }}>Reps</p>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder={ej?.reps ? String(parseReps(ej.reps)) : '0'}
+                value={setActualData.reps}
+                onChange={e => updateSet('reps', e.target.value)}
+                className="w-full text-3xl font-black text-white text-center rounded-2xl py-4 outline-none transition-all"
+                style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid rgba(255,255,255,0.1)`, caretColor: color }}
+              />
+            </div>
+          </div>
+
+          {/* Nota del ejercicio */}
+          {ej?.notas && (
+            <p className="text-[10px] leading-relaxed mb-4 italic" style={{ color: 'rgba(255,255,255,0.3)' }}>💡 {ej.notas}</p>
+          )}
+
+          {/* Botón serie completada */}
+          <button onClick={completarSet}
+            className="w-full py-4 rounded-2xl font-black text-lg text-white active:scale-95 transition-all"
+            style={{ background: color }}>
+            ✓ Serie completada
+          </button>
+        </div>
+      </div>
+
+      {/* Footer con progreso y saltar */}
+      <div className="px-5 pb-8 pt-4 flex items-center justify-between flex-shrink-0">
+        <div>
+          <p className="text-xs text-white font-semibold">{dia.nombre || `Día`}</p>
+          <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.3)' }}>{progresoPct}% completado</p>
+        </div>
+        <button onClick={saltarSet}
+          className="text-xs font-bold px-4 py-2 rounded-xl active:scale-95"
+          style={{ background: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }}>
+          Saltar →
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline, biblioteca = {}, cliente, onEntrenoGuardado }) {
   const [diaAbierto, setDiaAbierto] = useState(null) // null = todos cerrados
   const [videoEj, setVideoEj] = useState(null) // { nombre, youtube_url, consejos_tecnica }
+  const [entrenoActivo, setEntrenoActivo] = useState(null) // dia object
 
   if (!rutina) return (
     <div className="space-y-3 pb-4">
@@ -1625,6 +1957,7 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
   }
 
   return (
+    <>
     <div className="space-y-3">
       {/* Modal vídeo ejercicio */}
       {videoEj && (
@@ -1794,22 +2127,68 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
                   })}
                 </div>
 
-                {/* Botón registrar (solo online) */}
-                {esOnline && (
-                  <div className="px-4 py-3 border-t border-black/5" style={{ background: `${color}04` }}>
+                {/* Botones de acción del día */}
+                <div className="px-4 py-3 border-t border-black/5 flex gap-2" style={{ background: `${color}04` }}>
+                  <button onClick={() => setEntrenoActivo(dia)}
+                    className="flex-1 py-3 rounded-xl text-sm font-bold text-white active:scale-95 transition-all"
+                    style={{ background: color }}>
+                    💪 Empezar entreno
+                  </button>
+                  {esOnline && (
                     <button onClick={() => setModalRegistro(dia)}
-                      className="w-full py-3 rounded-xl text-sm font-bold text-white active:scale-95 transition-all"
-                      style={{ background: color }}>
-                      ✓ Registrar esta sesión
+                      className="py-3 px-3 rounded-xl text-sm font-bold active:scale-95 transition-all border border-black/10"
+                      style={{ color: color, background: 'white' }}
+                      title="Registrar sin modo activo">
+                      ✓
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </>
             )}
           </div>
         )
       })}
     </div>
+
+    {/* Overlay modo entreno activo */}
+    {entrenoActivo && (
+      <ModoEntrenoActivo
+        dia={entrenoActivo}
+        color={color}
+        histPorEj={histPorEj}
+        biblioteca={biblioteca}
+        cliente={cliente}
+        onCerrar={() => setEntrenoActivo(null)}
+        onGuardar={async (setsLog, ejercicios, dia, duracionMin) => {
+          if (!cliente) return
+          const tipo = esOnline ? 'online' : 'presencial'
+          const { data: sesNueva, error } = await supabase.from('sesiones').insert({
+            cliente_id: cliente.id,
+            entrenador_id: cliente.entrenador_id,
+            fecha: new Date().toISOString().split('T')[0],
+            tipo,
+            completada: true,
+            cancelada: false,
+            notas: dia.nombre || 'Entreno activo',
+            valoracion_pendiente: true,
+            duracion_minutos: duracionMin || null,
+          }).select().single()
+          if (error) throw error
+          const rows = ejercicios.map((ej, i) => ({
+            sesion_id: sesNueva.id,
+            cliente_id: cliente.id,
+            ejercicio_nombre: ej.nombre,
+            patron: ej.patron || null,
+            orden: i,
+            sets: (setsLog[i] || []).filter(s => s.completada || s.peso || s.reps),
+          })).filter(r => r.sets.length > 0)
+          if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
+          setEntrenoActivo(null)
+          if (onEntrenoGuardado) onEntrenoGuardado()
+        }}
+      />
+    )}
+    </>
   )
 }
 
