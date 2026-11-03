@@ -1599,7 +1599,7 @@ export default function Clientes({ session }) {
                 <button onClick={() => setDetalle(null)} className="text-[#6B6B6B] text-xl">×</button>
               </div>
               <div className="flex gap-1 overflow-x-auto">
-                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],...(moduloVisible('seguimiento')?[['seguimientos','Check-ins']]:[]),['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],...(funcionActiva('historial')?[['historial','🩺 Historial']]:[]),...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
+                {[['resumen','Resumen'],['progreso','Progreso'],['fotos','Fotos'],...(moduloVisible('seguimiento')?[['seguimientos','Check-ins']]:[]),['sesiones','Sesiones'],['cuestionario','📋 Cuestionario'],['pagos','💳 Pagos'],['legal','🔒 Legal'],...(funcionActiva('historial')?[['historial','🩺 Historial']]:[]),...(detalle.tipo==='presencial'?[['extra','💡 Trabajo extra']]:[])].map(([id,label]) => (
                   <button key={id} onClick={() => setDTab(id)}
                     className={`flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-all relative ${dTab===id ? 'bg-acento text-white' : 'text-[#6B6B6B] hover:bg-[#F5F5F0]'}`}>
                     {label}
@@ -2341,6 +2341,126 @@ export default function Clientes({ session }) {
                           ))}
                           <p className="text-xs text-[#9B9B9B] text-right pt-1">Total facturado: {dData.pagos?.filter(p=>p.estado==='pagado').reduce((s,p)=>s+Number(p.importe||0),0)||0}€</p>
                         </>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {dTab==='legal' && (() => {
+                const parqFecha = detalle.parq_fecha
+                const parqAlerta = detalle.parq_alerta
+                const parqConfirmado = detalle.parq_confirmado_entrenador
+                const parqRespuestas = detalle.parq_respuestas
+                const rgpdFecha = detalle.rgpd_consentimiento_fecha
+                const rgpdVersion = detalle.rgpd_texto_version
+
+                const PARQ_PREGUNTAS = [
+                  'Ha sido operado/a del corazón o tiene una cardiopatía diagnosticada',
+                  'Siente dolor en el pecho durante la actividad física',
+                  'Ha sentido dolor en el pecho en el último mes (en reposo)',
+                  'Pierde el equilibrio o tiene mareos/pérdidas de conciencia',
+                  'Tiene algún problema óseo o articular que empeore con el ejercicio',
+                  'Toma medicación para la presión arterial o el corazón',
+                  'Conoce alguna otra razón por la que no debería hacer actividad física'
+                ]
+
+                async function confirmarParqAlerta() {
+                  await supabase.from('clientes').update({ parq_confirmado_entrenador: true }).eq('id', detalle.id)
+                  setDetalle(d => ({ ...d, parq_confirmado_entrenador: true }))
+                  setClientes(cs => cs.map(c => c.id === detalle.id ? { ...c, parq_confirmado_entrenador: true } : c))
+                  showToast('✓ Alerta PAR-Q marcada como revisada')
+                }
+
+                return (
+                  <div className="space-y-4">
+                    {/* ── PAR-Q ── */}
+                    <div className="bg-white border border-black/5 rounded-2xl overflow-hidden">
+                      <div className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-[#0A0A0A]">PAR-Q · Cuestionario de aptitud física</p>
+                          {parqFecha
+                            ? <p className="text-xs text-[#9B9B9B] mt-0.5">Completado el {new Date(parqFecha).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</p>
+                            : <p className="text-xs text-[#9B9B9B] mt-0.5">Pendiente — no completado por el cliente</p>
+                          }
+                        </div>
+                        {parqFecha && (
+                          parqAlerta && !parqConfirmado
+                            ? <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600 animate-pulse">⚠️ Requiere revisión</span>
+                            : parqAlerta && parqConfirmado
+                              ? <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-600">⚠️ Revisada</span>
+                              : <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">✓ Sin alertas</span>
+                        )}
+                      </div>
+
+                      {parqAlerta && !parqConfirmado && (
+                        <div className="mx-4 mb-4 p-3 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
+                          <span className="text-red-500 text-lg flex-shrink-0">⚠️</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-red-700">El cliente ha marcado alguna respuesta de riesgo</p>
+                            <p className="text-xs text-red-600 mt-0.5">Revisa las respuestas antes de iniciar el programa. Una vez revisada, márcala como confirmada.</p>
+                            <button onClick={confirmarParqAlerta}
+                              className="mt-2 text-xs font-semibold text-white bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-all active:scale-95">
+                              ✓ Confirmar revisión
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {parqRespuestas && (
+                        <div className="border-t border-black/5">
+                          {PARQ_PREGUNTAS.map((p, i) => {
+                            const resp = parqRespuestas[`p${i+1}`]
+                            const esRiesgo = resp === true
+                            return (
+                              <div key={i} className={`flex items-start gap-3 px-4 py-3 ${i < PARQ_PREGUNTAS.length - 1 ? 'border-b border-black/4' : ''} ${esRiesgo ? 'bg-red-50/60' : ''}`}>
+                                <span className={`flex-shrink-0 text-sm font-bold w-5 text-center ${esRiesgo ? 'text-red-500' : 'text-emerald-500'}`}>
+                                  {esRiesgo ? '✗' : '✓'}
+                                </span>
+                                <p className={`text-xs leading-relaxed ${esRiesgo ? 'text-red-700 font-medium' : 'text-[#6B6B6B]'}`}>{p}</p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+
+                      {!parqFecha && (
+                        <div className="border-t border-black/5 p-4">
+                          <p className="text-xs text-[#9B9B9B]">El cuestionario PAR-Q se completa desde el portal del cliente durante el onboarding. Asegúrate de que el cliente ha accedido al portal.</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── RGPD ── */}
+                    <div className="bg-white border border-black/5 rounded-2xl overflow-hidden">
+                      <div className="p-4 flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-[#0A0A0A]">RGPD · Consentimiento de datos de salud</p>
+                          {rgpdFecha
+                            ? <p className="text-xs text-[#9B9B9B] mt-0.5">Consentimiento otorgado el {new Date(rgpdFecha).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</p>
+                            : <p className="text-xs text-[#9B9B9B] mt-0.5">Consentimiento pendiente</p>
+                          }
+                        </div>
+                        {rgpdFecha
+                          ? <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700">✓ Otorgado</span>
+                          : <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-600">⏳ Pendiente</span>
+                        }
+                      </div>
+                      {rgpdFecha && (
+                        <div className="border-t border-black/5 px-4 py-3 space-y-1.5">
+                          {rgpdVersion && (
+                            <p className="text-xs text-[#9B9B9B]">Versión del texto: <span className="font-medium text-[#6B6B6B]">{rgpdVersion}</span></p>
+                          )}
+                          {detalle.rgpd_consentimiento_ip && (
+                            <p className="text-xs text-[#9B9B9B]">IP de registro: <span className="font-medium text-[#6B6B6B]">{detalle.rgpd_consentimiento_ip}</span></p>
+                          )}
+                          <p className="text-xs text-[#9B9B9B] pt-1">Art. 9 RGPD — datos de categoría especial (salud). Consentimiento explícito obtenido mediante formulario digital firmado por el titular.</p>
+                        </div>
+                      )}
+                      {!rgpdFecha && (
+                        <div className="border-t border-black/5 p-4">
+                          <p className="text-xs text-[#9B9B9B]">El consentimiento RGPD para datos de salud se solicita durante el onboarding del portal. El cliente debe aceptar explícitamente antes de comenzar el programa.</p>
+                        </div>
                       )}
                     </div>
                   </div>
