@@ -82,6 +82,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true, enviado_a: emailEntrenador }), { headers: CORS })
     }
 
+    // Push notification al cliente (no bloqueante)
+    if (tipo === 'mensaje_entrenador') {
+      const pushCuerpo = preview ? preview.slice(0, 100) : `${nombreEntrenador} te ha enviado un mensaje`
+      sb.functions.invoke('enviar-push', {
+        body: {
+          auth_user_id: cliente.auth_user_id,
+          tipo: 'mensaje',
+          titulo: `💬 ${eNegocio}`,
+          cuerpo: pushCuerpo,
+          url: '/portal',
+        },
+      }).catch(() => {}) // no bloquear si push falla
+    }
+
     // Email al cliente
     const html = `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#f5f5f0;padding:24px"><div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden"><div style="background:#111;padding:24px"><span style="color:${color};font-size:18px;font-weight:800">${eNegocio}</span></div><div style="padding:24px">${cuerpo}<a href="${portalUrl}" style="display:inline-block;background:${color};color:#fff;text-decoration:none;font-weight:700;padding:12px 24px;border-radius:10px">Abrir mi portal →</a></div><div style="padding:16px 24px;background:#f5f5f0;font-size:12px;color:#888">Este mensaje va dirigido a ti como cliente de ${eNegocio}.</div></div></body></html>`
 

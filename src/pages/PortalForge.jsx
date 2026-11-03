@@ -4,6 +4,7 @@ import { BRAND, colorMarca } from '../lib/brand'
 import BrandMark from '../components/BrandMark'
 import { moduloVisible } from '../lib/modulos'
 import { ytEmbed, ytMiniatura } from '../lib/youtube'
+import { registerSW, subscribePush, savePushSub, unsubscribePush, pushSupported, pushPermissionState } from '../lib/push'
 
 // El portal respeta los módulos que el centro tiene ocultos: si el centro no usa
 // Seguimiento, Mensajes o Nutrición, sus clientes no ven el check-in, el chat ni
@@ -107,6 +108,7 @@ export default function PortalForge() {
   const [modoPreview, setModoPreview] = useState(false)
   const [telefonoInput, setTelefonoInput] = useState('')
   const [guardandoTelefono, setGuardandoTelefono] = useState(false)
+  const [pushSuscrito, setPushSuscrito] = useState(() => pushPermissionState() === 'granted')
   const mensajesEndRef = useRef(null)
 
   function bloqueadoPreview() {
@@ -125,6 +127,8 @@ export default function PortalForge() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSesion(session?.user || null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, s) => setSesion(s?.user || null))
+    // Registrar Service Worker en silencio — sin pedir permiso todavía
+    registerSW()
     return () => subscription.unsubscribe()
   }, [])
 
@@ -370,6 +374,16 @@ export default function PortalForge() {
     setDatos(d => ({ ...d, mensajes: msgs }))
     setEnviandoMsg(false)
     setTimeout(() => mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+    // Activar push tras primer mensaje — momento de valor natural, no crea fricción
+    if (!pushSuscrito && pushSupported() && pushPermissionState() !== 'denied') {
+      setTimeout(async () => {
+        const { subscription, permiso } = await subscribePush()
+        if (subscription && permiso === 'granted') {
+          await savePushSub(supabase, cliente.id, subscription)
+          setPushSuscrito(true)
+        }
+      }, 800)
+    }
   }
 
   async function guardarTelefono() {
@@ -746,7 +760,7 @@ export default function PortalForge() {
           )}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
           {tab === 'mensajes' && VER_MENSAJES && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} config={config} />}
-          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
+          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} pushSuscrito={pushSuscrito} setPushSuscrito={setPushSuscrito} />}
         </div>
 
         {/* Bottom bar — negro total, 5 slots fijos */}
@@ -1879,7 +1893,7 @@ function TabPagos({ pagos, color }) {
 }
 
 // ─── Tab Más ──────────────────────────────────────────────────────────────────
-function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0, seccionInicial, onConsumirSeccionInicial, solicitarCambioPlan, lesiones, cargarTodo, modoPreview }) {
+function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0, seccionInicial, onConsumirSeccionInicial, solicitarCambioPlan, lesiones, cargarTodo, modoPreview, pushSuscrito, setPushSuscrito }) {
   const [seccion, setSeccion] = useState(seccionInicial || 'menu')
   const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
   const [guardando, setGuardando] = useState(false)
@@ -2001,6 +2015,33 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
           <button onClick={async()=>{await supabase.auth.resetPasswordForEmail(cliente?.email||'',{redirectTo:`${window.location.origin}/`});alert('Email enviado.')}}
             className="text-sm font-bold text-[#6B6B6B]">Cambiar contraseña →</button>
         </div>
+        {pushSupported() && (
+          <div className="bg-white rounded-2xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold text-[#0A0A0A]">Notificaciones push</p>
+              <p className="text-xs text-[#9B9B9B] mt-0.5">
+                {pushSuscrito ? 'Activadas — te avisamos de mensajes y sesiones' : 'Desactivadas'}
+              </p>
+            </div>
+            <button
+              onClick={async () => {
+                if (pushSuscrito) {
+                  await unsubscribePush(supabase)
+                  setPushSuscrito(false)
+                } else {
+                  const { subscription, permiso } = await subscribePush()
+                  if (subscription && permiso === 'granted') {
+                    await savePushSub(supabase, cliente.id, subscription)
+                    setPushSuscrito(true)
+                  }
+                }
+              }}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${pushSuscrito ? 'bg-[#10b981]' : 'bg-black/10'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${pushSuscrito ? 'translate-x-6' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        )}
         <button onClick={()=>supabase.auth.signOut()}
           className="w-full py-3.5 rounded-xl border border-red-100 text-red-400 text-sm font-bold">
           Cerrar sesión

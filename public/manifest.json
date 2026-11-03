@@ -1,0 +1,20 @@
+{
+  "name": "Forge Studio",
+  "short_name": "Forge",
+  "description": "Tu portal de entrenamiento personal",
+  "start_url": "/portal",
+  "display": "standalone",
+  "background_color": "#F7F6F3",
+  "theme_color": "#FF5C00",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "fitness"],
+  "lang": "es"
+}
