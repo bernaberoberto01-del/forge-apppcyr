@@ -416,7 +416,30 @@ export default function PortalForge() {
     </div>
   )
 
-  if (!datos) return <div className="min-h-screen" style={{ background: '#F2F1EE' }} />
+  if (!datos) return (
+    <div className="min-h-screen pb-24" style={{ background: '#F2F1EE' }}>
+      {/* Header skeleton */}
+      <div className="px-5 pt-6 pb-4">
+        <div className="h-3 w-24 rounded-full mb-2 animate-pulse" style={{ background: 'rgba(10,10,10,0.08)' }} />
+        <div className="h-6 w-48 rounded-full animate-pulse" style={{ background: 'rgba(10,10,10,0.12)' }} />
+      </div>
+      {/* Tab bar skeleton */}
+      <div className="px-5 mb-4">
+        <div className="h-10 rounded-2xl animate-pulse" style={{ background: 'rgba(10,10,10,0.1)' }} />
+      </div>
+      {/* Cards skeleton */}
+      <div className="px-5 space-y-3">
+        <div className="h-32 rounded-3xl animate-pulse" style={{ background: '#0A0A0A', opacity: 0.85 }} />
+        <div className="h-24 rounded-2xl animate-pulse" style={{ background: '#0A0A0A', opacity: 0.7 }} />
+        <div className="grid grid-cols-3 gap-2">
+          {[1,2,3].map(i => (
+            <div key={i} className="h-20 rounded-2xl animate-pulse" style={{ background: '#0A0A0A', opacity: 0.5 + i*0.1 }} />
+          ))}
+        </div>
+        <div className="h-40 rounded-2xl animate-pulse" style={{ background: 'rgba(10,10,10,0.07)' }} />
+      </div>
+    </div>
+  )
 
   const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, biblioteca = {} } = datos
   const esOnline = cliente.tipo === 'online'
@@ -2891,6 +2914,80 @@ function SubMedidas({ medidas, color, cliente, cargarTodo, modoPreview }) {
 }
 
 
+// ─── ComparativaFotosSlider ───────────────────────────────────────────────────
+// Slider interactivo antes/después. El usuario arrastra para revelar la imagen "ahora".
+function ComparativaFotosSlider({ fotoAntes, fotoAhora, color }) {
+  const [pos, setPos] = useState(50) // porcentaje 0-100
+  const [dragging, setDragging] = useState(false)
+  const containerRef = useRef(null)
+
+  function getPos(clientX) {
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return 50
+    return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100))
+  }
+
+  function onStart(e) {
+    e.preventDefault()
+    setDragging(true)
+  }
+  function onMove(e) {
+    if (!dragging) return
+    const x = e.touches ? e.touches[0].clientX : e.clientX
+    setPos(getPos(x))
+  }
+  function onEnd() { setDragging(false) }
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+      <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between">
+        <p className="text-[9px] font-black tracking-[0.15em] uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Inicio vs Ahora</p>
+        <p className="text-[9px] font-bold" style={{ color: 'rgba(255,255,255,0.2)' }}>← arrastra →</p>
+      </div>
+      <div
+        ref={containerRef}
+        className="relative w-full select-none"
+        style={{ aspectRatio: '3/4', cursor: dragging ? 'ew-resize' : 'col-resize', touchAction: 'none' }}
+        onMouseDown={onStart} onMouseMove={onMove} onMouseUp={onEnd} onMouseLeave={onEnd}
+        onTouchStart={onStart} onTouchMove={onMove} onTouchEnd={onEnd}
+      >
+        {/* Foto ANTES (fondo completo) */}
+        <img src={fotoAntes.url} alt="Inicio" className="absolute inset-0 w-full h-full object-cover" draggable={false} />
+
+        {/* Foto AHORA (recortada por clip) */}
+        <div className="absolute inset-0 overflow-hidden" style={{ clipPath: `inset(0 ${100-pos}% 0 0)` }}>
+          <img src={fotoAhora.url} alt="Ahora" className="absolute inset-0 w-full h-full object-cover" draggable={false} />
+        </div>
+
+        {/* Línea divisora */}
+        <div className="absolute top-0 bottom-0" style={{ left: `${pos}%`, transform: 'translateX(-50%)', width: 2, background: 'white', boxShadow: '0 0 8px rgba(0,0,0,0.5)' }}>
+          {/* Handle */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center"
+            style={{ background: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M5 8L2 5L2 11L5 8Z" fill="#0A0A0A"/>
+              <path d="M11 8L14 5V11L11 8Z" fill="#0A0A0A"/>
+              <line x1="8" y1="2" x2="8" y2="14" stroke="#0A0A0A" strokeWidth="1.5"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Labels */}
+        <div className="absolute bottom-0 left-0 px-3 py-2" style={{ background: 'rgba(0,0,0,0.65)' }}>
+          <p className="text-white text-[9px] font-black uppercase tracking-widest">
+            INICIO · {new Date(fotoAntes.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
+          </p>
+        </div>
+        <div className="absolute bottom-0 right-0 px-3 py-2" style={{ background: `${color}dd` }}>
+          <p className="text-white text-[9px] font-black uppercase tracking-widest">
+            AHORA · {new Date(fotoAhora.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── SubFotos ─────────────────────────────────────────────────────────────────
 function SubFotos({ fotos, color, cliente, cargarTodo, modoPreview }) {
   const [subiendo, setSubiendo] = useState(false)
@@ -2973,27 +3070,14 @@ function SubFotos({ fotos, color, cliente, cargarTodo, modoPreview }) {
         </div>
       ) : (
         <>
-          {/* Comparativa inicio vs ahora */}
-          {fechas.length >= 2 && (
-            <div className="bg-white rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-black/5">
-                <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Inicio vs Ahora</p>
-              </div>
-              <div className="grid grid-cols-2 gap-0.5">
-                {[grupos[fechas[fechas.length-1]]?.[0], grupos[fechas[0]]?.[0]].filter(Boolean).map((f,i) => (
-                  <div key={i} className="relative aspect-[3/4]">
-                    <img src={f.url} alt="" className="w-full h-full object-cover" />
-                    <div className="absolute bottom-0 left-0 right-0 px-3 py-2"
-                      style={{ background: i===0?'rgba(0,0,0,0.6)':`${color}dd` }}>
-                      <p className="text-white text-[9px] font-black uppercase tracking-widest">
-                        {i===0?'INICIO':'AHORA'} · {new Date(f.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short'})}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Comparativa inicio vs ahora — slider interactivo */}
+          {fechas.length >= 2 && (() => {
+            const fotoAntes = grupos[fechas[fechas.length-1]]?.[0]
+            const fotoAhora = grupos[fechas[0]]?.[0]
+            return fotoAntes && fotoAhora
+              ? <ComparativaFotosSlider fotoAntes={fotoAntes} fotoAhora={fotoAhora} color={color} />
+              : null
+          })()}
 
           {/* Galería por fecha */}
           {fechas.map(fecha => (
