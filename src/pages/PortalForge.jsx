@@ -2755,7 +2755,7 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
     <div className="space-y-3">
       {/* Header */}
       <div className="pb-1">
-        <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Nutrición</p>
+        <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Plan de alimentación</p>
         <h2 className="text-xl font-black text-[#0A0A0A] tracking-tight mt-0.5">{nutricion.nombre}</h2>
       </div>
 
@@ -2911,11 +2911,18 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                             </div>
                           )}
                           {/* Alimentos */}
-                          <div className="space-y-1.5">
+                          <div className="space-y-2">
                             {(comida.alimentos || []).map((al, ai) => (
-                              <div key={ai} className="flex items-center justify-between">
-                                <p className="text-sm text-[#0A0A0A] font-medium">{typeof al === 'string' ? al : al.nombre}</p>
-                                {al.cantidad && <p className="text-xs font-black text-[#9B9B9B] flex-shrink-0 ml-3">{al.cantidad}</p>}
+                              <div key={ai}>
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm text-[#0A0A0A] font-medium">{typeof al === 'string' ? al : al.nombre}</p>
+                                  {al.cantidad && <p className="text-xs font-black text-[#9B9B9B] flex-shrink-0 ml-3">{al.cantidad}</p>}
+                                </div>
+                                {al.alternativa && (
+                                  <p className="text-[10px] text-[#9B9B9B] mt-0.5 pl-0.5">
+                                    <span className="font-bold">↔</span> Alt: {al.alternativa}
+                                  </p>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -3021,6 +3028,15 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
           </div>
         </div>
       )}
+
+      {/* Aviso legal */}
+      <div className="flex gap-2.5 p-3.5 rounded-2xl" style={{ background: '#FAFAF8', border: '1px solid rgba(0,0,0,0.06)' }}>
+        <span className="text-sm flex-shrink-0">⚖️</span>
+        <p className="text-[10px] text-[#6B6B6B] leading-relaxed">
+          <span className="font-semibold text-[#0A0A0A]">Aviso importante: </span>
+          Este plan de alimentación es orientativo para rendimiento deportivo y composición corporal. No constituye prescripción dietética ni sustituye la consulta con un dietista-nutricionista titulado.
+        </p>
+      </div>
 
       <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />
     </div>
