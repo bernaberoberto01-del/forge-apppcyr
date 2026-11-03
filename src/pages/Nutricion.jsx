@@ -81,7 +81,7 @@ export default function Nutricion({ session }) {
         body: { cliente_id: clienteId, ...(instrucciones ? { instrucciones_extra: instrucciones } : {}) }
       })
       if (error) throw error
-      if (data?.ok) { setToast({ msg: '✓ Plan nutricional generado — revísalo y publícalo' }); await cargar() }
+      if (data?.ok) { setToast({ msg: '✓ Plan de alimentación generado — revísalo y publícalo' }); await cargar() }
       else setToast({ msg: (data?.error || 'Error') + (data?.detail ? ': ' + data.detail : '') + (data?.preview ? ' | ' + data.preview : ''), tipo: 'error' })
     } catch (e) { setToast({ msg: e.message, tipo: 'error' }) }
     setGenerando(null)
@@ -199,7 +199,7 @@ export default function Nutricion({ session }) {
       {/* Clientes sin plan */}
       {clientesSinPlan.length > 0 && (
         <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 mb-4">
-          <p className="text-xs font-semibold text-amber-700 mb-3">⚠ Sin plan nutricional ({clientesSinPlan.length})</p>
+          <p className="text-xs font-semibold text-amber-700 mb-3">⚠ Sin plan de alimentación ({clientesSinPlan.length})</p>
           <div className="space-y-2">
             {clientesSinPlan.map(c => {
               const tieneCuest = cuests.some(cu => cu.cliente_id === c.id)
@@ -262,7 +262,7 @@ export default function Nutricion({ session }) {
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
             <p className="text-4xl mb-3">🥗</p>
             <p className="font-semibold text-[#0A0A0A]">Sin planes nutricionales</p>
-            <p className="text-sm text-[#6B6B6B] mt-1">Activa nutrición para un cliente y genera su plan con IA</p>
+            <p className="text-sm text-[#6B6B6B] mt-1">Activa el módulo de alimentación para un cliente y genera su plan con IA</p>
           </div>
         ) : planFiltrado.map(p => {
           const obj = p.objetivo || 'perdida_grasa'
@@ -382,7 +382,7 @@ export default function Nutricion({ session }) {
                       </button>
                     : <button
                         onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
-                        title={activo ? 'Desactivar: el cliente dejará de ver el plan nutricional en su portal' : 'Activar: el cliente podrá ver su plan nutricional en el portal'}
+                        title={activo ? 'Desactivar: el cliente dejará de ver el plan de alimentación en su portal' : 'Activar: el cliente podrá ver su plan de alimentación en el portal'}
                         className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
                         <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
                       </button>
@@ -432,7 +432,7 @@ export default function Nutricion({ session }) {
                     </span>
                   : <button
                       onClick={() => activarNutricion(c.id, !c.nutricion_activa)}
-                      title={activo ? 'Desactivar: el cliente dejará de ver el plan nutricional en su portal' : 'Activar: el cliente podrá ver su plan nutricional en el portal'}
+                      title={activo ? 'Desactivar: el cliente dejará de ver el plan de alimentación en su portal' : 'Activar: el cliente podrá ver su plan de alimentación en el portal'}
                       className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${activo ? 'bg-acento' : 'bg-black/20'}`}>
                       <div className={`w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all shadow ${activo ? 'left-5' : 'left-0.5'}`} />
                     </button>
@@ -602,7 +602,7 @@ export default function Nutricion({ session }) {
               <div className="bg-[#F5F5F0] border border-black/8 rounded-xl p-3 flex gap-2">
                 <span className="text-sm flex-shrink-0">⚖️</span>
                 <p className="text-xs text-[#6B6B6B] leading-relaxed">
-                  <span className="font-semibold text-[#0A0A0A]">Aviso legal:</span> Este plan nutricional es orientativo y no constituye prescripción dietética. Para un seguimiento médico-nutricional, consulta con un dietista-nutricionista titulado.
+                  <span className="font-semibold text-[#0A0A0A]">Aviso importante:</span> Este plan de alimentación es orientativo para rendimiento deportivo y composición corporal. No constituye prescripción dietética ni sustituye la consulta con un dietista-nutricionista titulado.
                 </p>
               </div>
       {/* Hidratación */}
