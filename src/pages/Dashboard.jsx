@@ -885,25 +885,49 @@ export default function Dashboard({ session }) {
                   )
                 })()}
 
-                {/* Más de 2 semanas sin check-in — alerta separada, más urgente */}
+                {/* Más de 2 semanas sin check-in — riesgo de baja */}
                 {moduloVisible('seguimiento') && d.clientesSinCI14d?.length > 0 && (
-                  <div className="flex items-center gap-3 px-5 py-3.5 bg-red-50">
-                    <div className="w-8 h-8 bg-red-500 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0">⏰</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold text-red-700">
-                        {d.clientesSinCI14d.length} cliente{d.clientesSinCI14d.length>1?'s':''} llevan más de 2 semanas sin check-in
-                      </p>
-                      <p className="text-xs text-[#6B6B6B] truncate">
-                        {d.clientesSinCI14d.slice(0,4).map(c=>c.nombre.split(' ')[0]).join(', ')}
-                        {d.clientesSinCI14d.length > 4 && ` +${d.clientesSinCI14d.length-4}`}
-                      </p>
+                  <div className="bg-red-50 border-l-4 border-red-400">
+                    <div className="flex items-center gap-3 px-5 py-3 border-b border-red-100">
+                      <div className="w-8 h-8 bg-red-500 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0 animate-pulse">⚠️</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-red-700">
+                          {d.clientesSinCI14d.length} cliente{d.clientesSinCI14d.length>1?'s':''} en riesgo de baja
+                        </p>
+                        <p className="text-xs text-red-500">Más de 14 días sin check-in — requiere contacto</p>
+                      </div>
+                      <button onClick={() => navigate('/seguimiento')}
+                        className="text-xs bg-red-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0 active:scale-95 transition-all">
+                        Ver seguimiento →
+                      </button>
+                      <button onClick={() => descartarGrupo(d.clientesSinCI14d.map(c=>c.id), 'sin_checkin_14d', 'clientesSinCI14d')}
+                        title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                     </div>
-                    <button onClick={() => navigate('/seguimiento')}
-                      className="text-xs bg-red-500 text-white font-semibold px-3 py-1.5 rounded-xl flex-shrink-0">
-                      Ver →
-                    </button>
-                    <button onClick={() => descartarGrupo(d.clientesSinCI14d.map(c=>c.id), 'sin_checkin_14d', 'clientesSinCI14d')}
-                      title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
+                    <div className="px-5 py-2 flex flex-col gap-2">
+                      {d.clientesSinCI14d.slice(0,3).map(c => {
+                        const ultimoCI = (d.checkins||[]).filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha?.localeCompare(a.fecha))[0]
+                        const diasSin = ultimoCI
+                          ? Math.floor((new Date() - new Date(ultimoCI.fecha)) / 864e5)
+                          : null
+                        const riesgo = diasSin === null ? 'crítico' : diasSin >= 30 ? 'crítico' : diasSin >= 21 ? 'alto' : 'medio'
+                        const riesgoColor = riesgo === 'crítico' ? 'text-red-600 bg-red-100' : riesgo === 'alto' ? 'text-orange-600 bg-orange-100' : 'text-amber-600 bg-amber-100'
+                        return (
+                          <div key={c.id} className="flex items-center gap-2 py-1">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
+                              style={{ background: `hsl(${c.nombre.charCodeAt(0)*7%360},55%,50%)` }}>
+                              {c.nombre.slice(0,1).toUpperCase()}
+                            </div>
+                            <p className="text-xs font-medium text-[#0A0A0A] flex-1 truncate">{c.nombre.split(' ')[0]}</p>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${riesgoColor}`}>
+                              {diasSin !== null ? `${diasSin}d sin CI` : 'Sin CI nunca'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                      {d.clientesSinCI14d.length > 3 && (
+                        <p className="text-[10px] text-[#9B9B9B] pb-1">+{d.clientesSinCI14d.length - 3} más en riesgo</p>
+                      )}
+                    </div>
                   </div>
                 )}
 

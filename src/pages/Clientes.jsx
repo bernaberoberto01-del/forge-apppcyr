@@ -150,6 +150,8 @@ function ProtocoloIA({ protocolo: p }) {
 }
 
 const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'',frecuencia_checkin:'semanal',
+  // Etiquetas y origen
+  etiquetas:[], origen:'',
   // Campos del cuestionario
   edad:'',altura:'',anos_entrenando:'',
   marca_press_banca:'',marca_sentadilla:'',marca_peso_muerto:'',marca_dominadas:'',marca_press_militar:'',
@@ -453,7 +455,7 @@ export default function Clientes({ session }) {
 
   async function guardar() {
     setLoading(true)
-    const camposCliente = { nombre:form.nombre, email:form.email, telefono:form.telefono, objetivo:form.objetivo, tipo:form.tipo, estado:form.estado, nivel:form.nivel, dias_semana:Number(form.dias_semana)||3, material:form.material, lesiones:form.lesiones||null, enfermedades:form.enfermedades||null, medicacion:form.medicacion||null, notas:form.notas||null, precio_mensual:Number(form.precio_mensual)||0, tipo_entrenamiento:form.tipo_entrenamiento||null, formato_entrenamiento:form.formato_entrenamiento||null, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, frecuencia_checkin: form.frecuencia_checkin||'semanal', nif: form.nif||null, direccion_fiscal: form.direccion_fiscal||null, tipo_factura: form.tipo_factura||'persona_fisica' }
+    const camposCliente = { nombre:form.nombre, email:form.email, telefono:form.telefono, objetivo:form.objetivo, tipo:form.tipo, estado:form.estado, nivel:form.nivel, dias_semana:Number(form.dias_semana)||3, material:form.material, lesiones:form.lesiones||null, enfermedades:form.enfermedades||null, medicacion:form.medicacion||null, notas:form.notas||null, precio_mensual:Number(form.precio_mensual)||0, tipo_entrenamiento:form.tipo_entrenamiento||null, formato_entrenamiento:form.formato_entrenamiento||null, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, frecuencia_checkin: form.frecuencia_checkin||'semanal', nif: form.nif||null, direccion_fiscal: form.direccion_fiscal||null, tipo_factura: form.tipo_factura||'persona_fisica', etiquetas: form.etiquetas || [], origen: form.origen || null }
     if (hayAreas) camposCliente.areas = form.areas?.length ? form.areas : ['entrenamiento']
     let clienteId = editId
     if (editId) {
@@ -768,7 +770,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', areas:areasDe(c), frecuencia_checkin:c.frecuencia_checkin||'semanal', nif:c.nif||'', direccion_fiscal:c.direccion_fiscal||'', tipo_factura:c.tipo_factura||'persona_fisica' })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', areas:areasDe(c), frecuencia_checkin:c.frecuencia_checkin||'semanal', nif:c.nif||'', direccion_fiscal:c.direccion_fiscal||'', tipo_factura:c.tipo_factura||'persona_fisica', etiquetas:c.etiquetas||[], origen:c.origen||'' })
     setEditId(c.id); setModal(true); setDetalle(null)
     // Cargar datos del cuestionario más reciente para este cliente
     supabase.from('cuestionarios').select('*').eq('cliente_id', c.id).order('created_at', {ascending:false}).limit(1).maybeSingle()
@@ -987,9 +989,22 @@ export default function Clientes({ session }) {
                           {c.plan_online === 'completo' ? '⚡ Completo' : c.plan_online === 'entrenamiento' ? '💪 Entrenamiento' : '🥗 Nutrición'}
                         </span>
                       )}
+                      {c.etiquetas && c.etiquetas.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {c.etiquetas.slice(0,2).map(et => (
+                            <span key={et} className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-acento/10 text-acento">{et}</span>
+                          ))}
+                          {c.etiquetas.length > 2 && <span className="text-[10px] text-[#9B9B9B]">+{c.etiquetas.length - 2}</span>}
+                        </div>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${estadoBadge.cls}`}>{estadoBadge.label}</span>
+                      {c.origen && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F5F5F0] text-[#6B6B6B] font-medium">{
+                          c.origen === 'Instagram' ? '📸' : c.origen === 'TikTok' ? '🎵' : c.origen === 'Referido' ? '🤝' : c.origen === 'Publicidad' ? '📢' : c.origen === 'Búsqueda' ? '🔍' : '💬'
+                        } {c.origen}</span>
+                      )}
                       {modalidadBadge && (
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium truncate max-w-[100px] ${modalidadBadge.cls}`}>{modalidadBadge.label}</span>
                       )}
@@ -1026,7 +1041,14 @@ export default function Clientes({ session }) {
                       {obj && <span className={`text-xs px-2 py-1 rounded-full font-medium ${obj.color}`}>{obj.label}</span>}
                     </span>
                     <span>
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${estadoBadge.cls}`}>{estadoBadge.label}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${estadoBadge.cls}`}>{estadoBadge.label}</span>
+                        {c.origen && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#F5F5F0] text-[#6B6B6B] font-medium w-fit">{
+                            c.origen === 'Instagram' ? '📸' : c.origen === 'TikTok' ? '🎵' : c.origen === 'Referido' ? '🤝' : c.origen === 'Publicidad' ? '📢' : c.origen === 'Búsqueda' ? '🔍' : '💬'
+                          } {c.origen}</span>
+                        )}
+                      </div>
                     </span>
                     <span className="text-right">
                       <p className={`text-sm font-bold ${al.pagoVencido ? 'text-red-500' : 'text-acento'}`}>
@@ -1457,6 +1479,68 @@ export default function Clientes({ session }) {
                   ))}
                 </div>
               </div>
+              {/* Origen y etiquetas */}
+              <div className="border border-black/8 rounded-xl p-3 space-y-3">
+                <p className="text-xs font-bold text-[#6B6B6B]">🏷️ Captación y etiquetas</p>
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Canal de captación</label>
+                  <select value={form.origen||''} onChange={e => setForm({...form,origen:e.target.value})}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white">
+                    <option value="">Sin especificar</option>
+                    <option value="Directo">💬 Directo (conocido, boca a boca)</option>
+                    <option value="Referido">🤝 Referido por otro cliente</option>
+                    <option value="Instagram">📸 Instagram</option>
+                    <option value="TikTok">🎵 TikTok</option>
+                    <option value="Publicidad">📢 Publicidad de pago</option>
+                    <option value="Búsqueda">🔍 Búsqueda (Google, etc.)</option>
+                    <option value="Otro">🌐 Otro</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Etiquetas personalizadas</label>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(form.etiquetas||[]).map(et => (
+                      <span key={et} className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-acento/10 text-acento">
+                        {et}
+                        <button type="button" onClick={() => setForm({...form, etiquetas: form.etiquetas.filter(e => e !== et)})}
+                          className="text-acento/60 hover:text-acento leading-none">×</button>
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      id="etiqueta-input"
+                      placeholder="Ej: VIP, Referidor, Septiembre 2024…"
+                      className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ',') {
+                          e.preventDefault()
+                          const val = e.target.value.trim()
+                          if (val && !(form.etiquetas||[]).includes(val)) {
+                            setForm({...form, etiquetas: [...(form.etiquetas||[]), val]})
+                          }
+                          e.target.value = ''
+                        }
+                      }}
+                    />
+                    <button type="button"
+                      className="text-xs px-3 py-2 rounded-xl border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0] active:scale-95 transition-all whitespace-nowrap"
+                      onClick={() => {
+                        const input = document.getElementById('etiqueta-input')
+                        const val = input.value.trim()
+                        if (val && !(form.etiquetas||[]).includes(val)) {
+                          setForm({...form, etiquetas: [...(form.etiquetas||[]), val]})
+                          input.value = ''
+                        }
+                      }}>
+                      + Añadir
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[#9B9B9B] mt-1">Pulsa Enter o la coma para añadir etiquetas</p>
+                </div>
+              </div>
+
               {/* Datos personales */}
               <div className="border border-black/8 rounded-xl p-3 space-y-3">
                 <p className="text-xs font-bold text-[#6B6B6B]">📊 Datos personales</p>
