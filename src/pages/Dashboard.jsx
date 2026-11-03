@@ -316,6 +316,20 @@ export default function Dashboard({ session }) {
     const totalClientes = (clientes||[]).length
     const tasaRetencion = totalClientes > 0 ? Math.round((activos.length/totalClientes)*100) : 100
 
+    // Deltas mes anterior para KPIs
+    const inicioMesAnterior = diaLocal(new Date(hoy.getFullYear(), hoy.getMonth()-1, 1))
+    const deltaIngresos = (() => {
+      const actual = ingresosPorMes[5]?.valor ?? 0
+      const anterior = ingresosPorMes[4]?.valor ?? 0
+      if (anterior === 0) return null
+      return Math.round(((actual - anterior) / anterior) * 100)
+    })()
+    const clientesNuevosEsteMes = activos.filter(c => c.fecha_inicio && c.fecha_inicio >= inicioMes).length
+    const clientesNuevosMesAnterior = activos.filter(c => c.fecha_inicio && c.fecha_inicio >= inicioMesAnterior && c.fecha_inicio < inicioMes).length
+    const deltaClientesNuevos = clientesNuevosMesAnterior > 0
+      ? clientesNuevosEsteMes - clientesNuevosMesAnterior
+      : null
+
     // Clientes con interés en suplementación activado pero sin recomendaciones generadas aún
     const interesPorCliente = {}
     ;(cuestSuplemento||[]).forEach(c => { if (!interesPorCliente[c.cliente_id]) interesPorCliente[c.cliente_id] = c })
@@ -379,6 +393,7 @@ export default function Dashboard({ session }) {
       clientesPagoFallido,
       clientesOnlineSinSuscripcion,
       solicitudesCambioPlan: (solicitudesCambioPlan || []).filter(s => !estaDescartada(s.cliente_id, 'cambio_plan')),
+      deltaIngresos, deltaClientesNuevos, clientesNuevosEsteMes,
     })
     setLoading(false)
     } catch (e) {
@@ -1043,28 +1058,62 @@ export default function Dashboard({ session }) {
             {/* KPIs — compactos en columna */}
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
               <div className="grid grid-cols-2 gap-3">
-                {[
-                  ['Clientes', d.activos.length, BRAND.color, '/clientes'],
-                  ['Ingresos', `${d.ingresosMes.toFixed(0)}€`, '#10b981', '/pagos',
-                    d.previstoMes > d.ingresosMes ? { label: `/${d.previstoMes.toFixed(0)}€`, tipo: 'previsto' } : null],
-                  ['Sesiones hoy', sesionesHoy.length, '#6366f1', '/agenda'],
-                  ['Adherencia', d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—', '#f59e0b', '/seguimiento'],
-                ].map(([l,v,c,ruta,sub]) => (
-                  <button key={l} onClick={() => navigate(ruta)}
-                    className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
+                {/* Clientes activos */}
+                <button onClick={() => navigate('/clientes')}
+                  className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
+                  <div className="flex items-baseline justify-between gap-1">
+                    <p className="text-lg font-bold" style={{color: BRAND.color}}>{d.activos.length}</p>
+                    {d.deltaClientesNuevos !== null && d.deltaClientesNuevos !== 0 && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${d.deltaClientesNuevos > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                        {d.deltaClientesNuevos > 0 ? `+${d.deltaClientesNuevos}` : d.deltaClientesNuevos} nuevos
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Clientes</p>
+                  {d.clientesNuevosEsteMes > 0 && (
+                    <p className="text-[10px] text-[#9B9B9B]">{d.clientesNuevosEsteMes} nuevos este mes</p>
+                  )}
+                </button>
+
+                {/* Ingresos */}
+                <button onClick={() => navigate('/pagos')}
+                  className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
+                  <div className="flex items-baseline justify-between gap-1">
                     <div className="flex items-baseline gap-1">
-                      <p className="text-lg font-bold" style={{color:c}}>{v}</p>
-                      {sub?.tipo === 'previsto' && (
-                        <span className="text-sm font-medium text-[#10b981]/60">{sub.label}</span>
+                      <p className="text-lg font-bold text-[#10b981]">{d.ingresosMes.toFixed(0)}€</p>
+                      {d.previstoMes > d.ingresosMes && (
+                        <span className="text-sm font-medium text-[#10b981]/60">/{d.previstoMes.toFixed(0)}€</span>
                       )}
                     </div>
-                    <p className="text-xs text-[#6B6B6B] mt-0.5">{l}</p>
-                    {sub?.tipo === 'previsto' && (
-                      <p className="text-[10px] text-[#10b981]/70 font-medium">previsto este mes</p>
+                    {d.deltaIngresos !== null && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${d.deltaIngresos >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                        {d.deltaIngresos >= 0 ? `▲${d.deltaIngresos}%` : `▼${Math.abs(d.deltaIngresos)}%`}
+                      </span>
                     )}
-                    {sub && typeof sub === 'string' && <p className="text-[10px] text-[#9B9B9B]">{sub}</p>}
-                  </button>
-                ))}
+                  </div>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Ingresos</p>
+                  {d.previstoMes > d.ingresosMes && (
+                    <p className="text-[10px] text-[#10b981]/70 font-medium">previsto este mes</p>
+                  )}
+                </button>
+
+                {/* Sesiones hoy */}
+                <button onClick={() => navigate('/agenda')}
+                  className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
+                  <p className="text-lg font-bold text-[#6366f1]">{sesionesHoy.length}</p>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Sesiones hoy</p>
+                  {sesionesHoy.filter(s => s.completada).length > 0 && (
+                    <p className="text-[10px] text-[#9B9B9B]">{sesionesHoy.filter(s => s.completada).length} completadas</p>
+                  )}
+                </button>
+
+                {/* Adherencia */}
+                <button onClick={() => navigate('/seguimiento')}
+                  className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
+                  <p className="text-lg font-bold text-[#f59e0b]">{d.adherenciaMedia !== null ? `${d.adherenciaMedia}%` : '—'}</p>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Adherencia</p>
+                  <p className="text-[10px] text-[#9B9B9B]">últimas 4 sem.</p>
+                </button>
               </div>
             </div>
 
