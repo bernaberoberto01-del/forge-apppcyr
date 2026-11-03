@@ -1464,39 +1464,122 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
         const DIAS_L = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
         const MESES_L = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
         const labelDias = diasHasta === 0 ? 'Hoy' : diasHasta === 1 ? 'Mañana' : `En ${diasHasta} días`
+        // Ejercicios principales del día que toca (máx 3)
+        const ejerciciosPrincipales = (diaHoy?.ejercicios || []).slice(0, 3)
+        const totalEjercicios = (diaHoy?.ejercicios || []).length
         return (
-          <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-            <div className="px-4 py-3 flex items-center justify-between border-b border-black/4">
-              <p className="text-[10px] font-black tracking-[0.12em] uppercase" style={{ color }}>Próxima sesión</p>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${color}15`, color }}>{labelDias}</span>
+          <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}18, ${color}08)`, border: `1.5px solid ${color}25` }}>
+            {/* Header con countdown */}
+            <div className="px-5 pt-4 pb-3 flex items-start justify-between">
+              <div>
+                <p className="text-[9px] font-black tracking-[0.18em] uppercase mb-1" style={{ color }}>Próxima sesión</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-2xl flex flex-col items-center justify-center flex-shrink-0" style={{ background: color }}>
+                    <span className="text-[8px] font-black text-white/70 uppercase leading-none">{DIAS_L[fechaProxima.getDay()]}</span>
+                    <span className="text-lg font-black text-white leading-tight">{fechaProxima.getDate()}</span>
+                  </div>
+                  <div>
+                    <p className="text-base font-black text-[#0A0A0A]">
+                      {diasHasta === 0 ? 'Hoy' : diasHasta === 1 ? 'Mañana' : `${DIAS_L[fechaProxima.getDay()]} ${fechaProxima.getDate()} ${MESES_L[fechaProxima.getMonth()]}`}
+                    </p>
+                    {proxima.hora && (
+                      <p className="text-xs text-[#6B6B6B]">🕐 {proxima.hora.slice(0,5)}{proxima.duracion_minutos ? ` · ${proxima.duracion_minutos} min` : ''}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <span className="text-[10px] font-black px-2.5 py-1 rounded-full text-white" style={{ background: color }}>{labelDias}</span>
             </div>
-            <div className="px-4 py-4 flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex flex-col items-center justify-center flex-shrink-0" style={{ background: `${color}12` }}>
-                <span className="text-[9px] font-black uppercase leading-none" style={{ color }}>{DIAS_L[fechaProxima.getDay()]}</span>
-                <span className="text-xl font-black text-[#0A0A0A] leading-tight">{fechaProxima.getDate()}</span>
-                <span className="text-[8px] font-bold text-[#9B9B9B] leading-none">{MESES_L[fechaProxima.getMonth()]}</span>
+            {/* Qué toca */}
+            {diaHoy && (
+              <div className="mx-4 mb-4 rounded-2xl bg-white/70 px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-black tracking-[0.12em] uppercase text-[#9B9B9B]">Qué toca</p>
+                  <span className="text-[9px] font-bold text-[#9B9B9B]">{totalEjercicios} ejercicios</span>
+                </div>
+                <p className="text-sm font-black text-[#0A0A0A] mb-1.5">{diaHoy.nombre}</p>
+                {ejerciciosPrincipales.length > 0 && (
+                  <div className="space-y-1">
+                    {ejerciciosPrincipales.map((ej, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: color }} />
+                        <p className="text-[11px] text-[#6B6B6B] truncate">{ej.nombre}
+                          {ej.series && ej.reps && <span className="text-[#C0C0C0]"> · {ej.series}×{ej.reps}</span>}
+                        </p>
+                      </div>
+                    ))}
+                    {totalEjercicios > 3 && (
+                      <p className="text-[10px] text-[#C0C0C0] pl-3">+{totalEjercicios - 3} más</p>
+                    )}
+                  </div>
+                )}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-[#0A0A0A]">{DIAS_L[fechaProxima.getDay()]} {fechaProxima.getDate()} {MESES_L[fechaProxima.getMonth()]}</p>
-                {proxima.hora && <p className="text-xs text-[#6B6B6B] mt-0.5">🕐 {proxima.hora.slice(0,5)}{proxima.duracion_minutos ? ` · ${proxima.duracion_minutos} min` : ''}</p>}
-                {diaHoy && <p className="text-[10px] text-[#9B9B9B] mt-0.5">{diaHoy.nombre} · {(diaHoy.ejercicios||[]).length} ejercicios</p>}
-              </div>
-              <button onClick={() => setTab('entrena')} className="text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0 active:scale-95 transition-all text-white" style={{ background: color }}>Ver →</button>
+            )}
+            {/* CTA */}
+            <div className="px-4 pb-4">
+              <button onClick={() => setTab('entrena')}
+                className="w-full py-3 rounded-2xl text-sm font-black text-white active:scale-95 transition-all"
+                style={{ background: color }}>
+                Ver rutina completa →
+              </button>
             </div>
           </div>
         )
       })()}
 
-      {/* Hoy toca (online sin sesión programada) */}
+      {/* Próxima sesión online — sin sesión registrada hoy */}
       {!sesionHoy && diaHoy && esOnline && (
-        <div className="bg-white rounded-2xl border border-black/5 overflow-hidden">
-          <div className="px-4 py-3.5 flex items-center gap-3 border-b border-black/4" style={{ background: `${color}06` }}>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: color }}>{sesCompletadas%diasRutina.length+1}</div>
-            <div className="flex-1"><p className="text-xs font-bold text-[#0A0A0A]">{diaHoy.nombre}</p><p className="text-[10px] text-[#9B9B9B]">{(diaHoy.ejercicios||[]).length} ejercicios · {rutina ? limpiarNombreRutina(rutina.nombre) : ''}</p></div>
+        <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}18, ${color}08)`, border: `1.5px solid ${color}25` }}>
+          {/* Header */}
+          <div className="px-5 pt-4 pb-3 flex items-start justify-between">
+            <div>
+              <p className="text-[9px] font-black tracking-[0.18em] uppercase mb-1.5" style={{ color }}>Entrena hoy</p>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 text-sm font-black text-white"
+                  style={{ background: color }}>
+                  {sesCompletadas % diasRutina.length + 1}
+                </div>
+                <div>
+                  <p className="text-base font-black text-[#0A0A0A]">{diaHoy.nombre}</p>
+                  <p className="text-[11px] text-[#9B9B9B]">{(diaHoy.ejercicios||[]).length} ejercicios · día {sesCompletadas % diasRutina.length + 1} de {diasRutina.length}</p>
+                </div>
+              </div>
+            </div>
+            {rutina && (
+              <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ background: `${color}15`, color }}>{limpiarNombreRutina(rutina.nombre)}</span>
+            )}
           </div>
-          <div className="px-4 py-3 flex gap-2">
-            <button onClick={() => setTab('entrena')} className="flex-1 py-2.5 rounded-xl text-xs font-bold border border-black/10 text-[#0A0A0A] active:scale-95">Ver ejercicios</button>
-            <button onClick={() => setModalRegistro(diaHoy)} className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white active:scale-95" style={{ background: color }}>✓ Registrar</button>
+          {/* Ejercicios principales */}
+          {(diaHoy.ejercicios||[]).length > 0 && (
+            <div className="mx-4 mb-4 rounded-2xl bg-white/70 px-4 py-3">
+              <p className="text-[10px] font-black tracking-[0.12em] uppercase text-[#9B9B9B] mb-2">Ejercicios</p>
+              <div className="space-y-1">
+                {(diaHoy.ejercicios||[]).slice(0,4).map((ej, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: color }} />
+                    <p className="text-[11px] text-[#6B6B6B] truncate">{ej.nombre}
+                      {ej.series && ej.reps && <span className="text-[#C0C0C0]"> · {ej.series}×{ej.reps}</span>}
+                    </p>
+                  </div>
+                ))}
+                {(diaHoy.ejercicios||[]).length > 4 && (
+                  <p className="text-[10px] text-[#C0C0C0] pl-3">+{(diaHoy.ejercicios||[]).length - 4} más</p>
+                )}
+              </div>
+            </div>
+          )}
+          {/* CTAs */}
+          <div className="px-4 pb-4 flex gap-2">
+            <button onClick={() => setTab('entrena')}
+              className="flex-1 py-3 rounded-2xl text-xs font-black border-2 text-[#0A0A0A] active:scale-95 transition-all"
+              style={{ borderColor: `${color}30`, background: 'white' }}>
+              Ver detalle
+            </button>
+            <button onClick={() => setModalRegistro(diaHoy)}
+              className="flex-1 py-3 rounded-2xl text-xs font-black text-white active:scale-95 transition-all"
+              style={{ background: color }}>
+              ✓ Registrar sesión
+            </button>
           </div>
         </div>
       )}
