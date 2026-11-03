@@ -41,7 +41,10 @@ function Toast({ msg, tipo = 'ok', onClose }) {
 const defaultConfig = {
   nombre_negocio: '', nombre_entrenador: '', bio: '', foto_url: '', color_acento: BRAND.color,
   modulos: { dashboard: true, clientes: true, rutinas: true, sesiones: true, seguimiento: true, pagos: true, agenda: true, nutricion: true, mensajes: true },
-  cuestionario_bloques: { basico: true, objetivo: true, historial: true, disponibilidad: true, material: true, salud: true, motivacion: true }
+  cuestionario_bloques: { basico: true, objetivo: true, historial: true, disponibilidad: true, material: true, salud: true, motivacion: true },
+  // Datos fiscales (M1)
+  nif: '', razon_social: '', direccion_fiscal: '', cp_fiscal: '', municipio_fiscal: '', provincia_fiscal: '',
+  regimen_iva: 'exento', serie_facturas: 'F'
 }
 
 export default function Configuracion({ session, onConfigChange }) {
@@ -144,7 +147,7 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-5 overflow-x-auto">
-        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['tarifas', '💶 Tarifas']].map(([id, label]) => (
+        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['tarifas', '💶 Tarifas'], ['facturacion', '🧾 Facturación']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex-shrink-0 py-2 px-3 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${tab === id ? 'bg-white shadow-sm text-[#0A0A0A]' : 'text-[#6B6B6B] hover:text-[#0A0A0A]'}`}>
             {label}
@@ -368,6 +371,99 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {tab === 'tarifas' && (
         <TarifasTab uid={uid} showToast={showToast} />
+      )}
+
+      {/* ── FACTURACIÓN ─────────────────────────────────────────────────── */}
+      {tab === 'facturacion' && (
+        <div className="space-y-4">
+          {/* Aviso datos completos */}
+          {(!config.nif || !config.razon_social || !config.direccion_fiscal) && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex gap-3">
+              <span className="text-amber-500 text-lg">⚠️</span>
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Datos incompletos</p>
+                <p className="text-xs text-amber-700 mt-0.5">Rellena NIF, razón social y dirección para poder emitir facturas válidas.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Datos fiscales */}
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-[#0A0A0A] mb-4">🧾 Datos fiscales del emisor</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">NIF / DNI *</label>
+                <input value={config.nif||''} onChange={e => setConfig(c=>({...c, nif: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
+                  placeholder="12345678A" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Razón social / Nombre legal *</label>
+                <input value={config.razon_social||''} onChange={e => setConfig(c=>({...c, razon_social: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
+                  placeholder="Roberto Bernabé García" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Dirección fiscal *</label>
+                <input value={config.direccion_fiscal||''} onChange={e => setConfig(c=>({...c, direccion_fiscal: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
+                  placeholder="Calle Mayor, 12, 1ºA" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Código postal</label>
+                <input value={config.cp_fiscal||''} onChange={e => setConfig(c=>({...c, cp_fiscal: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
+                  placeholder="30001" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Municipio</label>
+                <input value={config.municipio_fiscal||''} onChange={e => setConfig(c=>({...c, municipio_fiscal: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
+                  placeholder="Murcia" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Provincia</label>
+                <input value={config.provincia_fiscal||''} onChange={e => setConfig(c=>({...c, provincia_fiscal: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
+                  placeholder="Murcia" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Serie de facturas</label>
+                <input value={config.serie_facturas||'F'} onChange={e => setConfig(c=>({...c, serie_facturas: e.target.value.toUpperCase().slice(0,3)}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento uppercase"
+                  placeholder="F" maxLength={3} />
+                <p className="text-xs text-[#9B9B9B] mt-1">Ej: F → F2024-001, A → A2024-001</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Régimen de IVA */}
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">Régimen de IVA</h2>
+            <p className="text-xs text-[#9B9B9B] mb-4">El régimen determina si tus facturas incluyen IVA o no. Si dudas, consúltalo con tu asesoría.</p>
+            <div className="space-y-2">
+              {[
+                { val: 'exento', label: 'Exento — Art. 20.1.13 LIVA', desc: 'Entrenadores individuales autónomos sin IVA (más habitual)' },
+                { val: 'general', label: 'IVA General — 21%', desc: 'Centros que aplican IVA estándar' },
+                { val: 're', label: 'Recargo de equivalencia', desc: 'Comerciantes minoristas (poco habitual en entrenamiento)' },
+              ].map(r => (
+                <label key={r.val} className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${config.regimen_iva===r.val ? 'border-acento bg-acento/5' : 'border-black/10 hover:border-black/20'}`}>
+                  <input type="radio" name="regimen_iva" value={r.val} checked={config.regimen_iva===r.val}
+                    onChange={() => setConfig(c=>({...c, regimen_iva: r.val}))} className="mt-0.5 accent-acento" />
+                  <div>
+                    <p className="text-sm font-semibold text-[#0A0A0A]">{r.label}</p>
+                    <p className="text-xs text-[#9B9B9B]">{r.desc}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="bg-[#F7F6F3] rounded-2xl px-4 py-3">
+            <p className="text-xs text-[#9B9B9B]">⚖️ Las facturas generadas por Forge son documentos de apoyo. Consulta con tu asesoría fiscal para garantizar su validez en tu situación concreta.</p>
+          </div>
+        </div>
       )}
     </div>
   )

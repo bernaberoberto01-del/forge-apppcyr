@@ -153,6 +153,8 @@ const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:
   // Campos del cuestionario
   edad:'',altura:'',anos_entrenando:'',
   marca_press_banca:'',marca_sentadilla:'',marca_peso_muerto:'',marca_dominadas:'',marca_press_militar:'',
+  // Datos fiscales
+  nif:'',direccion_fiscal:'',tipo_factura:'persona_fisica',
 }
 const PER_PAGE = 20
 
@@ -451,7 +453,7 @@ export default function Clientes({ session }) {
 
   async function guardar() {
     setLoading(true)
-    const camposCliente = { nombre:form.nombre, email:form.email, telefono:form.telefono, objetivo:form.objetivo, tipo:form.tipo, estado:form.estado, nivel:form.nivel, dias_semana:Number(form.dias_semana)||3, material:form.material, lesiones:form.lesiones||null, enfermedades:form.enfermedades||null, medicacion:form.medicacion||null, notas:form.notas||null, precio_mensual:Number(form.precio_mensual)||0, tipo_entrenamiento:form.tipo_entrenamiento||null, formato_entrenamiento:form.formato_entrenamiento||null, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, frecuencia_checkin: form.frecuencia_checkin||'semanal' }
+    const camposCliente = { nombre:form.nombre, email:form.email, telefono:form.telefono, objetivo:form.objetivo, tipo:form.tipo, estado:form.estado, nivel:form.nivel, dias_semana:Number(form.dias_semana)||3, material:form.material, lesiones:form.lesiones||null, enfermedades:form.enfermedades||null, medicacion:form.medicacion||null, notas:form.notas||null, precio_mensual:Number(form.precio_mensual)||0, tipo_entrenamiento:form.tipo_entrenamiento||null, formato_entrenamiento:form.formato_entrenamiento||null, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, frecuencia_checkin: form.frecuencia_checkin||'semanal', nif: form.nif||null, direccion_fiscal: form.direccion_fiscal||null, tipo_factura: form.tipo_factura||'persona_fisica' }
     if (hayAreas) camposCliente.areas = form.areas?.length ? form.areas : ['entrenamiento']
     let clienteId = editId
     if (editId) {
@@ -766,7 +768,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', areas:areasDe(c), frecuencia_checkin:c.frecuencia_checkin||'semanal' })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', areas:areasDe(c), frecuencia_checkin:c.frecuencia_checkin||'semanal', nif:c.nif||'', direccion_fiscal:c.direccion_fiscal||'', tipo_factura:c.tipo_factura||'persona_fisica' })
     setEditId(c.id); setModal(true); setDetalle(null)
     // Cargar datos del cuestionario más reciente para este cliente
     supabase.from('cuestionarios').select('*').eq('cliente_id', c.id).order('created_at', {ascending:false}).limit(1).maybeSingle()
@@ -1535,6 +1537,33 @@ export default function Clientes({ session }) {
                   <option value="mensual">Mensual</option>
                 </select>
                 <p className="text-[10px] text-[#9B9B9B] mt-1">Define cada cuánto se espera el check-in de este cliente</p>
+              </div>
+              {/* Datos fiscales */}
+              <div className="bg-[#F7F6F3] rounded-2xl p-4 space-y-3">
+                <p className="text-xs font-bold text-[#6B6B6B] uppercase tracking-wider">🧾 Datos fiscales (opcional)</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">NIF / DNI</label>
+                    <input value={form.nif||''} onChange={e => setForm({...form,nif:e.target.value.toUpperCase()})}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white"
+                      placeholder="12345678A" maxLength={15} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Tipo</label>
+                    <select value={form.tipo_factura||'persona_fisica'} onChange={e => setForm({...form,tipo_factura:e.target.value})}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
+                      <option value="persona_fisica">Persona física</option>
+                      <option value="empresa">Empresa / Autónomo</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Dirección fiscal</label>
+                  <input value={form.direccion_fiscal||''} onChange={e => setForm({...form,direccion_fiscal:e.target.value})}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white"
+                    placeholder="Calle, número, CP, ciudad" />
+                </div>
+                <p className="text-[10px] text-[#9B9B9B]">Solo necesario si el cliente solicita facturas con sus datos.</p>
               </div>
             </div>
             <div className="flex gap-2 mt-4">

@@ -65,6 +65,7 @@ export default function Pagos({ session }) {
   const [formPlan, setFormPlan] = useState({ cliente_id:'', importe:'', concepto:'Entrenamiento personal', frecuencia:'mensual', dia_cobro:1 })
   const [loading, setLoading] = useState(false)
   const [generandoStripe, setGenerandoStripe] = useState(null)
+  const [facturas, setFacturas] = useState([])
   const uid = session.user.id
   const equipo = useEquipo(uid)
   const { completar, completado } = useOnboarding(uid)
@@ -135,16 +136,177 @@ export default function Pagos({ session }) {
     setTimeout(() => win.print(), 500)
   }
 
+  async function generarFactura(pago) {
+    const cfg = config || {}
+    const serie = cfg.serie_facturas || 'F'
+    const regimen = cfg.regimen_iva || 'exento'
+    const año = new Date().getFullYear()
+
+    // Número correlativo: MAX(numero) de este año
+    const { data: maxRow } = await supabase
+      .from('facturas')
+      .select('numero')
+      .eq('entrenador_id', uid)
+      .gte('fecha', `${año}-01-01`)
+      .lte('fecha', `${año}-12-31`)
+      .order('numero', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const siguiente = (maxRow?.numero || 0) + 1
+    const numStr = `${serie}${año}-${String(siguiente).padStart(3,'0')}`
+
+    const importe = Number(pago.importe)
+    const esExento = regimen === 'exento'
+    const porcentajeIva = esExento ? 0 : (regimen === 're' ? 21 : 21)
+    const base = esExento ? importe : parseFloat((importe / (1 + porcentajeIva/100)).toFixed(2))
+    const cuotaIva = esExento ? 0 : parseFloat((importe - base).toFixed(2))
+    const hoy = diaLocal(new Date())
+
+    // Guardar en tabla facturas
+    await supabase.from('facturas').insert({
+      entrenador_id: uid,
+      cliente_id: pago.cliente_id,
+      pago_id: pago.id,
+      numero: siguiente,
+      fecha: hoy,
+      concepto: pago.concepto || 'Entrenamiento personal',
+      base_imponible: base,
+      porcentaje_iva: porcentajeIva,
+      cuota_iva: cuotaIva,
+      total: importe,
+      regimen_iva: regimen,
+    }).then(() => {}).catch(() => {})
+
+    // Datos del emisor y receptor
+    const negocio = escapeHtml(cfg.razon_social || nombreMarca(cfg.nombre_negocio))
+    const nifEmisor = escapeHtml(cfg.nif || '—')
+    const dirEmisor = escapeHtml([cfg.direccion_fiscal, cfg.cp_fiscal, cfg.municipio_fiscal, cfg.provincia_fiscal].filter(Boolean).join(', ') || '—')
+    const colorFact = colorMarca(/^#[0-9A-Fa-f]{6}$/.test(cfg.color_acento || '') ? cfg.color_acento : null)
+    const nombreCliente = escapeHtml(pago.clientes?.nombre || '—')
+    const nifCliente = escapeHtml(pago.clientes?.nif || '—')
+    const dirCliente = escapeHtml(pago.clientes?.direccion_fiscal || '—')
+
+    const ivaText = esExento
+      ? `<tr><td style="padding:6px 0;color:#6B6B6B;font-size:13px">IVA</td><td style="padding:6px 0;text-align:right;font-size:13px">Exento Art. 20.1.13 LIVA</td></tr>`
+      : `<tr><td style="padding:6px 0;color:#6B6B6B;font-size:13px">Base imponible</td><td style="padding:6px 0;text-align:right;font-size:13px">${base.toFixed(2)}€</td></tr>
+         <tr><td style="padding:6px 0;color:#6B6B6B;font-size:13px">IVA (${porcentajeIva}%)</td><td style="padding:6px 0;text-align:right;font-size:13px">${cuotaIva.toFixed(2)}€</td></tr>`
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, sans-serif; color: #0A0A0A; padding: 48px; max-width: 640px; margin: 0 auto; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 3px solid ${colorFact}; }
+  .logo { font-size: 26px; font-weight: 900; color: ${colorFact}; letter-spacing: -0.5px; }
+  .factura-id { text-align: right; }
+  .factura-id .label { font-size: 11px; color: #9B9B9B; text-transform: uppercase; letter-spacing: 0.08em; }
+  .factura-id .num { font-size: 20px; font-weight: 800; color: #0A0A0A; margin-top: 2px; }
+  .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 36px; }
+  .party-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9B9B9B; margin-bottom: 8px; font-weight: 700; }
+  .party-name { font-size: 15px; font-weight: 700; color: #0A0A0A; }
+  .party-detail { font-size: 12px; color: #6B6B6B; margin-top: 3px; line-height: 1.5; }
+  .concepto-box { background: #F7F6F3; border-radius: 12px; padding: 20px 24px; margin-bottom: 28px; }
+  .concepto-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: #9B9B9B; margin-bottom: 6px; }
+  .concepto-text { font-size: 15px; font-weight: 600; }
+  .totales { border-top: 1px solid #E5E5E5; padding-top: 16px; margin-top: 8px; }
+  .total-row { display: flex; justify-content: space-between; }
+  .total-final { display: flex; justify-content: space-between; align-items: center; background: ${colorFact}10; border-radius: 10px; padding: 14px 16px; margin-top: 12px; }
+  .total-final-label { font-size: 14px; font-weight: 700; }
+  .total-final-amount { font-size: 28px; font-weight: 900; color: ${colorFact}; }
+  .footer { font-size: 10px; color: #9B9B9B; text-align: center; padding-top: 32px; border-top: 1px solid #eee; margin-top: 32px; line-height: 1.8; }
+  .fecha-row { display: flex; gap: 32px; margin-bottom: 32px; }
+  .fecha-item .fl { font-size: 10px; color: #9B9B9B; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+  .fecha-item .fv { font-size: 13px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo">${negocio}</div>
+    <div class="factura-id">
+      <div class="label">Factura</div>
+      <div class="num">${numStr}</div>
+    </div>
+  </div>
+  <div class="fecha-row">
+    <div class="fecha-item">
+      <div class="fl">Fecha de emisión</div>
+      <div class="fv">${new Date(hoy+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</div>
+    </div>
+    <div class="fecha-item">
+      <div class="fl">Fecha de servicio</div>
+      <div class="fv">${new Date(pago.fecha_pago+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}</div>
+    </div>
+  </div>
+  <div class="parties">
+    <div>
+      <div class="party-label">Emisor</div>
+      <div class="party-name">${negocio}</div>
+      <div class="party-detail">NIF: ${nifEmisor}<br>${dirEmisor}</div>
+    </div>
+    <div>
+      <div class="party-label">Receptor</div>
+      <div class="party-name">${nombreCliente}</div>
+      <div class="party-detail">NIF: ${nifCliente}<br>${dirCliente}</div>
+    </div>
+  </div>
+  <div class="concepto-box">
+    <div class="concepto-label">Concepto</div>
+    <div class="concepto-text">${escapeHtml(pago.concepto || 'Entrenamiento personal')}</div>
+  </div>
+  <table style="width:100%;border-collapse:collapse" class="totales">
+    ${ivaText}
+    <tr><td colspan="2" style="padding:0"><div class="total-final">
+      <span class="total-final-label">Total</span>
+      <span class="total-final-amount">${importe.toFixed(2)}€</span>
+    </div></td></tr>
+  </table>
+  <div class="footer">
+    Factura emitida el ${new Date().toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})} por ${negocio} · NIF ${nifEmisor}
+  </div>
+</body>
+</html>`
+
+    const win = window.open('', '_blank')
+    win.document.write(html)
+    win.document.close()
+    setTimeout(() => win.print(), 500)
+    setToast(`✓ Factura ${numStr} generada`)
+    await cargar()
+  }
+
+  function exportarCSV() {
+    const filas = [['Fecha', 'Cliente', 'Concepto', 'Importe (€)']]
+    pagosFiltrados.forEach(p => {
+      filas.push([
+        p.fecha_pago || '',
+        p.clientes?.nombre || '',
+        p.concepto || '',
+        Number(p.importe || 0).toFixed(2),
+      ])
+    })
+    const csv = filas.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `cobros-${diaLocal(new Date())}.csv`; a.click()
+    URL.revokeObjectURL(url)
+    setToast('✓ CSV descargado')
+  }
+
   useEffect(() => { cargar() }, [uid])
 
   async function cargar() {
-    const [{ data: pg }, { data: cl }, { data: pl }] = await Promise.all([
-      supabase.from('pagos').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).order('fecha_pago', { ascending: false }),
-      supabase.from('clientes').select('id,nombre,tipo,precio_mensual').in('entrenador_id', equipo).eq('estado','activo'),
+    const [{ data: pg }, { data: cl }, { data: pl }, { data: fa }] = await Promise.all([
+      supabase.from('pagos').select('*, clientes(nombre,tipo,nif,direccion_fiscal)').in('entrenador_id', equipo).order('fecha_pago', { ascending: false }),
+      supabase.from('clientes').select('id,nombre,tipo,precio_mensual,nif,direccion_fiscal').in('entrenador_id', equipo).eq('estado','activo'),
       supabase.from('planes_cobro').select('*, clientes(nombre,estado,acceso_libre,is_demo,suscripcion_activa,proxima_factura)').in('entrenador_id', equipo).eq('activo', true).order('proximo_cobro'),
+      supabase.from('facturas').select('*, clientes(nombre)').eq('entrenador_id', uid).order('fecha', { ascending: false }),
     ])
     setPagos(pg || [])
     setClientes(cl || [])
+    setFacturas(fa || [])
     // Mismo criterio que Clientes y Dashboard: solo clientes activos y no exentos
     setPlanes((pl || []).filter(p => p.clientes && cuentaParaCuotas(p.clientes)))
   }
@@ -374,7 +536,7 @@ export default function Pagos({ session }) {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-4">
-        {[['estado','Planes de cobro'],['historial','Historial']].map(([v,l])=>(
+        {[['estado','Planes de cobro'],['historial','Historial'],['facturas','Facturas']].map(([v,l])=>(
           <button key={v} onClick={() => setTab(v)}
             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${tab===v?'bg-white shadow-sm text-[#0A0A0A]':'text-[#6B6B6B]'}`}>
             {l}
@@ -538,12 +700,48 @@ export default function Pagos({ session }) {
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <p className="text-sm font-bold text-emerald-600">+{Number(p.importe).toFixed(0)}€</p>
-                  <button onClick={() => generarRecibo(p)} className="text-[#6B6B6B] hover:text-acento text-sm transition-colors">🧾</button>
+                  <button onClick={() => generarFactura(p)} title="Generar factura" className="text-[#6B6B6B] hover:text-acento text-sm transition-colors">🧾</button>
                   <button onClick={() => eliminarPago(p.id)} className="text-[#6B6B6B] hover:text-red-500 text-lg">×</button>
                 </div>
               </div>
             ))}
           </div>
+        </>
+      )}
+
+      {/* TAB FACTURAS */}
+      {tab === 'facturas' && (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-semibold text-[#0A0A0A]">Facturas emitidas</p>
+              <p className="text-xs text-[#9B9B9B]">{facturas.length} {facturas.length === 1 ? 'factura' : 'facturas'} en total</p>
+            </div>
+            <button onClick={exportarCSV}
+              className="flex items-center gap-1.5 text-sm font-semibold text-[#6B6B6B] border border-black/10 px-3 py-2 rounded-xl hover:bg-[#F7F6F3] transition-all">
+              <span>⬇</span> CSV
+            </button>
+          </div>
+          {facturas.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-black/5 p-8 text-center">
+              <p className="text-3xl mb-2">🧾</p>
+              <p className="text-sm font-semibold text-[#0A0A0A]">Sin facturas emitidas</p>
+              <p className="text-xs text-[#9B9B9B] mt-1.5 max-w-xs mx-auto">Ve al historial de cobros y pulsa 🧾 en cualquier pago para generar una factura legal.</p>
+            </div>
+          ) : facturas.map(f => (
+            <div key={f.id} className="bg-white rounded-xl border border-black/5 shadow-sm p-3.5 flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 bg-[#6366f1]/10 rounded-xl flex items-center justify-center text-[#6366f1] text-xs font-bold flex-shrink-0">📄</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-[#0A0A0A]">{f.numero_display || `F${new Date(f.fecha).getFullYear()}-${String(f.numero).padStart(3,'0')}`}</p>
+                <p className="text-xs text-[#6B6B6B] truncate">{f.clientes?.nombre} · {f.concepto}</p>
+                <p className="text-xs text-[#9B9B9B]">{new Date(f.fecha+'T12:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'})}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-sm font-bold text-emerald-600">{Number(f.total).toFixed(2)}€</p>
+                <p className="text-xs text-[#9B9B9B]">{f.regimen_iva === 'exento' ? 'Exento IVA' : `IVA ${f.porcentaje_iva}%`}</p>
+              </div>
+            </div>
+          ))}
         </>
       )}
 
