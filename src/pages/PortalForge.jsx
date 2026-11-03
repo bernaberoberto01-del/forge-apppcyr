@@ -3550,6 +3550,97 @@ function SubMedidas({ medidas, color, cliente, cargarTodo, modoPreview }) {
             </div>
           )}
 
+          {/* Gráficas de evolución por medida — solo campos con ≥2 puntos */}
+          {(() => {
+            const camposConDatos = CAMPOS.filter(campo => {
+              const pts = (medidas || []).filter(m => m[campo.key] != null).length
+              return pts >= 2
+            })
+            if (!camposConDatos.length) return null
+            return (
+              <div className="bg-white rounded-2xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-black/5">
+                  <p className="text-[9px] font-black tracking-[0.15em] uppercase text-[#9B9B9B]">Evolución</p>
+                </div>
+                <div className="divide-y divide-black/4">
+                  {camposConDatos.map(campo => {
+                    // datos cronológicos (medidas viene desc, invertimos para la gráfica)
+                    const datos = (medidas || [])
+                      .filter(m => m[campo.key] != null)
+                      .slice(0, 8)
+                      .reverse()
+                    const vals = datos.map(m => m[campo.key])
+                    const min = Math.min(...vals)
+                    const max = Math.max(...vals)
+                    const range = max - min || 0.1
+                    const actual = vals[vals.length - 1]
+                    const anterior = vals[vals.length - 2]
+                    const diff = anterior != null ? +(actual - anterior).toFixed(1) : null
+                    const W = 280, H = 52, padX = 6, padY = 6
+                    const iW = W - padX * 2
+                    const iH = H - padY * 2
+                    const pts = datos.map((d, i) => ({
+                      x: padX + (i / (datos.length - 1)) * iW,
+                      y: padY + (1 - (d[campo.key] - min) / range) * iH,
+                    }))
+                    const linePath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+                    const areaPath = `M ${pts[0].x.toFixed(1)},${H} ` + pts.map(p => `L ${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ') + ` L ${pts[pts.length-1].x.toFixed(1)},${H} Z`
+                    const gradId = `mg_${campo.key}`
+                    return (
+                      <div key={campo.key} className="px-5 py-3 flex items-center gap-4">
+                        {/* Label + valor actual */}
+                        <div className="flex-shrink-0 w-16">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-[#9B9B9B]">{campo.label}</p>
+                          <p className="text-lg font-black text-[#0A0A0A] leading-tight">
+                            {actual}<span className="text-[10px] font-normal text-[#9B9B9B] ml-0.5">cm</span>
+                          </p>
+                          {diff !== null && diff !== 0 && (
+                            <p className="text-[9px] font-black" style={{ color: diff < 0 ? '#10b981' : '#ef4444' }}>
+                              {diff > 0 ? '+' : ''}{diff}cm
+                            </p>
+                          )}
+                          {diff === 0 && (
+                            <p className="text-[9px] font-bold text-[#9B9B9B]">sin cambio</p>
+                          )}
+                        </div>
+                        {/* Sparkline SVG */}
+                        <div className="flex-1 min-w-0">
+                          <svg width="100%" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ overflow: 'visible', display: 'block' }}>
+                            <defs>
+                              <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={color} stopOpacity="0.15"/>
+                                <stop offset="100%" stopColor={color} stopOpacity="0"/>
+                              </linearGradient>
+                            </defs>
+                            {/* Área */}
+                            <path d={areaPath} fill={`url(#${gradId})`} />
+                            {/* Línea */}
+                            <path d={linePath} stroke={color} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                            {/* Puntos — solo primero y último */}
+                            {pts.map((p, i) => {
+                              if (i !== 0 && i !== pts.length - 1) return null
+                              const esUltimo = i === pts.length - 1
+                              return (
+                                <circle key={i} cx={p.x} cy={p.y} r={esUltimo ? 4 : 3}
+                                  fill={esUltimo ? color : 'white'}
+                                  stroke={color} strokeWidth="2" />
+                              )
+                            })}
+                          </svg>
+                        </div>
+                        {/* Cantidad de mediciones */}
+                        <div className="flex-shrink-0 text-right">
+                          <p className="text-[9px] font-black text-[#C0C0C0]">{datos.length}</p>
+                          <p className="text-[8px] text-[#C0C0C0]">med.</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Historial */}
           <div className="bg-white rounded-2xl overflow-hidden">
             <div className="px-5 py-3 border-b border-black/5">
