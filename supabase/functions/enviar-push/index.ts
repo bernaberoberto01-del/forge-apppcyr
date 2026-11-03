@@ -183,16 +183,16 @@ Deno.serve(async (req) => {
 
     const { cliente_id, auth_user_id: targetUserId, tipo = 'general', titulo, cuerpo, url } = await req.json()
 
-    // Resolver auth_user_id
-    let resolvedUserId = targetUserId
-    if (!resolvedUserId && cliente_id) {
-      const { data: cli } = await sb.from('clientes').select('auth_user_id').eq('id', cliente_id).single()
-      resolvedUserId = cli?.auth_user_id
+    // Resolver cliente_id — puede venir directo o via auth_user_id
+    let resolvedClienteId = cliente_id
+    if (!resolvedClienteId && targetUserId) {
+      const { data: cli } = await sb.from('clientes').select('id').eq('auth_user_id', targetUserId).maybeSingle()
+      resolvedClienteId = cli?.id
     }
-    if (!resolvedUserId) return new Response(JSON.stringify({ error: 'cliente_id o auth_user_id requerido' }), { status: 400, headers: CORS })
+    if (!resolvedClienteId) return new Response(JSON.stringify({ error: 'cliente_id o auth_user_id requerido' }), { status: 400, headers: CORS })
 
-    // Cargar suscripciones activas del usuario
-    const { data: subs } = await sb.from('push_subscriptions').select('id, endpoint, p256dh, auth').eq('auth_user_id', resolvedUserId)
+    // Cargar suscripciones activas del cliente
+    const { data: subs } = await sb.from('push_subscriptions').select('id, endpoint, p256dh, auth').eq('cliente_id', resolvedClienteId).eq('activa', true)
     if (!subs?.length) return new Response(JSON.stringify({ ok: true, enviados: 0, motivo: 'Sin suscripciones push' }), { headers: CORS })
 
     const titles: Record<string, string> = {

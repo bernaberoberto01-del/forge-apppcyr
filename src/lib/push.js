@@ -7,12 +7,13 @@
  * 3. savePushSub()       — guardar la suscripción en Supabase
  * 4. unsubscribePush()   — cancelar suscripción (en ajustes)
  *
- * VAPID Public Key — generada con Node.js WebCrypto, par guardado en Supabase Secrets:
- * VAPID_PUBLIC_KEY  = BE1SqNc5csrZJir_sC9Tw8sRKL89ej678bFkWsLIlG1ldcLu1GQJTZconorAXYCyFcJbox3s8JXoShSIEayru1M
- * VAPID_PRIVATE_KEY = _YOjrg-CDYBQE1NQCC-YKnCjz9lYUJWe3fHo6CHlV5k
+ * VAPID Public Key — generada con Web Crypto API (P-256), par guardado en Supabase Secrets:
+ * VAPID_PUBLIC_KEY  = BDN887ceyfmQ6vSFH8kQPBt9FJ4XE79NejQLJbPzi0TgpUcGfhAbEYmGBXSHZ8b0jVtWx-bLadKtfG9RaaV081Q
+ * VAPID_PRIVATE_KEY = (en Supabase Secrets — no exponer en frontend)
+ * VAPID_SUBJECT     = mailto:bernaberoberto01@gmail.com
  */
 
-const VAPID_PUBLIC_KEY = 'BE1SqNc5csrZJir_sC9Tw8sRKL89ej678bFkWsLIlG1ldcLu1GQJTZconorAXYCyFcJbox3s8JXoShSIEayru1M'
+const VAPID_PUBLIC_KEY = 'BDN887ceyfmQ6vSFH8kQPBt9FJ4XE79NejQLJbPzi0TgpUcGfhAbEYmGBXSHZ8b0jVtWx-bLadKtfG9RaaV081Q'
 
 /** Convierte una cadena base64url a Uint8Array (para applicationServerKey) */
 function urlB64ToUint8Array(base64String) {
@@ -90,8 +91,9 @@ export async function savePushSub(supabase, clienteId, subscription) {
       endpoint,
       p256dh: keys.p256dh,
       auth: keys.auth,
+      activa: true,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'auth_user_id,endpoint' })
+    }, { onConflict: 'cliente_id,endpoint' })
     if (error) console.warn('[Push] Error guardando suscripción:', error)
     return !error
   } catch (e) {

@@ -16,5 +16,7 @@
     }
   ],
   "categories": ["health", "fitness"],
-  "lang": "es"
+  "lang": "es",
+  "screenshots": [],
+  "prefer_related_applications": false
 }
