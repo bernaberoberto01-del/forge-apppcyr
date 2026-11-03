@@ -191,6 +191,8 @@ export default function Clientes({ session }) {
   const [guardandoCI, setGuardandoCI] = useState(false)
   const [descargandoZip, setDescargandoZip] = useState(false)
   const [lightboxFoto, setLightboxFoto] = useState(null)
+  const [vistaFotos, setVistaFotos] = useState('galeria') // 'galeria' | 'comparar'
+  const [comparar, setComparar] = useState({ tipoVista: 'frontal', fechaA: null, fechaB: null })
   const [form, setForm] = useState(initForm)
   const [editId, setEditId] = useState(null)
   const [detalle, setDetalle] = useState(null)
@@ -2119,80 +2121,182 @@ export default function Clientes({ session }) {
               {dTab==='fotos' && (() => {
                 const fotos = dData.fotos || []
                 const tiposVista = ['frontal','lateral','espalda']
+                // Fechas únicas disponibles
+                const fechasUnicas = [...new Set(fotos.map(f => f.fecha))].sort()
+                // Fotos para comparar
+                const fotoA = fotos.find(f => f.fecha === comparar.fechaA && f.tipo === comparar.tipoVista)
+                const fotoB = fotos.find(f => f.fecha === comparar.fechaB && f.tipo === comparar.tipoVista)
+                // Inicializar fechas comparar si no están seteadas y hay fotos
+                if (fotos.length >= 2 && !comparar.fechaA && fechasUnicas.length >= 1) {
+                  setTimeout(() => setComparar(c => ({
+                    ...c,
+                    fechaA: fechasUnicas[0],
+                    fechaB: fechasUnicas[fechasUnicas.length - 1]
+                  })), 0)
+                }
                 return (
                   <div className="space-y-4">
-                    {fotos.length > 0 && (
-                      <button onClick={() => descargarTodasLasFotos(fotos, detalle.nombre)} disabled={descargandoZip}
-                        className="w-full bg-[#0A0A0A] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#222] disabled:opacity-50 flex items-center justify-center gap-2">
-                        {descargandoZip ? <>⏳ Generando ZIP...</> : <>⬇️ Descargar todas ({fotos.length}) — ZIP</>}
+                    {/* Toggle vista */}
+                    <div className="flex gap-2">
+                      <button onClick={() => setVistaFotos('galeria')}
+                        className={`flex-1 text-xs font-bold py-2 rounded-xl transition-all ${vistaFotos==='galeria'?'bg-[#0A0A0A] text-white':'bg-[#F7F6F3] text-[#6B6B6B] hover:bg-[#EEECE8]'}`}>
+                        📸 Galería
                       </button>
-                    )}
-
-                    {/* Subir fotos */}
-                    <div className="grid grid-cols-3 gap-2">
-                      {tiposVista.map(tipo => (
-                        <label key={tipo} className="cursor-pointer">
-                          <input type="file" accept="image/*" className="hidden"
-                            onChange={e => subirFoto(e.target.files[0], tipo)} />
-                          <div className="border-2 border-dashed border-black/15 rounded-xl p-3 text-center hover:border-acento transition-all">
-                            <p className="text-2xl mb-1">📷</p>
-                            <p className="text-xs font-medium text-[#0A0A0A] capitalize">{tipo}</p>
-                            <p className="text-xs text-[#6B6B6B]">+ añadir</p>
-                          </div>
-                        </label>
-                      ))}
+                      <button onClick={() => setVistaFotos('comparar')} disabled={fotos.length < 2}
+                        className={`flex-1 text-xs font-bold py-2 rounded-xl transition-all disabled:opacity-40 ${vistaFotos==='comparar'?'bg-[#0A0A0A] text-white':'bg-[#F7F6F3] text-[#6B6B6B] hover:bg-[#EEECE8]'}`}>
+                        ◑ Antes / Después
+                      </button>
                     </div>
 
-                    {fotos.length === 0 ? (
-                      <div className="text-center py-6">
-                        <p className="text-3xl mb-2">📸</p>
-                        <p className="text-sm font-semibold text-[#0A0A0A]">Sin fotos todavía</p>
-                        <p className="text-xs text-[#6B6B6B] mt-1">Añade fotos comparativas para ver la evolución</p>
-                      </div>
-                    ) : (
-                      /* Agrupar por fecha */
-                      Object.entries(fotos.reduce((acc, f) => {
-                        if (!acc[f.fecha]) acc[f.fecha] = []
-                        acc[f.fecha].push(f)
-                        return acc
-                      }, {})).map(([fecha, fotosDia]) => (
-                        <div key={fecha}>
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs font-semibold text-[#0A0A0A]">
-                              {new Date(fecha).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
-                            </p>
-                            {fotosDia[0]?.peso && <p className="text-xs text-acento font-bold">{fotosDia[0].peso}kg</p>}
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {fotosDia.map(f => (
-                              <div key={f.id} className="relative group">
-                                <img src={f.url} alt={f.tipo} onClick={() => setLightboxFoto(f)}
-                                  className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5 cursor-pointer" />
-                                <div className="absolute bottom-0 left-0 right-0 bg-black/60 rounded-b-xl px-2 py-1.5 flex items-center justify-between">
-                                  <span className="text-white text-xs capitalize">{f.tipo}</span>
-                                  <div className="flex gap-1">
-                                    <button onClick={async (e) => {
-                                      e.stopPropagation()
-                                      await supabase.from('fotos_progreso').update({ visible_cliente: !f.visible_cliente }).eq('id', f.id)
-                                      await abrirDetalle(detalle)
-                                    }} className={`text-xs px-1.5 py-0.5 rounded ${f.visible_cliente?'bg-emerald-500 text-white':'bg-white/20 text-white'}`}>
-                                      {f.visible_cliente ? '👁' : '🙈'}
-                                    </button>
-                                    <button onClick={async () => {
-                                      const ok = await confirm({ title: '¿Eliminar foto?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
-                                      if (!ok) return
-                                      await supabase.from('fotos_progreso').delete().eq('id', f.id)
-                                      await abrirDetalle(detalle)
-                                    }} className="text-white/70 hover:text-red-400 text-xs px-1">×</button>
-                                  </div>
+                    {vistaFotos === 'comparar' && fotos.length >= 2 ? (
+                      /* ── MODO COMPARAR ── */
+                      <div className="space-y-3">
+                        {/* Selector tipo vista */}
+                        <div className="flex gap-1.5">
+                          {tiposVista.map(t => (
+                            <button key={t} onClick={() => setComparar(c => ({...c, tipoVista: t}))}
+                              className={`flex-1 text-[11px] font-semibold py-1.5 rounded-lg capitalize transition-all ${comparar.tipoVista===t?'bg-acento text-white':'bg-[#F7F6F3] text-[#6B6B6B]'}`}>
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                        {/* Paneles antes/después */}
+                        <div className="grid grid-cols-2 gap-3">
+                          {/* Panel A — Antes */}
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide text-center">Antes</p>
+                            <select value={comparar.fechaA || ''} onChange={e => setComparar(c => ({...c, fechaA: e.target.value}))}
+                              className="w-full text-[11px] font-medium text-[#0A0A0A] bg-[#F7F6F3] border border-black/5 rounded-lg px-2 py-1.5 appearance-none">
+                              <option value="">— fecha —</option>
+                              {fechasUnicas.map(f => (
+                                <option key={f} value={f}>{new Date(f).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})}</option>
+                              ))}
+                            </select>
+                            {fotoA ? (
+                              <div className="relative">
+                                <img src={fotoA.url} alt="antes" className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
+                                {fotoA.peso && <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{fotoA.peso}kg</div>}
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer" onClick={() => setLightboxFoto(fotoA)}>
+                                  <div className="bg-black/50 text-white text-xs font-bold px-3 py-1.5 rounded-full">🔍 Ver</div>
                                 </div>
                               </div>
-                            ))}
+                            ) : (
+                              <div className="w-full aspect-[3/4] bg-[#F7F6F3] rounded-xl border-2 border-dashed border-black/10 flex flex-col items-center justify-center gap-1">
+                                <p className="text-2xl opacity-30">📷</p>
+                                <p className="text-[10px] text-[#9B9B9B]">Sin foto</p>
+                              </div>
+                            )}
+                          </div>
+                          {/* Panel B — Después */}
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] font-bold text-[#9B9B9B] uppercase tracking-wide text-center">Después</p>
+                            <select value={comparar.fechaB || ''} onChange={e => setComparar(c => ({...c, fechaB: e.target.value}))}
+                              className="w-full text-[11px] font-medium text-[#0A0A0A] bg-[#F7F6F3] border border-black/5 rounded-lg px-2 py-1.5 appearance-none">
+                              <option value="">— fecha —</option>
+                              {fechasUnicas.map(f => (
+                                <option key={f} value={f}>{new Date(f).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'2-digit'})}</option>
+                              ))}
+                            </select>
+                            {fotoB ? (
+                              <div className="relative">
+                                <img src={fotoB.url} alt="después" className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5" />
+                                {fotoB.peso && <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{fotoB.peso}kg</div>}
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer" onClick={() => setLightboxFoto(fotoB)}>
+                                  <div className="bg-black/50 text-white text-xs font-bold px-3 py-1.5 rounded-full">🔍 Ver</div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="w-full aspect-[3/4] bg-[#F7F6F3] rounded-xl border-2 border-dashed border-black/10 flex flex-col items-center justify-center gap-1">
+                                <p className="text-2xl opacity-30">📷</p>
+                                <p className="text-[10px] text-[#9B9B9B]">Sin foto</p>
+                              </div>
+                            )}
                           </div>
                         </div>
-                      ))
+                        {/* Diferencia de peso entre las dos fechas */}
+                        {fotoA?.peso && fotoB?.peso && (() => {
+                          const diff = (fotoB.peso - fotoA.peso).toFixed(1)
+                          return (
+                            <div className={`text-center py-2 rounded-xl text-sm font-bold ${diff < 0 ? 'bg-emerald-50 text-emerald-700' : diff > 0 ? 'bg-red-50 text-red-600' : 'bg-[#F7F6F3] text-[#6B6B6B]'}`}>
+                              {diff < 0 ? '▼' : diff > 0 ? '▲' : '—'} {Math.abs(diff)}kg {diff < 0 ? 'perdidos' : diff > 0 ? 'ganados' : 'sin cambio'}
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    ) : (
+                      /* ── MODO GALERÍA ── */
+                      <>
+                        {fotos.length > 0 && (
+                          <button onClick={() => descargarTodasLasFotos(fotos, detalle.nombre)} disabled={descargandoZip}
+                            className="w-full bg-[#0A0A0A] text-white text-sm font-bold py-3 rounded-xl hover:bg-[#222] disabled:opacity-50 flex items-center justify-center gap-2">
+                            {descargandoZip ? <>⏳ Generando ZIP...</> : <>⬇️ Descargar todas ({fotos.length}) — ZIP</>}
+                          </button>
+                        )}
+                        {/* Subir fotos */}
+                        <div className="grid grid-cols-3 gap-2">
+                          {tiposVista.map(tipo => (
+                            <label key={tipo} className="cursor-pointer">
+                              <input type="file" accept="image/*" className="hidden"
+                                onChange={e => subirFoto(e.target.files[0], tipo)} />
+                              <div className="border-2 border-dashed border-black/15 rounded-xl p-3 text-center hover:border-acento transition-all">
+                                <p className="text-2xl mb-1">📷</p>
+                                <p className="text-xs font-medium text-[#0A0A0A] capitalize">{tipo}</p>
+                                <p className="text-xs text-[#6B6B6B]">+ añadir</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                        {fotos.length === 0 ? (
+                          <div className="text-center py-6">
+                            <p className="text-3xl mb-2">📸</p>
+                            <p className="text-sm font-semibold text-[#0A0A0A]">Sin fotos todavía</p>
+                            <p className="text-xs text-[#6B6B6B] mt-1">Añade fotos comparativas para ver la evolución</p>
+                          </div>
+                        ) : (
+                          Object.entries(fotos.reduce((acc, f) => {
+                            if (!acc[f.fecha]) acc[f.fecha] = []
+                            acc[f.fecha].push(f)
+                            return acc
+                          }, {})).map(([fecha, fotosDia]) => (
+                            <div key={fecha}>
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-semibold text-[#0A0A0A]">
+                                  {new Date(fecha).toLocaleDateString('es-ES',{day:'numeric',month:'long',year:'numeric'})}
+                                </p>
+                                {fotosDia[0]?.peso && <p className="text-xs text-acento font-bold">{fotosDia[0].peso}kg</p>}
+                              </div>
+                              <div className="grid grid-cols-3 gap-2">
+                                {fotosDia.map(f => (
+                                  <div key={f.id} className="relative group">
+                                    <img src={f.url} alt={f.tipo} onClick={() => setLightboxFoto(f)}
+                                      className="w-full aspect-[3/4] object-cover rounded-xl border border-black/5 cursor-pointer" />
+                                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 rounded-b-xl px-2 py-1.5 flex items-center justify-between">
+                                      <span className="text-white text-xs capitalize">{f.tipo}</span>
+                                      <div className="flex gap-1">
+                                        <button onClick={async (e) => {
+                                          e.stopPropagation()
+                                          await supabase.from('fotos_progreso').update({ visible_cliente: !f.visible_cliente }).eq('id', f.id)
+                                          await abrirDetalle(detalle)
+                                        }} className={`text-xs px-1.5 py-0.5 rounded ${f.visible_cliente?'bg-emerald-500 text-white':'bg-white/20 text-white'}`}>
+                                          {f.visible_cliente ? '👁' : '🙈'}
+                                        </button>
+                                        <button onClick={async () => {
+                                          const ok = await confirm({ title: '¿Eliminar foto?', message: 'Esta acción no se puede deshacer.', danger: true, confirmText: 'Eliminar' })
+                                          if (!ok) return
+                                          await supabase.from('fotos_progreso').delete().eq('id', f.id)
+                                          await abrirDetalle(detalle)
+                                        }} className="text-white/70 hover:text-red-400 text-xs px-1">×</button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                        <p className="text-xs text-[#6B6B6B] text-center">👁 = visible para el cliente en su portal</p>
+                      </>
                     )}
-                    <p className="text-xs text-[#6B6B6B] text-center">👁 = visible para el cliente en su portal</p>
                   </div>
                 )
               })()}
