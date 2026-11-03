@@ -183,7 +183,7 @@ export default function PortalForge() {
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
       mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, bibRaw] = await Promise.all([
       q1(supabase.from('configuracion').select('*').eq('entrenador_id', eid)),
-      q1(supabase.from('rutinas').select('id,nombre,semanas,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
+      q1(supabase.from('rutinas').select('id,nombre,semanas,fecha_inicio,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
       qa(supabase.from('checkins').select('*').eq('cliente_id', cid).order('fecha', { ascending: false }).limit(52)),
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).gte('fecha', hoy).eq('cancelada', false).order('fecha').order('hora').limit(10)),
@@ -1597,7 +1597,19 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
       <div className="pb-1 flex items-end justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">{limpiarNombreRutina(rutina.nombre)}</h2>
-          <p className="text-xs text-[#9B9B9B] mt-0.5">{dias.length} días · {rutina.semanas || 4} semanas</p>
+          <p className="text-xs text-[#9B9B9B] mt-0.5">
+            {dias.length} días
+            {rutina.fecha_inicio ? (() => {
+              const inicio = new Date(rutina.fecha_inicio)
+              const hoy = new Date()
+              const dias2 = Math.floor((hoy - inicio) / (1000*60*60*24))
+              const sem = rutina.semanas || 4
+              const semActual = Math.max(1, Math.min(sem, Math.floor(dias2 / 7) + 1))
+              if (dias2 < 0) return ` · Empieza en ${Math.abs(dias2)} días`
+              if (dias2 >= sem * 7) return ` · ${sem} semanas completadas`
+              return ` · Semana ${semActual} de ${sem}`
+            })() : ` · ${rutina.semanas || 4} semanas`}
+          </p>
         </div>
         {diaAbierto !== null && (
           <button onClick={() => setDiaAbierto(null)}

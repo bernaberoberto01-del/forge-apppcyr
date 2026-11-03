@@ -47,6 +47,8 @@ export default function Rutinas({ session }) {
   const [contextoIA, setContextoIA] = useState('')
   const [mostrarContextoIA, setMostrarContextoIA] = useState(false)
   const [notasEdit, setNotasEdit] = useState('')
+  const [fechaInicioEdit, setFechaInicioEdit] = useState('')
+  const [semanasEdit, setSemanasEdit] = useState(4)
   const [msgModal, setMsgModal] = useState(null)
   const [msgTexto, setMsgTexto] = useState('')
   const [modalManual, setModalManual] = useState(false)
@@ -86,7 +88,7 @@ export default function Rutinas({ session }) {
     const rutinaId = searchParams.get('rutina')
     if (!rutinaId || !rutinas.length) return
     const r = rutinas.find(x => x.id === rutinaId)
-    if (r) { setDetalle(r); setNotasEdit(r.notas_entrenador || ''); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }
+    if (r) { setDetalle(r); setNotasEdit(r.notas_entrenador || ''); setFechaInicioEdit(r.fecha_inicio || ''); setSemanasEdit(r.semanas || 4); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }
   }, [rutinas, searchParams])
 
   async function cargar() {
@@ -175,7 +177,9 @@ export default function Rutinas({ session }) {
   }
 
   async function publicar(rutina) {
-    await supabase.from('rutinas').update({ estado: 'publicada', contenido: rutina.borrador, notas_entrenador: notasEdit }).eq('id', rutina.id)
+    const updates = { estado: 'publicada', contenido: rutina.borrador, notas_entrenador: notasEdit, semanas: semanasEdit }
+    if (fechaInicioEdit) updates.fecha_inicio = fechaInicioEdit
+    await supabase.from('rutinas').update(updates).eq('id', rutina.id)
     setDetalle(null); setToast(`✓ Rutina publicada para ${rutina.clientes?.nombre}`); await cargar()
   }
 
@@ -529,12 +533,23 @@ export default function Rutinas({ session }) {
                     <button onClick={() => setQuickView(r.cliente_id)} className="text-sm font-semibold text-[#0A0A0A] hover:text-acento transition-colors truncate block text-left">{r.clientes?.nombre}</button>
                     <p className="text-xs text-[#6B6B6B] truncate">{r.borrador?.nombre || r.contenido?.nombre || 'Rutina'} · {r.dias_semana} días/sem</p>
                   </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${r.estado==='archivada'?'bg-[#F5F5F0] text-[#6B6B6B]':r.estado==='publicada'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
-                    {r.estado==='archivada'?'🗂 Archivada':r.estado==='publicada'?'✓ Publicada':'Por revisar'}
-                  </span>
+                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${r.estado==='archivada'?'bg-[#F5F5F0] text-[#6B6B6B]':r.estado==='publicada'?'bg-emerald-50 text-emerald-700':'bg-amber-50 text-amber-700'}`}>
+                      {r.estado==='archivada'?'🗂 Archivada':r.estado==='publicada'?'✓ Publicada':'Por revisar'}
+                    </span>
+                    {r.estado==='publicada' && r.fecha_inicio && (() => {
+                      const inicio = new Date(r.fecha_inicio)
+                      const hoy = new Date()
+                      const dias = Math.floor((hoy - inicio) / (1000*60*60*24))
+                      const sem = r.semanas || 4
+                      const semActual = Math.max(1, Math.min(sem, Math.floor(dias / 7) + 1))
+                      if (dias < 0 || dias >= sem * 7) return null
+                      return <span className="text-[10px] text-acento font-semibold">Sem {semActual}/{sem}</span>
+                    })()}
+                  </div>
                 </div>
                 <div className="flex gap-2 mt-3">
-                  <button onClick={() => { setDetalle(r); setNotasEdit(r.notas_entrenador||''); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }}
+                  <button onClick={() => { setDetalle(r); setNotasEdit(r.notas_entrenador||''); setFechaInicioEdit(r.fecha_inicio||''); setSemanasEdit(r.semanas||4); setModoEdicion(false); setRutinaBorrador(null); setContextoIA(''); setMostrarContextoIA(false) }}
                     className="flex-1 border border-black/10 text-[#0A0A0A] text-xs font-medium py-2 rounded-lg hover:bg-[#F5F5F0]">Ver rutina</button>
                   {r.estado === 'publicada' && IA && (
                     <button onClick={() => analizarYActualizar(r.cliente_id)} disabled={generando === r.cliente_id}
@@ -841,6 +856,37 @@ export default function Rutinas({ session }) {
               <div className="bg-[#F5F5F0] border border-black/8 rounded-xl p-3 flex gap-2">
                 <span className="text-sm flex-shrink-0">⚖️</span>
                 <p className="text-xs text-[#6B6B6B] leading-relaxed"><span className="font-semibold text-[#0A0A0A]">Aviso:</span> Este programa es una guía de entrenamiento. Si tienes dudas sobre tu estado de salud, consulta con un profesional médico.</p>
+              </div>
+
+              {/* Fecha inicio + duración del bloque */}
+              <div className="border border-black/8 rounded-xl p-3.5 space-y-3">
+                <p className="text-xs font-semibold text-[#0A0A0A]">📅 Bloque de entrenamiento</p>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="text-xs text-[#6B6B6B] mb-1 block">Fecha de inicio</label>
+                    <input type="date" value={fechaInicioEdit} onChange={e => setFechaInicioEdit(e.target.value)}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white" />
+                  </div>
+                  <div className="w-28">
+                    <label className="text-xs text-[#6B6B6B] mb-1 block">Semanas</label>
+                    <select value={semanasEdit} onChange={e => setSemanasEdit(Number(e.target.value))}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white">
+                      {[2,3,4,5,6,8,10,12,16].map(n => <option key={n} value={n}>{n} sem</option>)}
+                    </select>
+                  </div>
+                </div>
+                {fechaInicioEdit && (() => {
+                  const inicio = new Date(fechaInicioEdit)
+                  const hoy = new Date()
+                  const diasDif = Math.floor((hoy - inicio) / (1000*60*60*24))
+                  const semanaActual = Math.max(1, Math.min(semanasEdit, Math.floor(diasDif / 7) + 1))
+                  const activo = diasDif >= 0 && diasDif < semanasEdit * 7
+                  return (
+                    <p className={`text-xs font-medium ${activo ? 'text-emerald-600' : diasDif < 0 ? 'text-[#6B6B6B]' : 'text-amber-600'}`}>
+                      {diasDif < 0 ? `⏳ Empieza en ${Math.abs(diasDif)} días` : activo ? `✓ En curso — Semana ${semanaActual} de ${semanasEdit}` : '⚑ Bloque completado'}
+                    </p>
+                  )
+                })()}
               </div>
 
               <div>
