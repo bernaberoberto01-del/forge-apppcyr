@@ -1546,7 +1546,23 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
     </div>
   )
 
-  const dias = rutina.borrador?.dias || rutina.contenido?.dias || []
+  // Calcular semana actual del bloque
+  const semInfo = (() => {
+    const totalSem = rutina.semanas || 4
+    if (!rutina.fecha_inicio) return { semActual: null, totalSem, completado: false, faltan: null }
+    const inicio = new Date(rutina.fecha_inicio + 'T00:00:00')
+    const hoy = new Date()
+    const diasTranscurridos = Math.floor((hoy - inicio) / (1000*60*60*24))
+    if (diasTranscurridos < 0) return { semActual: null, totalSem, completado: false, faltan: Math.abs(diasTranscurridos) }
+    if (diasTranscurridos >= totalSem * 7) return { semActual: totalSem, totalSem, completado: true, faltan: 0 }
+    const semActual = Math.floor(diasTranscurridos / 7) + 1
+    return { semActual, totalSem, completado: false, faltan: null }
+  })()
+
+  // Días: si hay estructura de semanas diferenciadas, usar la semana actual
+  const contenidoBase = rutina.borrador || rutina.contenido || {}
+  const diasDeSemana = semInfo.semActual && contenidoBase.semanas?.[semInfo.semActual - 1]?.dias
+  const dias = diasDeSemana || contenidoBase.dias || []
 
   // Índice de último peso por ejercicio (primera entrada = más reciente por el order desc)
   const histPorEj = {}
@@ -1597,25 +1613,54 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
       <div className="pb-1 flex items-end justify-between">
         <div>
           <h2 className="text-xl font-bold text-[#0A0A0A] tracking-tight">{limpiarNombreRutina(rutina.nombre)}</h2>
-          <p className="text-xs text-[#9B9B9B] mt-0.5">
-            {dias.length} días
-            {rutina.fecha_inicio ? (() => {
-              const inicio = new Date(rutina.fecha_inicio)
-              const hoy = new Date()
-              const dias2 = Math.floor((hoy - inicio) / (1000*60*60*24))
-              const sem = rutina.semanas || 4
-              const semActual = Math.max(1, Math.min(sem, Math.floor(dias2 / 7) + 1))
-              if (dias2 < 0) return ` · Empieza en ${Math.abs(dias2)} días`
-              if (dias2 >= sem * 7) return ` · ${sem} semanas completadas`
-              return ` · Semana ${semActual} de ${sem}`
-            })() : ` · ${rutina.semanas || 4} semanas`}
-          </p>
+          <p className="text-xs text-[#9B9B9B] mt-0.5">{dias.length} días · {semInfo.totalSem} semanas</p>
         </div>
         {diaAbierto !== null && (
           <button onClick={() => setDiaAbierto(null)}
             className="text-xs text-[#9B9B9B] active:scale-95">Cerrar todo</button>
         )}
       </div>
+
+      {/* Badge de semana actual — solo si hay fecha de inicio */}
+      {rutina.fecha_inicio && (
+        <div className="rounded-2xl overflow-hidden" style={{ background: semInfo.completado ? '#ecfdf5' : `${color}14` }}>
+          <div className="px-4 py-3 flex items-center gap-3">
+            {semInfo.faltan !== null ? (
+              // Aún no ha empezado
+              <>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0" style={{ background: `${color}22` }}>📅</div>
+                <div>
+                  <p className="text-sm font-bold text-[#0A0A0A]">Empieza en {semInfo.faltan} días</p>
+                  <p className="text-xs text-[#9B9B9B]">Bloque de {semInfo.totalSem} semanas</p>
+                </div>
+              </>
+            ) : semInfo.completado ? (
+              // Bloque completado
+              <>
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-xl flex-shrink-0">✅</div>
+                <div>
+                  <p className="text-sm font-bold text-emerald-800">Bloque completado</p>
+                  <p className="text-xs text-emerald-600">{semInfo.totalSem} semanas finalizadas</p>
+                </div>
+              </>
+            ) : (
+              // En curso
+              <>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}22` }}>
+                  <span className="text-lg font-black" style={{ color }}>{semInfo.semActual}</span>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-[#0A0A0A]">Semana {semInfo.semActual} de {semInfo.totalSem}</p>
+                  <div className="mt-1.5 h-1.5 bg-black/8 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.round((semInfo.semActual / semInfo.totalSem) * 100)}%`, background: color }} />
+                  </div>
+                </div>
+                <span className="text-xs font-semibold flex-shrink-0" style={{ color }}>{Math.round((semInfo.semActual / semInfo.totalSem) * 100)}%</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {dias.map((dia, di) => {
         const abierto = diaAbierto === di
