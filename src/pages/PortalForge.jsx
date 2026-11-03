@@ -752,7 +752,7 @@ export default function PortalForge() {
           {tab === 'entrena' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoRutina) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
-                <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} esOnline={esOnline} biblioteca={biblioteca} cliente={cliente} onEntrenoGuardado={cargarTodo} />
+                <TabEntrena rutina={rutina} color={color} ejerciciosHist={ejerciciosHist} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} esOnline={esOnline} biblioteca={biblioteca} cliente={cliente} onEntrenoGuardado={cargarTodo} setValorando={modoPreview ? bloqueadoPreview : setValorando} />
               </div>
               {pagoVencido ? (
                 <BloqueoOverlay mensaje="Tu plan está pausado. Renueva para seguir." boton="Renovar ahora" onClick={irAPagos} color={color} />
@@ -1719,6 +1719,7 @@ function ModoEntrenoActivo({ dia, color, histPorEj, biblioteca, onGuardar, onCer
   const [faseResumen, setFaseResumen] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [guardado, setGuardado] = useState(false)
+  const [celebrando, setCelebrando] = useState(false)
   const timerRef = useRef(null)
   const inputPesoRef = useRef(null)
   const inicioRef = useRef(Date.now())
@@ -1816,6 +1817,8 @@ function ModoEntrenoActivo({ dia, color, histPorEj, biblioteca, onGuardar, onCer
     try {
       await onGuardar(setsLog, ejercicios, dia, duracionMin)
       setGuardado(true)
+      setCelebrando(true)
+      setTimeout(() => setCelebrando(false), 3000)
     } catch (e) {
       console.error('Error guardando entreno:', e)
     } finally {
@@ -1828,8 +1831,61 @@ function ModoEntrenoActivo({ dia, color, histPorEj, biblioteca, onGuardar, onCer
     const seriesRealizadas = Object.values(setsLog).flat().filter(s => s.completada && (s.peso || s.reps)).length
     const duracionMin = Math.round((Date.now() - inicioRef.current) / 60000)
 
+    // Confetti particles — colores vivos sobre fondo oscuro
+    const CONFETTI_COLORS = [color, '#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
+    const confettiParticles = Array.from({ length: 40 }, (_, i) => {
+      const col = CONFETTI_COLORS[i % CONFETTI_COLORS.length]
+      const left = 5 + (i * 2.4) % 90
+      const delay = (i * 0.07) % 1.2
+      const dur = 1.8 + (i % 5) * 0.25
+      const size = 6 + (i % 4) * 3
+      const isCircle = i % 3 !== 0
+      return { col, left, delay, dur, size, isCircle, id: i }
+    })
+
     return (
       <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0A0A0A' }}>
+        {/* Confetti overlay */}
+        {celebrando && (
+          <div className="fixed inset-0 z-[60] pointer-events-none overflow-hidden">
+            <style>{`
+              @keyframes confetti-fall {
+                0%   { transform: translateY(-20px) rotate(0deg) scale(1); opacity: 1; }
+                70%  { opacity: 1; }
+                100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; }
+              }
+              @keyframes confetti-sway {
+                0%, 100% { margin-left: 0px; }
+                25%       { margin-left: 12px; }
+                75%       { margin-left: -12px; }
+              }
+            `}</style>
+            {confettiParticles.map(p => (
+              <div key={p.id} style={{
+                position: 'absolute',
+                left: `${p.left}%`,
+                top: '-20px',
+                width: p.isCircle ? p.size : p.size * 0.7,
+                height: p.isCircle ? p.size : p.size * 1.4,
+                borderRadius: p.isCircle ? '50%' : '2px',
+                background: p.col,
+                animation: `confetti-fall ${p.dur}s ${p.delay}s ease-in forwards, confetti-sway ${p.dur * 0.6}s ${p.delay}s ease-in-out infinite`,
+              }} />
+            ))}
+            {/* Texto celebración centrado */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <div style={{
+                fontSize: 72,
+                animation: 'confetti-fall 0.5s ease-out reverse forwards',
+                animationFillMode: 'both',
+              }}>🏆</div>
+              <p className="text-white font-black text-2xl mt-3 text-center px-6" style={{
+                textShadow: `0 0 20px ${color}`,
+              }}>¡Así se hace!</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto">
           <div className="px-5 pt-12 pb-6 text-center">
             <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl mx-auto mb-5"
@@ -2030,7 +2086,7 @@ function ModoEntrenoActivo({ dia, color, histPorEj, biblioteca, onGuardar, onCer
   )
 }
 
-function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline, biblioteca = {}, cliente, onEntrenoGuardado }) {
+function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline, biblioteca = {}, cliente, onEntrenoGuardado, setValorando }) {
   const [diaAbierto, setDiaAbierto] = useState(null) // null = todos cerrados
   const [videoEj, setVideoEj] = useState(null) // { nombre, youtube_url, consejos_tecnica }
   const [entrenoActivo, setEntrenoActivo] = useState(null) // dia object
@@ -2321,8 +2377,15 @@ function TabEntrena({ rutina, color, ejerciciosHist, setModalRegistro, esOnline,
             sets: (setsLog[i] || []).filter(s => s.completada || s.peso || s.reps),
           })).filter(r => r.sets.length > 0)
           if (rows.length) await supabase.from('sesion_ejercicios').insert(rows)
-          setEntrenoActivo(null)
-          if (onEntrenoGuardado) onEntrenoGuardado()
+          // Tras confetti (3s), cerrar entreno y abrir valoración inmediata
+          setTimeout(() => {
+            setEntrenoActivo(null)
+            if (onEntrenoGuardado) onEntrenoGuardado()
+            // Abrir valoración para la sesión recién creada
+            if (setValorando && sesNueva) {
+              setTimeout(() => setValorando({ ...sesNueva, _postEntreno: true }), 300)
+            }
+          }, 3200)
         }}
       />
     )}
