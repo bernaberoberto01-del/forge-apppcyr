@@ -132,7 +132,7 @@ function VistaMensual({ mesVista, setMesVista, sesiones, hoy, abrirModalEnDia, s
                   const miem = miembros?.find(m => m.user_id === s.entrenador_id)
                   const col = miem?.color || clienteColor(s.cliente_id)
                   return (
-                    <div key={si} onClick={e => { e.stopPropagation(); setSesionDetalle(s) }}
+                    <div key={si} onClick={e => { e.stopPropagation(); setSesionDetalle(s); setMostrarCancelar(false) }}
                       className="text-[10px] px-1 py-0.5 rounded truncate leading-tight"
                       style={{ background: s._esVirtual ? 'transparent' : col, color: s._esVirtual ? col : 'white', border: s._esVirtual ? `1px dashed ${col}` : 'none' }}>
                       {s.hora?.slice(0,5)} {ICONO_SERVICIO[s.tipo] || ''}{s.clientes?.nombre?.split(' ')[0]}
@@ -176,6 +176,7 @@ export default function Agenda({ session }) {
   const [diaClick, setDiaClick] = useState(null)
   const [horaClick, setHoraClick] = useState('09:00')
   const [sesionDetalle, setSesionDetalle] = useState(null)
+  const [mostrarCancelar, setMostrarCancelar] = useState(false)
   const [editando, setEditando] = useState(false)
   const [moverForm, setMoverForm] = useState(null)
   const [entrenadorSel, setEntrenadorSel] = useState(null)
@@ -757,7 +758,35 @@ export default function Agenda({ session }) {
   }
 
   async function toggleCompletada(id, completada) {
-    await supabase.from('sesiones').update({ completada: !completada }).eq('id', id)
+    const nuevoEstado = !completada
+    await supabase.from('sesiones').update({
+      completada: nuevoEstado,
+      cancelada: false,
+      estado: nuevoEstado ? 'completada' : 'programada'
+    }).eq('id', id)
+    await cargar(centro?.id)
+  }
+
+  async function cancelarSesion(id, motivo) {
+    await supabase.from('sesiones').update({
+      cancelada: true,
+      completada: false,
+      estado: 'cancelada',
+      motivo_cancelacion: motivo
+    }).eq('id', id)
+    setToast({ msg: `Sesión cancelada · motivo: ${motivo === 'cliente' ? 'cliente' : motivo === 'entrenador' ? 'entrenador' : 'causa mayor'}` })
+    setSesionDetalle(null)
+    await cargar(centro?.id)
+  }
+
+  async function marcarNoShow(id) {
+    await supabase.from('sesiones').update({
+      cancelada: false,
+      completada: false,
+      estado: 'no_show'
+    }).eq('id', id)
+    setToast({ msg: 'Marcada como no-show' })
+    setSesionDetalle(null)
     await cargar(centro?.id)
   }
 
@@ -972,9 +1001,15 @@ export default function Agenda({ session }) {
                       const color = miembros?.find(m => m.user_id === s.entrenador_id)?.color || clienteColor(s.cliente_id)
                       const completada = s.completada
                       const cancelada = s.cancelada
+                      const noShow = s.estado === 'no_show'
                       return (
-                        <div key={si} onClick={() => setSesionDetalle(s)}
-                          className={`bg-white border rounded-xl p-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all ${completada ? 'border-emerald-100' : cancelada ? 'border-red-100 opacity-60' : 'border-black/6 hover:shadow-sm'}`}>
+                        <div key={si} onClick={() => { setSesionDetalle(s); setMostrarCancelar(false) }}
+                          className={`bg-white border rounded-xl p-3.5 flex items-center gap-3 cursor-pointer active:scale-[0.98] transition-all ${
+                            completada ? 'border-emerald-100' :
+                            noShow ? 'border-amber-200 opacity-70' :
+                            cancelada ? 'border-red-100 opacity-60' :
+                            'border-black/6 hover:shadow-sm'
+                          }`}>
                           <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{background: color}} />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-[#0A0A0A] truncate">
@@ -987,11 +1022,14 @@ export default function Agenda({ session }) {
                               {s.tipo && s.tipo !== 'presencial' && (
                                 <span className="text-xs bg-[#6366f1]/10 text-[#6366f1] px-1.5 py-0.5 rounded-md font-medium">{ICONO_SERVICIO[s.tipo] ? `${ICONO_SERVICIO[s.tipo]} ${NOMBRE_SERVICIO[s.tipo]}` : s.tipo}</span>
                               )}
+                              {noShow && <span className="text-xs bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-md font-medium">No-show</span>}
                             </div>
                           </div>
                           <div className="flex-shrink-0">
                             {completada
                               ? <span className="w-7 h-7 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center text-sm">✓</span>
+                              : noShow
+                              ? <span className="w-7 h-7 bg-amber-50 text-amber-500 rounded-lg flex items-center justify-center text-sm">👻</span>
                               : cancelada
                               ? <span className="w-7 h-7 bg-red-50 text-red-400 rounded-lg flex items-center justify-center text-sm">✕</span>
                               : <span className="text-xs font-bold text-[#6B6B6B] bg-[#F5F5F0] px-2 py-1 rounded-lg">{s.hora}</span>
@@ -1141,7 +1179,7 @@ export default function Agenda({ session }) {
                       
                       return (
                         <div key={s.id || idx}
-                          onClick={e => { e.stopPropagation(); if (Date.now() - ultimoArrastreRef.current < 400) return; setSesionDetalle(s) }}
+                          onClick={e => { e.stopPropagation(); if (Date.now() - ultimoArrastreRef.current < 400) return; setSesionDetalle(s); setMostrarCancelar(false) }}
                           onMouseDown={e => { if (e.button === 0) iniciarArrastre(s, e.clientX, e.clientY, false) }}
                           onTouchStart={e => { const t = e.touches[0]; if (t) iniciarArrastre(s, t.clientX, t.clientY, true) }}
                           onContextMenu={e => e.preventDefault()}
@@ -1350,14 +1388,72 @@ export default function Agenda({ session }) {
                     </div>
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <button onClick={() => toggleCompletada(sesionDetalle.id, sesionDetalle.completada)}
-                    className={`flex-1 text-sm font-semibold py-2.5 rounded-xl ${sesionDetalle.completada ? 'bg-[#F5F5F0] text-[#6B6B6B]' : 'bg-emerald-500 text-white'}`}>
-                    {sesionDetalle.completada ? 'Marcar pendiente' : '✓ Completada'}
-                  </button>
-                  <button onClick={() => eliminarSesion(sesionDetalle.id)}
-                    className="border border-red-200 text-red-500 text-sm px-3 py-2.5 rounded-xl hover:bg-red-50">🗑</button>
-                </div>
+                {/* Acciones de estado */}
+                {sesionDetalle.recurrente_id == null || sesionDetalle.recurrente_id === undefined || true ? (
+                  <div className="space-y-2">
+                    {/* Fila principal */}
+                    <div className="flex gap-2">
+                      <button onClick={() => { toggleCompletada(sesionDetalle.id, sesionDetalle.completada); setSesionDetalle(null) }}
+                        className={`flex-1 text-sm font-semibold py-2.5 rounded-xl transition-all ${
+                          sesionDetalle.completada
+                            ? 'bg-[#F5F5F0] text-[#6B6B6B]'
+                            : sesionDetalle.estado === 'cancelada' || sesionDetalle.estado === 'no_show'
+                            ? 'bg-[#F5F5F0] text-[#9B9B9B] opacity-60'
+                            : 'bg-emerald-500 text-white'
+                        }`}>
+                        {sesionDetalle.completada ? '↩ Desmarcar' : '✓ Completada'}
+                      </button>
+                      {sesionDetalle.estado !== 'no_show' && (
+                        <button onClick={() => marcarNoShow(sesionDetalle.id)}
+                          className="border border-amber-200 text-amber-600 text-sm px-3 py-2.5 rounded-xl hover:bg-amber-50 transition-all"
+                          title="No-show: el cliente no apareció">
+                          👻
+                        </button>
+                      )}
+                      <button onClick={() => setMostrarCancelar(v => !v)}
+                        className={`border text-sm px-3 py-2.5 rounded-xl transition-all ${mostrarCancelar ? 'bg-red-50 border-red-300 text-red-600' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
+                        title="Cancelar sesión">
+                        ✕
+                      </button>
+                      <button onClick={() => eliminarSesion(sesionDetalle.id)}
+                        className="border border-black/10 text-[#9B9B9B] text-sm px-3 py-2.5 rounded-xl hover:bg-[#F5F5F0] transition-all"
+                        title="Eliminar sesión">
+                        🗑
+                      </button>
+                    </div>
+
+                    {/* Selector de motivo de cancelación */}
+                    {mostrarCancelar && (
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-3 space-y-2">
+                        <p className="text-xs font-semibold text-red-600 mb-1">Motivo de cancelación</p>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { id: 'cliente', label: 'Cliente' },
+                            { id: 'entrenador', label: 'Entrenador' },
+                            { id: 'causa_mayor', label: 'Causa mayor' },
+                          ].map(m => (
+                            <button key={m.id} onClick={() => cancelarSesion(sesionDetalle.id, m.id)}
+                              className="text-xs font-semibold py-2 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-100 active:scale-95 transition-all">
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Badge de estado actual */}
+                    {(sesionDetalle.estado === 'cancelada' || sesionDetalle.estado === 'no_show') && (
+                      <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium ${sesionDetalle.estado === 'no_show' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-500'}`}>
+                        <span>{sesionDetalle.estado === 'no_show' ? '👻 No-show' : `✕ Cancelada${sesionDetalle.motivo_cancelacion ? ` · ${sesionDetalle.motivo_cancelacion === 'causa_mayor' ? 'causa mayor' : sesionDetalle.motivo_cancelacion}` : ''}`}</span>
+                        <button onClick={() => {
+                          supabase.from('sesiones').update({ cancelada: false, completada: false, estado: 'programada', motivo_cancelacion: null }).eq('id', sesionDetalle.id)
+                            .then(() => cargar(centro?.id))
+                          setSesionDetalle(null)
+                        }} className="ml-auto text-xs underline opacity-70 hover:opacity-100">Deshacer</button>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
