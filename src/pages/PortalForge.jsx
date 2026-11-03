@@ -603,6 +603,11 @@ export default function PortalForge() {
     return streak
   })()
 
+  // Día actual de la rutina para el FAB (calculado aquí para que esté disponible en el layout padre)
+  const diasRutinaFAB = rutina?.borrador?.dias || rutina?.contenido?.dias || []
+  const sesCompletadasFAB = (sesionesEstaSemana || []).filter(s => s.completada).length
+  const diaFAB = diasRutinaFAB.length > 0 ? diasRutinaFAB[sesCompletadasFAB % diasRutinaFAB.length] : null
+
   // Visibilidad de tabs según plan — un cliente de solo Nutrición no ve Entrena y viceversa.
   // verRutina / verNutricion ya incluyen la lógica de acceso y la excepción "tiene datos en BD".
   const TABS = [
@@ -695,11 +700,15 @@ export default function PortalForge() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black text-white truncate tracking-tight leading-none">{nombre}</p>
-            {semanasActivas > 0 && (
+            {semanasActivas > 0 ? (
               <p className="text-[10px] font-bold mt-0.5" style={{ color }}>
                 {semanasActivas} sem · ACTIVO
               </p>
-            )}
+            ) : config?.nombre_negocio ? (
+              <p className="text-[10px] font-medium mt-0.5 truncate" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                {config.nombre_negocio}
+              </p>
+            ) : null}
           </div>
           {config?.foto_url && (
             <img src={config.foto_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0 opacity-80" />
@@ -762,6 +771,36 @@ export default function PortalForge() {
           {tab === 'mensajes' && VER_MENSAJES && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} config={config} />}
           {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} pushSuscrito={pushSuscrito} setPushSuscrito={setPushSuscrito} />}
         </div>
+
+        {/* FAB — botón flotante entreno, visible desde hoy/nutricion/progreso */}
+        {!modoPreview && diaFAB && !['mensajes', 'mas', 'entrena'].includes(tab) && (
+          <button
+            onClick={() => {
+              if (esOnline) {
+                setModalRegistro(diaFAB)
+              } else {
+                setTab('entrena')
+              }
+            }}
+            className="md:hidden fixed z-30 active:scale-90 transition-all duration-150 shadow-2xl"
+            style={{
+              bottom: 'calc(72px + max(env(safe-area-inset-bottom, 0px), 8px))',
+              right: 20,
+              width: 52,
+              height: 52,
+              borderRadius: 16,
+              background: color,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-label="Iniciar entreno"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M6 4v16M18 4v16M2 9h4M18 9h4M2 15h4M18 15h4M6 9h12M6 15h12"/>
+            </svg>
+          </button>
+        )}
 
         {/* Bottom bar — negro total, 5 slots fijos */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 z-20"
