@@ -413,7 +413,7 @@ export default function Dashboard({ session }) {
   )
 
   const d = datos
-  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length + (d.leadsPendientes?.length || 0) + (d.clientesContacto?.length || 0)
+  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length + (d.leadsPendientes?.length || 0) + (d.clientesContacto?.length || 0) + (moduloVisible('seguimiento') ? d.clientesSinCI14d?.length || 0 : 0)
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -494,7 +494,12 @@ export default function Dashboard({ session }) {
             {/* Lista de atención priorizada */}
             <div id="atencion-requerida" className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
-                <p className="font-bold text-[#0A0A0A] text-sm">Atención requerida</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-bold text-[#0A0A0A] text-sm">Requiere atención hoy</p>
+                  {totalPendiente > 0 && (
+                    <span className="text-xs bg-red-500 text-white font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">{totalPendiente}</span>
+                  )}
+                </div>
                 {totalPendiente === 0 && (
                   <span className="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full">✓ Todo al día</span>
                 )}
@@ -885,10 +890,10 @@ export default function Dashboard({ session }) {
                   )
                 })()}
 
-                {/* Más de 2 semanas sin check-in — riesgo de baja */}
+                {/* Clientes en riesgo de baja — más de 14 días sin check-in */}
                 {moduloVisible('seguimiento') && d.clientesSinCI14d?.length > 0 && (
-                  <div className="bg-red-50 border-l-4 border-red-400">
-                    <div className="flex items-center gap-3 px-5 py-3 border-b border-red-100">
+                  <div>
+                    <div className="flex items-center gap-3 px-5 py-3.5 bg-red-50">
                       <div className="w-8 h-8 bg-red-500 rounded-xl flex items-center justify-center text-white text-sm flex-shrink-0 animate-pulse">⚠️</div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-red-700">
@@ -903,7 +908,7 @@ export default function Dashboard({ session }) {
                       <button onClick={() => descartarGrupo(d.clientesSinCI14d.map(c=>c.id), 'sin_checkin_14d', 'clientesSinCI14d')}
                         title="Descartar 30 días" className="text-[#C0C0C0] hover:text-[#6B6B6B] text-sm px-1 flex-shrink-0">✕</button>
                     </div>
-                    <div className="px-5 py-2 flex flex-col gap-2">
+                    <div className="px-5 py-2 flex flex-col gap-2 bg-red-50/40">
                       {d.clientesSinCI14d.slice(0,3).map(c => {
                         const ultimoCI = (d.checkins||[]).filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha?.localeCompare(a.fecha))[0]
                         const diasSin = ultimoCI
