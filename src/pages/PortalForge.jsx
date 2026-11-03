@@ -764,7 +764,7 @@ export default function PortalForge() {
           {tab === 'nutricion' && (
             <div className="relative">
               <div style={(pagoVencido || bloqueadoNutricion) ? { filter: `blur(${pagoVencido ? 8 : 4}px)`, pointerEvents: 'none' } : {}}>
-                <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} suplementacion={suplementacion} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />
+                <TabNutricion nutricion={nutricion} cuest={cuest} cliente={cliente} color={color} nutricionRegistros={nutricionRegistros} suplementacion={suplementacion} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} config={config} setTab={setTab} />
               </div>
               {pagoVencido ? (
                 <BloqueoOverlay mensaje="Tu plan está pausado. Renueva para seguir." boton="Renovar ahora" onClick={irAPagos} color={color} />
@@ -2820,37 +2820,80 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
 }
 
 // ─── Tab Nutrición ────────────────────────────────────────────────────────────
-function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [], suplementacion, cargarTodo, acceso, irAPagos, modoPreview }) {
+function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [], suplementacion, cargarTodo, acceso, irAPagos, modoPreview, config, setTab }) {
   const [diaAbierto, setDiaAbierto] = useState(null)
   const [guardandoDia, setGuardandoDia] = useState(null)
   const [registrosLocales, setRegistrosLocales] = useState(nutricionRegistros)
 
-  if (!nutricion) return (
-    <div className="space-y-3 pb-4">
-      <div className="rounded-3xl overflow-hidden" style={{ background: '#0A0A0A' }}>
-        <div className="px-5 pt-6 pb-5">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-4" style={{ background: `${color}20` }}>🥗</div>
-          <p className="text-white font-black text-2xl leading-tight mb-2">Plan en<br/>preparación</p>
-          {!cuest ? (
-            <>
-              <p className="text-sm leading-relaxed mb-5" style={{ color: 'rgba(255,255,255,0.45)' }}>Tu entrenador necesita tu cuestionario de nutrición para diseñar tu plan personalizado.</p>
-              <a href={`${window.location.origin}/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
-                className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm active:scale-95 transition-all text-white"
-                style={{ background: color }}>
-                📋 Rellenar cuestionario →
-              </a>
-            </>
-          ) : (
-            <div className="flex items-center gap-3 mt-2">
-              <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#10b981' }} />
-              <p className="text-sm font-semibold" style={{ color: 'rgba(255,255,255,0.55)' }}>Cuestionario enviado · Tu entrenador lo revisará pronto</p>
+  if (!nutricion) {
+    const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
+    return (
+      <div className="space-y-3 pb-4">
+        <div className="rounded-3xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+          <div className="px-5 pt-6 pb-5">
+            {/* Avatar entrenador + estado */}
+            <div className="flex items-center gap-3 mb-5">
+              {config?.foto_url ? (
+                <img src={config.foto_url} alt={nombreEntrenador}
+                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                  style={{ border: `2px solid ${color}40` }} />
+              ) : (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-lg"
+                  style={{ background: `${color}20` }}>💪</div>
+              )}
+              <div>
+                <p className="text-xs font-black text-white">{nombreEntrenador}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10b981' }} />
+                  <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Preparando tu plan</p>
+                </div>
+              </div>
             </div>
-          )}
+            {/* Mensaje del entrenador */}
+            <div className="rounded-2xl p-4 mb-5" style={{ background: 'rgba(255,255,255,0.05)', borderLeft: `3px solid ${color}` }}>
+              <p className="text-sm leading-relaxed text-white font-medium">
+                {!cuest
+                  ? `Hola, estoy trabajando en tu plan de nutrición personalizado. Para diseñarlo necesito que rellenes un breve cuestionario.`
+                  : `He recibido tu cuestionario. Estoy diseñando tu plan de nutrición personalizado. Te aviso en cuanto esté listo.`
+                }
+              </p>
+            </div>
+            {!cuest ? (
+              <>
+                <a href={`${window.location.origin}/nutricion-cuest?e=${cliente?.entrenador_id}&c=${cliente?.id}`}
+                  className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-black text-sm active:scale-95 transition-all text-white mb-3"
+                  style={{ background: color }}>
+                  📋 Rellenar cuestionario →
+                </a>
+                {setTab && (
+                  <button onClick={() => setTab('mas')}
+                    className="w-full py-3 rounded-2xl text-sm font-bold active:scale-95 transition-all"
+                    style={{ background: 'rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.5)' }}>
+                    💬 Escribir a {nombreEntrenador}
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 py-3 px-4 rounded-2xl" style={{ background: 'rgba(16,185,129,0.1)' }}>
+                  <span className="text-lg">✓</span>
+                  <p className="text-sm font-semibold" style={{ color: '#10b981' }}>Cuestionario enviado</p>
+                </div>
+                {setTab && (
+                  <button onClick={() => setTab('mas')}
+                    className="w-full py-3.5 rounded-2xl text-sm font-black active:scale-95 transition-all text-white"
+                    style={{ background: color }}>
+                    💬 Escribir a {nombreEntrenador}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+        {cuest && <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />}
       </div>
-      {cuest && <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />}
-    </div>
-  )
+    )
+  }
 
   const contenido = nutricion.contenido || nutricion.borrador || {}
   const macrosSrc = contenido.macros || {}
