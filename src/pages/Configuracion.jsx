@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import EquipoTab from '../components/EquipoTab'
 import { useCentro } from '../hooks/useCentro.jsx'
 import { BRAND } from '../lib/brand'
+import { colorMarca } from '../lib/brand'
 
 const MODULOS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊', desc: 'Métricas, alertas y resumen general', obligatorio: true },
@@ -44,7 +45,11 @@ const defaultConfig = {
   cuestionario_bloques: { basico: true, objetivo: true, historial: true, disponibilidad: true, material: true, salud: true, motivacion: true },
   // Datos fiscales (M1)
   nif: '', razon_social: '', direccion_fiscal: '', cp_fiscal: '', municipio_fiscal: '', provincia_fiscal: '',
-  regimen_iva: 'exento', serie_facturas: 'F'
+  regimen_iva: 'exento', serie_facturas: 'F',
+  // M9 — Logo, email fiscal, política cancelación, umbrales inactividad
+  logo_url: '', email_fiscal: '',
+  politica_cancelacion_horas: 24, politica_cancelacion_consecuencia: 'ninguna',
+  inactividad_alerta_dias: 7, inactividad_riesgo_dias: 14
 }
 
 export default function Configuracion({ session, onConfigChange }) {
@@ -52,7 +57,9 @@ export default function Configuracion({ session, onConfigChange }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [subiendoFoto, setSubiendoFoto] = useState(false)
+  const [subiendoLogo, setSubiendoLogo] = useState(false)
   const fotoRef = useRef()
+  const logoRef = useRef()
   const [toast, setToast] = useState(null)
   const showToast = (msg, tipo = 'ok') => setToast({ msg, tipo })
   const [tab, setTab] = useState('perfil')
@@ -104,6 +111,24 @@ export default function Configuracion({ session, onConfigChange }) {
     setToast({ msg: 'Foto subida correctamente' })
   }
 
+  async function subirLogo(file) {
+    if (!file) return
+    const parts = file.name.split('.')
+    const ext = parts.length > 1 ? parts.pop().toLowerCase() : ''
+    if (!EXTENSIONES_PERMITIDAS.includes(ext)) {
+      setToast({ msg: 'Formato no permitido. Usa JPG, PNG, WEBP o GIF', tipo: 'error' })
+      return
+    }
+    setSubiendoLogo(true)
+    const path = `${uid}/logo.${ext}`
+    const { error } = await supabase.storage.from('avatares').upload(path, file, { upsert: true })
+    if (error) { setToast({ msg: 'Error al subir logo', tipo: 'error' }); setSubiendoLogo(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('avatares').getPublicUrl(path)
+    setConfig(c => ({ ...c, logo_url: publicUrl + '?t=' + Date.now() }))
+    setSubiendoLogo(false)
+    setToast({ msg: 'Logo del centro subido correctamente' })
+  }
+
   async function guardar() {
     setSaving(true)
     const { error } = await supabase.from('configuracion').upsert({
@@ -147,7 +172,7 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-black/5 p-1 rounded-xl mb-5 overflow-x-auto">
-        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['tarifas', '💶 Tarifas'], ['facturacion', '🧾 Facturación']].map(([id, label]) => (
+        {[['perfil', '👤 Perfil'], ['equipo', '🏋️ Equipo'], ['modulos', '⚡ Módulos'], ['cuestionario', '📋 Cuestionario'], ['apariencia', '🎨 Apariencia'], ['tarifas', '💶 Tarifas'], ['facturacion', '🧾 Facturación'], ['operativa', '⚙️ Operativa']].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex-shrink-0 py-2 px-3 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${tab === id ? 'bg-white shadow-sm text-[#0A0A0A]' : 'text-[#6B6B6B] hover:text-[#0A0A0A]'}`}>
             {label}
@@ -207,6 +232,35 @@ export default function Configuracion({ session, onConfigChange }) {
             </div>
           </div>
 
+          {/* Logo del centro */}
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">Logo del centro</h2>
+            <p className="text-xs text-[#9B9B9B] mb-4">Aparece en el portal del cliente: login, cabecera y PDFs de facturas</p>
+            <div className="flex items-center gap-3">
+              {config.logo_url ? (
+                <img src={config.logo_url} alt="Logo" className="w-20 h-20 rounded-2xl object-contain border border-black/10 bg-[#F5F5F0] p-2 flex-shrink-0" onError={e => e.target.style.display='none'} />
+              ) : (
+                <div className="w-20 h-20 rounded-2xl bg-[#F5F5F0] border-2 border-dashed border-black/20 flex flex-col items-center justify-center text-2xl flex-shrink-0 gap-1">
+                  <span>🏢</span>
+                  <span className="text-[9px] text-[#9B9B9B] font-medium">Sin logo</span>
+                </div>
+              )}
+              <div className="flex-1 space-y-1.5">
+                <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => subirLogo(e.target.files[0])} />
+                <button onClick={() => logoRef.current?.click()} disabled={subiendoLogo}
+                  className="w-full border border-black/10 text-[#0A0A0A] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0] disabled:opacity-40 transition-all">
+                  {subiendoLogo ? '⏳ Subiendo...' : '🏢 Subir logo'}
+                </button>
+                {config.logo_url && (
+                  <button onClick={() => setConfig(c => ({ ...c, logo_url: '' }))}
+                    className="w-full text-xs text-red-500 hover:text-red-600 py-1">
+                    Eliminar logo
+                  </button>
+                )}
+                <p className="text-xs text-[#9B9B9B]">Recomendado: fondo transparente (PNG), mínimo 200×200px</p>
+              </div>
+            </div>
+          </div>
           </div>
 
           {/* Columna derecha — Preview */}
@@ -355,6 +409,173 @@ export default function Configuracion({ session, onConfigChange }) {
         </div>
       )}
 
+      {/* ── OPERATIVA ───────────────────────────────────────────────────── */}
+      {tab === 'operativa' && (
+        <div className="space-y-4">
+          {/* Política de cancelación */}
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">📅 Política de cancelación</h2>
+            <p className="text-xs text-[#9B9B9B] mb-5">Define cuándo se considera una cancelación tardía y qué consecuencias tiene. Esta información se muestra al cliente en su portal.</p>
+
+            <div className="space-y-4">
+              {/* Horas antelación */}
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Antelación mínima para cancelar</label>
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      type="number" min={1} max={168} value={config.politica_cancelacion_horas}
+                      onChange={e => setConfig(c=>({...c, politica_cancelacion_horas: Math.max(1, parseInt(e.target.value)||24)}))}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento pr-14" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#9B9B9B] font-medium">horas</span>
+                  </div>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    {[12, 24, 48].map(h => (
+                      <button key={h} onClick={() => setConfig(c=>({...c, politica_cancelacion_horas: h}))}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${config.politica_cancelacion_horas===h ? 'border-acento bg-acento/5 text-acento' : 'border-black/10 text-[#6B6B6B] hover:border-black/20'}`}>
+                        {h}h
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-[#9B9B9B] mt-1.5">
+                  Si el cliente cancela con menos de <span className="font-semibold text-[#0A0A0A]">{config.politica_cancelacion_horas} horas</span> de antelación, se aplica la consecuencia.
+                </p>
+              </div>
+
+              {/* Consecuencia */}
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Consecuencia por cancelación tardía</label>
+                <div className="space-y-2">
+                  {[
+                    { val: 'ninguna', icon: '🟢', label: 'Sin consecuencias', desc: 'Cancelación libre, sin penalización. Solo informativa.' },
+                    { val: 'descuenta_bono', icon: '🟡', label: 'Descuenta sesión del bono', desc: 'La sesión se da por consumida aunque no se haya realizado.' },
+                    { val: 'penalizacion', icon: '🔴', label: 'Penalización económica', desc: 'Se cobra una penalización (la cantidad la gestionas tú directamente).' },
+                  ].map(op => (
+                    <label key={op.val} className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${config.politica_cancelacion_consecuencia===op.val ? 'border-acento bg-acento/5' : 'border-black/10 hover:border-black/20'}`}>
+                      <input type="radio" name="pol_cancel" value={op.val}
+                        checked={config.politica_cancelacion_consecuencia===op.val}
+                        onChange={() => setConfig(c=>({...c, politica_cancelacion_consecuencia: op.val}))}
+                        className="mt-0.5 accent-acento flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold text-[#0A0A0A]">{op.icon} {op.label}</p>
+                        <p className="text-xs text-[#9B9B9B] mt-0.5">{op.desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Preview mensaje cliente */}
+              <div className="bg-[#F7F6F3] rounded-xl p-4">
+                <p className="text-xs font-semibold text-[#6B6B6B] mb-2">Vista previa — mensaje en el portal del cliente:</p>
+                <div className="bg-white rounded-xl border border-black/5 p-3">
+                  <p className="text-sm font-semibold text-[#0A0A0A] mb-1">📋 Política de cancelación</p>
+                  <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                    Las cancelaciones deben realizarse con al menos <span className="font-semibold text-[#0A0A0A]">{config.politica_cancelacion_horas} horas</span> de antelación.
+                    {config.politica_cancelacion_consecuencia === 'ninguna' && ' Las cancelaciones son libres y sin penalización.'}
+                    {config.politica_cancelacion_consecuencia === 'descuenta_bono' && ' Las cancelaciones tardías descuentan la sesión del bono.'}
+                    {config.politica_cancelacion_consecuencia === 'penalizacion' && ' Las cancelaciones tardías conllevan una penalización económica.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Umbrales de inactividad */}
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">🔔 Alertas de inactividad</h2>
+            <p className="text-xs text-[#9B9B9B] mb-5">Configura cuándo aparecen las alertas de seguimiento cuando un cliente no hace check-in.</p>
+
+            <div className="space-y-5">
+              {/* Alerta amarilla */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 flex-shrink-0" />
+                  <label className="text-xs font-semibold text-[#0A0A0A]">Alerta de atención</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      type="number" min={1} max={30} value={config.inactividad_alerta_dias}
+                      onChange={e => {
+                        const v = Math.max(1, parseInt(e.target.value)||7)
+                        setConfig(c=>({...c, inactividad_alerta_dias: v, inactividad_riesgo_dias: Math.max(v+1, c.inactividad_riesgo_dias)}))
+                      }}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento pr-14" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#9B9B9B] font-medium">días</span>
+                  </div>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    {[5, 7, 10].map(d => (
+                      <button key={d} onClick={() => setConfig(c=>({...c, inactividad_alerta_dias: d, inactividad_riesgo_dias: Math.max(d+1, c.inactividad_riesgo_dias)}))}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${config.inactividad_alerta_dias===d ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-black/10 text-[#6B6B6B] hover:border-black/20'}`}>
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-[#9B9B9B] mt-1.5">Badge amarillo en el cliente tras <span className="font-semibold text-[#0A0A0A]">{config.inactividad_alerta_dias} días</span> sin check-in</p>
+              </div>
+
+              {/* Alerta roja */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+                  <label className="text-xs font-semibold text-[#0A0A0A]">Alerta de riesgo de baja</label>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      type="number" min={config.inactividad_alerta_dias+1} max={60} value={config.inactividad_riesgo_dias}
+                      onChange={e => setConfig(c=>({...c, inactividad_riesgo_dias: Math.max(c.inactividad_alerta_dias+1, parseInt(e.target.value)||14)}))}
+                      className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento pr-14" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#9B9B9B] font-medium">días</span>
+                  </div>
+                  <div className="flex gap-1.5 flex-shrink-0">
+                    {[14, 21, 30].map(d => (
+                      <button key={d} onClick={() => { if (d > config.inactividad_alerta_dias) setConfig(c=>({...c, inactividad_riesgo_dias: d})) }}
+                        disabled={d <= config.inactividad_alerta_dias}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all disabled:opacity-30 ${config.inactividad_riesgo_dias===d ? 'border-red-400 bg-red-50 text-red-700' : 'border-black/10 text-[#6B6B6B] hover:border-black/20'}`}>
+                        {d}d
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <p className="text-xs text-[#9B9B9B] mt-1.5">Badge rojo en el cliente tras <span className="font-semibold text-[#0A0A0A]">{config.inactividad_riesgo_dias} días</span> sin check-in</p>
+              </div>
+
+              {/* Visual de la escala */}
+              <div className="bg-[#F7F6F3] rounded-xl p-4">
+                <p className="text-xs font-semibold text-[#6B6B6B] mb-3">Escala de alerta:</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                    <span className="text-xs text-[#6B6B6B]">0–{config.inactividad_alerta_dias-1}d: Normal</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                    <span className="text-xs text-[#6B6B6B]">{config.inactividad_alerta_dias}–{config.inactividad_riesgo_dias-1}d: Atención</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                    <span className="text-xs text-[#6B6B6B]">{config.inactividad_riesgo_dias}d+: Riesgo baja</span>
+                  </div>
+                </div>
+                <div className="mt-2 h-2 rounded-full overflow-hidden flex">
+                  <div className="bg-emerald-400 flex-1" style={{flexBasis:`${(config.inactividad_alerta_dias/config.inactividad_riesgo_dias/1.5)*100}%`}} />
+                  <div className="bg-amber-400" style={{flexBasis:`${((config.inactividad_riesgo_dias-config.inactividad_alerta_dias)/config.inactividad_riesgo_dias/1.5)*100}%`}} />
+                  <div className="bg-red-500 flex-1" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#F7F6F3] rounded-2xl px-4 py-3">
+            <p className="text-xs text-[#9B9B9B]">💡 Las alertas se calculan automáticamente cada noche. Afectan a la vista de seguimiento del dashboard y a los badges de la lista de clientes.</p>
+          </div>
+        </div>
+      )}
+
       {tab === 'equipo' && (
         centroLoading
           ? <div className="flex items-center justify-center py-12"><div className="w-6 h-6 border-2 border-acento border-t-transparent rounded-full animate-spin"/></div>
@@ -433,6 +654,13 @@ export default function Configuracion({ session, onConfigChange }) {
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento uppercase"
                   placeholder="F" maxLength={3} />
                 <p className="text-xs text-[#9B9B9B] mt-1">Ej: F → F2024-001, A → A2024-001</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Email fiscal</label>
+                <input type="email" value={config.email_fiscal||''} onChange={e => setConfig(c=>({...c, email_fiscal: e.target.value}))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento"
+                  placeholder="facturacion@tucentro.es" />
+                <p className="text-xs text-[#9B9B9B] mt-1">Aparece en el pie de las facturas generadas</p>
               </div>
             </div>
           </div>
