@@ -29,20 +29,25 @@ const TooltipCustom = ({ active, payload, label }) => {
 export default function GraficasCliente({ clienteId }) {
   const [checkins, setCheckins] = useState([])
   const [progresion, setProgresion] = useState([])
+  const [sesiones, setSesiones] = useState([])
   const [tabGrafica, setTabGrafica] = useState('peso')
   const [ejercicioFuerza, setEjercicioFuerza] = useState('press_banca')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function cargar() {
-      const [{ data: ci }, { data: pf }] = await Promise.all([
+      const [{ data: ci }, { data: pf }, { data: se }] = await Promise.all([
         supabase.from('checkins').select('*').eq('cliente_id', clienteId)
           .order('fecha', { ascending: true }).limit(16),
         supabase.from('progresion_fuerza').select('*').eq('cliente_id', clienteId)
           .order('fecha', { ascending: true }).limit(12),
+        supabase.from('sesiones').select('id,fecha,rpe,fatiga_post,completada').eq('cliente_id', clienteId)
+          .eq('completada', true).not('rpe', 'is', null)
+          .order('fecha', { ascending: true }).limit(20),
       ])
       setCheckins(ci || [])
       setProgresion(pf || [])
+      setSesiones(se || [])
       setLoading(false)
     }
     cargar()
@@ -84,10 +89,18 @@ export default function GraficasCliente({ clienteId }) {
       reps: p[`${ejercicioFuerza}_reps`] || p['dominadas_reps'] || null,
     }))
 
+  // Datos para gráfica de RPE
+  const dataRpe = sesiones.map(s => ({
+    fecha: fmtFecha(s.fecha),
+    RPE: s.rpe,
+    Fatiga: s.fatiga_post || null,
+  }))
+
   const tabs = [
     { id: 'peso', label: '⚖️ Peso' },
     { id: 'bienestar', label: '⚡ Bienestar' },
     { id: 'adherencia', label: '💪 Adherencia' },
+    { id: 'rpe', label: '🔥 RPE' },
     { id: 'fuerza', label: '🏋️ Fuerza' },
   ]
 
@@ -210,6 +223,45 @@ export default function GraficasCliente({ clienteId }) {
                   <Bar dataKey="Entreno" fill={BRAND.color} radius={[4,4,0,0]} />
                   <Bar dataKey="Nutrición" fill="#10b981" radius={[4,4,0,0]} />
                 </BarChart>
+              </ResponsiveContainer>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* RPE */}
+      {tabGrafica === 'rpe' && (
+        <div>
+          {dataRpe.length < 2 ? (
+            <div className="h-32 flex items-center justify-center text-sm text-[#6B6B6B] bg-[#F5F5F0] rounded-xl">
+              Sin suficientes valoraciones de sesión todavía
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-[#6B6B6B]">Percepción de esfuerzo por sesión (1-10)</p>
+                {dataRpe.length >= 2 && (() => {
+                  const avg = (dataRpe.reduce((s,d)=>s+d.RPE,0)/dataRpe.length).toFixed(1)
+                  return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${avg>=8?'bg-red-50 text-red-600':avg>=6?'bg-orange-50 text-orange-600':'bg-emerald-50 text-emerald-700'}`}>Media {avg}</span>
+                })()}
+              </div>
+              <div className="flex gap-3 mb-2">
+                {[['RPE',BRAND.color],['Fatiga post','#6366f1']].map(([l,c]) => (
+                  <div key={l} className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{background:c}} />
+                    <span className="text-xs text-[#6B6B6B]">{l}</span>
+                  </div>
+                ))}
+              </div>
+              <ResponsiveContainer width="100%" height={160}>
+                <LineChart data={dataRpe}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: '#6B6B6B' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: '#6B6B6B' }} axisLine={false} tickLine={false} domain={[0,10]} width={25} />
+                  <Tooltip content={<TooltipCustom />} />
+                  <Line type="monotone" dataKey="RPE" stroke={BRAND.color} strokeWidth={2.5} dot={{ fill: BRAND.color, r: 3 }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="Fatiga" stroke="#6366f1" strokeWidth={2} dot={{ r: 2 }} activeDot={{ r: 4 }} strokeDasharray="4 2" connectNulls={false} />
+                </LineChart>
               </ResponsiveContainer>
             </>
           )}
