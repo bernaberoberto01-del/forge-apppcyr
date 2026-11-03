@@ -149,7 +149,7 @@ function ProtocoloIA({ protocolo: p }) {
   )
 }
 
-const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'',
+const initForm = { nombre:'',email:'',telefono:'',objetivo:'perdida_grasa',tipo:'presencial',estado:'activo',peso_actual:'',peso_objetivo:'',nivel:'principiante',dias_semana:3,material:'gimnasio',lesiones:'',enfermedades:'',medicacion:'',notas:'',precio_mensual:'',tipo_entrenamiento:'',formato_entrenamiento:'',frecuencia_checkin:'semanal',
   // Campos del cuestionario
   edad:'',altura:'',anos_entrenando:'',
   marca_press_banca:'',marca_sentadilla:'',marca_peso_muerto:'',marca_dominadas:'',marca_press_militar:'',
@@ -451,7 +451,7 @@ export default function Clientes({ session }) {
 
   async function guardar() {
     setLoading(true)
-    const camposCliente = { nombre:form.nombre, email:form.email, telefono:form.telefono, objetivo:form.objetivo, tipo:form.tipo, estado:form.estado, nivel:form.nivel, dias_semana:Number(form.dias_semana)||3, material:form.material, lesiones:form.lesiones||null, enfermedades:form.enfermedades||null, medicacion:form.medicacion||null, notas:form.notas||null, precio_mensual:Number(form.precio_mensual)||0, tipo_entrenamiento:form.tipo_entrenamiento||null, formato_entrenamiento:form.formato_entrenamiento||null, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null }
+    const camposCliente = { nombre:form.nombre, email:form.email, telefono:form.telefono, objetivo:form.objetivo, tipo:form.tipo, estado:form.estado, nivel:form.nivel, dias_semana:Number(form.dias_semana)||3, material:form.material, lesiones:form.lesiones||null, enfermedades:form.enfermedades||null, medicacion:form.medicacion||null, notas:form.notas||null, precio_mensual:Number(form.precio_mensual)||0, tipo_entrenamiento:form.tipo_entrenamiento||null, formato_entrenamiento:form.formato_entrenamiento||null, entrenador_id: uid, peso_actual: form.peso_actual ? Number(form.peso_actual) : null, peso_objetivo: form.peso_objetivo ? Number(form.peso_objetivo) : null, frecuencia_checkin: form.frecuencia_checkin||'semanal' }
     if (hayAreas) camposCliente.areas = form.areas?.length ? form.areas : ['entrenamiento']
     let clienteId = editId
     if (editId) {
@@ -766,7 +766,7 @@ export default function Clientes({ session }) {
   }
 
   function abrirEditar(c) {
-    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', areas:areasDe(c) })
+    setForm({ nombre:c.nombre||'', email:c.email||'', telefono:c.telefono||'', objetivo:c.objetivo||'perdida_grasa', tipo:c.tipo||'presencial', estado:c.estado||'activo', peso_actual:c.peso_actual||'', peso_objetivo:c.peso_objetivo||'', nivel:c.nivel||'principiante', dias_semana:c.dias_semana||3, material:c.material||'gimnasio', lesiones:c.lesiones||'', enfermedades:c.enfermedades||'', medicacion:c.medicacion||'', notas:c.notas||'', precio_mensual:c.precio_mensual||'', tipo_entrenamiento:c.tipo_entrenamiento||'', formato_entrenamiento:c.formato_entrenamiento||'', areas:areasDe(c), frecuencia_checkin:c.frecuencia_checkin||'semanal' })
     setEditId(c.id); setModal(true); setDetalle(null)
     // Cargar datos del cuestionario más reciente para este cliente
     supabase.from('cuestionarios').select('*').eq('cliente_id', c.id).order('created_at', {ascending:false}).limit(1).maybeSingle()
@@ -1524,6 +1524,17 @@ export default function Clientes({ session }) {
                 <textarea value={form.notas} onChange={e => setForm({...form,notas:e.target.value})} rows={2}
                   className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none"
                   placeholder="Observaciones, preferencias..." />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">📅 Frecuencia de check-in</label>
+                <select value={form.frecuencia_checkin||'semanal'} onChange={e => setForm({...form,frecuencia_checkin:e.target.value})}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
+                  <option value="diario">Diario</option>
+                  <option value="semanal">Semanal (recomendado)</option>
+                  <option value="quincenal">Quincenal</option>
+                  <option value="mensual">Mensual</option>
+                </select>
+                <p className="text-[10px] text-[#9B9B9B] mt-1">Define cada cuánto se espera el check-in de este cliente</p>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
