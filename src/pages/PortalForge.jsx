@@ -858,7 +858,7 @@ function LoginPortal() {
   }
   async function resetPass(e) {
     e.preventDefault(); setLoading(true); setError('')
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/portal` })
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` })
     if (error) setError('No se pudo enviar el email')
     else setEnviado(true)
     setLoading(false)
@@ -1952,7 +1952,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
           </button>
         </form>
         <div className="rounded-2xl p-4" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
-          <button onClick={async()=>{await supabase.auth.resetPasswordForEmail(cliente?.email||'',{redirectTo:`${window.location.origin}/`});alert('Email enviado.')}}
+          <button onClick={async()=>{await supabase.auth.resetPasswordForEmail(cliente?.email||'',{redirectTo:`${window.location.origin}/reset-password`});alert('Email enviado.')}}
             className="text-sm font-bold" style={{ color: C.textSecondary }}>Cambiar contraseña →</button>
         </div>
         <button onClick={()=>supabase.auth.signOut()}

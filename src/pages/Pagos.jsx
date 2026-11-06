@@ -21,7 +21,7 @@ function Toast({ msg, tipo='ok', onClose }) {
   )
 }
 
-const FRECUENCIAS = { mensual:'Mensual', quincenal:'Quincenal', semanal:'Semanal' }
+const FRECUENCIAS = { mensual:'Mensual', trimestral:'Trimestral', quincenal:'Quincenal', semanal:'Semanal' }
 const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
 
 function proximoCobro(plan) {
@@ -32,6 +32,7 @@ function proximoCobro(plan) {
 function siguienteCobro(plan, desde) {
   if (plan.frecuencia === 'quincenal') return new Date(desde.getTime() + 14*864e5)
   if (plan.frecuencia === 'semanal') return new Date(desde.getTime() + 7*864e5)
+  if (plan.frecuencia === 'trimestral') return new Date(desde.getFullYear(), desde.getMonth() + 3, plan.dia_cobro || desde.getDate())
   return new Date(desde.getFullYear(), desde.getMonth() + 1, plan.dia_cobro || desde.getDate())
 }
 // Un mes después de una fecha 'YYYY-MM-DD', recortando al último día del mes
@@ -181,7 +182,15 @@ export default function Pagos({ session }) {
     if (!formPlan.cliente_id || !formPlan.importe) return
     setLoading(true)
     const hoy = new Date()
-    const proximo = new Date(hoy.getFullYear(), hoy.getMonth() + (hoy.getDate() >= formPlan.dia_cobro ? 1 : 0), formPlan.dia_cobro)
+    const mesesSumar = formPlan.frecuencia === 'trimestral' ? 3 : 1
+    let proximo
+    if (formPlan.frecuencia === 'quincenal') {
+      proximo = new Date(hoy.getTime() + 14*864e5)
+    } else if (formPlan.frecuencia === 'semanal') {
+      proximo = new Date(hoy.getTime() + 7*864e5)
+    } else {
+      proximo = new Date(hoy.getFullYear(), hoy.getMonth() + (hoy.getDate() >= formPlan.dia_cobro ? mesesSumar : 0), formPlan.dia_cobro)
+    }
     const data = {
       entrenador_id: uid, cliente_id: formPlan.cliente_id,
       importe: Number(formPlan.importe), concepto: formPlan.concepto,
@@ -206,6 +215,7 @@ export default function Pagos({ session }) {
     const hoy = new Date()
     let siguiente
     if (plan.frecuencia === 'mensual') siguiente = new Date(hoy.getFullYear(), hoy.getMonth()+1, plan.dia_cobro)
+    else if (plan.frecuencia === 'trimestral') siguiente = new Date(hoy.getFullYear(), hoy.getMonth()+3, plan.dia_cobro)
     else if (plan.frecuencia === 'quincenal') siguiente = new Date(hoy.getTime() + 14*864e5)
     else siguiente = new Date(hoy.getTime() + 7*864e5)
 
@@ -660,14 +670,15 @@ export default function Pagos({ session }) {
                   <select value={formPlan.frecuencia} onChange={e=>setFormPlan(f=>({...f,frecuencia:e.target.value}))}
                     className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                     <option value="mensual">Mensual</option>
+                    <option value="trimestral">Trimestral</option>
                     <option value="quincenal">Quincenal</option>
                     <option value="semanal">Semanal</option>
                   </select>
                 </div>
               </div>
-              {formPlan.frecuencia === 'mensual' && (
+              {(formPlan.frecuencia === 'mensual' || formPlan.frecuencia === 'trimestral') && (
                 <div>
-                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Día de cobro del mes</label>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Día de cobro</label>
                   <div className="flex gap-2 flex-wrap">
                     {[1,5,10,15,20,25,30].map(d => (
                       <button key={d} type="button" onClick={() => setFormPlan(f=>({...f,dia_cobro:d}))}
