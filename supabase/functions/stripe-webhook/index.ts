@@ -58,6 +58,10 @@ serve(async (req) => {
         const proximoCobro = invoice.next_payment_attempt ? new Date(invoice.next_payment_attempt * 1000).toISOString().split('T')[0] : null
         await supabase.from('pagos').insert({ entrenador_id: plan.entrenador_id, cliente_id: plan.cliente_id, importe, concepto: plan.concepto || 'Suscripción mensual Forge', fecha_pago: fecha, estado: 'pagado' })
         await supabase.from('planes_cobro').update({ estado: 'activo', activo: true, ultimo_cobro: fecha, ...(proximoCobro ? { proximo_cobro: proximoCobro } : {}) }).eq('id', plan.id)
+        // Reactivar cliente si estaba inactivo por falta de pago
+        await supabase.from('clientes').update({ estado: 'activo', plan_activo: true }).eq('id', plan.cliente_id)
+        // Limpiar alerta de pago pendiente
+        await supabase.from('alertas').delete().eq('cliente_id', plan.cliente_id).eq('tipo', 'pago_pendiente')
         break
       }
       case 'invoice.payment_failed': {

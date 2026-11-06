@@ -22,14 +22,69 @@ Deno.serve(async (req) => {
     const hace14 = new Date(Date.now() - 14 * 86400000).toISOString();
     const hace30 = new Date(Date.now() - 30 * 86400000).toISOString();
     const hace7 = new Date(Date.now() - 7 * 86400000).toISOString();
+    const hoy = new Date().toISOString().split('T')[0];
 
     let query = supabase.from('clientes').select('id, nombre, entrenador_id, tipo, estado, plan_activo').eq('estado', 'activo');
     if (entrenadorFiltro) query = query.eq('entrenador_id', entrenadorFiltro);
     const { data: clientes } = await query;
 
     let alertasCreadas = 0;
+    let inactivados = 0;
 
     for (const cliente of (clientes || [])) {
+
+      // ── PASO 1: clientes online — comprobar si llevan >30 días sin pago válido ──
+      // Solo aplica a online. Presencial no tiene pagos en Stripe en Forge.
+      if (cliente.tipo === 'online') {
+        const { data: ultimoPago } = await supabase
+          .from('pagos')
+          .select('valido_hasta, fecha_pago')
+          .eq('cliente_id', cliente.id)
+          .order('valido_hasta', { ascending: false })
+          .limit(1);
+
+        const tienePagoActivo = ultimoPago?.[0]?.valido_hasta >= hoy;
+        const ultimaFechaPago = ultimoPago?.[0]?.fecha_pago || null;
+        const diasSinPago = ultimaFechaPago
+          ? Math.ceil((Date.now() - new Date(ultimaFechaPago).getTime()) / 86400000)
+          : null;
+
+        // Sin ningún pago registrado o el último venció hace más de 30 días → inactivar
+        const debeInactivar = !ultimoPago?.length || (diasSinPago !== null && diasSinPago > 30 && !tienePagoActivo);
+
+        if (debeInactivar) {
+          // Marcar como inactivo para que deje de recibir alertas, check-ins, etc.
+          await supabase.from('clientes').update({ estado: 'inactivo' }).eq('id', cliente.id);
+          inactivados++;
+
+          // Alerta al entrenador (esta SÍ se crea — es para que Roberto sepa)
+          const yaExisteAlerta = await supabase
+            .from('alertas')
+            .select('id')
+            .eq('cliente_id', cliente.id)
+            .eq('tipo', 'pago_pendiente')
+            .gte('created_at', hace30)
+            .single();
+
+          if (!yaExisteAlerta.data) {
+            const msgDias = diasSinPago !== null
+              ? `Lleva ${diasSinPago} días sin pago registrado.`
+              : 'No tiene ningún pago registrado.';
+            await supabase.from('alertas').insert({
+              entrenador_id: cliente.entrenador_id,
+              cliente_id: cliente.id,
+              tipo: 'pago_pendiente',
+              mensaje: `${cliente.nombre.split(' ')[0]} ha pasado a inactivo. ${msgDias} Contacta para renovar su plan.`,
+            });
+            alertasCreadas++;
+          }
+
+          // No generar más alertas (fatiga, sin_checkin…) para este cliente inactivo
+          continue;
+        }
+      }
+
+      // ── PASO 2: alertas de seguimiento normales (solo clientes activos con pago vigente) ──
       const { data: checkins } = await supabase.from('checkins').select('*').eq('cliente_id', cliente.id).gte('fecha', hace30).order('fecha', { ascending: false });
 
       if (checkins && checkins.length >= 2) {
@@ -58,8 +113,7 @@ Deno.serve(async (req) => {
         const { data: pagos } = await supabase.from('pagos').select('valido_hasta').eq('cliente_id', cliente.id).order('valido_hasta', { ascending: false }).limit(1);
         if (pagos && pagos[0]) {
           const vencimiento = new Date(pagos[0].valido_hasta);
-          const hoy = new Date();
-          const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / 86400000);
+          const diasRestantes = Math.ceil((vencimiento.getTime() - Date.now()) / 86400000);
           if (diasRestantes <= 5 && diasRestantes >= 0) {
             const yaExiste = await supabase.from('alertas').select('id').eq('cliente_id', cliente.id).eq('tipo', 'pago_vencido').gte('created_at', hace7).single();
             if (!yaExiste.data) {
@@ -71,7 +125,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, alertasCreadas }), { headers: CORS });
+    return new Response(JSON.stringify({ ok: true, alertasCreadas, inactivados }), { headers: CORS });
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: CORS });
   }
