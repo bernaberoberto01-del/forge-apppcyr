@@ -226,6 +226,7 @@ export default function Dashboard({ session }) {
       { data: leadsPendientesRaw },
       { data: cuestConLead },
       { data: clientesContactoRaw },
+      { data: sesionesMeses },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio,stripe_subscription_id,acceso_libre,is_demo').in('entrenador_id', equipo),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').in('entrenador_id', equipo).gte('fecha_pago', hace6m),
@@ -249,6 +250,8 @@ export default function Dashboard({ session }) {
       supabase.from('clientes').select('id,nombre,email,created_at,plan_online').in('entrenador_id', equipo).eq('estado', 'pendiente').order('created_at',{ascending:false}),
       supabase.from('cuestionarios').select('cliente_id,sugerencia_plan,sugerencia_justificacion,edad,objetivo,ciudad,que_no_funciono,expectativas_30dias,dias_semana,donde_entrena').in('entrenador_id', equipo).not('cliente_id','is',null).order('created_at',{ascending:false}),
       supabase.from('clientes').select('id,nombre,email,plan_online,created_at').in('entrenador_id', equipo).eq('estado', 'contacto').order('created_at',{ascending:false}),
+      // M8 F1 — sesiones del mes actual y anterior para comparativa
+      supabase.from('sesiones').select('id,fecha,completada').in('entrenador_id', equipo).gte('fecha', diaLocal(new Date(hoy.getFullYear(), hoy.getMonth()-1, 1))).eq('completada', true),
     ])
 
     if (alertas?.length > 0) {
@@ -328,6 +331,13 @@ export default function Dashboard({ session }) {
     const clientesNuevosMesAnterior = activos.filter(c => c.fecha_inicio && c.fecha_inicio >= inicioMesAnterior && c.fecha_inicio < inicioMes).length
     const deltaClientesNuevos = clientesNuevosMesAnterior > 0
       ? clientesNuevosEsteMes - clientesNuevosMesAnterior
+      : null
+
+    // M8 F1 — Comparativa sesiones mes actual vs mes anterior
+    const sesionesEsteMes = (sesionesMeses||[]).filter(s => s.fecha >= inicioMes).length
+    const sesionesEsteMesAnterior = (sesionesMeses||[]).filter(s => s.fecha >= inicioMesAnterior && s.fecha < inicioMes).length
+    const deltaSesiones = sesionesEsteMesAnterior > 0
+      ? Math.round(((sesionesEsteMes - sesionesEsteMesAnterior) / sesionesEsteMesAnterior) * 100)
       : null
 
     // Clientes con interés en suplementación activado pero sin recomendaciones generadas aún
@@ -434,6 +444,7 @@ export default function Dashboard({ session }) {
       solicitudesCambioPlan: (solicitudesCambioPlan || []).filter(s => !estaDescartada(s.cliente_id, 'cambio_plan')),
       deltaIngresos, deltaClientesNuevos, clientesNuevosEsteMes,
       saludCentro,
+      deltaSesiones, sesionesEsteMes,
     })
     setLoading(false)
     } catch (e) {
@@ -1166,14 +1177,19 @@ export default function Dashboard({ session }) {
                   )}
                 </button>
 
-                {/* Sesiones hoy */}
+                {/* Sesiones */}
                 <button onClick={() => navigate('/agenda')}
                   className="bg-[#F7F6F3] hover:bg-[#EEECEA] rounded-xl p-3 text-left transition-all">
-                  <p className="text-lg font-bold text-[#6366f1]">{sesionesHoy.length}</p>
-                  <p className="text-xs text-[#6B6B6B] mt-0.5">Sesiones hoy</p>
-                  {sesionesHoy.filter(s => s.completada).length > 0 && (
-                    <p className="text-[10px] text-[#9B9B9B]">{sesionesHoy.filter(s => s.completada).length} completadas</p>
-                  )}
+                  <div className="flex items-baseline justify-between gap-1">
+                    <p className="text-lg font-bold text-[#6366f1]">{d.sesionesEsteMes ?? sesionesHoy.length}</p>
+                    {d.deltaSesiones !== null && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${d.deltaSesiones >= 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-red-100 text-red-600'}`}>
+                        {d.deltaSesiones >= 0 ? `▲${d.deltaSesiones}%` : `▼${Math.abs(d.deltaSesiones)}%`}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-[#6B6B6B] mt-0.5">Sesiones mes</p>
+                  <p className="text-[10px] text-[#9B9B9B]">{sesionesHoy.length} hoy</p>
                 </button>
 
                 {/* Adherencia */}
