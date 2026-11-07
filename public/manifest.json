@@ -3,20 +3,26 @@
   "short_name": "Forge",
   "description": "Tu portal de entrenamiento personal",
   "start_url": "/portal",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#F7F6F3",
+  "background_color": "#0A0A0A",
   "theme_color": "#FF5C00",
   "orientation": "portrait-primary",
+  "lang": "es",
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ],
   "categories": ["health", "fitness"],
-  "lang": "es",
-  "screenshots": [],
   "prefer_related_applications": false
 }

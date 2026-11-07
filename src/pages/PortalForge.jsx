@@ -1526,6 +1526,53 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
         )}
       </div>
 
+      {/* Logros de constancia — hitos por semanas consecutivas con check-in */}
+      {semanasActivas >= 4 && (() => {
+        const hitos = [
+          { sem: 4,  emoji: '🥉', label: '4 semanas seguidas', sub: 'Primer mes completo', color: '#CD7F32' },
+          { sem: 8,  emoji: '🥈', label: '8 semanas seguidas', sub: 'Dos meses sin parar',  color: '#9CA3AF' },
+          { sem: 12, emoji: '🥇', label: '12 semanas seguidas', sub: 'Tres meses de racha', color: '#F59E0B' },
+          { sem: 20, emoji: '🏆', label: '20 semanas seguidas', sub: 'Constancia élite',    color: '#FF5C00' },
+        ]
+        // Hito actual = el mayor alcanzado
+        const alcanzados = hitos.filter(h => semanasActivas >= h.sem)
+        const actual = alcanzados[alcanzados.length - 1]
+        // Próximo hito
+        const siguiente = hitos.find(h => semanasActivas < h.sem)
+        const progSiguiente = siguiente ? Math.round((semanasActivas - (alcanzados[alcanzados.length-2]?.sem ?? 0)) / (siguiente.sem - (alcanzados[alcanzados.length-2]?.sem ?? 0)) * 100) : 100
+        return (
+          <div className="rounded-2xl px-4 py-3.5" style={{ background: '#0A0A0A' }}>
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0"
+                style={{ background: `${actual.color}22` }}>
+                {actual.emoji}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-black text-white leading-tight">{actual.label}</p>
+                <p className="text-[11px] mt-0.5" style={{ color: actual.color }}>{actual.sub}</p>
+                {siguiente && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${progSiguiente}%`, background: actual.color }} />
+                    </div>
+                    <p className="text-[9px] font-bold tracking-wide flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      {siguiente.sem - semanasActivas} sem para {siguiente.emoji}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {alcanzados.length > 1 && (
+                <div className="flex gap-1 flex-shrink-0">
+                  {alcanzados.slice(0,-1).map(h => (
+                    <span key={h.sem} className="text-base opacity-50">{h.emoji}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Resumen semanal de progreso */}
       {(sesCompletadas > 0 || (pesos.length >= 2)) && !esNuevo && (() => {
         // Diff de peso esta semana (último check-in de la semana vs el anterior)
