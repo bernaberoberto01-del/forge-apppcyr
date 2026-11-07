@@ -616,9 +616,11 @@ export default function PortalForge() {
 
   // Visibilidad de tabs según plan — un cliente de solo Nutrición no ve Entrena y viceversa.
   // verRutina / verNutricion ya incluyen la lógica de acceso y la excepción "tiene datos en BD".
+  // M9 F3 — Nombres de tabs personalizables por el entrenador
+  const nombreTabEntrena = config?.portal_nombre_rutinas?.trim() || 'Entrena'
   const TABS = [
     { id: 'hoy',       label: 'Inicio',    icon: '⊞' },
-    { id: 'entrena',   label: 'Entrena',   icon: '💪',  oculto: !verRutina },
+    { id: 'entrena',   label: nombreTabEntrena, icon: '💪',  oculto: !verRutina },
     { id: 'nutricion', label: 'Nutrición', icon: '🥗',  oculto: !verNutricion },
     { id: 'progreso',  label: 'Progreso',  icon: '📈' },
     { id: 'mas',       label: 'Más',       icon: '···', badge: msgNoLeidos },
@@ -645,7 +647,8 @@ export default function PortalForge() {
         👁 Modo vista previa — estás viendo el portal de {cliente.nombre}
       </div>
     )}
-    <div className="min-h-screen flex" style={{ background: '#F4F3F0', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica Neue,sans-serif' }}>
+    {/* M9 F3 — color_fondo personalizado del centro, fallback a #F4F3F0 */}
+    <div className="min-h-screen flex" style={{ background: config?.color_fondo || '#F4F3F0', fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica Neue,sans-serif' }}>
 
       {/* Sidebar desktop */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-black/6 fixed h-full z-20">
@@ -682,6 +685,12 @@ export default function PortalForge() {
           <div className="px-5 py-4 border-t border-black/5 flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}15` }}><span>🔥</span></div>
             <div><p className="text-xs font-bold text-[#0A0A0A]">{semanasActivas} sem. seguidas</p><p className="text-[10px] text-[#9B9B9B]">Racha activa</p></div>
+          </div>
+        )}
+        {/* M9 F3 — Texto de pie personalizado del centro */}
+        {config?.portal_pie?.trim() && (
+          <div className="px-5 pb-2">
+            <p className="text-[10px] text-[#C0C0C0] text-center leading-relaxed">{config.portal_pie}</p>
           </div>
         )}
         <div className="px-3 pb-4">
@@ -1375,7 +1384,8 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
       {esNuevo && (
         <div className="rounded-3xl overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
           <div className="px-5 py-6">
-            <p className="text-white/60 text-xs font-semibold mb-1.5">{`Bienvenido a ${BRAND.nombre}`}</p>
+            {/* M9 F3 — Mensaje de bienvenida personalizado */}
+            <p className="text-white/60 text-xs font-semibold mb-1.5">{config?.portal_bienvenida?.trim() || `Bienvenido a ${BRAND.nombre}`}</p>
             <p className="text-white font-bold text-xl leading-snug">{config?.nombre_entrenador||'Tu entrenador'} está preparando tu plan</p>
             <p className="text-white/60 text-sm mt-2">En breve tendrás tu rutina, plan de nutrición y progreso.</p>
             {verNutricion && !cuest && (

@@ -266,7 +266,11 @@ const defaultConfig = {
   // M9 — Logo, email fiscal, política cancelación, umbrales inactividad
   logo_url: '', email_fiscal: '',
   politica_cancelacion_horas: 24, politica_cancelacion_consecuencia: 'ninguna',
-  inactividad_alerta_dias: 7, inactividad_riesgo_dias: 14
+  inactividad_alerta_dias: 7, inactividad_riesgo_dias: 14,
+  // M9 F3 — Branding avanzado y textos del portal
+  color_fondo: '#F7F6F3', color_texto: '#0A0A0A',
+  portal_bienvenida: '', portal_pie: '',
+  portal_nombre_rutinas: '', portal_nombre_seguimiento: ''
 }
 
 export default function Configuracion({ session, onConfigChange }) {
@@ -622,6 +626,99 @@ export default function Configuracion({ session, onConfigChange }) {
 
           <div className="bg-[#F5F5F0] rounded-xl p-4">
             <p className="text-xs text-[#6B6B6B]">⚠ El cambio de color se aplica globalmente después de guardar y recargar la página. La implementación completa de temas dinámicos estará en la próxima versión.</p>
+          </div>
+
+          {/* M9 F3 — Colores del portal */}
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">🌐 Colores del portal del cliente</h2>
+            <p className="text-xs text-[#9B9B9B] mb-4">Personaliza el fondo y el texto principal que ve el cliente en su portal</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Color de fondo</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={config.color_fondo || '#F7F6F3'}
+                    onChange={e => setConfig(c => ({ ...c, color_fondo: e.target.value }))}
+                    className="w-10 h-10 rounded-lg border border-black/10 cursor-pointer p-0.5" />
+                  <input type="text" value={config.color_fondo || '#F7F6F3'}
+                    onChange={e => { if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) setConfig(c => ({ ...c, color_fondo: e.target.value })) }}
+                    className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-acento" />
+                </div>
+                <button onClick={() => setConfig(c => ({ ...c, color_fondo: '#F7F6F3' }))}
+                  className="text-xs text-[#9B9B9B] mt-1 hover:text-acento transition-colors">
+                  Restablecer
+                </button>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-2 block">Color de texto</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={config.color_texto || '#0A0A0A'}
+                    onChange={e => setConfig(c => ({ ...c, color_texto: e.target.value }))}
+                    className="w-10 h-10 rounded-lg border border-black/10 cursor-pointer p-0.5" />
+                  <input type="text" value={config.color_texto || '#0A0A0A'}
+                    onChange={e => { if (/^#[0-9A-Fa-f]{0,6}$/.test(e.target.value)) setConfig(c => ({ ...c, color_texto: e.target.value })) }}
+                    className="flex-1 border border-black/10 rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:border-acento" />
+                </div>
+                <button onClick={() => setConfig(c => ({ ...c, color_texto: '#0A0A0A' }))}
+                  className="text-xs text-[#9B9B9B] mt-1 hover:text-acento transition-colors">
+                  Restablecer
+                </button>
+              </div>
+            </div>
+            {/* Mini preview del portal */}
+            <div className="mt-4 rounded-xl overflow-hidden border border-black/5">
+              <div className="px-3 py-2.5" style={{ background: config.color_fondo || '#F7F6F3' }}>
+                <p className="text-xs font-bold" style={{ color: config.color_texto || '#0A0A0A' }}>Portal del cliente — preview</p>
+                <p className="text-[11px] mt-0.5" style={{ color: (config.color_texto || '#0A0A0A') + '99' }}>Así verá el cliente el fondo y el texto de su portal</p>
+                <div className="mt-2 flex gap-1.5">
+                  {['Inicio','Entrena','Nutrición','Progreso'].map(t => (
+                    <span key={t} className="text-[10px] px-2 py-1 rounded-lg" style={{ background: (config.color_texto || '#0A0A0A') + '10', color: config.color_texto || '#0A0A0A' }}>{t}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* M9 F3 — Textos del portal */}
+          <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+            <h2 className="text-sm font-bold text-[#0A0A0A] mb-1">✏️ Textos del portal</h2>
+            <p className="text-xs text-[#9B9B9B] mb-4">Personaliza los textos que el cliente ve en su portal. Déjalos vacíos para usar los textos por defecto.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Mensaje de bienvenida</label>
+                <textarea value={config.portal_bienvenida || ''}
+                  onChange={e => setConfig(c => ({ ...c, portal_bienvenida: e.target.value }))}
+                  placeholder={`Bienvenido a ${BRAND.nombre}`}
+                  rows={2}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento resize-none placeholder:text-[#C0C0C0]" />
+                <p className="text-xs text-[#9B9B9B] mt-1">Se muestra en la cabecera del portal cuando el cliente entra</p>
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Texto del pie del portal</label>
+                <input type="text" value={config.portal_pie || ''}
+                  onChange={e => setConfig(c => ({ ...c, portal_pie: e.target.value }))}
+                  placeholder={`© ${new Date().getFullYear()} ${config.nombre_negocio || BRAND.nombre}`}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento placeholder:text-[#C0C0C0]" />
+                <p className="text-xs text-[#9B9B9B] mt-1">Aparece al final de la barra lateral. Deja vacío para ocultarlo.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre del tab Entrena</label>
+                  <input type="text" value={config.portal_nombre_rutinas || ''}
+                    onChange={e => setConfig(c => ({ ...c, portal_nombre_rutinas: e.target.value }))}
+                    placeholder="Entrena"
+                    maxLength={16}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento placeholder:text-[#C0C0C0]" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Nombre del seguimiento</label>
+                  <input type="text" value={config.portal_nombre_seguimiento || ''}
+                    onChange={e => setConfig(c => ({ ...c, portal_nombre_seguimiento: e.target.value }))}
+                    placeholder="Seguimiento"
+                    maxLength={16}
+                    className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento placeholder:text-[#C0C0C0]" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
