@@ -2361,6 +2361,37 @@ export default function Clientes({ session }) {
                       </div>
                     )}
                   </div>
+                  {/* Widget adherencia nutricional últimas 8 semanas */}
+                  {(() => {
+                    const conAdherencia = (dData.checkins||[]).filter(c => c.adherencia_nutricion)
+                    if (!conAdherencia.length) return null
+                    const ultimas8 = conAdherencia.slice(0,8).reverse()
+                    const totalSi = conAdherencia.filter(c => c.adherencia_nutricion === 'si').length
+                    const pct = Math.round((totalSi / conAdherencia.length) * 100)
+                    const colorPct = pct >= 70 ? '#10b981' : pct >= 40 ? '#f59e0b' : '#ef4444'
+                    return (
+                      <div className="bg-white border border-black/5 rounded-2xl p-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-[#0A0A0A]">🥗 Adherencia al plan de alimentación</p>
+                          <span className="text-sm font-black" style={{color:colorPct}}>{pct}%</span>
+                        </div>
+                        <div className="flex gap-1">
+                          {ultimas8.map((ci, i) => (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1" title={`${ci.fecha}: ${ci.adherencia_nutricion === 'si' ? '✓ Siguió el plan' : ci.adherencia_nutricion === 'mas_o_menos' ? '± Más o menos' : '✗ No siguió'}`}>
+                              <div className={`h-8 w-full rounded-md ${ci.adherencia_nutricion === 'si' ? 'bg-emerald-400' : ci.adherencia_nutricion === 'mas_o_menos' ? 'bg-amber-300' : 'bg-red-400'}`} />
+                              <span className="text-[9px] text-[#C0C0C0] leading-none">{new Date(ci.fecha+'T12:00').toLocaleDateString('es-ES',{day:'2-digit',month:'2-digit'})}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-3 text-[10px] text-[#9B9B9B]">
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block" />Siguió</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-300 inline-block" />Más o menos</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400 inline-block" />No siguió</span>
+                        </div>
+                      </div>
+                    )
+                  })()}
+
                   {!dData.checkins?.length ? (
                     <div className="text-center py-8">
                       <p className="text-3xl mb-2">📋</p>
@@ -2382,6 +2413,9 @@ export default function Clientes({ session }) {
                         {ci.fatiga && <span className={`text-xs px-2 py-1 rounded-full ${ci.fatiga>=4?'bg-red-50 text-red-700':'bg-gray-50 text-gray-600'}`}>🔥 {ci.fatiga}/5</span>}
                         {ci.motivacion && <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full">💫 {ci.motivacion}/7</span>}
                         {ci.adherencia_entreno && <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-full">💪 {ci.adherencia_entreno}/10</span>}
+                        {ci.adherencia_nutricion === 'si' && <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full">🥗 Plan: ✓</span>}
+                        {ci.adherencia_nutricion === 'mas_o_menos' && <span className="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded-full">🥗 Plan: ±</span>}
+                        {ci.adherencia_nutricion === 'no' && <span className="text-xs bg-red-50 text-red-700 px-2 py-1 rounded-full">🥗 Plan: ✗</span>}
                       </div>
                       {ci.comentario && <p className="text-xs text-[#6B6B6B] mt-2 italic border-t border-black/5 pt-2">"{ci.comentario}"</p>}
                     </div>
