@@ -3209,6 +3209,7 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
   const [registrosLocales, setRegistrosLocales] = useState(nutricionRegistros)
   const [guardandoAdherencia, setGuardandoAdherencia] = useState(false)
   const [adherenciaLocal, setAdherenciaLocal] = useState(null)
+  const [opcionB, setOpcionB] = useState({}) // {`${diaIdx}-${comidaIdx}`: true} cuando el cliente elige la alternativa B
 
   if (!nutricion) {
     const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
@@ -3554,20 +3555,44 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                 {abierto && (
                   <>
                     <div className="divide-y border-t" style={{ borderColor: 'rgba(0,0,0,0.05)' }}>
-                      {comidas.map((comida, ci) => (
+                      {comidas.map((comida, ci) => {
+                        const keyAB = `${di}-${ci}`
+                        const usandoB = !!opcionB[keyAB] && !!comida.alternativa_b
+                        const alimentosActivos = usandoB ? (comida.alternativa_b?.alimentos || []) : (comida.alimentos || [])
+                        const prepActiva = usandoB ? comida.alternativa_b?.prep : comida.prep
+                        return (
                         <div key={ci} className="px-4 py-3.5">
                           {/* Cabecera comida */}
                           <div className="flex items-start justify-between mb-2">
-                            <div>
+                            <div className="flex-1 min-w-0">
                               <p className="text-sm font-black text-[#0A0A0A]">{comida.nombre}</p>
                               {comida.hora && <p className="text-[10px] text-[#9B9B9B] font-medium">{comida.hora}</p>}
                             </div>
-                            {comida.kcal && (
-                              <div className="text-right flex-shrink-0 ml-2">
-                                <p className="text-base font-black" style={{ color }}>{comida.kcal}</p>
-                                <p className="text-[9px] text-[#9B9B9B]">kcal</p>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              {/* Toggle A/B si hay alternativa */}
+                              {comida.alternativa_b && (
+                                <div className="flex rounded-lg overflow-hidden border border-black/10 text-[10px] font-black">
+                                  <button
+                                    onClick={() => setOpcionB(prev => ({ ...prev, [keyAB]: false }))}
+                                    className="px-2 py-1 transition-colors"
+                                    style={{ background: !usandoB ? color : 'transparent', color: !usandoB ? 'white' : '#9B9B9B' }}>
+                                    A
+                                  </button>
+                                  <button
+                                    onClick={() => setOpcionB(prev => ({ ...prev, [keyAB]: true }))}
+                                    className="px-2 py-1 transition-colors"
+                                    style={{ background: usandoB ? color : 'transparent', color: usandoB ? 'white' : '#9B9B9B' }}>
+                                    B
+                                  </button>
+                                </div>
+                              )}
+                              {comida.kcal && (
+                                <div className="text-right">
+                                  <p className="text-base font-black" style={{ color }}>{comida.kcal}</p>
+                                  <p className="text-[9px] text-[#9B9B9B]">kcal</p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                           {/* Macros comida */}
                           {(comida.proteinas_g || comida.carbohidratos_g || comida.grasas_g) && (
@@ -3577,15 +3602,21 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                               ))}
                             </div>
                           )}
-                          {/* Alimentos */}
+                          {/* Label opción activa si hay alternativa */}
+                          {comida.alternativa_b && (
+                            <p className="text-[10px] font-bold mb-1.5" style={{ color: `${color}99` }}>
+                              {usandoB ? '↔ Alternativa B' : 'Opción A (principal)'}
+                            </p>
+                          )}
+                          {/* Alimentos de la opción activa */}
                           <div className="space-y-2">
-                            {(comida.alimentos || []).map((al, ai) => (
+                            {alimentosActivos.map((al, ai) => (
                               <div key={ai}>
                                 <div className="flex items-center justify-between">
                                   <p className="text-sm text-[#0A0A0A] font-medium">{typeof al === 'string' ? al : al.nombre}</p>
                                   {al.cantidad && <p className="text-xs font-black text-[#9B9B9B] flex-shrink-0 ml-3">{al.cantidad}</p>}
                                 </div>
-                                {al.alternativa && (
+                                {!usandoB && al.alternativa && (
                                   <p className="text-[10px] text-[#9B9B9B] mt-0.5 pl-0.5">
                                     <span className="font-bold">↔</span> Alt: {al.alternativa}
                                   </p>
@@ -3593,14 +3624,15 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
                               </div>
                             ))}
                           </div>
-                          {/* Preparación */}
-                          {comida.prep && (
+                          {/* Preparación de la opción activa */}
+                          {prepActiva && (
                             <p className="text-[10px] text-[#9B9B9B] italic mt-2.5 leading-relaxed border-t pt-2 border-black/5">
-                              {comida.prep}
+                              {prepActiva}
                             </p>
                           )}
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     {/* Botón registrar */}
                     <div className="px-4 py-3 border-t" style={{ borderColor: 'rgba(0,0,0,0.05)', background: registradoEste ? '#f0fdf4' : `${color}04` }}>

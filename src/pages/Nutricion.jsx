@@ -550,6 +550,59 @@ export default function Nutricion({ session }) {
                               <input value={editComidaData.prep||''} onChange={e => setEditComidaData({...editComidaData, prep: e.target.value})}
                                 className="w-full border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="Breve descripción..."/>
                             </div>
+                            {/* Alternativa B */}
+                            <div className="border border-dashed border-amber-300 rounded-xl p-3 mt-1">
+                              <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-semibold text-amber-700">↔ Alternativa B (opcional)</p>
+                                {editComidaData.alternativa_b ? (
+                                  <button onClick={() => {
+                                    const copy = JSON.parse(JSON.stringify(editComidaData))
+                                    delete copy.alternativa_b
+                                    setEditComidaData(copy)
+                                  }} className="text-[10px] text-red-400 hover:text-red-600">× Eliminar</button>
+                                ) : (
+                                  <button onClick={() => {
+                                    setEditComidaData({...editComidaData, alternativa_b: { alimentos: [{ nombre: '', cantidad: '' }], prep: '' }})
+                                  }} className="text-[10px] text-acento font-bold">+ Añadir</button>
+                                )}
+                              </div>
+                              {editComidaData.alternativa_b && (
+                                <div className="space-y-2">
+                                  {(editComidaData.alternativa_b.alimentos || []).map((al, j) => (
+                                    <div key={j} className="flex gap-2 items-center">
+                                      <input value={al.nombre} onChange={e => {
+                                        const copy = JSON.parse(JSON.stringify(editComidaData))
+                                        copy.alternativa_b.alimentos[j].nombre = e.target.value
+                                        setEditComidaData(copy)
+                                      }} className="flex-1 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="Alimento alt."/>
+                                      <input value={al.cantidad} onChange={e => {
+                                        const copy = JSON.parse(JSON.stringify(editComidaData))
+                                        copy.alternativa_b.alimentos[j].cantidad = e.target.value
+                                        setEditComidaData(copy)
+                                      }} className="w-24 border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="150g"/>
+                                      <button onClick={() => {
+                                        const copy = JSON.parse(JSON.stringify(editComidaData))
+                                        copy.alternativa_b.alimentos.splice(j, 1)
+                                        setEditComidaData(copy)
+                                      }} className="text-red-400 hover:text-red-600 text-sm px-1">×</button>
+                                    </div>
+                                  ))}
+                                  <button onClick={() => {
+                                    const copy = JSON.parse(JSON.stringify(editComidaData))
+                                    copy.alternativa_b.alimentos = [...(copy.alternativa_b.alimentos || []), { nombre: '', cantidad: '' }]
+                                    setEditComidaData(copy)
+                                  }} className="text-xs text-acento font-semibold">+ Añadir alimento</button>
+                                  <input value={editComidaData.alternativa_b.prep||''} onChange={e => {
+                                    const copy = JSON.parse(JSON.stringify(editComidaData))
+                                    copy.alternativa_b.prep = e.target.value
+                                    setEditComidaData(copy)
+                                  }} className="w-full border border-amber-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-acento" placeholder="Preparación alternativa..."/>
+                                </div>
+                              )}
+                              {!editComidaData.alternativa_b && (
+                                <p className="text-[10px] text-amber-500/70">El cliente podrá elegir entre la opción principal o esta alternativa</p>
+                              )}
+                            </div>
                             <div className="flex gap-2 pt-1">
                               <button onClick={async () => {
                                 // Guardar cambios en el borrador — y en contenido también si el
@@ -589,6 +642,20 @@ export default function Nutricion({ session }) {
                               <p className="text-xs text-[#6B6B6B] border-t border-black/5 pt-2 mt-2 leading-relaxed">
                                 🍳 {comida.prep}
                               </p>
+                            )}
+                            {comida.alternativa_b && (
+                              <div className="mt-2 pt-2 border-t border-dashed border-black/10">
+                                <p className="text-[10px] font-bold text-[#9B9B9B] mb-1.5">↔ Alternativa B</p>
+                                {(comida.alternativa_b.alimentos || []).map((al, j) => (
+                                  <div key={j} className="flex items-center justify-between text-xs">
+                                    <span className="text-[#6B6B6B]">{al.nombre}</span>
+                                    <span className="text-[#9B9B9B] font-medium">{al.cantidad}</span>
+                                  </div>
+                                ))}
+                                {comida.alternativa_b.prep && (
+                                  <p className="text-[10px] text-[#9B9B9B] italic mt-1">🍳 {comida.alternativa_b.prep}</p>
+                                )}
+                              </div>
                             )}
                           </div>
                         )}
