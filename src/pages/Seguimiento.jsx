@@ -95,6 +95,10 @@ export default function Seguimiento({ session }) {
   const [borradorMensajeAnalisis, setBorradorMensajeAnalisis] = useState('')
   const [enviandoAnalisisId, setEnviandoAnalisisId] = useState(null)
   const [generandoAjusteId, setGenerandoAjusteId] = useState(null)
+  // M11-C — respuesta manual entrenador al check-in
+  const [respondiendo, setRespondiendo] = useState(false)
+  const [textoRespuesta, setTextoRespuesta] = useState('')
+  const [guardandoRespuesta, setGuardandoRespuesta] = useState(false)
   // M9 F1 — umbrales configurables por centro
   const [umbralAlerta, setUmbralAlerta] = useState(7)
   const [umbralRiesgo, setUmbralRiesgo] = useState(14)
@@ -548,6 +552,12 @@ export default function Seguimiento({ session }) {
               </div>
             )}
             {ci.comentario && <p className="text-xs text-[#6B6B6B] mt-2 italic border-t border-black/5 pt-2">"{ci.comentario}"</p>}
+            {ci.respuesta_entrenador && (
+              <div className="mt-2 flex items-center gap-1.5 border-t border-black/5 pt-2">
+                <span className="text-xs">📝</span>
+                <span className="text-xs text-emerald-700 font-medium">Respondido</span>
+              </div>
+            )}
             {/* Tendencia vs CI anterior */}
             {(() => {
               const anterior = checkinsFiltrados.find(x => x.cliente_id === ci.cliente_id && x.fecha < ci.fecha)
@@ -582,7 +592,7 @@ export default function Seguimiento({ session }) {
 
       {/* Modal detalle check-in */}
       {detalleCI && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setDetalleCI(null)}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => { setDetalleCI(null); setRespondiendo(false); setTextoRespuesta('') }}>
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="p-4 border-b border-black/5 sticky top-0 bg-white flex items-center justify-between">
@@ -592,7 +602,7 @@ export default function Seguimiento({ session }) {
                   {new Date(detalleCI.fecha).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
                 </p>
               </div>
-              <button onClick={() => setDetalleCI(null)} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
+              <button onClick={() => { setDetalleCI(null); setRespondiendo(false); setTextoRespuesta('') }} className="text-[#6B6B6B] text-xl w-8 h-8 flex items-center justify-center">×</button>
             </div>
 
             <div className="p-4 space-y-4">
@@ -708,6 +718,73 @@ export default function Seguimiento({ session }) {
                 </div>
               )}
 
+              {/* M11-C — Respuesta del entrenador al check-in */}
+              <div className="border border-black/8 rounded-2xl overflow-hidden">
+                {/* Respuesta existente */}
+                {detalleCI.respuesta_entrenador && !respondiendo && (
+                  <div className="p-4 bg-[#F5F5F0]">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-[#0A0A0A]">📝 Tu respuesta</p>
+                      <button onClick={() => { setRespondiendo(true); setTextoRespuesta(detalleCI.respuesta_entrenador || '') }}
+                        className="text-xs text-acento font-medium hover:underline">
+                        Editar
+                      </button>
+                    </div>
+                    <p className="text-sm text-[#3A3A3A] leading-relaxed whitespace-pre-wrap">{detalleCI.respuesta_entrenador}</p>
+                  </div>
+                )}
+
+                {/* Editor de respuesta */}
+                {(respondiendo || !detalleCI.respuesta_entrenador) && (
+                  <div className="p-4">
+                    <p className="text-xs font-semibold text-[#0A0A0A] mb-2">
+                      {detalleCI.respuesta_entrenador ? '✏️ Editar respuesta' : '💬 Responder al check-in'}
+                    </p>
+                    <textarea
+                      value={textoRespuesta}
+                      onChange={e => setTextoRespuesta(e.target.value)}
+                      onFocus={() => { if (!respondiendo) { setRespondiendo(true); setTextoRespuesta(detalleCI.respuesta_entrenador || '') } }}
+                      placeholder="Escribe tu valoración, ajustes de carga o feedback para el cliente..."
+                      className="w-full text-sm border border-black/10 rounded-xl p-3 resize-none focus:outline-none focus:border-acento/40 bg-white placeholder:text-[#C0C0C0] leading-relaxed"
+                      rows={3}
+                    />
+                    {respondiendo && (
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={async () => {
+                          if (!textoRespuesta.trim()) return
+                          setGuardandoRespuesta(true)
+                          const { error } = await supabase.from('checkins')
+                            .update({ respuesta_entrenador: textoRespuesta.trim(), respondido: true })
+                            .eq('id', detalleCI.id)
+                          if (!error) {
+                            // actualizar estado local sin recargar todo
+                            setCheckins(prev => prev.map(c => c.id === detalleCI.id
+                              ? { ...c, respuesta_entrenador: textoRespuesta.trim(), respondido: true }
+                              : c
+                            ))
+                            setDetalleCI(prev => ({ ...prev, respuesta_entrenador: textoRespuesta.trim(), respondido: true }))
+                            setRespondiendo(false)
+                            setToast('✓ Respuesta guardada')
+                            setTimeout(() => setToast(''), 3000)
+                          } else {
+                            setToast('Error al guardar la respuesta')
+                            setTimeout(() => setToast(''), 3000)
+                          }
+                          setGuardandoRespuesta(false)
+                        }} disabled={guardandoRespuesta || !textoRespuesta.trim()}
+                          className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40 bg-acento active:scale-95 transition-all">
+                          {guardandoRespuesta ? 'Guardando...' : '✓ Guardar respuesta'}
+                        </button>
+                        <button onClick={() => { setRespondiendo(false); setTextoRespuesta('') }}
+                          className="px-4 py-2.5 rounded-xl text-sm border border-black/10 text-[#6B6B6B] hover:bg-[#F5F5F0]">
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Acciones */}
               <div className="flex gap-2 pt-1">
                 <button onClick={async () => {
@@ -741,7 +818,7 @@ export default function Seguimiento({ session }) {
                   className="flex-1 border border-black/10 text-[#6B6B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-[#F5F5F0]">
                   🔗 Enviar nuevo CI
                 </button>
-                <button onClick={() => { setDetalleCI(null); setMensajeSugerido(null) }}
+                <button onClick={() => { setDetalleCI(null); setMensajeSugerido(null); setRespondiendo(false); setTextoRespuesta('') }}
                   className="flex-1 bg-[#111] text-white text-sm font-semibold py-2.5 rounded-xl">
                   Cerrar
                 </button>

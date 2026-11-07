@@ -4106,6 +4106,13 @@ function SubPeso({ checkins, color, cliente }) {
                 {c.comentario && (
                   <p className="text-[10px] text-[#9B9B9B] mt-1.5 italic leading-relaxed">"{c.comentario}"</p>
                 )}
+                {/* M11-C — Respuesta del entrenador visible en el portal */}
+                {c.respuesta_entrenador && (
+                  <div className="mt-2 bg-[#F5F5F0] rounded-xl px-3 py-2.5">
+                    <p className="text-[10px] font-bold text-[#6B6B6B] mb-1">📝 Respuesta de tu entrenador</p>
+                    <p className="text-xs text-[#0A0A0A] leading-relaxed whitespace-pre-wrap">{c.respuesta_entrenador}</p>
+                  </div>
+                )}
               </div>
               {c.peso && (
                 <p className="text-base font-black text-[#0A0A0A] flex-shrink-0">{c.peso}<span className="text-xs font-normal text-[#9B9B9B] ml-0.5">kg</span></p>
