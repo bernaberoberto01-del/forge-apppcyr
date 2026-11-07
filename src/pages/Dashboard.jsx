@@ -229,6 +229,7 @@ export default function Dashboard({ session }) {
       { data: cuestConLead },
       { data: clientesContactoRaw },
       { data: sesionesMeses },
+      { data: rutinasPublicadas },
     ] = await Promise.all([
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio,stripe_subscription_id,acceso_libre,is_demo').in('entrenador_id', equipo),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').in('entrenador_id', equipo).gte('fecha_pago', hace6m),
@@ -254,6 +255,8 @@ export default function Dashboard({ session }) {
       supabase.from('clientes').select('id,nombre,email,plan_online,created_at').in('entrenador_id', equipo).eq('estado', 'contacto').order('created_at',{ascending:false}),
       // M8 F1/F2 — sesiones últimas 8 semanas para comparativa y tendencia semanal
       supabase.from('sesiones').select('id,fecha,completada').in('entrenador_id', equipo).gte('fecha', diaLocal(new Date(Date.now()-56*864e5))).eq('completada', true),
+      // M8 operativo — clientes con rutina publicada para cruzar con sesiones de mañana
+      supabase.from('rutinas').select('cliente_id').in('entrenador_id', equipo).eq('estado', 'publicada'),
     ])
 
     if (alertas?.length > 0) {
@@ -449,6 +452,10 @@ export default function Dashboard({ session }) {
       planLabel: c.plan_online ? (PLAN_LABEL_CONTACTO[c.plan_online] || c.plan_online) : null,
     }))
 
+    // M8 operativo — sesiones de mañana sin rutina publicada asignada al cliente
+    const clienteIdsConRutinaPublicada = new Set((rutinasPublicadas||[]).map(r => r.cliente_id))
+    const sesionesMananaSinRutina = (sesManana||[]).filter(s => !clienteIdsConRutinaPublicada.has(s.cliente_id))
+
     setDatos({
       activos, ingresosMes, previstoMes, adherenciaMedia, ingresosPorMes, maxIngreso,
       alertasPagos, cobrosProximos, clientesSinCI, clientesSinCI14d, checkinsNuevos,
@@ -469,6 +476,7 @@ export default function Dashboard({ session }) {
       deltaSesiones, sesionesEsteMes,
       churnTotal, churnEsteMes, tasaChurn,
       tendenciaSemanal,
+      sesionesMananaSinRutina,
     })
     setLoading(false)
     } catch (e) {
@@ -488,7 +496,7 @@ export default function Dashboard({ session }) {
   )
 
   const d = datos
-  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length + (d.leadsPendientes?.length || 0) + (d.clientesContacto?.length || 0) + (moduloVisible('seguimiento') ? d.clientesSinCI14d?.length || 0 : 0)
+  const totalPendiente = (moduloVisible('mensajes') ? d.mensajesNL.length : 0) + (moduloVisible('seguimiento') ? d.clientesSinCI.length : 0) + (moduloVisible('rutinas') ? d.rutinasIA.length : 0) + d.alertasPagos.length + (d.leadsPendientes?.length || 0) + (d.clientesContacto?.length || 0) + (moduloVisible('seguimiento') ? d.clientesSinCI14d?.length || 0 : 0) + (moduloVisible('rutinas') ? (d.sesionesMananaSinRutina?.length || 0) : 0)
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -1071,6 +1079,27 @@ export default function Dashboard({ session }) {
                   </div>
                 ))}
 
+                {/* M8 Operativo — sesiones de mañana sin rutina asignada */}
+                {d.sesionesMananaSinRutina?.length > 0 && moduloVisible('rutinas') && (
+                  <div className="flex items-center gap-3 px-5 py-3.5 bg-amber-50/60 border-t border-amber-100">
+                    <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600 font-bold text-sm flex-shrink-0">📋</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-[#0A0A0A]">
+                        {d.sesionesMananaSinRutina.length === 1
+                          ? `Mañana: ${d.sesionesMananaSinRutina[0].clientes?.nombre?.split(' ')[0]} no tiene rutina`
+                          : `Mañana: ${d.sesionesMananaSinRutina.length} sesiones sin rutina asignada`}
+                      </p>
+                      <p className="text-xs text-[#9B9B9B] truncate">
+                        {d.sesionesMananaSinRutina.map(s => s.clientes?.nombre?.split(' ')[0]).join(', ')}
+                      </p>
+                    </div>
+                    <button onClick={() => navigate('/rutinas')}
+                      className="text-xs bg-amber-500 text-white font-bold px-3 py-1.5 rounded-xl flex-shrink-0 active:scale-95 transition-all">
+                      Asignar →
+                    </button>
+                  </div>
+                )}
+
                 {/* Onboarding — sistema vacío, usuario nuevo */}
                 {totalPendiente === 0 && cuestPendientes.length === 0 && clientesIAPendiente.length === 0 && d.activos.length === 0 && (
                   <div className="px-5 py-6 space-y-3">
@@ -1185,16 +1214,26 @@ export default function Dashboard({ session }) {
               )}
               {sesionesManana.length > 0 && (
                 <div className="px-5 py-3 border-t border-black/5 bg-[#F9F8F6]">
-                  <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-2">
-                    Mañana — {sesionesManana.length} sesión{sesionesManana.length>1?'es':''}
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide">
+                      Mañana — {sesionesManana.length} sesión{sesionesManana.length>1?'es':''}
+                    </p>
+                    {d.sesionesMananaSinRutina?.length > 0 && moduloVisible('rutinas') && (
+                      <button onClick={() => navigate('/rutinas')}
+                        className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl active:scale-95 transition-all">
+                        ⚠️ {d.sesionesMananaSinRutina.length} sin rutina · Asignar →
+                      </button>
+                    )}
+                  </div>
                   <div className="flex gap-2 flex-wrap">
                     {sesionesManana.map(s => {
                       const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
+                      const sinRutina = d.sesionesMananaSinRutina?.some(sr => sr.id === s.id)
                       return (
-                        <div key={s.id} className="flex items-center gap-2 bg-white border border-black/8 px-3 py-1.5 rounded-xl">
-                          <span className="text-xs font-bold text-[#6366f1]">{ini(s.clientes?.nombre)}</span>
+                        <div key={s.id} className={`flex items-center gap-2 bg-white border px-3 py-1.5 rounded-xl ${sinRutina ? 'border-amber-300 bg-amber-50' : 'border-black/8'}`}>
+                          <span className={`text-xs font-bold ${sinRutina ? 'text-amber-600' : 'text-[#6366f1]'}`}>{ini(s.clientes?.nombre)}</span>
                           <span className="text-xs text-[#9B9B9B]">{s.hora}</span>
+                          {sinRutina && <span className="text-[9px] font-bold text-amber-500">sin rutina</span>}
                         </div>
                       )
                     })}
