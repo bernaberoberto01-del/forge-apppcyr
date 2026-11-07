@@ -65,6 +65,8 @@ export default function Dashboard({ session }) {
   const [toast, setToast] = useState('')
   const [mostrarWizard, setMostrarWizard] = useState(false)
   const [expandirCriticos, setExpandirCriticos] = useState(false)
+  // M8 F2 — vista gerente (solo cuando hay varios entrenadores en equipo)
+  const [vistaGerente, setVistaGerente] = useState(false)
   const navigate = useNavigate()
   const uid = session.user.id
   const equipo = useEquipo(uid)
@@ -250,8 +252,8 @@ export default function Dashboard({ session }) {
       supabase.from('clientes').select('id,nombre,email,created_at,plan_online').in('entrenador_id', equipo).eq('estado', 'pendiente').order('created_at',{ascending:false}),
       supabase.from('cuestionarios').select('cliente_id,sugerencia_plan,sugerencia_justificacion,edad,objetivo,ciudad,que_no_funciono,expectativas_30dias,dias_semana,donde_entrena').in('entrenador_id', equipo).not('cliente_id','is',null).order('created_at',{ascending:false}),
       supabase.from('clientes').select('id,nombre,email,plan_online,created_at').in('entrenador_id', equipo).eq('estado', 'contacto').order('created_at',{ascending:false}),
-      // M8 F1 — sesiones del mes actual y anterior para comparativa
-      supabase.from('sesiones').select('id,fecha,completada').in('entrenador_id', equipo).gte('fecha', diaLocal(new Date(hoy.getFullYear(), hoy.getMonth()-1, 1))).eq('completada', true),
+      // M8 F1/F2 — sesiones últimas 8 semanas para comparativa y tendencia semanal
+      supabase.from('sesiones').select('id,fecha,completada').in('entrenador_id', equipo).gte('fecha', diaLocal(new Date(Date.now()-56*864e5))).eq('completada', true),
     ])
 
     if (alertas?.length > 0) {
@@ -339,6 +341,26 @@ export default function Dashboard({ session }) {
     const deltaSesiones = sesionesEsteMesAnterior > 0
       ? Math.round(((sesionesEsteMes - sesionesEsteMesAnterior) / sesionesEsteMesAnterior) * 100)
       : null
+
+    // M8 F2 — Churn mensual: clientes inactivos (estimación por estado)
+    const inactivos = (clientes||[]).filter(c => c.estado === 'inactivo' || c.estado === 'baja')
+    // Clientes que tenían fecha_inicio antes del mes actual (es decir, no eran nuevos) y ahora están inactivos
+    const churnEsteMes = inactivos.filter(c => c.fecha_inicio && c.fecha_inicio < inicioMes && c.fecha_inicio >= inicioMesAnterior).length
+    // Para el mes anterior no tenemos dato exacto, usamos total inactivos creados antes como referencia
+    const churnTotal = inactivos.length
+    // Tasa churn = bajas / (activos + bajas) × 100
+    const tasaChurn = (activos.length + churnTotal) > 0
+      ? Math.round((churnTotal / (activos.length + churnTotal)) * 100) : 0
+
+    // M8 F2 — Tendencia semanal (8 semanas): sesiones completadas + check-ins
+    const tendenciaSemanal = Array.from({length:8},(_,i) => {
+      const lunes = new Date(); lunes.setDate(lunes.getDate()-((lunes.getDay()||7)-1)-7*(7-i))
+      const viernes = new Date(lunes); viernes.setDate(lunes.getDate()+6)
+      const ls = diaLocal(lunes); const vs = diaLocal(viernes)
+      const sesSemana = (sesionesMeses||[]).filter(s=>s.fecha>=ls&&s.fecha<=vs).length
+      const ciSemana = (checkins||[]).filter(c=>c.fecha>=ls&&c.fecha<=vs).length
+      return { semana: i+1, sesiones: sesSemana, checkins: ciSemana }
+    })
 
     // Clientes con interés en suplementación activado pero sin recomendaciones generadas aún
     const interesPorCliente = {}
@@ -445,6 +467,8 @@ export default function Dashboard({ session }) {
       deltaIngresos, deltaClientesNuevos, clientesNuevosEsteMes,
       saludCentro,
       deltaSesiones, sesionesEsteMes,
+      churnTotal, churnEsteMes, tasaChurn,
+      tendenciaSemanal,
     })
     setLoading(false)
     } catch (e) {
@@ -526,24 +550,72 @@ export default function Dashboard({ session }) {
               {new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}
             </p>
           </div>
-          {totalPendiente > 0 && (
-            <button
-              onClick={() => document.getElementById('atencion-requerida')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-              className="bg-acento text-white text-sm font-bold px-3 py-1.5 rounded-full active:scale-95 transition-all cursor-pointer hover:opacity-90"
-            >
-              {totalPendiente} pendiente{totalPendiente > 1 ? 's' : ''}
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* M8 F2 — vista gerente: solo visible si hay varios entrenadores en el equipo */}
+            {equipo.length > 1 && (
+              <button onClick={() => setVistaGerente(v => !v)}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full transition-all active:scale-95 ${vistaGerente ? 'bg-[#0A0A0A] text-white' : 'bg-[#F7F6F3] text-[#6B6B6B] hover:bg-[#EEECEA]'}`}>
+                {vistaGerente ? '📊 Gerente' : '📊 Gerente'}
+              </button>
+            )}
+            {totalPendiente > 0 && (
+              <button
+                onClick={() => document.getElementById('atencion-requerida')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className="bg-acento text-white text-sm font-bold px-3 py-1.5 rounded-full active:scale-95 transition-all cursor-pointer hover:opacity-90"
+              >
+                {totalPendiente} pendiente{totalPendiente > 1 ? 's' : ''}
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* M8 F2 — Accesos rápidos contextuales */}
+        {(() => {
+          const atajos = []
+          if (d.mensajesNL?.length > 0 && moduloVisible('mensajes')) atajos.push({ icon: '💬', label: `${d.mensajesNL.length} mensaje${d.mensajesNL.length>1?'s':''}`, ruta: '/mensajes', color: '#6366f1' })
+          if (d.rutinasIA?.length > 0 && moduloVisible('rutinas')) atajos.push({ icon: '💪', label: `${d.rutinasIA.length} rutina${d.rutinasIA.length>1?'s':''} en borrador`, ruta: '/rutinas', color: BRAND.color })
+          if (d.clientesSinCI14d?.length > 0 && moduloVisible('seguimiento')) atajos.push({ icon: '⚠️', label: `${d.clientesSinCI14d.length} sin check-in`, ruta: '/seguimiento', color: '#f59e0b' })
+          if (d.alertasPagos?.length > 0) atajos.push({ icon: '💳', label: `${d.alertasPagos.length} pago${d.alertasPagos.length>1?'s':''} vencido${d.alertasPagos.length>1?'s':''}`, ruta: '/pagos', color: '#ef4444' })
+          if (d.analisisPendientes?.length > 0) atajos.push({ icon: '📊', label: `${d.analisisPendientes.length} análisis IA`, ruta: '/seguimiento', color: '#8b5cf6' })
+          if (atajos.length === 0) {
+            // Sin pendientes: atajos de navegación habitual
+            atajos.push({ icon: '📅', label: 'Agenda', ruta: '/agenda', color: '#6366f1' })
+            atajos.push({ icon: '👥', label: 'Clientes', ruta: '/clientes', color: BRAND.color })
+            if (moduloVisible('seguimiento')) atajos.push({ icon: '📈', label: 'Seguimiento', ruta: '/seguimiento', color: '#10b981' })
+          }
+          return atajos.length > 0 ? (
+            <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-0.5 px-0.5 scrollbar-hide">
+              {atajos.slice(0, 5).map((a, i) => (
+                <button key={i} onClick={() => navigate(a.ruta)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap active:scale-95 transition-all flex-shrink-0"
+                  style={{ background: `${a.color}12`, color: a.color, border: `1px solid ${a.color}20` }}>
+                  {a.icon} {a.label}
+                </button>
+              ))}
+            </div>
+          ) : null
+        })()}
 
         {/* Grid principal: atención (izq) + agenda y métricas (der) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
           {/* ── COLUMNA IZQUIERDA: Todo lo que necesita tu atención ── */}
-          <div className="lg:col-span-2 space-y-4">
+          <div className={`space-y-4 ${vistaGerente ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
+
+            {/* M8 F2 — Vista gerente: columna izquierda colapsada a banner de alertas */}
+            {vistaGerente && totalPendiente > 0 && (
+              <button onClick={() => setVistaGerente(false)}
+                className="w-full flex items-center justify-between bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 active:scale-95 transition-all">
+                <div className="flex items-center gap-2">
+                  <span className="text-amber-600 font-bold text-sm">⚠️ {totalPendiente} pendiente{totalPendiente>1?'s':''}</span>
+                  <span className="text-xs text-amber-500">Toca para ver detalle</span>
+                </div>
+                <span className="text-amber-400 text-xs">→</span>
+              </button>
+            )}
 
             {/* Lista de atención priorizada */}
-            <div id="atencion-requerida" className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+            <div id="atencion-requerida" className={`bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden ${vistaGerente ? 'hidden' : ''}`}>
               <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <p className="font-bold text-[#0A0A0A] text-sm">Requiere atención hoy</p>
@@ -1078,7 +1150,7 @@ export default function Dashboard({ session }) {
             )}
 
             {/* Agenda — hoy y mañana */}
-            <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+            <div className={`bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden ${vistaGerente ? 'hidden' : ''}`}>
               <div className="px-5 py-4 border-b border-black/5 flex items-center justify-between">
                 <p className="text-sm font-bold text-[#0A0A0A]">
                   {sesionesHoy.length > 0 ? `Hoy — ${sesionesHoy.length} sesión${sesionesHoy.length>1?'es':''}` : 'Agenda de hoy'}
@@ -1133,7 +1205,7 @@ export default function Dashboard({ session }) {
           </div>
 
           {/* ── COLUMNA DERECHA: Números y estado ── */}
-          <div className="space-y-4">
+          <div className={`space-y-4 ${vistaGerente ? 'lg:col-span-2' : ''}`}>
 
             {/* KPIs — compactos en columna */}
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
@@ -1255,7 +1327,7 @@ export default function Dashboard({ session }) {
               <BarChart datos={d.ingresosPorMes} max={d.maxIngreso} />
             </div>
 
-            {/* Mix online / presencial */}
+            {/* Mix online / presencial + M8 F2 Churn */}
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
               <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Clientes</p>
               <div className="space-y-2">
@@ -1270,8 +1342,106 @@ export default function Dashboard({ session }) {
                     <p className="text-sm font-bold" style={{color:c}}>{v}</p>
                   </div>
                 ))}
+                {/* M8 F2 — Churn */}
+                {d.churnTotal > 0 && (
+                  <div className="mt-1 pt-2 border-t border-black/5">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-[#6B6B6B]">Bajas acumuladas</p>
+                      <p className="text-sm font-bold text-[#ef4444]">{d.churnTotal}</p>
+                    </div>
+                    {d.churnEsteMes > 0 && (
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-xs text-[#6B6B6B]">Bajas este mes</p>
+                        <span className="text-xs font-bold bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full">+{d.churnEsteMes}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between mt-1">
+                      <p className="text-xs text-[#6B6B6B]">Tasa churn</p>
+                      <p className={`text-sm font-bold ${d.tasaChurn <= 5 ? 'text-emerald-600' : d.tasaChurn <= 15 ? 'text-amber-600' : 'text-red-500'}`}>{d.tasaChurn}%</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* M8 F2 — Tendencia semanal (8 semanas): sesiones + check-ins */}
+            {d.tendenciaSemanal && d.tendenciaSemanal.length > 0 && (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-bold text-[#0A0A0A]">Tendencia 8 semanas</p>
+                  <div className="flex items-center gap-3 text-[10px] text-[#9B9B9B]">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#6366f1] inline-block" />Sesiones</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-[#10b981] inline-block" />Check-ins</span>
+                  </div>
+                </div>
+                {/* Sparkline SVG */}
+                {(() => {
+                  const datos = d.tendenciaSemanal
+                  const maxS = Math.max(...datos.map(x=>x.sesiones), 1)
+                  const maxC = Math.max(...datos.map(x=>x.checkins), 1)
+                  const maxVal = Math.max(maxS, maxC, 1)
+                  const W = 220, H = 56, pad = 4
+                  const pts = (key) => datos.map((x,i) => {
+                    const xPos = pad + (i / (datos.length-1)) * (W - pad*2)
+                    const yPos = H - pad - (x[key] / maxVal) * (H - pad*2)
+                    return `${xPos},${yPos}`
+                  }).join(' ')
+                  const ptsFill = (key) => {
+                    const inner = pts(key)
+                    const first = inner.split(' ')[0].split(',')
+                    const last = inner.split(' ').slice(-1)[0].split(',')
+                    return `${first[0]},${H} ${inner} ${last[0]},${H}`
+                  }
+                  return (
+                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-14" preserveAspectRatio="none">
+                      {/* Área sesiones */}
+                      <polygon points={ptsFill('sesiones')} fill="#6366f115" />
+                      <polyline points={pts('sesiones')} fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                      {/* Área check-ins */}
+                      <polygon points={ptsFill('checkins')} fill="#10b98115" />
+                      <polyline points={pts('checkins')} fill="none" stroke="#10b981" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+                      {/* Puntos última semana */}
+                      {datos.slice(-1).map((x,_) => {
+                        const xPos = W - pad
+                        const yS = H - pad - (x.sesiones / maxVal) * (H - pad*2)
+                        const yC = H - pad - (x.checkins / maxVal) * (H - pad*2)
+                        return (
+                          <g key="last">
+                            <circle cx={xPos} cy={yS} r="3" fill="#6366f1" />
+                            <circle cx={xPos} cy={yC} r="3" fill="#10b981" />
+                          </g>
+                        )
+                      })}
+                    </svg>
+                  )
+                })()}
+                {/* Semanas etiquetas */}
+                <div className="flex justify-between mt-1">
+                  {d.tendenciaSemanal.map((_, i) => (
+                    <p key={i} className={`text-[9px] ${i===7?'text-[#0A0A0A] font-bold':'text-[#C0C0C0]'}`}>
+                      {i===0?'S-7':i===3?'S-4':i===7?'Esta':'' }
+                    </p>
+                  ))}
+                </div>
+                {/* Totales última semana */}
+                <div className="flex justify-between mt-2 pt-2 border-t border-black/5">
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-[#6366f1]">{d.tendenciaSemanal[7]?.sesiones ?? 0}</p>
+                    <p className="text-[10px] text-[#9B9B9B]">ses. esta sem.</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-[#10b981]">{d.tendenciaSemanal[7]?.checkins ?? 0}</p>
+                    <p className="text-[10px] text-[#9B9B9B]">ci esta sem.</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-[#0A0A0A]">
+                      {d.tendenciaSemanal.reduce((s,x)=>s+x.sesiones,0)}
+                    </p>
+                    <p className="text-[10px] text-[#9B9B9B]">ses. 8 sem.</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
