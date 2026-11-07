@@ -657,8 +657,9 @@ export default function PortalForge() {
             <div><p className="text-xs font-bold text-[#0A0A0A]">{BRAND.nombre}</p><p className="text-[10px] text-[#9B9B9B]">Tu portal</p></div>
           </div>
           <div className="flex items-center gap-3">
-            {config?.foto_url
-              ? <img src={config.foto_url} alt="" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
+            {/* M9 F1 — Logo del centro en sidebar: preferir logo sobre foto */}
+            {(config?.logo_url || config?.foto_url)
+              ? <img src={config.logo_url || config.foto_url} alt="" className={`w-10 h-10 rounded-xl flex-shrink-0 ${config.logo_url ? 'object-contain p-0.5 bg-[#F7F6F3]' : 'object-cover'}`} />
               : <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: `${color}15`, color }}>{(config?.nombre_entrenador || 'E').slice(0,2).toUpperCase()}</div>
             }
             <div className="min-w-0">
@@ -716,8 +717,13 @@ export default function PortalForge() {
               </p>
             ) : null}
           </div>
-          {config?.foto_url && (
-            <img src={config.foto_url} alt="" className="w-7 h-7 rounded-full object-cover flex-shrink-0 opacity-80" />
+          {/* M9 F1 — Logo del centro tiene prioridad sobre foto del entrenador */}
+          {(config?.logo_url || config?.foto_url) && (
+            <img
+              src={config.logo_url || config.foto_url}
+              alt=""
+              className={`flex-shrink-0 opacity-90 object-contain ${config.logo_url ? 'w-8 h-8 rounded-lg' : 'w-7 h-7 rounded-full object-cover'}`}
+            />
           )}
           <button onClick={() => supabase.auth.signOut()}
             className="text-[10px] text-white/30 font-medium ml-1">Salir</button>

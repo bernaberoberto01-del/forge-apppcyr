@@ -95,6 +95,9 @@ export default function Seguimiento({ session }) {
   const [borradorMensajeAnalisis, setBorradorMensajeAnalisis] = useState('')
   const [enviandoAnalisisId, setEnviandoAnalisisId] = useState(null)
   const [generandoAjusteId, setGenerandoAjusteId] = useState(null)
+  // M9 F1 — umbrales configurables por centro
+  const [umbralAlerta, setUmbralAlerta] = useState(7)
+  const [umbralRiesgo, setUmbralRiesgo] = useState(14)
 
   const checkinsFiltrados = useMemo(() => {
     let r = [...checkins]
@@ -115,17 +118,24 @@ export default function Seguimiento({ session }) {
       supabase.from('sesiones').select('*, clientes(nombre,tipo)').in('entrenador_id', equipo).order('fecha', { ascending: false }).limit(300),
       supabase.from('rutinas').select('id,nombre,created_at,notas_entrenador,cliente_id,borrador,contenido,clientes(nombre,objetivo)').in('entrenador_id', equipo).eq('estado', 'por revisar').order('created_at', { ascending: false }),
       supabase.from('analisis_mensual').select('*, clientes(nombre)').in('entrenador_id', equipo).eq('enviado_cliente', false).order('created_at', { ascending: false }).limit(20),
+      // M9 F1 — cargar umbrales de inactividad configurables
+      supabase.from('configuracion').select('inactividad_alerta_dias,inactividad_riesgo_dias').eq('entrenador_id', uid).maybeSingle(),
     ])
-    if (resultados.some(r => r.error)) {
+    if (resultados.slice(0, 5).some(r => r.error)) {
       setToast('Error al cargar datos')
       setTimeout(() => setToast(''), 3000)
     }
-    const [{ data: ci }, { data: cl }, { data: se }, { data: bors }, { data: an }] = resultados
+    const [{ data: ci }, { data: cl }, { data: se }, { data: bors }, { data: an }, { data: cfg }] = resultados
     setCheckins(ci || [])
     setClientes(cl || [])
     setSesiones(se || [])
     setBorradores(bors || [])
     setAnalisisMensual(an || [])
+    // M9 F1 — aplicar umbrales personalizados (fallback a defaults si no hay config)
+    if (cfg) {
+      setUmbralAlerta(cfg.inactividad_alerta_dias || 7)
+      setUmbralRiesgo(cfg.inactividad_riesgo_dias || 14)
+    }
   }
 
   async function cargarHistorialAnalisis() {
@@ -331,8 +341,9 @@ export default function Seguimiento({ session }) {
           const diasSinCI = _fechaCI != null ? Math.max(0, Math.floor((Date.now() - _fechaCI) / 864e5)) : 999
 
           let alerta = 'ok' // ok | warning | critical
-          if (diasSinCI >= 14) alerta = 'critical'
-          else if (diasSinCI >= 7) alerta = 'warning'
+          // M9 F1 — umbrales configurables por centro
+          if (diasSinCI >= umbralRiesgo) alerta = 'critical'
+          else if (diasSinCI >= umbralAlerta) alerta = 'warning'
 
           return { ...c, diasSinCI, alerta, ciUltimo }
         }).sort((a,b) => {
@@ -340,8 +351,8 @@ export default function Seguimiento({ session }) {
           return orden[a.alerta] - orden[b.alerta] || a.diasSinCI - b.diasSinCI
         })
 
-        const sinCI = estadoClientes.filter(c => c.diasSinCI >= 7)
-        const okClientes = estadoClientes.filter(c => c.diasSinCI < 7)
+        const sinCI = estadoClientes.filter(c => c.diasSinCI >= umbralAlerta)
+        const okClientes = estadoClientes.filter(c => c.diasSinCI < umbralAlerta)
 
         // Bloque D — Métricas agregadas del centro
         const ahora = Date.now()
@@ -354,7 +365,8 @@ export default function Seguimiento({ session }) {
         const adherencias = ciEstaSemana.map(ci => ci.adherencia_entreno).filter(v => v != null)
         const adherenciaMedia = adherencias.length > 0 ? (adherencias.reduce((a,v) => a + v, 0) / adherencias.length) : null
 
-        const clientesSinCI14d = estadoClientes.filter(c => c.diasSinCI >= 14)
+        // M9 F1 — usar umbral configurable en lugar del hardcoded 14
+        const clientesSinCI14d = estadoClientes.filter(c => c.diasSinCI >= umbralRiesgo)
 
         return (
           <div className="space-y-4">
@@ -391,7 +403,7 @@ export default function Seguimiento({ session }) {
             {/* Alerta crítica — sin CI >14d */}
             {clientesSinCI14d.length > 0 && (
               <div className="bg-red-50 border border-red-100 rounded-2xl p-3">
-                <p className="text-xs font-bold text-red-700 mb-1">🚨 Sin actividad &gt;14 días ({clientesSinCI14d.length})</p>
+                <p className="text-xs font-bold text-red-700 mb-1">🚨 Sin actividad &gt;{umbralRiesgo} días ({clientesSinCI14d.length})</p>
                 <div className="flex flex-wrap gap-1.5">
                   {clientesSinCI14d.map(c => (
                     <button key={c.id} onClick={() => setQuickView(c.id)}
@@ -407,7 +419,7 @@ export default function Seguimiento({ session }) {
               {estadoClientes.map(c => (
                 <TarjetaClienteSemana key={c.id} c={c}
                   color={c.alerta === 'critical' ? '#ef4444' : c.alerta === 'warning' ? '#f59e0b' : '#10b981'}
-                  navigate={navigate} setQuickView={setQuickView} />
+                  navigate={navigate} setQuickView={setQuickView} umbralAlerta={umbralAlerta} />
               ))}
             </div>
           </div>
@@ -773,7 +785,7 @@ export default function Seguimiento({ session }) {
                       </div>
                     ) : <p className="text-xs text-[#C0C0C0]">Sin check-in</p>}
                   </div>
-                  <p className={`text-xs font-semibold flex-shrink-0 ${diasSinCI === null ? 'text-[#C0C0C0]' : diasSinCI > 7 ? 'text-red-500' : diasSinCI > 4 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                  <p className={`text-xs font-semibold flex-shrink-0 ${diasSinCI === null ? 'text-[#C0C0C0]' : diasSinCI >= umbralRiesgo ? 'text-red-500' : diasSinCI >= umbralAlerta ? 'text-amber-500' : 'text-emerald-600'}`}>
                     {diasSinCI === null ? '—' : diasSinCI === 0 ? 'Hoy' : diasSinCI === 1 ? 'Ayer' : `${diasSinCI}d`}
                   </p>
                 </div>
@@ -1430,9 +1442,9 @@ export default function Seguimiento({ session }) {
 }
 
 // ─── Tarjeta cliente semana ────────────────────────────────────────────────────
-function TarjetaClienteSemana({ c, color, navigate, setQuickView }) {
+function TarjetaClienteSemana({ c, color, navigate, setQuickView, umbralAlerta = 7 }) {
   const ini = n => (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-  const alDia = c.diasSinCI < 7
+  const alDia = c.diasSinCI < umbralAlerta
   const texto = alDia ? '✓ Esta semana' : c.diasSinCI === 999 ? 'Sin check-in nunca' : `${c.diasSinCI}d sin check-in`
 
   // Datos del último CI
