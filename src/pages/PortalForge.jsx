@@ -562,6 +562,7 @@ export default function PortalForge() {
   // violaría las Rules of Hooks (hooks llamados condicionalmente entre renders).
   if (tab === 'entrena' && !verRutina) setTab('hoy')
   if (tab === 'nutricion' && !verNutricion) setTab('hoy')
+  if (tab === 'mensajes' && !VER_MENSAJES) setTab('hoy')
 
   // Pago vencido: plan manual (sin suscripción activa en Stripe) con más de 35 días desde el último pago
   const ultimoPago = pagos?.[0] || null
@@ -688,23 +689,23 @@ export default function PortalForge() {
   const TABS = [
     { id: 'hoy',       label: 'Inicio',    icon: '⊞' },
     { id: 'entrena',   label: nombreTabEntrena, icon: '💪',  oculto: !verRutina },
-    { id: 'nutricion', label: 'Alimentación', icon: '🥗',  oculto: !verNutricion },
     { id: 'progreso',  label: 'Progreso',  icon: '📈' },
-    { id: 'mas',       label: 'Más',       icon: '···', badge: msgNoLeidos },
+    { id: 'mensajes',  label: 'Mensajes',  icon: '✉️', oculto: !VER_MENSAJES, badge: msgNoLeidos },
+    { id: 'mas',       label: 'Más',       icon: '···' },
   ].filter(t => !t.oculto)
 
-  // Bottom bar: siempre los tabs disponibles (máx 4) + Más
+  // Bottom bar: siempre los tabs disponibles (máx 5) + Más
   const BOTTOM_TABS = (() => {
     const sinMas = TABS.filter(t => t.id !== 'mas') // todos menos Más
-    return [...sinMas, { id: 'mas', label: 'Más', icon: '···', badge: msgNoLeidos }]
+    return [...sinMas, { id: 'mas', label: 'Más', icon: '···' }]
   })()
 
-  // Secciones dentro del menú Más
+  // Secciones dentro del menú Más — M11-E: nutrición, pagos, ajustes
   const MAS_ITEMS = [
-    { id: 'mensajes', label: 'Mensajes',  icon: '✉️', badge: msgNoLeidos, desc: msgNoLeidos > 0 ? `${msgNoLeidos} sin leer` : 'Chat con tu entrenador' },
+    ...(verNutricion ? [{ id: 'nutricion', label: 'Alimentación', icon: '🥗', badge: 0, desc: 'Tu plan nutricional' }] : []),
     ...(pagos?.length ? [{ id: 'pagos', label: 'Pagos', icon: '💳', badge: 0, desc: `${pagos.filter(p=>!['cobrado','pagado'].includes(p.estado)).length > 0 ? 'Tienes pagos pendientes' : 'Historial al día'}` }] : []),
     { id: 'ajustes', label: 'Ajustes', icon: '⚙️', badge: 0, desc: 'Objetivo, peso, contraseña' },
-  ].filter(i => VER_MENSAJES || i.id !== 'mensajes')
+  ]
 
   return (
     <>
@@ -739,14 +740,20 @@ export default function PortalForge() {
           </div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-0.5">
-          {TABS.map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${tab === t.id ? 'text-white' : 'text-[#6B6B6B] hover:bg-[#F2F1EE] hover:text-[#0A0A0A]'}`}
-              style={tab === t.id ? { background: color } : {}}>
-              <span>{t.icon}</span><span>{t.label}</span>
-              {t.badge > 0 && <span className="ml-auto w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: tab === t.id ? 'rgba(255,255,255,0.3)' : color, color: 'white' }}>{t.badge}</span>}
-            </button>
-          ))}
+          {TABS.map(t => {
+            // M11-E: Más se activa también cuando el tab actual es nutricion/pagos/ajustes
+            const activoSidebar = t.id === 'mas'
+              ? tab === 'mas' || ['nutricion','pagos','ajustes'].includes(tab)
+              : tab === t.id
+            return (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${activoSidebar ? 'text-white' : 'text-[#6B6B6B] hover:bg-[#F2F1EE] hover:text-[#0A0A0A]'}`}
+                style={activoSidebar ? { background: color } : {}}>
+                <span>{t.icon}</span><span>{t.label}</span>
+                {t.badge > 0 && <span className="ml-auto w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center" style={{ background: activoSidebar ? 'rgba(255,255,255,0.3)' : color, color: 'white' }}>{t.badge}</span>}
+              </button>
+            )
+          })}
         </nav>
         {semanasActivas > 0 && (
           <div className="px-5 py-4 border-t border-black/5 flex items-center gap-3">
@@ -857,7 +864,7 @@ export default function PortalForge() {
           )}
           {tab === 'progreso' && <TabProgreso checkins={checkins} marcas={marcas} medidas={medidas} fotos={fotos} ejerciciosHist={ejerciciosHist} color={color} subTab={subTab} setSubTab={setSubTab} cliente={cliente} cargarTodo={cargarTodo} modoPreview={modoPreview} />}
           {tab === 'mensajes' && VER_MENSAJES && <TabMensajes mensajes={mensajes} textoMsg={textoMsg} setTextoMsg={setTextoMsg} enviandoMsg={enviandoMsg} enviarMensaje={enviarMensaje} color={color} endRef={mensajesEndRef} modoPreview={modoPreview} config={config} />}
-          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} pushSuscrito={pushSuscrito} setPushSuscrito={setPushSuscrito} />}
+          {tab === 'mas' && <TabMas pagos={pagos} planCobro={planCobro} plan={plan} cliente={cliente} setCliente={setCliente} color={color} tabsExtra={[]} setTab={setTab} msgNoLeidos={msgNoLeidos} seccionInicial={seccionMasInicial} onConsumirSeccionInicial={() => setSeccionMasInicial(null)} solicitarCambioPlan={solicitarCambioPlan} lesiones={lesiones} cargarTodo={cargarTodo} modoPreview={modoPreview} pushSuscrito={pushSuscrito} setPushSuscrito={setPushSuscrito} verNutricion={verNutricion} />}
         </div>
 
         {/* FAB — botón flotante entreno, visible desde hoy/nutricion/progreso */}
@@ -896,15 +903,15 @@ export default function PortalForge() {
           <div className="flex">
             {BOTTOM_TABS.map(t => {
               const activo = t.id === 'mas'
-                ? tab === 'mas' || ['mensajes','pagos','ajustes'].includes(tab)
+                ? tab === 'mas' || ['nutricion','pagos','ajustes'].includes(tab)
                 : tab === t.id
               const badge = t.badge || 0
               // Iconos SVG por tab
               const ICONS = {
                 hoy: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,
                 entrena: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4v16M18 4v16M2 9h4M18 9h4M2 15h4M18 15h4M6 9h12M6 15h12"/></svg>,
-                nutricion: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>,
                 progreso: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+                mensajes: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
                 mas: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>,
               }
               return (
@@ -2871,7 +2878,7 @@ function TabPagos({ pagos, color }) {
 }
 
 // ─── Tab Más ──────────────────────────────────────────────────────────────────
-function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0, seccionInicial, onConsumirSeccionInicial, solicitarCambioPlan, lesiones, cargarTodo, modoPreview, pushSuscrito, setPushSuscrito }) {
+function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra = [], setTab, msgNoLeidos = 0, seccionInicial, onConsumirSeccionInicial, solicitarCambioPlan, lesiones, cargarTodo, modoPreview, pushSuscrito, setPushSuscrito, verNutricion = false }) {
   const [seccion, setSeccion] = useState(seccionInicial || 'menu')
   const [form, setForm] = useState({ peso_actual: cliente?.peso_actual || '', peso_objetivo: cliente?.peso_objetivo || '', objetivo: cliente?.objetivo || '' })
   const [guardando, setGuardando] = useState(false)
@@ -2904,14 +2911,15 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
   }
 
   const ITEMS = [
-    {
-      id: 'mensajes',
-      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
-      label: 'Mensajes',
-      desc: msgNoLeidos > 0 ? `${msgNoLeidos} mensaje${msgNoLeidos > 1 ? 's' : ''} sin leer` : 'Chat con tu entrenador',
-      badge: msgNoLeidos,
-      urgente: msgNoLeidos > 0,
-    },
+    // M11-E: nutrición pasa a Más (antes estaba en el bottom bar)
+    ...(verNutricion ? [{
+      id: 'nutricion',
+      icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12c0-2.76 1.12-5.26 2.93-7.07"/><path d="M12 6v6l4 2"/></svg>,
+      label: 'Alimentación',
+      desc: 'Tu plan nutricional',
+      badge: 0,
+      urgente: false,
+    }] : []),
     ...(pagos?.length || planCobro ? [{
       id: 'pagos',
       icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
@@ -2936,7 +2944,7 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
       badge: 0,
       urgente: false,
     },
-  ].filter(i => VER_MENSAJES || i.id !== 'mensajes')
+  ]
 
   async function guardar(e) {
     e.preventDefault()
@@ -3200,18 +3208,6 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
     )
   }
 
-  if (seccion === 'mensajes') {
-    return (
-      <div>
-        <button onClick={() => setSeccion('menu')} className="text-xs font-bold mb-4 flex items-center gap-1.5" style={{ color }}>← Volver</button>
-        <p className="text-xl font-black text-[#0A0A0A] tracking-tight mb-4">Mensajes</p>
-        <button onClick={() => { setSeccion('menu'); setTab('mensajes') }}
-          className="w-full py-4 rounded-2xl text-white font-black text-sm active:scale-95 transition-all"
-          style={{ background: color }}>Ir a Mensajes →</button>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-3">
       <p className="text-2xl font-black text-[#0A0A0A] tracking-tight pt-1">Más</p>
@@ -3220,7 +3216,8 @@ function TabMas({ pagos, planCobro, plan, cliente, setCliente, color, tabsExtra 
       {ITEMS.map(item => (
         <button key={item.id}
           onClick={() => {
-            if (item.id === 'mensajes') setTab('mensajes')
+            // M11-E: nutrición es un tab principal — navegar directamente
+            if (item.id === 'nutricion') setTab('nutricion')
             else setSeccion(item.id)
           }}
           className="w-full rounded-2xl p-5 flex items-center gap-4 text-left active:scale-[0.98] transition-all"
