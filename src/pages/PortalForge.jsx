@@ -257,7 +257,7 @@ export default function PortalForge() {
     const cid = cl.id, eid = cl.entrenador_id, hoy = hoyStr()
 
     const [cfg, rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes,
-      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, bibRaw] = await Promise.all([
+      mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, bibRaw, informeMensual] = await Promise.all([
       q1(supabase.from('configuracion').select('*').eq('entrenador_id', eid)),
       q1(supabase.from('rutinas').select('id,nombre,semanas,fecha_inicio,contenido,borrador').eq('cliente_id', cid).eq('estado', 'publicada').order('created_at', { ascending: false })),
       q1(supabase.from('planes_nutricion').select('*').eq('cliente_id', cid).in('estado', ['publicado', 'publicada']).order('created_at', { ascending: false })),
@@ -279,6 +279,7 @@ export default function PortalForge() {
       qa(supabase.from('sesiones').select('*').eq('cliente_id', cid).eq('valoracion_pendiente', true).is('rpe', null).gte('fecha', hace(30)).order('fecha', { ascending: false })),
       qa(supabase.from('lesiones_cliente').select('*').eq('cliente_id', cid).order('created_at', { ascending: false })),
       qa(supabase.from('ejercicios_biblioteca').select('nombre,youtube_url,consejos_tecnica').eq('entrenador_id', eid)),
+      q1(supabase.from('analisis_mensual').select('id,mensaje_cliente,resumen,energia_media,fatiga_media,adherencia_pct,created_at').eq('cliente_id', cid).eq('enviado_cliente', true).order('created_at', { ascending: false }).limit(1)),
     ])
 
     // Índice nombre→datos para lookup O(1) en TabEntrena y ModalRegistroSesion
@@ -286,7 +287,7 @@ export default function PortalForge() {
     for (const e of bibRaw) if (e.nombre) biblioteca[e.nombre.toLowerCase()] = e
 
     setConfig(cfg)
-    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, biblioteca })
+    setDatos({ rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, biblioteca, informeMensual })
     if (!previewId) {
       supabase.from('mensajes_cliente').update({ leido: true }).eq('cliente_id', cid).eq('leido', false).then(() => {}).catch(() => {})
       setTimeout(() => supabase.from('actividad_cliente').insert({ cliente_id: cid, entrenador_id: eid, tipo: 'portal_acceso', descripcion: 'Entró al portal' }).then(() => {}).catch(() => {}), 2000)
@@ -527,7 +528,7 @@ export default function PortalForge() {
     </div>
   )
 
-  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, biblioteca = {} } = datos
+  const { rutina, nutricion, checkins, sesiones, sesionesHoy, pendientes, mensajes, pagos, marcas, medidas, fotos, cuest, ejerciciosHist, sesionesEstaSemana, nutricionRegistros, suplementacion, planCobro, sesionesPendientesValorar, lesiones, biblioteca = {}, informeMensual } = datos
   const esOnline = cliente.tipo === 'online'
 
   // Onboarding guiado — pasos 1 y 2 en vivo (badges), paso 3 informativo.
@@ -828,7 +829,7 @@ export default function PortalForge() {
               ? <OnboardingNuevoCliente cliente={cliente} color={color} config={config}
                   pasoCuestionarioDone={pasoCuestionarioDone} pasoCheckinDone={pasoCheckinDone} pasoRutinaDone={pasoRutinaDone}
                   setModalCI={modoPreview ? bloqueadoPreview : setModalCI} setTab={setTab} />
-              : <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={modoPreview ? bloqueadoPreview : setModalCI} setValorando={modoPreview ? bloqueadoPreview : setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={modoPreview ? bloqueadoPreview : setModalActividad} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} ejerciciosHist={ejerciciosHist} editarCheckin={modoPreview ? bloqueadoPreview : editarCheckin} />
+              : <TabHoy cliente={cliente} color={color} config={config} checkins={checkins} rutina={rutina} nutricion={nutricion} sesiones={sesiones} sesionesHoy={sesionesHoy} pendientes={pendientes} sesionesPendientesValorar={sesionesPendientesValorar} cuest={cuest} verRutina={verRutina} verNutricion={verNutricion} setTab={setTab} setModalCI={modoPreview ? bloqueadoPreview : setModalCI} setValorando={modoPreview ? bloqueadoPreview : setValorando} sesionesEstaSemana={sesionesEstaSemana} semanasActivas={semanasActivas} setModalActividad={modoPreview ? bloqueadoPreview : setModalActividad} setModalRegistro={modoPreview ? bloqueadoPreview : setModalRegistro} ejerciciosHist={ejerciciosHist} editarCheckin={modoPreview ? bloqueadoPreview : editarCheckin} informeMensual={informeMensual} />
           )}
           {tab === 'entrena' && (
             <div className="relative">
@@ -1411,7 +1412,7 @@ function OnboardingNuevoCliente({ cliente, color, config, pasoCuestionarioDone, 
 }
 
 // ─── TAB HOY ──────────────────────────────────────────────────────────────────
-function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones, sesionesHoy, pendientes, sesionesPendientesValorar, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando, sesionesEstaSemana, semanasActivas, setModalActividad, setModalRegistro, ejerciciosHist, editarCheckin }) {
+function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones, sesionesHoy, pendientes, sesionesPendientesValorar, cuest, verRutina, verNutricion, setTab, setModalCI, setValorando, sesionesEstaSemana, semanasActivas, setModalActividad, setModalRegistro, ejerciciosHist, editarCheckin, informeMensual }) {
   const hoy = hoyStr()
   const ahora = new Date()
   const hora = ahora.getHours()
@@ -1964,11 +1965,88 @@ function TabHoy({ cliente, color, config, checkins, rutina, nutricion, sesiones,
           <p className="text-[10px] font-bold mt-2" style={{ color }}>Footing, padel… →</p>
         </button>
       </div>
+
+      {/* Informe mensual del entrenador — M11 F3 */}
+      {informeMensual && <InformeMensual informe={informeMensual} color={color} config={config} />}
     </div>
   )
 }
 
 
+
+
+// ─── Informe mensual (análisis IA del entrenador, visible al cliente) ─────────
+function InformeMensual({ informe, color, config }) {
+  const [expandido, setExpandido] = useState(false)
+  const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
+  const fecha = informe.created_at ? new Date(informe.created_at) : null
+  const fechaLabel = fecha ? `${fecha.getDate()} ${MESES[fecha.getMonth()]} ${fecha.getFullYear()}` : ''
+  const nombreEntrenador = config?.nombre_entrenador || 'Tu entrenador'
+
+  // Chips de stats — solo los que tienen valor
+  const stats = [
+    informe.adherencia_pct != null && { label: 'Adherencia', valor: `${Math.round(informe.adherencia_pct)}%`, bueno: informe.adherencia_pct >= 70 },
+    informe.energia_media != null && { label: 'Energía', valor: `${informe.energia_media.toFixed(1)}/5`, bueno: informe.energia_media >= 3 },
+    informe.fatiga_media != null && { label: 'Fatiga', valor: `${informe.fatiga_media.toFixed(1)}/10`, bueno: informe.fatiga_media <= 6 },
+  ].filter(Boolean)
+
+  const texto = informe.mensaje_cliente || informe.resumen || ''
+  const textoCorto = texto.length > 180 ? texto.slice(0, 180).trimEnd() + '…' : texto
+
+  return (
+    <div className="rounded-3xl overflow-hidden" style={{ background: '#0A0A0A' }}>
+      {/* Header */}
+      <div className="px-5 pt-5 pb-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <p className="text-[9px] font-black tracking-[0.15em] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+              Informe mensual
+            </p>
+            <p className="text-base font-black text-white leading-tight">
+              Análisis de {fechaLabel}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>
+              De {nombreEntrenador}
+            </p>
+          </div>
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: `${color}25` }}>
+            <span className="text-lg">📋</span>
+          </div>
+        </div>
+
+        {/* Stats chips */}
+        {stats.length > 0 && (
+          <div className="flex gap-2 flex-wrap mb-4">
+            {stats.map((s, i) => (
+              <div key={i} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.bueno ? '#10b981' : '#f59e0b' }} />
+                <p className="text-[10px] font-bold text-white/60">{s.label}</p>
+                <p className="text-[11px] font-black text-white">{s.valor}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Texto del informe */}
+        {texto ? (
+          <div>
+            <p className="text-sm leading-relaxed" style={{ color: 'rgba(255,255,255,0.75)' }}>
+              {expandido ? texto : textoCorto}
+            </p>
+            {texto.length > 180 && (
+              <button
+                onClick={() => setExpandido(e => !e)}
+                className="mt-2 text-[11px] font-bold active:scale-95 transition-all"
+                style={{ color }}>
+                {expandido ? 'Leer menos ↑' : 'Leer más →'}
+              </button>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
 
 
 // ─── Botón temporizador de descanso ───────────────────────────────────────────
