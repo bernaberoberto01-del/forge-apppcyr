@@ -117,6 +117,72 @@ export default function PortalForge() {
     try { return !!localStorage.getItem('portal_onboarding_v1') } catch { return false }
   })
 
+  // M2 F1 — Modal RGPD + PAR-Q (aparece si el cliente no ha dado consentimiento)
+  const PARQ_PREGUNTAS = [
+    '¿Algún médico te ha dicho que tienes una enfermedad cardíaca y que solo debes realizar actividad física recomendada por un médico?',
+    '¿Sientes dolor en el pecho cuando realizas actividad física?',
+    '¿En el último mes, has sentido dolor en el pecho cuando no estabas realizando actividad física?',
+    '¿Pierdes el equilibrio a causa de mareos o alguna vez has perdido el conocimiento?',
+    '¿Tienes algún problema óseo o articular que podría empeorar con un cambio en tu actividad física?',
+    '¿Actualmente un médico te está recetando medicamentos para la tensión arterial o para el corazón?',
+    '¿Conoces alguna otra razón por la que no deberías realizar actividad física?',
+  ]
+  const [consentimientoStep, setConsentimientoStep] = useState(0) // 0=RGPD, 1=PARQ
+  const [rgpdAceptado, setRgpdAceptado] = useState(false)
+  const [parqRespuestas, setParqRespuestas] = useState({})
+  const [guardandoConsentimiento, setGuardandoConsentimiento] = useState(false)
+  const [consentimientoCerrado, setConsentimientoCerrado] = useState(false)
+  // Se muestra si el cliente está cargado y no ha dado consentimiento RGPD
+  const mostrarModalConsentimiento = !modoPreview && !consentimientoCerrado && cliente && !cliente.rgpd_consentimiento_fecha
+
+  async function guardarConsentimiento() {
+    if (!cliente) return
+    setGuardandoConsentimiento(true)
+    try {
+      const ahora = new Date().toISOString()
+      const parqAlerta = Object.values(parqRespuestas).some(v => v === true)
+      const rgpdTexto = `Consentimiento RGPD v1.0 — Tratamiento de datos personales con fines de asesoramiento deportivo (Art. 6.1.a y Art. 9.2.a RGPD)`
+
+      // Actualizar clientes con PAR-Q y RGPD
+      await supabase.from('clientes').update({
+        parq_fecha: ahora,
+        parq_respuestas: parqRespuestas,
+        parq_alerta: parqAlerta,
+        rgpd_consentimiento_fecha: ahora,
+        rgpd_texto_version: '1.0',
+      }).eq('id', cliente.id).then(() => {}).catch(() => {})
+
+      // Registrar en tabla consentimientos_cliente
+      const registros = [
+        {
+          cliente_id: cliente.id,
+          entrenador_id: cliente.entrenador_id,
+          tipo: 'rgpd',
+          version: '1.0',
+          aceptado: true,
+          fecha_aceptacion: ahora,
+          datos_adicionales: { texto_version: rgpdTexto },
+        },
+        {
+          cliente_id: cliente.id,
+          entrenador_id: cliente.entrenador_id,
+          tipo: 'parq',
+          version: '1.0',
+          aceptado: true,
+          fecha_aceptacion: ahora,
+          datos_adicionales: { respuestas: parqRespuestas, alerta: parqAlerta },
+        },
+      ]
+      await supabase.from('consentimientos_cliente').insert(registros).then(() => {}).catch(() => {})
+
+      // Actualizar estado local del cliente
+      setCliente(prev => prev ? { ...prev, parq_fecha: ahora, rgpd_consentimiento_fecha: ahora, parq_alerta: parqAlerta } : prev)
+      setConsentimientoCerrado(true)
+      showToast('✓ Documentación completada')
+    } catch {}
+    setGuardandoConsentimiento(false)
+  }
+
   function bloqueadoPreview() {
     showToast('👁 Modo vista previa — solo lectura')
   }
@@ -864,6 +930,161 @@ export default function PortalForge() {
             })}
           </div>
         </nav>
+
+        {/* M2 F1 — Modal RGPD + PAR-Q — aparece si el cliente no ha dado consentimiento */}
+        {mostrarModalConsentimiento && (() => {
+          const totalParq = PARQ_PREGUNTAS.length
+          const parqCompleto = Object.keys(parqRespuestas).length === totalParq
+          const parqAlerta = Object.values(parqRespuestas).some(v => v === true)
+          return (
+            <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center"
+              style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+              <div className="w-full max-w-md mx-0 md:mx-4 md:mb-0"
+                style={{ borderRadius: '28px 28px 0 0', background: '#FAFAFA', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+                onClick={e => e.stopPropagation()}>
+
+                {/* Header */}
+                <div className="flex-shrink-0 px-6 pt-6 pb-4" style={{ borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+                  <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+                      style={{ background: consentimientoStep === 0 ? `${color}18` : '#10b98118' }}>
+                      {consentimientoStep === 0 ? '📋' : '🏃'}
+                    </div>
+                    <div>
+                      <p className="font-black text-[#0A0A0A] text-base leading-tight">
+                        {consentimientoStep === 0 ? 'Consentimiento de datos' : 'Cuestionario de salud PAR-Q'}
+                      </p>
+                      <p className="text-xs text-[#9B9B9B]">
+                        Paso {consentimientoStep + 1} de 2 — Obligatorio para empezar
+                      </p>
+                    </div>
+                  </div>
+                  {/* Barra de progreso */}
+                  <div className="flex gap-1.5 mt-3">
+                    {[0, 1].map(i => (
+                      <div key={i} className="h-1 rounded-full flex-1 transition-all duration-500"
+                        style={{ background: i <= consentimientoStep ? color : 'rgba(0,0,0,0.1)' }} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Contenido scrollable */}
+                <div className="flex-1 overflow-y-auto px-6 py-5">
+
+                  {consentimientoStep === 0 && (
+                    <div>
+                      <div className="bg-[#F7F6F3] rounded-2xl p-4 mb-5 border border-black/5">
+                        <p className="font-bold text-sm text-[#0A0A0A] mb-2">¿Para qué usamos tus datos?</p>
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed mb-3">
+                          Tu entrenador trata tus datos personales (nombre, email, datos físicos y de salud) para prestarte el servicio de entrenamiento personalizado. Los datos son confidenciales y nunca se ceden a terceros sin tu consentimiento explícito.
+                        </p>
+                        <div className="flex flex-col gap-2">
+                          {[
+                            { emoji: '🔒', texto: 'Acceso solo a tu entrenador' },
+                            { emoji: '🗑️', texto: 'Puedes solicitar la eliminación de tus datos en cualquier momento' },
+                            { emoji: '📧', texto: 'Sin comunicaciones comerciales sin permiso' },
+                          ].map(({ emoji, texto }) => (
+                            <div key={texto} className="flex items-center gap-2">
+                              <span className="text-sm">{emoji}</span>
+                              <p className="text-xs text-[#4B4B4B]">{texto}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="text-xs text-[#9B9B9B] leading-relaxed mb-5">
+                        <strong>Base legal:</strong> Art. 6.1.a y Art. 9.2.a del Reglamento General de Protección de Datos (RGPD). Responsable del tratamiento: tu entrenador personal. Puedes ejercer tus derechos (acceso, rectificación, supresión, portabilidad) contactando directamente con él.
+                      </div>
+                      <button
+                        onClick={() => setRgpdAceptado(v => !v)}
+                        className="w-full flex items-start gap-3 p-4 rounded-2xl border-2 transition-all active:scale-95"
+                        style={{ borderColor: rgpdAceptado ? color : 'rgba(0,0,0,0.1)', background: rgpdAceptado ? `${color}08` : 'white' }}>
+                        <div className="w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center transition-all mt-0.5"
+                          style={{ background: rgpdAceptado ? color : 'rgba(0,0,0,0.08)' }}>
+                          {rgpdAceptado && <span className="text-white text-xs font-black">✓</span>}
+                        </div>
+                        <p className="text-sm text-[#0A0A0A] text-left leading-relaxed">
+                          He leído y acepto el tratamiento de mis datos personales para la prestación del servicio de entrenamiento personal.
+                        </p>
+                      </button>
+                    </div>
+                  )}
+
+                  {consentimientoStep === 1 && (
+                    <div>
+                      <div className="bg-[#FFF8F5] rounded-2xl p-4 mb-5 border border-orange-100">
+                        <p className="text-xs text-[#6B6B6B] leading-relaxed">
+                          Este cuestionario evalúa tu aptitud para el ejercicio físico. Responde <strong>Sí</strong> o <strong>No</strong> a cada pregunta con sinceridad. Es confidencial y solo lo ve tu entrenador.
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-3">
+                        {PARQ_PREGUNTAS.map((pregunta, i) => {
+                          const resp = parqRespuestas[`q${i + 1}`]
+                          return (
+                            <div key={i} className="rounded-2xl border p-4 transition-all"
+                              style={{ borderColor: resp === true ? '#ef4444' : resp === false ? '#10b981' : 'rgba(0,0,0,0.08)', background: resp === true ? '#fef2f2' : resp === false ? '#f0fdf4' : 'white' }}>
+                              <p className="text-xs text-[#4B4B4B] leading-relaxed mb-3 font-medium">
+                                {i + 1}. {pregunta}
+                              </p>
+                              <div className="flex gap-2">
+                                {[{ label: 'Sí', val: true }, { label: 'No', val: false }].map(({ label, val }) => (
+                                  <button key={label}
+                                    onClick={() => setParqRespuestas(prev => ({ ...prev, [`q${i + 1}`]: val }))}
+                                    className="flex-1 py-2 rounded-xl text-sm font-bold transition-all active:scale-95"
+                                    style={{
+                                      background: resp === val ? (val ? '#ef4444' : '#10b981') : 'rgba(0,0,0,0.05)',
+                                      color: resp === val ? 'white' : '#6B6B6B',
+                                    }}>
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {parqAlerta && parqCompleto && (
+                        <div className="mt-4 bg-red-50 border border-red-200 rounded-2xl p-4">
+                          <p className="text-xs text-red-700 leading-relaxed font-medium">
+                            ⚠️ Has respondido Sí a alguna pregunta. Tu entrenador lo tendrá en cuenta para adaptar tu programa. Te recomendamos consultar con tu médico antes de comenzar.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer con botón de acción */}
+                <div className="flex-shrink-0 px-6 pb-[calc(1.5rem+max(env(safe-area-inset-bottom,0px),0px))] pt-4"
+                  style={{ borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                  {consentimientoStep === 0 ? (
+                    <button
+                      onClick={() => setConsentimientoStep(1)}
+                      disabled={!rgpdAceptado}
+                      className="w-full py-4 rounded-2xl font-black text-sm transition-all active:scale-95 disabled:opacity-30"
+                      style={{ background: rgpdAceptado ? color : '#E5E5E5', color: rgpdAceptado ? 'white' : '#9B9B9B' }}>
+                      Continuar al cuestionario de salud →
+                    </button>
+                  ) : (
+                    <div className="flex gap-3">
+                      <button onClick={() => setConsentimientoStep(0)}
+                        className="px-5 py-4 rounded-2xl font-bold text-sm active:scale-95 transition-all"
+                        style={{ background: 'rgba(0,0,0,0.06)', color: '#6B6B6B' }}>
+                        ← Volver
+                      </button>
+                      <button
+                        onClick={guardarConsentimiento}
+                        disabled={!parqCompleto || guardandoConsentimiento}
+                        className="flex-1 py-4 rounded-2xl font-black text-sm transition-all active:scale-95 disabled:opacity-30"
+                        style={{ background: parqCompleto ? color : '#E5E5E5', color: parqCompleto ? 'white' : '#9B9B9B' }}>
+                        {guardandoConsentimiento ? 'Guardando…' : parqCompleto ? '✓ Completar y empezar' : `Faltan ${totalParq - Object.keys(parqRespuestas).length} respuestas`}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Onboarding overlay — 3 pasos, solo clientes online nuevos, descartable */}
         {mostrarOnboarding && !onbCerrado && (() => {
