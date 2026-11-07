@@ -230,7 +230,7 @@ export default function Dashboard({ session }) {
       supabase.from('clientes').select('id,nombre,objetivo,tipo,nivel,estado,precio_mensual,fecha_inicio,stripe_subscription_id,acceso_libre,is_demo').in('entrenador_id', equipo),
       supabase.from('pagos').select('importe,fecha_pago,cliente_id,valido_hasta').in('entrenador_id', equipo).gte('fecha_pago', hace6m),
       supabase.from('planes_cobro').select('cliente_id,importe,concepto,proximo_cobro').in('entrenador_id', equipo).eq('activo', true),
-      supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos').in('entrenador_id', equipo).gte('fecha', inicioSemana),
+      supabase.from('sesiones').select('id,fecha,completada,cliente_id,duracion_minutos,rpe,fatiga_post').in('entrenador_id', equipo).gte('fecha', inicioSemana),
       supabase.from('checkins').select('cliente_id,fecha,adherencia_entreno,energia,fatiga').in('entrenador_id', equipo).gte('fecha', hace6m).order('fecha', {ascending:false}),
       supabase.from('alertas').select('*').in('entrenador_id', equipo).eq('leida', false).order('created_at',{ascending:false}).limit(20),
       supabase.from('mensajes_cliente').select('id,cliente_id,contenido,created_at,clientes(nombre)').in('entrenador_id', equipo).eq('leido_entrenador', false).eq('tipo','cliente').order('created_at',{ascending:false}).limit(10),
@@ -345,6 +345,45 @@ export default function Dashboard({ session }) {
     const sugerenciaPorCliente = {}
     ;(cuestConLead||[]).forEach(c => { if (!sugerenciaPorCliente[c.cliente_id]) sugerenciaPorCliente[c.cliente_id] = c })
     const PLAN_LABEL = { nutricion: 'Hábitos & Alimentación', entrenamiento: 'Entrenamiento', completo: 'Plan Completo' }
+    // M7 F2 — KPIs agregados del centro: tabla de salud semanal
+    const sesionesEstaSemana = sesiones || []
+    const checkinsSemana = (checkins||[]).filter(c => c.fecha >= inicioSemana)
+    const pctCheckinsSemana = activos.length > 0
+      ? Math.round((new Set(checkinsSemana.map(c=>c.cliente_id)).size / activos.length) * 100)
+      : null
+    const clientesRiesgo = activos.filter(c => {
+      const ultimoCI = (checkins||[]).filter(ci => ci.cliente_id === c.id).sort((a,b) => b.fecha?.localeCompare(a.fecha))[0]
+      return !ultimoCI || ultimoCI.fecha < hace14d
+    })
+    const progresionPesoMedia = (() => {
+      const clientesConPeso = activos.filter(c => {
+        const cis = (checkins||[]).filter(ci => ci.cliente_id === c.id && ci.fecha >= hace4s).sort((a,b) => b.fecha?.localeCompare(a.fecha))
+        return cis.length >= 2 && cis[0]?.peso && cis[cis.length-1]?.peso
+      })
+      if (!clientesConPeso.length) return null
+      const deltas = clientesConPeso.map(c => {
+        const cis = (checkins||[]).filter(ci => ci.cliente_id === c.id && ci.fecha >= hace4s).sort((a,b) => b.fecha?.localeCompare(a.fecha))
+        return cis[0].peso - cis[cis.length-1].peso
+      })
+      return (deltas.reduce((s,d)=>s+d,0)/deltas.length).toFixed(1)
+    })()
+    const rpeMediaSemana = (() => {
+      const vals = sesionesEstaSemana.filter(s=>s.rpe&&s.completada).map(s=>s.rpe)
+      return vals.length ? (vals.reduce((s,v)=>s+v,0)/vals.length).toFixed(1) : null
+    })()
+    const sesionesCompletadasSemana = sesionesEstaSemana.filter(s=>s.completada).length
+    const sesionesProgSemana = sesionesEstaSemana.filter(s=>!s.cancelada).length
+    const adherenciaSesiones = sesionesProgSemana > 0
+      ? Math.round((sesionesCompletadasSemana / sesionesProgSemana) * 100)
+      : null
+    const saludCentro = {
+      pctCheckins: pctCheckinsSemana,
+      clientesRiesgo: clientesRiesgo.length,
+      progresionPeso: progresionPesoMedia,
+      rpeMedia: rpeMediaSemana,
+      adherenciaSesiones,
+    }
+
     const OBJETIVO_LABEL = {
       perdida_grasa: 'Pérdida de grasa', ganancia_muscular: 'Ganancia muscular',
       rendimiento: 'Rendimiento deportivo', salud_general: 'Salud general',
@@ -394,6 +433,7 @@ export default function Dashboard({ session }) {
       clientesOnlineSinSuscripcion,
       solicitudesCambioPlan: (solicitudesCambioPlan || []).filter(s => !estaDescartada(s.cliente_id, 'cambio_plan')),
       deltaIngresos, deltaClientesNuevos, clientesNuevosEsteMes,
+      saludCentro,
     })
     setLoading(false)
     } catch (e) {
@@ -1145,6 +1185,50 @@ export default function Dashboard({ session }) {
                 </button>
               </div>
             </div>
+
+            {/* M7 F2 — Salud del Centro */}
+            {d.saludCentro && (
+              <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">
+                <p className="text-xs font-bold text-[#9B9B9B] uppercase tracking-wide mb-3">Salud del centro · esta semana</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Check-ins */}
+                  <div className={`rounded-xl p-3 ${d.saludCentro.pctCheckins === null ? 'bg-[#F7F6F3]' : d.saludCentro.pctCheckins >= 70 ? 'bg-emerald-50' : d.saludCentro.pctCheckins >= 40 ? 'bg-amber-50' : 'bg-red-50'}`}>
+                    <p className={`text-lg font-bold ${d.saludCentro.pctCheckins === null ? 'text-[#C0C0C0]' : d.saludCentro.pctCheckins >= 70 ? 'text-emerald-600' : d.saludCentro.pctCheckins >= 40 ? 'text-amber-600' : 'text-red-500'}`}>
+                      {d.saludCentro.pctCheckins !== null ? `${d.saludCentro.pctCheckins}%` : '—'}
+                    </p>
+                    <p className="text-[11px] text-[#6B6B6B] mt-0.5">Check-ins semana</p>
+                  </div>
+                  {/* Clientes en riesgo */}
+                  <button onClick={() => navigate('/seguimiento')}
+                    className={`rounded-xl p-3 text-left transition-all active:scale-95 ${d.saludCentro.clientesRiesgo === 0 ? 'bg-emerald-50' : d.saludCentro.clientesRiesgo <= 2 ? 'bg-amber-50' : 'bg-red-50 animate-pulse'}`}>
+                    <p className={`text-lg font-bold ${d.saludCentro.clientesRiesgo === 0 ? 'text-emerald-600' : d.saludCentro.clientesRiesgo <= 2 ? 'text-amber-600' : 'text-red-500'}`}>
+                      {d.saludCentro.clientesRiesgo}
+                    </p>
+                    <p className="text-[11px] text-[#6B6B6B] mt-0.5">En riesgo {'>'}14d</p>
+                  </button>
+                  {/* RPE medio */}
+                  <div className={`rounded-xl p-3 ${d.saludCentro.rpeMedia === null ? 'bg-[#F7F6F3]' : parseFloat(d.saludCentro.rpeMedia) <= 7 ? 'bg-emerald-50' : parseFloat(d.saludCentro.rpeMedia) <= 8.5 ? 'bg-amber-50' : 'bg-red-50'}`}>
+                    <p className={`text-lg font-bold ${d.saludCentro.rpeMedia === null ? 'text-[#C0C0C0]' : parseFloat(d.saludCentro.rpeMedia) <= 7 ? 'text-emerald-600' : parseFloat(d.saludCentro.rpeMedia) <= 8.5 ? 'text-amber-600' : 'text-red-500'}`}>
+                      {d.saludCentro.rpeMedia !== null ? d.saludCentro.rpeMedia : '—'}
+                    </p>
+                    <p className="text-[11px] text-[#6B6B6B] mt-0.5">RPE medio</p>
+                  </div>
+                  {/* Adherencia sesiones */}
+                  <div className={`rounded-xl p-3 ${d.saludCentro.adherenciaSesiones === null ? 'bg-[#F7F6F3]' : d.saludCentro.adherenciaSesiones >= 80 ? 'bg-emerald-50' : d.saludCentro.adherenciaSesiones >= 60 ? 'bg-amber-50' : 'bg-red-50'}`}>
+                    <p className={`text-lg font-bold ${d.saludCentro.adherenciaSesiones === null ? 'text-[#C0C0C0]' : d.saludCentro.adherenciaSesiones >= 80 ? 'text-emerald-600' : d.saludCentro.adherenciaSesiones >= 60 ? 'text-amber-600' : 'text-red-500'}`}>
+                      {d.saludCentro.adherenciaSesiones !== null ? `${d.saludCentro.adherenciaSesiones}%` : '—'}
+                    </p>
+                    <p className="text-[11px] text-[#6B6B6B] mt-0.5">Adherencia sesiones</p>
+                  </div>
+                </div>
+                {d.saludCentro.clientesRiesgo > 0 && (
+                  <button onClick={() => navigate('/seguimiento')}
+                    className="mt-3 w-full text-center text-xs text-[#9B9B9B] hover:text-acento transition-colors">
+                    Ver clientes sin actividad →
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Ingresos 6 meses */}
             <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-4">

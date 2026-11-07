@@ -1715,6 +1715,48 @@ export default function Clientes({ session }) {
                 // Tendencia de peso (últimos 4 checkins con peso)
                 const pesosRecientes = dData.checkins?.filter(c=>c.peso).slice(0,4).map(c=>c.peso)||[]
                 const tendenciaPeso = pesosRecientes.length >= 2 ? (pesosRecientes[0] - pesosRecientes[pesosRecientes.length-1]) : null
+
+                // M7 F2 — Velocidad de progresión de peso
+                const checkinsCronologico = [...(dData.checkins||[])].reverse()
+                const checkinsConPeso = checkinsCronologico.filter(c=>c.peso&&c.fecha)
+                const velocidadPeso = (() => {
+                  if (checkinsConPeso.length < 2) return null
+                  const primero = checkinsConPeso[0]
+                  const ultimo = checkinsConPeso[checkinsConPeso.length-1]
+                  const semanas = (new Date(ultimo.fecha)-new Date(primero.fecha))/(7*864e5)
+                  if (semanas < 0.5) return null
+                  return ((ultimo.peso - primero.peso) / semanas).toFixed(2)
+                })()
+                const proyeccionSemanas = (() => {
+                  if (!velocidadPeso || !detalle.peso_objetivo || !pesoActual) return null
+                  const diff = detalle.peso_objetivo - pesoActual
+                  if (Math.abs(parseFloat(velocidadPeso)) < 0.05) return null
+                  const sems = Math.round(diff / parseFloat(velocidadPeso))
+                  return sems > 0 ? sems : null
+                })()
+
+                // M7 F2 — Alerta sobreentrenamiento (RPE ≥8 en ≥3 últimas sesiones + fatiga alta)
+                const sesCompletadas = (dData.sesiones||[]).filter(s=>s.completada&&s.rpe).slice(0,5)
+                const rpeAlto = sesCompletadas.filter(s=>s.rpe>=8)
+                const fatigaAlta = sesCompletadas.filter(s=>s.fatiga_post>=4)
+                const alertaSobreentreno = rpeAlto.length >= 3 && fatigaAlta.length >= 2
+
+                // M7 F2 — Comparativa 4 semanas vs 4 anteriores
+                const hoy = new Date()
+                const hace4s = new Date(hoy-28*864e5).toISOString().slice(0,10)
+                const hace8s = new Date(hoy-56*864e5).toISOString().slice(0,10)
+                const ci4s = (dData.checkins||[]).filter(c=>c.fecha>=hace4s)
+                const ci4ant = (dData.checkins||[]).filter(c=>c.fecha>=hace8s&&c.fecha<hace4s)
+                const mediaPeso4s = ci4s.length ? (ci4s.reduce((s,c)=>s+(c.peso||0),0)/ci4s.filter(c=>c.peso).length||null) : null
+                const mediaPeso4ant = ci4ant.length ? (ci4ant.reduce((s,c)=>s+(c.peso||0),0)/ci4ant.filter(c=>c.peso).length||null) : null
+                const mediaEnergia4s = ci4s.length ? (ci4s.reduce((s,c)=>s+(c.energia||0),0)/ci4s.length).toFixed(1) : null
+                const mediaEnergia4ant = ci4ant.length ? (ci4ant.reduce((s,c)=>s+(c.energia||0),0)/ci4ant.length).toFixed(1) : null
+                const ses4s = (dData.sesiones||[]).filter(s=>s.completada&&s.fecha>=hace4s).length
+                const ses4ant = (dData.sesiones||[]).filter(s=>s.completada&&s.fecha>=hace8s&&s.fecha<hace4s).length
+                const rpe4s = (() => { const v=(dData.sesiones||[]).filter(s=>s.rpe&&s.completada&&s.fecha>=hace4s).map(s=>s.rpe); return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null })()
+                const rpe4ant = (() => { const v=(dData.sesiones||[]).filter(s=>s.rpe&&s.completada&&s.fecha>=hace8s&&s.fecha<hace4s).map(s=>s.rpe); return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null })()
+                const hayComparativa = ci4s.length > 0 || ses4s > 0
+
                 return (
                 <div className="space-y-3">
                   {/* Vista de progreso unificada — M7F1 */}
@@ -1774,6 +1816,100 @@ export default function Clientes({ session }) {
                       </div>
                     </div>
                   </div>
+
+                  {/* M7 F2 — Alerta sobreentrenamiento */}
+                  {alertaSobreentreno && (
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-3">
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">⚠️</span>
+                        <div>
+                          <p className="text-sm font-bold text-red-700">Posible sobreentrenamiento</p>
+                          <p className="text-xs text-red-600 mt-0.5">RPE ≥8 en las últimas {rpeAlto.length} sesiones y fatiga post alta. Puede ser sobreentrenamiento o puede haber otro motivo — revisa con el cliente.</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* M7 F2 — Velocidad de progresión */}
+                  {(velocidadPeso !== null || proyeccionSemanas !== null) && (
+                    <div className="bg-white border border-black/5 rounded-2xl p-3">
+                      <p className="text-xs font-bold text-[#0A0A0A] mb-2.5">Velocidad de progresión</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className={`rounded-xl p-2.5 ${velocidadPeso === null ? 'bg-[#F7F6F3]' : parseFloat(velocidadPeso) < 0 ? 'bg-emerald-50' : parseFloat(velocidadPeso) > 0 ? 'bg-red-50' : 'bg-[#F7F6F3]'}`}>
+                          <p className="text-[10px] text-[#9B9B9B] mb-0.5">kg/semana</p>
+                          <p className={`text-base font-bold ${velocidadPeso === null ? 'text-[#C0C0C0]' : parseFloat(velocidadPeso) < 0 ? 'text-emerald-600' : parseFloat(velocidadPeso) > 0 ? 'text-red-500' : 'text-[#9B9B9B]'}`}>
+                            {velocidadPeso !== null ? (parseFloat(velocidadPeso) > 0 ? `+${velocidadPeso}` : velocidadPeso) : '—'}
+                          </p>
+                          <p className="text-[9px] text-[#9B9B9B] mt-0.5">tendencia</p>
+                        </div>
+                        <div className={`rounded-xl p-2.5 ${proyeccionSemanas !== null ? 'bg-blue-50' : 'bg-[#F7F6F3]'}`}>
+                          <p className="text-[10px] text-[#9B9B9B] mb-0.5">Proyección</p>
+                          <p className={`text-base font-bold ${proyeccionSemanas !== null ? 'text-blue-600' : 'text-[#C0C0C0]'}`}>
+                            {proyeccionSemanas !== null ? `${proyeccionSemanas}sem` : '—'}
+                          </p>
+                          <p className="text-[9px] text-[#9B9B9B] mt-0.5">hasta objetivo</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* M7 F2 — Comparativa 4 semanas vs 4 anteriores */}
+                  {hayComparativa && (
+                    <div className="bg-white border border-black/5 rounded-2xl p-3">
+                      <p className="text-xs font-bold text-[#0A0A0A] mb-2.5">Últimas 4 sem. vs 4 anteriores</p>
+                      <div className="space-y-2">
+                        {[
+                          {
+                            label: 'Peso medio',
+                            actual: mediaPeso4s ? `${mediaPeso4s?.toFixed?.(1) ?? '—'}kg` : null,
+                            anterior: mediaPeso4ant ? `${mediaPeso4ant?.toFixed?.(1) ?? '—'}kg` : null,
+                            delta: mediaPeso4s && mediaPeso4ant ? (mediaPeso4s - mediaPeso4ant).toFixed(1) : null,
+                            positiveIsGood: false,
+                          },
+                          {
+                            label: 'Energía',
+                            actual: mediaEnergia4s ? `${mediaEnergia4s}/5` : null,
+                            anterior: mediaEnergia4ant ? `${mediaEnergia4ant}/5` : null,
+                            delta: mediaEnergia4s && mediaEnergia4ant ? (parseFloat(mediaEnergia4s)-parseFloat(mediaEnergia4ant)).toFixed(1) : null,
+                            positiveIsGood: true,
+                          },
+                          {
+                            label: 'Sesiones',
+                            actual: `${ses4s}`,
+                            anterior: `${ses4ant}`,
+                            delta: ses4s - ses4ant,
+                            positiveIsGood: true,
+                          },
+                          {
+                            label: 'RPE medio',
+                            actual: rpe4s,
+                            anterior: rpe4ant,
+                            delta: rpe4s && rpe4ant ? (parseFloat(rpe4s)-parseFloat(rpe4ant)).toFixed(1) : null,
+                            positiveIsGood: false,
+                          },
+                        ].filter(r => r.actual !== null && r.actual !== '0' && r.actual !== undefined).map(row => {
+                          const d = parseFloat(row.delta)
+                          const isGood = row.positiveIsGood ? d > 0 : d < 0
+                          const isNeutral = !row.delta || d === 0 || isNaN(d)
+                          return (
+                            <div key={row.label} className="flex items-center justify-between gap-2">
+                              <p className="text-xs text-[#6B6B6B] w-20 flex-shrink-0">{row.label}</p>
+                              <div className="flex items-center gap-2 flex-1 justify-end">
+                                <p className="text-[10px] text-[#C0C0C0]">{row.anterior ?? '—'}</p>
+                                <span className="text-[#C0C0C0]">→</span>
+                                <p className="text-xs font-bold text-[#0A0A0A]">{row.actual}</p>
+                                {!isNeutral && (
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isGood ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                                    {d > 0 ? `▲${Math.abs(d)}` : `▼${Math.abs(d)}`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Métricas clave */}
                   <div className="grid grid-cols-2 gap-2">
