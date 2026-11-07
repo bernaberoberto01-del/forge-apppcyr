@@ -586,7 +586,7 @@ export default function Clientes({ session }) {
         supabase.from('mensajes_cliente').insert({
           entrenador_id: uid,
           cliente_id: cliente.id,
-          contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu ${cliente.plan_online === 'nutricion' ? 'plan nutricional' : cliente.plan_online === 'entrenamiento' ? 'rutina' : 'rutina y plan nutricional'}. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
+          contenido: `¡Hola ${c.nombre.split(' ')[0]}! 👋 Bienvenido/a. Ya tengo tus datos y estoy preparando tu plan personalizado. En breve recibirás tu ${cliente.plan_online === 'nutricion' ? 'plan de alimentación' : cliente.plan_online === 'entrenamiento' ? 'rutina' : 'rutina y plan de alimentación'}. Cualquier duda, escríbeme por aquí. ¡Vamos a por ello! 💪`
         })
       ])
       // Si es cliente online con plan asignado, lanzar IA automáticamente

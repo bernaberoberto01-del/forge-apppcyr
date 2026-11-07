@@ -621,7 +621,7 @@ export default function PortalForge() {
   const TABS = [
     { id: 'hoy',       label: 'Inicio',    icon: '⊞' },
     { id: 'entrena',   label: nombreTabEntrena, icon: '💪',  oculto: !verRutina },
-    { id: 'nutricion', label: 'Nutrición', icon: '🥗',  oculto: !verNutricion },
+    { id: 'nutricion', label: 'Alimentación', icon: '🥗',  oculto: !verNutricion },
     { id: 'progreso',  label: 'Progreso',  icon: '📈' },
     { id: 'mas',       label: 'Más',       icon: '···', badge: msgNoLeidos },
   ].filter(t => !t.oculto)
@@ -3017,8 +3017,8 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
             <div className="rounded-2xl p-4 mb-5" style={{ background: 'rgba(255,255,255,0.05)', borderLeft: `3px solid ${color}` }}>
               <p className="text-sm leading-relaxed text-white font-medium">
                 {!cuest
-                  ? `Hola, estoy trabajando en tu plan de nutrición personalizado. Para diseñarlo necesito que rellenes un breve cuestionario.`
-                  : `He recibido tu cuestionario. Estoy diseñando tu plan de nutrición personalizado. Te aviso en cuanto esté listo.`
+                  ? `Hola, estoy trabajando en tu plan de alimentación personalizado. Para diseñarlo necesito que rellenes un breve cuestionario.`
+                  : `He recibido tu cuestionario. Estoy diseñando tu plan de alimentación personalizado. Te aviso en cuanto esté listo.`
                 }
               </p>
             </div>
@@ -3055,6 +3055,12 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
           </div>
         </div>
         {cuest && <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />}
+        {/* M6 F1 — Disclaimer legal (estado sin plan) */}
+        <div className="bg-[#F7F6F3] rounded-xl px-4 py-3 border border-black/5">
+          <p className="text-[10px] text-[#9B9B9B] leading-relaxed">
+            <span className="font-bold">ⓘ Aviso:</span> Las orientaciones nutricionales no sustituyen la consulta con un dietista-nutricionista colegiado. Ante cualquier condición de salud, consulta con un profesional sanitario.
+          </p>
+        </div>
       </div>
     )
   }
@@ -3479,6 +3485,13 @@ function TabNutricion({ nutricion, cuest, cliente, color, nutricionRegistros = [
       </div>
 
       <SuplementacionSection cuest={cuest} suplementacion={suplementacion} color={color} cliente={cliente} cargarTodo={cargarTodo} acceso={acceso} irAPagos={irAPagos} modoPreview={modoPreview} />
+
+      {/* M6 F1 — Disclaimer legal nutrición */}
+      <div className="bg-[#F7F6F3] rounded-xl px-4 py-3 border border-black/5">
+        <p className="text-[10px] text-[#9B9B9B] leading-relaxed">
+          <span className="font-bold">ⓘ Aviso importante:</span> Este plan de alimentación es una orientación nutricional elaborada por tu entrenador y no constituye asesoramiento médico o dietético-nutricional con fines clínicos. No sustituye la consulta con un dietista-nutricionista colegiado. Si tienes alguna condición de salud, alergia o intolerancia, consulta con un profesional sanitario antes de seguir estas recomendaciones.
+        </p>
+      </div>
     </div>
   )
 }

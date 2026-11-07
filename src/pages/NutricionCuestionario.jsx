@@ -92,7 +92,7 @@ export default function NutricionCuestionario() {
       <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-sm border border-black/5">
         <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🥗</div>
         <h2 className="text-xl font-bold text-[#0A0A0A] mb-2">¡Listo!</h2>
-        <p className="text-sm text-[#6B6B6B]">Tu entrenador recibirá tus datos y preparará tu plan nutricional personalizado. Lo verás en tu portal en breve.</p>
+        <p className="text-sm text-[#6B6B6B]">Tu entrenador recibirá tus datos y preparará tu plan de alimentación personalizado. Lo verás en tu portal en breve.</p>
       </div>
     </div>
   )

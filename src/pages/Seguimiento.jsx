@@ -625,7 +625,7 @@ export default function Seguimiento({ session }) {
                   { campo:'calidad_entreno', label:'Calidad entreno', icon:'🏋️', max:7, desc:'Calidad percibida de los entrenamientos' },
                   { campo:'sesiones_semana', label:'Sesiones realizadas', icon:'📅', max:7, desc:'Número de sesiones completadas esta semana', noBar:true },
                   { campo:'adherencia_entreno', label:'Adherencia entreno', icon:'💪', max:10, desc:'Cumplimiento del plan de entrenamiento' },
-                  { campo:'adherencia_nutricion', label:'Adherencia nutrición', icon:'🥗', max:10, desc:'Cumplimiento del plan nutricional' },
+                  { campo:'adherencia_nutricion', label:'Adherencia nutrición', icon:'🥗', max:10, desc:'Cumplimiento del plan de alimentación' },
                 ].map(({ campo, label, icon, max, desc, invertido, noBar }) => {
                   const val = detalleCI[campo]
                   if (!val && val !== 0) return null
