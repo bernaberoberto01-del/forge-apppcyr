@@ -54,11 +54,18 @@ Deno.serve(async (req) => {
       const eEntrenador = escapeHtml(nombreEntrenador)
       const eNegocio = escapeHtml(nombreNegocio)
 
-      const { data: clientes } = await sb.from('clientes').select('id, nombre, email, entrenador_id, auth_user_id').eq('estado', 'activo').eq('entrenador_id', eid).not('email', 'is', null).not('auth_user_id', 'is', null)
+      const { data: clientes } = await sb.from('clientes').select('id, nombre, email, entrenador_id, auth_user_id, frecuencia_checkin').eq('estado', 'activo').eq('entrenador_id', eid).not('email', 'is', null).not('auth_user_id', 'is', null)
       if (!clientes?.length) continue
 
+      // Días umbral por frecuencia de check-in configurada en el cliente
+      const diasPorFrecuencia: Record<string, number> = {
+        diario: 1,
+        semanal: 7,
+        quincenal: 15,
+        mensual: 30,
+      }
+
       const hoy = new Date()
-      const fechaCorte = new Date(hoy.getTime() - diasUmbral * 864e5).toISOString().split('T')[0]
       const clienteIds = clientes.map((c: any) => c.id)
       const { data: ultimosCIs } = await sb.from('checkins').select('cliente_id, fecha').in('cliente_id', clienteIds).gte('fecha', new Date(hoy.getTime() - 60 * 864e5).toISOString().split('T')[0]).order('fecha', { ascending: false })
 
@@ -68,6 +75,8 @@ Deno.serve(async (req) => {
       }
 
       const clientesConNecesidad = forzar ? clientes : clientes.filter((c: any) => {
+        const umbral = diasPorFrecuencia[c.frecuencia_checkin as string] ?? diasUmbral
+        const fechaCorte = new Date(hoy.getTime() - umbral * 864e5).toISOString().split('T')[0]
         const ultimo = ultimoPorCliente[c.id]
         return !ultimo || ultimo < fechaCorte
       })

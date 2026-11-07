@@ -2300,8 +2300,30 @@ export default function Clientes({ session }) {
                   </div>
                 )
               })()}
-              {dTab==='seguimientos' && (
-                <div className="space-y-2">
+              {dTab==='seguimientos' && (() => {
+                // Estado del check-in según frecuencia configurada
+                const diasPorFrecuencia = { diario: 1, semanal: 7, quincenal: 15, mensual: 30 }
+                const umbralDias = diasPorFrecuencia[detalle.frecuencia_checkin] ?? 7
+                const ultimoCI = dData.checkins?.[0]
+                const diasSinCI = ultimoCI ? Math.floor((Date.now() - new Date(ultimoCI.fecha).getTime()) / 864e5) : null
+                const alDia = diasSinCI !== null && diasSinCI <= umbralDias
+                const frecLabel = { diario: 'Diario', semanal: 'Semanal', quincenal: 'Quincenal', mensual: 'Mensual' }[detalle.frecuencia_checkin] || 'Semanal'
+                return (
+                <div className="space-y-3">
+                  {/* Banner estado check-in */}
+                  <div className={`flex items-center justify-between p-3 rounded-xl ${alDia ? 'bg-emerald-50 border border-emerald-200' : diasSinCI === null ? 'bg-[#F7F6F3] border border-black/5' : 'bg-red-50 border border-red-200'}`}>
+                    <div>
+                      <p className={`text-xs font-bold ${alDia ? 'text-emerald-700' : diasSinCI === null ? 'text-[#6B6B6B]' : 'text-red-700'}`}>
+                        {diasSinCI === null ? '📋 Sin check-ins todavía' : alDia ? `✓ Al día — hace ${diasSinCI} día${diasSinCI !== 1 ? 's' : ''}` : `⚠️ Retrasado ${diasSinCI - umbralDias} día${diasSinCI - umbralDias !== 1 ? 's' : ''}`}
+                      </p>
+                      <p className="text-[10px] text-[#9B9B9B] mt-0.5">Frecuencia configurada: {frecLabel} (cada {umbralDias}d)</p>
+                    </div>
+                    {diasSinCI !== null && (
+                      <div className={`text-xs font-black px-2.5 py-1 rounded-full ${alDia ? 'bg-emerald-600 text-white' : 'bg-red-500 text-white'}`}>
+                        {diasSinCI}d
+                      </div>
+                    )}
+                  </div>
                   {!dData.checkins?.length ? (
                     <div className="text-center py-8">
                       <p className="text-3xl mb-2">📋</p>
@@ -2328,7 +2350,8 @@ export default function Clientes({ session }) {
                     </div>
                   ))}
                 </div>
-              )}
+                )
+              })()}
               {dTab==='cuestionario' && (() => {
                 const cr = dData.cuestRegistro
                 const cn = dData.cuestNutricion
