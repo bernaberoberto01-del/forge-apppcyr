@@ -261,7 +261,7 @@ export default function Nutricion({ session }) {
         {planFiltrado.length === 0 && planesActivos.length === 0 ? (
           <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-10 text-center">
             <p className="text-4xl mb-3">🥗</p>
-            <p className="font-semibold text-[#0A0A0A]">Sin planes nutricionales</p>
+            <p className="font-semibold text-[#0A0A0A]">Sin planes de alimentación</p>
             <p className="text-sm text-[#6B6B6B] mt-1">Activa el módulo de alimentación para un cliente y genera su plan con IA</p>
           </div>
         ) : planFiltrado.map(p => {
@@ -749,7 +749,7 @@ export default function Nutricion({ session }) {
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="p-4 border-b border-black/5 sticky top-0 bg-white z-10 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-[#0A0A0A]">Cuestionario nutricional</h2>
+                <h2 className="font-bold text-[#0A0A0A]">Cuestionario de alimentación</h2>
                 <p className="text-xs text-[#6B6B6B]">{modalCuest.nombre}</p>
               </div>
               <button onClick={() => setModalCuest(null)} className="text-[#6B6B6B] text-xl">×</button>
@@ -795,7 +795,7 @@ export default function Nutricion({ session }) {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Objetivo nutricional</label>
+                    <label className="text-xs font-semibold text-[#6B6B6B] mb-1 block">Objetivo de alimentación</label>
                     <select value={cuest.objetivo||''} onChange={e=>setCuest(c=>({...c,objetivo:e.target.value}))}
                       className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
                       <option value="">Selecciona</option>

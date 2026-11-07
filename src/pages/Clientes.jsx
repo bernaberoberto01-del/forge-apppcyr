@@ -1914,6 +1914,43 @@ export default function Clientes({ session }) {
                     </button>
                   )}
 
+                  {/* Intolerancias y preferencias alimentarias — bloque rápido para generación IA */}
+                  {dData.cuestNutricion && (dData.cuestNutricion.alergias || dData.cuestNutricion.intolerancias || dData.cuestNutricion.alimentos_no_gustan || dData.cuestNutricion.alimentos_favoritos) && (
+                    <button onClick={() => setDTab('cuestionario')}
+                      className="w-full text-left bg-white border border-black/5 rounded-2xl overflow-hidden hover:border-black/10 transition-all active:scale-[0.99]">
+                      <div className="flex items-center justify-between px-3.5 pt-3 pb-2 border-b border-black/4">
+                        <p className="text-xs font-bold text-[#0A0A0A]">🥗 Preferencias alimentarias</p>
+                        <span className="text-[#C0C0C0] text-xs">ver todo ›</span>
+                      </div>
+                      <div className="px-3.5 py-2.5 space-y-1.5">
+                        {dData.cuestNutricion.alergias && (
+                          <div className="flex gap-2">
+                            <span className="text-xs text-[#9B9B9B] flex-shrink-0 w-24">Alergias</span>
+                            <span className="text-xs font-semibold text-red-600 leading-relaxed">{dData.cuestNutricion.alergias}</span>
+                          </div>
+                        )}
+                        {dData.cuestNutricion.intolerancias && (
+                          <div className="flex gap-2">
+                            <span className="text-xs text-[#9B9B9B] flex-shrink-0 w-24">Intolerancias</span>
+                            <span className="text-xs font-semibold text-orange-600 leading-relaxed">{dData.cuestNutricion.intolerancias}</span>
+                          </div>
+                        )}
+                        {dData.cuestNutricion.alimentos_no_gustan && (
+                          <div className="flex gap-2">
+                            <span className="text-xs text-[#9B9B9B] flex-shrink-0 w-24">No le gusta</span>
+                            <span className="text-xs font-semibold text-[#0A0A0A] leading-relaxed">{dData.cuestNutricion.alimentos_no_gustan}</span>
+                          </div>
+                        )}
+                        {dData.cuestNutricion.alimentos_favoritos && (
+                          <div className="flex gap-2">
+                            <span className="text-xs text-[#9B9B9B] flex-shrink-0 w-24">Favoritos</span>
+                            <span className="text-xs font-semibold text-emerald-700 leading-relaxed">{dData.cuestNutricion.alimentos_favoritos}</span>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  )}
+
                   {/* Solicitud pendiente de cambio de plan */}
                   {dData.solicitudCambioPlan && (
                     <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 space-y-2">
@@ -2428,7 +2465,7 @@ export default function Clientes({ session }) {
                     {cn && (
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold text-[#0A0A0A]">🥗 Cuestionario de nutrición</p>
+                          <p className="text-xs font-bold text-[#0A0A0A]">🥗 Cuestionario de alimentación</p>
                           <div className="flex items-center gap-2">
                             <p className="text-xs text-[#9B9B9B]">
                               {new Date(cn.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
