@@ -6,15 +6,37 @@ import { BRAND } from '../lib/brand'
 import { colorMarca } from '../lib/brand'
 
 // ── M10 F1: Tab de Integraciones ──────────────────────────────────────────
-function IntegracionesTab({ uid, config }) {
+function IntegracionesTab({ uid, config, onUpdateConfig }) {
   const [estado, setEstado] = useState({ loading: true, stripe: null, smtp: null, ia: null, push: null, n8n: null })
-  const [crons] = useState([
-    { id: 'checkin-semanal', label: 'Recordatorio check-in', desc: 'Envía un recordatorio a clientes sin check-in reciente', cadencia: 'Domingos 9:00h', icon: '📋', activo: true },
+  const [savingCadencia, setSavingCadencia] = useState(false)
+  const [toastCadencia, setToastCadencia] = useState(null)
+
+  const DIAS_SEMANA = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado']
+
+  const crons = [
+    { id: 'checkin-semanal', label: 'Recordatorio check-in', desc: 'Envía un recordatorio a clientes sin check-in reciente', cadencia: `${DIAS_SEMANA[config?.checkin_dia_semana ?? 0]}s ${config?.checkin_hora ?? '09:00'}h`, icon: '📋', activo: true },
     { id: 'detectar-alertas', label: 'Detección de alertas', desc: 'Detecta clientes inactivos y pagos vencidos', cadencia: 'Diario 8:00h', icon: '🔔', activo: true },
     { id: 'completar-sesiones', label: 'Auto-completar sesiones', desc: 'Marca como completadas las sesiones pasadas', cadencia: 'Cada hora', icon: '✅', activo: true },
-    { id: 'analisis-mensual', label: 'Análisis mensual IA', desc: 'Genera el informe mensual de cada cliente con IA', cadencia: 'Domingos 20:00h', icon: '🤖', activo: true },
+    { id: 'analisis-mensual', label: 'Análisis mensual IA', desc: 'Genera el informe mensual de cada cliente con IA', cadencia: 'Domingos 20:00h', icon: '🤖', activo: config?.analisis_mensual_activo ?? true },
     { id: 'resumen-mensual', label: 'Resumen mensual', desc: 'Envía el resumen del mes a cada entrenador', cadencia: 'Día 1 del mes 8:00h', icon: '📊', activo: true },
-  ])
+  ]
+
+  async function guardarCadencia() {
+    setSavingCadencia(true)
+    try {
+      await supabase.from('configuracion').update({
+        checkin_dia_semana: config.checkin_dia_semana,
+        checkin_hora: config.checkin_hora,
+        analisis_mensual_activo: config.analisis_mensual_activo,
+        recordatorio_sesion_activo: config.recordatorio_sesion_activo,
+        recordatorio_sesion_horas: config.recordatorio_sesion_horas,
+        alerta_pago_dias: config.alerta_pago_dias,
+      }).eq('entrenador_id', uid)
+      setToastCadencia('✓ Guardado')
+      setTimeout(() => setToastCadencia(null), 2000)
+    } catch { setToastCadencia('Error') }
+    setSavingCadencia(false)
+  }
 
   useEffect(() => {
     verificarIntegraciones()
@@ -152,6 +174,116 @@ function IntegracionesTab({ uid, config }) {
         </div>
       </div>
 
+      {/* ── M9-E: Configuración de cadencia ───────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-sm font-bold text-[#0A0A0A]">🕐 Cadencia de notificaciones</h2>
+            <p className="text-xs text-[#9B9B9B] mt-0.5">Configura cuándo y cómo se ejecutan las automatizaciones</p>
+          </div>
+          <button
+            onClick={guardarCadencia}
+            disabled={savingCadencia}
+            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white transition-all active:scale-95 disabled:opacity-50"
+            style={{ background: config?.color_acento || '#FF5C00' }}>
+            {savingCadencia ? 'Guardando…' : toastCadencia || 'Guardar'}
+          </button>
+        </div>
+
+        <div className="space-y-5">
+          {/* Check-in semanal */}
+          <div>
+            <p className="text-xs font-semibold text-[#0A0A0A] mb-2">📋 Recordatorio check-in semanal</p>
+            <div className="flex gap-2 flex-wrap">
+              <div className="flex-1 min-w-[140px]">
+                <label className="text-[11px] text-[#9B9B9B] mb-1 block">Día</label>
+                <select
+                  value={config?.checkin_dia_semana ?? 0}
+                  onChange={e => onUpdateConfig(c => ({ ...c, checkin_dia_semana: parseInt(e.target.value) }))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-black/30">
+                  {DIAS_SEMANA.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                </select>
+              </div>
+              <div className="flex-1 min-w-[120px]">
+                <label className="text-[11px] text-[#9B9B9B] mb-1 block">Hora</label>
+                <input
+                  type="time"
+                  value={config?.checkin_hora ?? '09:00'}
+                  onChange={e => onUpdateConfig(c => ({ ...c, checkin_hora: e.target.value }))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-black/30" />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-black/5" />
+
+          {/* Análisis mensual IA */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold text-[#0A0A0A]">🤖 Análisis mensual IA</p>
+              <p className="text-[11px] text-[#9B9B9B] mt-0.5">Informe mensual automático por cliente (domingos 20h)</p>
+            </div>
+            <button
+              onClick={() => onUpdateConfig(c => ({ ...c, analisis_mensual_activo: !c.analisis_mensual_activo }))}
+              className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${config?.analisis_mensual_activo ? 'bg-emerald-500' : 'bg-black/15'}`}>
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${config?.analisis_mensual_activo ? 'left-5' : 'left-0.5'}`} />
+            </button>
+          </div>
+
+          <div className="border-t border-black/5" />
+
+          {/* Recordatorio sesión */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-xs font-semibold text-[#0A0A0A]">📅 Recordatorio de sesión</p>
+                <p className="text-[11px] text-[#9B9B9B] mt-0.5">Aviso antes de cada sesión programada</p>
+              </div>
+              <button
+                onClick={() => onUpdateConfig(c => ({ ...c, recordatorio_sesion_activo: !c.recordatorio_sesion_activo }))}
+                className={`w-11 h-6 rounded-full transition-all flex-shrink-0 relative ${config?.recordatorio_sesion_activo ? 'bg-emerald-500' : 'bg-black/15'}`}>
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${config?.recordatorio_sesion_activo ? 'left-5' : 'left-0.5'}`} />
+              </button>
+            </div>
+            {config?.recordatorio_sesion_activo && (
+              <div className="flex items-center gap-2 mt-2">
+                <label className="text-[11px] text-[#9B9B9B] flex-shrink-0">Enviar</label>
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 6, 12, 24].map(h => (
+                    <button key={h}
+                      onClick={() => onUpdateConfig(c => ({ ...c, recordatorio_sesion_horas: h }))}
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${config?.recordatorio_sesion_horas === h ? 'border-black/30 bg-black text-white' : 'border-black/10 text-[#6B6B6B] hover:border-black/20'}`}>
+                      {h}h
+                    </button>
+                  ))}
+                </div>
+                <label className="text-[11px] text-[#9B9B9B] flex-shrink-0">antes</label>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-black/5" />
+
+          {/* Alerta pago vencido */}
+          <div>
+            <p className="text-xs font-semibold text-[#0A0A0A] mb-2">💳 Alerta de pago vencido</p>
+            <p className="text-[11px] text-[#9B9B9B] mb-2">Alertar al entrenador cuando un pago lleva X días sin recibirse</p>
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1.5">
+                {[1, 3, 5, 7, 14].map(d => (
+                  <button key={d}
+                    onClick={() => onUpdateConfig(c => ({ ...c, alerta_pago_dias: d }))}
+                    className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${config?.alerta_pago_dias === d ? 'border-red-400 bg-red-50 text-red-700' : 'border-black/10 text-[#6B6B6B] hover:border-black/20'}`}>
+                    {d}d
+                  </button>
+                ))}
+              </div>
+              <span className="text-[11px] text-[#9B9B9B]">de retraso</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Inventario de automatizaciones */}
       <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
         <div className="mb-4">
@@ -168,8 +300,8 @@ function IntegracionesTab({ uid, config }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-semibold text-[#0A0A0A]">{cron.label}</p>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide bg-emerald-100 text-emerald-700">
-                    Activo
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ${cron.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-black/5 text-[#9B9B9B]'}`}>
+                    {cron.activo ? 'Activo' : 'Paused'}
                   </span>
                 </div>
                 <p className="text-xs text-[#9B9B9B] mt-0.5">{cron.desc}</p>
@@ -270,7 +402,12 @@ const defaultConfig = {
   // M9 F3 — Branding avanzado y textos del portal
   color_fondo: '#F7F6F3', color_texto: '#0A0A0A',
   portal_bienvenida: '', portal_pie: '',
-  portal_nombre_rutinas: '', portal_nombre_seguimiento: ''
+  portal_nombre_rutinas: '', portal_nombre_seguimiento: '',
+  // M9-E — Cadencia de notificaciones y automatizaciones
+  checkin_dia_semana: 0, checkin_hora: '09:00',
+  analisis_mensual_activo: true,
+  recordatorio_sesion_activo: true, recordatorio_sesion_horas: 2,
+  alerta_pago_dias: 3
 }
 
 export default function Configuracion({ session, onConfigChange }) {
@@ -892,7 +1029,7 @@ export default function Configuracion({ session, onConfigChange }) {
 
       {/* ── INTEGRACIONES ─────────────────────────────────────────────────── */}
       {tab === 'integraciones' && (
-        <IntegracionesTab uid={uid} config={config} />
+        <IntegracionesTab uid={uid} config={config} onUpdateConfig={setConfig} />
       )}
 
       {tab === 'equipo' && (
