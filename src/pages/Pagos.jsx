@@ -67,6 +67,7 @@ export default function Pagos({ session }) {
   const [loading, setLoading] = useState(false)
   const [generandoStripe, setGenerandoStripe] = useState(null)
   const [facturas, setFacturas] = useState([])
+  const [filtroPeriodo, setFiltroPeriodo] = useState('todo') // 'todo' | '2024-T1' | '2024' etc.
   const uid = session.user.id
   const equipo = useEquipo(uid)
   const { completar, completado } = useOnboarding(uid)
@@ -143,17 +144,32 @@ export default function Pagos({ session }) {
     const regimen = cfg.regimen_iva || 'exento'
     const año = new Date().getFullYear()
 
-    // Número correlativo: MAX(numero) de este año
+    // Número correlativo: MAX(numero_int) de este año — fallback a contar filas si numero_int es null
     const { data: maxRow } = await supabase
       .from('facturas')
-      .select('numero')
+      .select('numero_int, numero')
       .eq('entrenador_id', uid)
       .gte('fecha', `${año}-01-01`)
       .lte('fecha', `${año}-12-31`)
-      .order('numero', { ascending: false })
+      .order('numero_int', { ascending: false })
       .limit(1)
       .maybeSingle()
-    const siguiente = (maxRow?.numero || 0) + 1
+    // Si hay filas con numero_int, usar MAX+1; si hay filas sin numero_int (legado), contar
+    let siguiente
+    if (maxRow?.numero_int != null) {
+      siguiente = maxRow.numero_int + 1
+    } else if (maxRow) {
+      // fila legado sin numero_int: contar filas de este año
+      const { count } = await supabase
+        .from('facturas')
+        .select('*', { count: 'exact', head: true })
+        .eq('entrenador_id', uid)
+        .gte('fecha', `${año}-01-01`)
+        .lte('fecha', `${año}-12-31`)
+      siguiente = (count || 0) + 1
+    } else {
+      siguiente = 1
+    }
     const numStr = `${serie}${año}-${String(siguiente).padStart(3,'0')}`
 
     const importe = Number(pago.importe)
@@ -163,12 +179,14 @@ export default function Pagos({ session }) {
     const cuotaIva = esExento ? 0 : parseFloat((importe - base).toFixed(2))
     const hoy = diaLocal(new Date())
 
-    // Guardar en tabla facturas
+    // Guardar en tabla facturas (numero_int = contador, numero_display = string formateado)
     await supabase.from('facturas').insert({
       entrenador_id: uid,
       cliente_id: pago.cliente_id,
       pago_id: pago.id,
-      numero: siguiente,
+      numero: String(siguiente), // legado text
+      numero_int: siguiente,
+      numero_display: numStr,
       fecha: hoy,
       concepto: pago.concepto || 'Entrenamiento personal',
       base_imponible: base,
@@ -278,22 +296,33 @@ export default function Pagos({ session }) {
   }
 
   function exportarCSV() {
-    const filas = [['Fecha', 'Cliente', 'Concepto', 'Importe (€)']]
+    const filas = [['Fecha', 'Cliente', 'Concepto', 'Canal', 'Importe (€)', 'Base imponible (€)', 'IVA (€)']]
     pagosFiltrados.forEach(p => {
+      // Buscar factura asociada para datos de IVA
+      const fact = facturas.find(f => f.pago_id === p.id)
       filas.push([
         p.fecha_pago || '',
         p.clientes?.nombre || '',
         p.concepto || '',
+        p.canal_cobro || '',
         Number(p.importe || 0).toFixed(2),
+        fact ? Number(fact.base_imponible||0).toFixed(2) : '',
+        fact ? Number(fact.cuota_iva||0).toFixed(2) : '',
       ])
     })
+    const totalImporte = pagosFiltrados.reduce((s,p)=>s+Number(p.importe||0),0)
+    const totalBase = pagosFiltrados.reduce((s,p)=>{ const f=facturas.find(x=>x.pago_id===p.id); return s+Number(f?.base_imponible||p.importe||0) },0)
+    const totalIva = pagosFiltrados.reduce((s,p)=>{ const f=facturas.find(x=>x.pago_id===p.id); return s+Number(f?.cuota_iva||0) },0)
+    filas.push([])
+    filas.push(['TOTAL', '', '', '', totalImporte.toFixed(2), totalBase.toFixed(2), totalIva.toFixed(2)])
     const csv = filas.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `cobros-${diaLocal(new Date())}.csv`; a.click()
+    const sufijo = filtroPeriodo !== 'todo' ? `-${filtroPeriodo}` : ''
+    a.href = url; a.download = `cobros${sufijo}-${diaLocal(new Date())}.csv`; a.click()
     URL.revokeObjectURL(url)
-    setToast('✓ CSV descargado')
+    setToast(`✓ CSV descargado (${pagosFiltrados.length} cobros, ${totalImporte.toFixed(0)}€)`)
   }
 
   useEffect(() => { cargar() }, [uid])
@@ -452,8 +481,19 @@ export default function Pagos({ session }) {
   const pagosFiltrados = useMemo(() => {
     let r = [...pagos]
     if (busqueda) { const b = busqueda.toLowerCase(); r = r.filter(p => p.clientes?.nombre?.toLowerCase().includes(b) || p.concepto?.toLowerCase().includes(b)) }
+    if (filtroPeriodo !== 'todo') {
+      const [añoStr, trim] = filtroPeriodo.split('-')
+      const añoN = parseInt(añoStr)
+      if (trim?.startsWith('T')) {
+        const t = parseInt(trim[1])
+        const mesIni = (t-1)*3+1, mesFin = t*3
+        r = r.filter(p => { if (!p.fecha_pago) return false; const d = new Date(p.fecha_pago+'T12:00'); return d.getFullYear()===añoN && d.getMonth()+1>=mesIni && d.getMonth()+1<=mesFin })
+      } else {
+        r = r.filter(p => { if (!p.fecha_pago) return false; return new Date(p.fecha_pago+'T12:00').getFullYear()===añoN })
+      }
+    }
     return r
-  }, [pagos, busqueda])
+  }, [pagos, busqueda, filtroPeriodo])
 
   const totalHistorico = pagos.reduce((s,p) => s+Number(p.importe||0), 0)
 
@@ -761,11 +801,41 @@ export default function Pagos({ session }) {
       )}
 
       {/* TAB HISTORIAL */}
-      {tab === 'historial' && (
+      {tab === 'historial' && (() => {
+        const añoActual = new Date().getFullYear()
+        const opcionesPeriodo = [
+          { v: 'todo', l: 'Todo el histórico' },
+          { v: `${añoActual}-T4`, l: `T4 ${añoActual} (oct-dic)` },
+          { v: `${añoActual}-T3`, l: `T3 ${añoActual} (jul-sep)` },
+          { v: `${añoActual}-T2`, l: `T2 ${añoActual} (abr-jun)` },
+          { v: `${añoActual}-T1`, l: `T1 ${añoActual} (ene-mar)` },
+          { v: `${añoActual-1}-T4`, l: `T4 ${añoActual-1}` },
+          { v: `${añoActual-1}-T3`, l: `T3 ${añoActual-1}` },
+          { v: `${añoActual-1}-T2`, l: `T2 ${añoActual-1}` },
+          { v: `${añoActual-1}-T1`, l: `T1 ${añoActual-1}` },
+          { v: String(añoActual), l: `Año ${añoActual}` },
+          { v: String(añoActual-1), l: `Año ${añoActual-1}` },
+        ]
+        const totalFiltrado = pagosFiltrados.reduce((s,p)=>s+Number(p.importe||0),0)
+        return (
         <>
-          <div className="bg-[#F5F5F0] rounded-xl p-3 mb-3 flex items-center justify-between">
-            <p className="text-sm text-[#6B6B6B]">Total histórico</p>
-            <p className="text-lg font-bold text-[#0A0A0A]">{totalHistorico.toFixed(0)}€</p>
+          {/* Selector periodo + resumen */}
+          <div className="bg-white rounded-xl border border-black/5 shadow-sm p-3 mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-semibold text-[#6B6B6B]">📅 Periodo</span>
+              <select value={filtroPeriodo} onChange={e=>setFiltroPeriodo(e.target.value)}
+                className="flex-1 border border-black/10 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:outline-none focus:border-acento bg-white">
+                {opcionesPeriodo.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+              </select>
+              <button onClick={exportarCSV}
+                className="flex items-center gap-1 text-xs font-semibold text-[#6B6B6B] border border-black/10 px-2.5 py-1.5 rounded-lg hover:bg-[#F7F6F3] transition-all active:scale-95 flex-shrink-0">
+                ⬇ CSV
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-[#9B9B9B]">{pagosFiltrados.length} cobros</p>
+              <p className="text-sm font-bold text-[#0A0A0A]">{totalFiltrado.toFixed(2)}€</p>
+            </div>
           </div>
           <div className="relative mb-3">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B6B6B] text-sm">🔍</span>
@@ -801,7 +871,8 @@ export default function Pagos({ session }) {
             ))}
           </div>
         </>
-      )}
+        )
+      })()}
 
       {/* TAB FACTURAS */}
       {tab === 'facturas' && (
