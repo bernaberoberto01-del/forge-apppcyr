@@ -64,6 +64,10 @@ export default function Rutinas({ session }) {
   const [modalPlantillas, setModalPlantillas] = useState(false)
   const [modalNombrePlantilla, setModalNombrePlantilla] = useState(null) // { rutina } cuando está abierto
   const [nombrePlantillaInput, setNombrePlantillaInput] = useState('')
+  const [modalAplicarPlantilla, setModalAplicarPlantilla] = useState(null) // { plantilla, clienteId, nombre, semanas, fechaInicio }
+  const [aplicarClienteId, setAplicarClienteId] = useState('')
+  const [aplicarSemanas, setAplicarSemanas] = useState(4)
+  const [aplicarFechaInicio, setAplicarFechaInicio] = useState('')
   const [busqueda, setBusqueda] = useState('')
   const [searchParams] = useSearchParams()
   const [filtroEstado, setFiltroEstado] = useState(() => searchParams.get('filtro') || 'activas')
@@ -197,11 +201,35 @@ export default function Rutinas({ session }) {
     setToast('✓ Guardada como plantilla'); await cargar()
   }
 
-  async function aplicarPlantilla(plantilla, clienteId) {
-    if (!clienteId) return
+  function abrirModalAplicar(plantilla, clienteId) {
+    // Detectar cuántas semanas tiene la plantilla
+    const semanasEnPlantilla = plantilla.contenido?.semanas?.length || 1
+    setAplicarClienteId(clienteId || '')
+    setAplicarSemanas(semanasEnPlantilla > 1 ? semanasEnPlantilla : 4)
+    setAplicarFechaInicio(new Date().toISOString().split('T')[0])
+    setModalAplicarPlantilla(plantilla)
+  }
+
+  async function confirmarAplicarPlantilla() {
+    const plantilla = modalAplicarPlantilla
+    if (!aplicarClienteId) return
     await supabase.from('plantillas_rutina').update({ usos: (plantilla.usos||0)+1 }).eq('id', plantilla.id)
-    await supabase.from('rutinas').insert({ cliente_id: clienteId, entrenador_id: uid, nombre: plantilla.nombre, objetivo: plantilla.objetivo, semanas: 4, dias_semana: plantilla.dias_semana, borrador: plantilla.contenido, estado: 'borrador' })
-    setModalPlantillas(false); setToast('Plantilla aplicada — revisa y publica'); await cargar()
+    const rutinaData = {
+      cliente_id: aplicarClienteId,
+      entrenador_id: uid,
+      nombre: plantilla.nombre,
+      objetivo: plantilla.objetivo,
+      semanas: aplicarSemanas,
+      dias_semana: plantilla.dias_semana,
+      borrador: plantilla.contenido,
+      estado: 'borrador',
+    }
+    if (aplicarFechaInicio) rutinaData.fecha_inicio = aplicarFechaInicio
+    await supabase.from('rutinas').insert(rutinaData)
+    setModalAplicarPlantilla(null)
+    setModalPlantillas(false)
+    setToast('✓ Plantilla aplicada — revisa y publica')
+    await cargar()
   }
 
   async function eliminarPlantilla(id) {
@@ -1047,24 +1075,71 @@ export default function Rutinas({ session }) {
       {/* Modal plantillas */}
       {modalPlantillas && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={() => setModalPlantillas(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}><div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white">
-              <h2 className="font-bold text-[#0A0A0A]">Plantillas de rutina</h2>
-              <button onClick={() => setModalPlantillas(false)} className="text-[#6B6B6B] text-xl">×</button>
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[88vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-black/5 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
+              <div>
+                <h2 className="font-bold text-[#0A0A0A]">📋 Biblioteca de plantillas</h2>
+                <p className="text-xs text-[#9B9B9B] mt-0.5">{plantillas.length} plantilla{plantillas.length !== 1 ? 's' : ''} guardada{plantillas.length !== 1 ? 's' : ''}</p>
+              </div>
+              <button onClick={() => setModalPlantillas(false)} className="w-7 h-7 rounded-full bg-[#F5F5F0] flex items-center justify-center text-[#6B6B6B] hover:bg-[#EBEBEB] transition-colors">×</button>
             </div>
-            <div className="p-4 space-y-3">
-              {plantillas.map(p => (
-                <div key={p.id} className="border border-black/8 rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div><p className="font-semibold text-sm text-[#0A0A0A]">{p.nombre}</p><p className="text-xs text-[#6B6B6B] mt-0.5">{p.dias_semana} días/sem · {p.usos} usos</p></div>
-                    <button onClick={() => eliminarPlantilla(p.id)} className="text-[#6B6B6B] hover:text-red-500 text-lg">×</button>
-                  </div>
-                  <select onChange={e => e.target.value && aplicarPlantilla(p, e.target.value)}
-                    className="w-full border border-black/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-acento bg-white">
-                    <option value="">Aplicar a cliente →</option>
-                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                  </select>
+            <div className="overflow-y-auto p-4 space-y-3">
+              {plantillas.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-3xl mb-2">📋</p>
+                  <p className="font-semibold text-[#0A0A0A] text-sm">Sin plantillas todavía</p>
+                  <p className="text-xs text-[#9B9B9B] mt-1">Desde cualquier rutina, pulsa 📋 para guardarla</p>
                 </div>
-              ))}
+              ) : plantillas.map(p => {
+                const totalSemanas = p.contenido?.semanas?.length || 1
+                const totalEjercicios = (() => {
+                  if (p.contenido?.semanas?.length > 0) {
+                    return p.contenido.semanas[0]?.dias?.reduce((acc, d) => acc + (d.ejercicios?.length || 0), 0) || 0
+                  }
+                  return p.contenido?.dias?.reduce((acc, d) => acc + (d.ejercicios?.length || 0), 0) || 0
+                })()
+                return (
+                  <div key={p.id} className="bg-[#F7F6F3] rounded-2xl overflow-hidden border border-black/5">
+                    {/* Header plantilla */}
+                    <div className="px-4 pt-4 pb-3">
+                      <div className="flex items-start justify-between gap-3 mb-1">
+                        <p className="font-bold text-sm text-[#0A0A0A] leading-tight">{p.nombre}</p>
+                        <button onClick={() => eliminarPlantilla(p.id)}
+                          className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[#C0C0C0] hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0 text-xs">×</button>
+                      </div>
+                      {p.descripcion && <p className="text-xs text-[#9B9B9B] mb-2 leading-relaxed">{p.descripcion}</p>}
+                      <div className="flex gap-2 flex-wrap">
+                        <span className="text-[10px] bg-white border border-black/8 text-[#6B6B6B] px-2 py-0.5 rounded-full font-medium">
+                          🗓 {p.dias_semana} días/sem
+                        </span>
+                        {totalSemanas > 1 && (
+                          <span className="text-[10px] bg-white border border-black/8 text-[#6B6B6B] px-2 py-0.5 rounded-full font-medium">
+                            📅 {totalSemanas} semanas
+                          </span>
+                        )}
+                        {totalEjercicios > 0 && (
+                          <span className="text-[10px] bg-white border border-black/8 text-[#6B6B6B] px-2 py-0.5 rounded-full font-medium">
+                            💪 {totalEjercicios} ejerc/día
+                          </span>
+                        )}
+                        {p.usos > 0 && (
+                          <span className="text-[10px] bg-acento/10 text-acento px-2 py-0.5 rounded-full font-medium">
+                            {p.usos} uso{p.usos !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {/* CTA aplicar */}
+                    <div className="px-4 pb-4">
+                      <button
+                        onClick={() => abrirModalAplicar(p, '')}
+                        className="w-full bg-acento text-white text-xs font-bold py-2.5 rounded-xl hover:bg-acento-hover active:scale-[0.98] transition-all">
+                        Crear rutina desde esta plantilla →
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -1087,6 +1162,68 @@ export default function Rutinas({ session }) {
 
       {quickView && <ClienteQuickView clienteId={quickView} onClose={() => setQuickView(null)} />}
       {ConfirmUI}
+
+      {/* Modal: configurar al aplicar plantilla */}
+      {modalAplicarPlantilla && (
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-center justify-center p-4" onClick={() => setModalAplicarPlantilla(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="bg-[#F7F6F3] px-5 pt-5 pb-4 border-b border-black/5">
+              <p className="text-xs text-[#9B9B9B] font-medium mb-0.5">Crear rutina desde plantilla</p>
+              <h3 className="font-bold text-[#0A0A0A] text-base leading-tight">{modalAplicarPlantilla.nombre}</h3>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <span className="text-[10px] bg-white border border-black/8 text-[#6B6B6B] px-2 py-0.5 rounded-full font-medium">🗓 {modalAplicarPlantilla.dias_semana} días/sem</span>
+                {(modalAplicarPlantilla.contenido?.semanas?.length > 1) && (
+                  <span className="text-[10px] bg-white border border-black/8 text-[#6B6B6B] px-2 py-0.5 rounded-full font-medium">📅 {modalAplicarPlantilla.contenido.semanas.length} sem en plantilla</span>
+                )}
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Cliente */}
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Cliente *</label>
+                <select value={aplicarClienteId} onChange={e => setAplicarClienteId(e.target.value)}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
+                  <option value="">Selecciona cliente</option>
+                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                </select>
+              </div>
+
+              {/* Semanas */}
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Duración del bloque</label>
+                <select value={aplicarSemanas} onChange={e => setAplicarSemanas(Number(e.target.value))}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento bg-white">
+                  {[2,3,4,5,6,8,10,12,16].map(n => <option key={n} value={n}>{n} semanas</option>)}
+                </select>
+              </div>
+
+              {/* Fecha inicio */}
+              <div>
+                <label className="text-xs font-semibold text-[#6B6B6B] mb-1.5 block">Fecha de inicio</label>
+                <input type="date" value={aplicarFechaInicio} onChange={e => setAplicarFechaInicio(e.target.value)}
+                  className="w-full border border-black/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-acento" />
+                {aplicarFechaInicio && (() => {
+                  const dias = Math.floor((new Date(aplicarFechaInicio) - new Date()) / (1000*60*60*24))
+                  if (dias > 0) return <p className="text-xs text-[#9B9B9B] mt-1">⏳ Empieza en {dias} días</p>
+                  if (dias === 0) return <p className="text-xs text-emerald-600 mt-1">✓ Empieza hoy</p>
+                  return <p className="text-xs text-amber-600 mt-1">⚠ Fecha en el pasado</p>
+                })()}
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setModalAplicarPlantilla(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-black/10 text-sm font-medium text-[#6B6B6B] hover:bg-[#F5F5F0] transition-all active:scale-95">
+                  Cancelar
+                </button>
+                <button onClick={confirmarAplicarPlantilla} disabled={!aplicarClienteId}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all active:scale-95 bg-acento hover:bg-acento-hover disabled:opacity-40">
+                  Crear rutina ✓
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal: nombre para plantilla (sustituye window.prompt) */}
       {modalNombrePlantilla && (
